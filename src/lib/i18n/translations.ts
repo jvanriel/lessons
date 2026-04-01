@@ -28,6 +28,19 @@ const translations: Record<Locale, Record<string, string>> = {
     "auth.passwordMismatch": "Passwords do not match.",
     "auth.emailExists": "An account with this email already exists.",
 
+    // Registration
+    "register.chooseType": "How would you like to use Golf Lessons?",
+    "register.student": "Student",
+    "register.studentDesc": "Find a pro, book lessons, receive personalized coaching and feedback.",
+    "register.pro": "Golf Pro",
+    "register.proDesc": "Manage your schedule, coach students, and grow your business.",
+    "register.free": "Free",
+    "register.subscription": "Subscription",
+    "register.back": "Back",
+    "register.proTitle": "Register as Pro",
+    "register.proSubtitle": "Create your account. An admin will activate your pro profile.",
+    "register.proNote": "After registration, our team will review your application and set up your pro profile. You'll be notified once your account is activated.",
+
     // Menu
     "menu.open": "Open menu",
     "menu.close": "Close menu",
@@ -205,6 +218,17 @@ const translations: Record<Locale, Record<string, string>> = {
     "auth.passwordMinLength": "Wachtwoord moet minimaal 8 tekens zijn.",
     "auth.passwordMismatch": "Wachtwoorden komen niet overeen.",
     "auth.emailExists": "Er bestaat al een account met dit e-mailadres.",
+    "register.chooseType": "Hoe wil je Golf Lessons gebruiken?",
+    "register.student": "Leerling",
+    "register.studentDesc": "Vind een pro, boek lessen, ontvang persoonlijke coaching en feedback.",
+    "register.pro": "Golf Pro",
+    "register.proDesc": "Beheer je agenda, coach leerlingen en laat je bedrijf groeien.",
+    "register.free": "Gratis",
+    "register.subscription": "Abonnement",
+    "register.back": "Terug",
+    "register.proTitle": "Registreren als Pro",
+    "register.proSubtitle": "Maak je account aan. Een admin activeert je pro-profiel.",
+    "register.proNote": "Na registratie beoordeelt ons team je aanmelding en stelt je pro-profiel in. Je ontvangt een melding zodra je account is geactiveerd.",
 
     // Menu
     "menu.open": "Menu openen",
@@ -372,6 +396,17 @@ const translations: Record<Locale, Record<string, string>> = {
     "auth.passwordMinLength": "Le mot de passe doit contenir au moins 8 caractères.",
     "auth.passwordMismatch": "Les mots de passe ne correspondent pas.",
     "auth.emailExists": "Un compte avec cette adresse e-mail existe déjà.",
+    "register.chooseType": "Comment souhaitez-vous utiliser Golf Lessons ?",
+    "register.student": "Élève",
+    "register.studentDesc": "Trouvez un pro, réservez des cours, recevez du coaching et des retours personnalisés.",
+    "register.pro": "Pro de Golf",
+    "register.proDesc": "Gérez votre agenda, coachez vos élèves et développez votre activité.",
+    "register.free": "Gratuit",
+    "register.subscription": "Abonnement",
+    "register.back": "Retour",
+    "register.proTitle": "S'inscrire comme Pro",
+    "register.proSubtitle": "Créez votre compte. Un administrateur activera votre profil pro.",
+    "register.proNote": "Après l'inscription, notre équipe examinera votre demande et configurera votre profil pro. Vous serez notifié une fois votre compte activé.",
 
     // Menu
     "menu.open": "Ouvrir le menu",

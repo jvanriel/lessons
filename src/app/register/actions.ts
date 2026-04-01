@@ -2,7 +2,7 @@
 
 import { redirect } from "next/navigation";
 import { db } from "@/lib/db";
-import { users } from "@/lib/db/schema";
+import { users, userEmails } from "@/lib/db/schema";
 import { eq } from "drizzle-orm";
 import { hashPassword, setSessionCookie } from "@/lib/auth";
 import { createNotification } from "@/lib/notifications";
@@ -17,6 +17,7 @@ export async function register(
   const phone = (formData.get("phone") as string)?.trim() || "";
   const password = formData.get("password") as string;
   const confirm = formData.get("confirmPassword") as string;
+  const accountType = (formData.get("accountType") as string) || "student";
 
   if (!firstName || !lastName || !email || !password) {
     return { error: "All fields are required." };
@@ -38,6 +39,9 @@ export async function register(
 
   const hashed = await hashPassword(password);
 
+  // Pro registrations get member role initially — admin must approve pro role
+  const roles = accountType === "pro" ? "member" : "member";
+
   let userId: number;
 
   if (existing && (!existing.roles || existing.roles.trim() === "")) {
@@ -48,7 +52,7 @@ export async function register(
         lastName,
         phone,
         password: hashed,
-        roles: "member",
+        roles,
       })
       .where(eq(users.id, existing.id));
     userId = existing.id;
@@ -63,19 +67,28 @@ export async function register(
         email,
         phone,
         password: hashed,
-        roles: "member",
+        roles,
       })
       .returning({ id: users.id });
     userId = inserted[0].id;
+
+    // Add primary email
+    await db
+      .insert(userEmails)
+      .values({ userId, email, label: "primary", isPrimary: true })
+      .onConflictDoNothing();
   }
+
+  const typeLabel = accountType === "pro" ? "pro (pending approval)" : "student";
 
   createNotification({
     type: "user_registered",
-    title: `New registration: ${firstName} ${lastName}`,
-    message: `${email} signed up as a member`,
+    priority: accountType === "pro" ? "high" : "normal",
+    title: `New ${typeLabel} registration: ${firstName} ${lastName}`,
+    message: `${email} signed up as ${typeLabel}`,
     actionUrl: "/admin/users",
     actionLabel: "View users",
-    metadata: { userId, email },
+    metadata: { userId, email, accountType },
   }).catch(() => {});
 
   await setSessionCookie({
