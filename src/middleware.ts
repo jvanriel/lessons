@@ -5,7 +5,7 @@ const ROLE_ROUTES: { prefix: string; roles: UserRole[] }[] = [
   { prefix: "/member", roles: ["member"] },
   { prefix: "/admin", roles: ["admin"] },
   { prefix: "/dev", roles: ["dev"] },
-  { prefix: "/pro", roles: ["pro", "admin"] },
+  { prefix: "/pro/", roles: ["pro", "admin"] },
 ];
 
 const SITE_PASSWORD = "prolessons";
