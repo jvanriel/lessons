@@ -21,8 +21,7 @@ export default function SiteAccessPage() {
     });
 
     if (res.ok) {
-      router.push("/");
-      router.refresh();
+      window.location.href = "/";
     } else {
       setError(true);
       setLoading(false);
