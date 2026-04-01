@@ -1,0 +1,517 @@
+"use client";
+
+import { useState, useEffect, useCallback, useRef, useMemo } from "react";
+import { usePathname, useRouter } from "next/navigation";
+import { useCms } from "@/components/cms/CmsProvider";
+import {
+  getCmsBlocks,
+  saveCmsBlocks,
+} from "@/app/(admin)/admin/cms/actions";
+import { LOCALES, LOCALE_SHORT, type Locale } from "@/lib/i18n";
+
+const CMS_PAGES: { slug: string; label: string; route: string }[] = [
+  { slug: "home", label: "Home", route: "/" },
+  { slug: "for-students", label: "For Students", route: "/for-students" },
+  { slug: "for-pros", label: "For Pros", route: "/for-pros" },
+  { slug: "contact", label: "Contact", route: "/contact" },
+];
+
+const ROUTE_TO_SLUG: Record<string, string> = {};
+const SLUG_TO_ROUTE: Record<string, string> = {};
+for (const p of CMS_PAGES) {
+  ROUTE_TO_SLUG[p.route] = p.slug;
+  SLUG_TO_ROUTE[p.slug] = p.route;
+}
+
+function CmsBlockField({
+  blockKey,
+  label,
+  multiline,
+}: {
+  blockKey: string;
+  label: string;
+  multiline?: boolean;
+}) {
+  const { getContent, updateDraft, blocks } = useCms();
+  const value = getContent(blockKey) ?? "";
+  const saved = blocks[blockKey] ?? "";
+  const isDirty = value !== saved;
+
+  return (
+    <div>
+      <label className="mb-1 flex items-center gap-2 text-[10px] font-semibold uppercase tracking-[0.15em] text-green-100/40">
+        {label}
+        {isDirty && (
+          <span className="h-1.5 w-1.5 rounded-full bg-gold-400" />
+        )}
+      </label>
+      {multiline ? (
+        <textarea
+          value={value}
+          onChange={(e) => updateDraft(blockKey, e.target.value)}
+          rows={3}
+          className="block w-full resize-none rounded border border-green-700 bg-green-900 px-2.5 py-1.5 text-xs text-green-100 placeholder-green-100/20 focus:border-gold-500/50 focus:outline-none focus:ring-1 focus:ring-gold-500/50"
+        />
+      ) : (
+        <input
+          value={value}
+          onChange={(e) => updateDraft(blockKey, e.target.value)}
+          className="block w-full rounded border border-green-700 bg-green-900 px-2.5 py-1.5 text-xs text-green-100 placeholder-green-100/20 focus:border-gold-500/50 focus:outline-none focus:ring-1 focus:ring-gold-500/50"
+        />
+      )}
+    </div>
+  );
+}
+
+function HomeEditor() {
+  return (
+    <div className="space-y-6">
+      <div>
+        <p className="mb-3 text-[10px] font-semibold uppercase tracking-[0.2em] text-gold-500/60">
+          Hero
+        </p>
+        <div className="space-y-3">
+          <CmsBlockField blockKey="hero.title" label="Title" />
+          <CmsBlockField blockKey="hero.subtitle" label="Subtitle" multiline />
+          <CmsBlockField blockKey="hero.cta" label="CTA Button" />
+          <CmsBlockField blockKey="hero.contact" label="Contact Button" />
+        </div>
+      </div>
+
+      <div>
+        <p className="mb-3 text-[10px] font-semibold uppercase tracking-[0.2em] text-gold-500/60">
+          How It Works
+        </p>
+        <div className="space-y-3">
+          <CmsBlockField blockKey="howItWorks.heading" label="Section Heading" />
+          <CmsBlockField blockKey="howItWorks.step1.title" label="Step 1 Title" />
+          <CmsBlockField blockKey="howItWorks.step1.desc" label="Step 1 Description" multiline />
+          <CmsBlockField blockKey="howItWorks.step2.title" label="Step 2 Title" />
+          <CmsBlockField blockKey="howItWorks.step2.desc" label="Step 2 Description" multiline />
+          <CmsBlockField blockKey="howItWorks.step3.title" label="Step 3 Title" />
+          <CmsBlockField blockKey="howItWorks.step3.desc" label="Step 3 Description" multiline />
+        </div>
+      </div>
+
+      <div>
+        <p className="mb-3 text-[10px] font-semibold uppercase tracking-[0.2em] text-gold-500/60">
+          Pro CTA
+        </p>
+        <div className="space-y-3">
+          <CmsBlockField blockKey="proCta.title" label="Title" />
+          <CmsBlockField blockKey="proCta.desc" label="Description" multiline />
+          <CmsBlockField blockKey="proCta.cta" label="Button Text" />
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function ForStudentsEditor() {
+  return (
+    <div className="space-y-6">
+      <div>
+        <p className="mb-3 text-[10px] font-semibold uppercase tracking-[0.2em] text-gold-500/60">
+          Hero
+        </p>
+        <div className="space-y-3">
+          <CmsBlockField blockKey="hero.badge" label="Badge" />
+          <CmsBlockField blockKey="hero.title" label="Title" />
+          <CmsBlockField blockKey="hero.subtitle" label="Subtitle" multiline />
+          <CmsBlockField blockKey="hero.cta" label="CTA Button" />
+        </div>
+      </div>
+      <div>
+        <p className="mb-3 text-[10px] font-semibold uppercase tracking-[0.2em] text-gold-500/60">
+          Features
+        </p>
+        <div className="space-y-3">
+          <CmsBlockField blockKey="features.heading" label="Heading" />
+          <CmsBlockField blockKey="features.subheading" label="Subheading" multiline />
+          {[1, 2, 3, 4, 5, 6].map((n) => (
+            <div key={n} className="space-y-2 rounded border border-green-800/30 p-2">
+              <CmsBlockField blockKey={`feature${n}.title`} label={`Feature ${n} Title`} />
+              <CmsBlockField blockKey={`feature${n}.desc`} label={`Feature ${n} Desc`} multiline />
+            </div>
+          ))}
+        </div>
+      </div>
+      <div>
+        <p className="mb-3 text-[10px] font-semibold uppercase tracking-[0.2em] text-gold-500/60">
+          CTA
+        </p>
+        <div className="space-y-3">
+          <CmsBlockField blockKey="cta.title" label="Title" />
+          <CmsBlockField blockKey="cta.desc" label="Description" multiline />
+          <CmsBlockField blockKey="cta.button" label="Button Text" />
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function ForProsEditor() {
+  return (
+    <div className="space-y-6">
+      <div>
+        <p className="mb-3 text-[10px] font-semibold uppercase tracking-[0.2em] text-gold-500/60">
+          Hero
+        </p>
+        <div className="space-y-3">
+          <CmsBlockField blockKey="hero.badge" label="Badge" />
+          <CmsBlockField blockKey="hero.title" label="Title" />
+          <CmsBlockField blockKey="hero.subtitle" label="Subtitle" multiline />
+          <CmsBlockField blockKey="hero.cta" label="CTA Button" />
+        </div>
+      </div>
+      <div>
+        <p className="mb-3 text-[10px] font-semibold uppercase tracking-[0.2em] text-gold-500/60">
+          Features
+        </p>
+        <div className="space-y-3">
+          <CmsBlockField blockKey="features.heading" label="Heading" />
+          <CmsBlockField blockKey="features.subheading" label="Subheading" multiline />
+          {[1, 2, 3, 4, 5, 6].map((n) => (
+            <div key={n} className="space-y-2 rounded border border-green-800/30 p-2">
+              <CmsBlockField blockKey={`feature${n}.title`} label={`Feature ${n} Title`} />
+              <CmsBlockField blockKey={`feature${n}.desc`} label={`Feature ${n} Desc`} multiline />
+            </div>
+          ))}
+        </div>
+      </div>
+      <div>
+        <p className="mb-3 text-[10px] font-semibold uppercase tracking-[0.2em] text-gold-500/60">
+          Beyond Bookings
+        </p>
+        <div className="space-y-3">
+          <CmsBlockField blockKey="beyond.heading" label="Heading" />
+          <CmsBlockField blockKey="beyond.subheading" label="Subheading" multiline />
+          {[1, 2, 3, 4].map((n) => (
+            <div key={n} className="space-y-2 rounded border border-green-800/30 p-2">
+              <CmsBlockField blockKey={`beyond${n}.title`} label={`Card ${n} Title`} />
+              <CmsBlockField blockKey={`beyond${n}.desc`} label={`Card ${n} Desc`} multiline />
+            </div>
+          ))}
+        </div>
+      </div>
+      <div>
+        <p className="mb-3 text-[10px] font-semibold uppercase tracking-[0.2em] text-gold-500/60">
+          CTA
+        </p>
+        <div className="space-y-3">
+          <CmsBlockField blockKey="cta.title" label="Title" />
+          <CmsBlockField blockKey="cta.desc" label="Description" multiline />
+          <CmsBlockField blockKey="cta.button" label="Button Text" />
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function ContactEditor() {
+  return (
+    <div className="space-y-6">
+      <div>
+        <p className="mb-3 text-[10px] font-semibold uppercase tracking-[0.2em] text-gold-500/60">
+          Contact Page
+        </p>
+        <div className="space-y-3">
+          <CmsBlockField blockKey="contact.title" label="Title" />
+          <CmsBlockField blockKey="contact.subtitle" label="Subtitle" multiline />
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function ReviewDialog({
+  changes,
+  blocks,
+  onClose,
+  onPublish,
+  saving,
+}: {
+  changes: { blockKey: string; content: string }[];
+  blocks: Record<string, string>;
+  onClose: () => void;
+  onPublish: () => void;
+  saving: boolean;
+}) {
+  const grouped = useMemo(() => {
+    const groups: Record<
+      string,
+      { key: string; label: string; oldVal: string; newVal: string }[]
+    > = {};
+    for (const c of changes) {
+      const parts = c.blockKey.split(".");
+      const cat = parts[0] || "Other";
+      const label = parts.slice(1).join(".");
+      if (!groups[cat]) groups[cat] = [];
+      groups[cat].push({
+        key: c.blockKey,
+        label,
+        oldVal: blocks[c.blockKey] ?? "",
+        newVal: c.content,
+      });
+    }
+    return groups;
+  }, [changes, blocks]);
+
+  return (
+    <div className="absolute inset-0 z-50 flex flex-col bg-green-950/95 backdrop-blur-sm">
+      <div className="flex items-center justify-between border-b border-green-700/50 px-4 py-3">
+        <h3 className="text-xs font-semibold uppercase tracking-[0.2em] text-gold-500/80">
+          Changes ({changes.length})
+        </h3>
+        <button
+          type="button"
+          onClick={onClose}
+          className="rounded p-1 text-green-100/40 hover:bg-green-800 hover:text-green-100/70"
+        >
+          <svg className="h-4 w-4" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth={2}>
+            <path d="M4 4l8 8M12 4l-8 8" />
+          </svg>
+        </button>
+      </div>
+      <div className="flex-1 overflow-y-auto px-4 py-3 space-y-4">
+        {Object.entries(grouped).map(([category, items]) => (
+          <div key={category}>
+            <p className="mb-2 text-[10px] font-semibold uppercase tracking-[0.2em] text-gold-500/60">
+              {category}
+            </p>
+            <div className="space-y-2">
+              {items.map((item) => (
+                <div key={item.key} className="rounded border border-green-700/30 bg-green-900/40 px-3 py-2">
+                  <p className="mb-1 text-[10px] text-green-100/40">{item.label}</p>
+                  <div className="space-y-1">
+                    {item.oldVal && (
+                      <p className="truncate text-xs text-red-400/70 line-through" title={item.oldVal}>
+                        {item.oldVal.length > 80 ? item.oldVal.slice(0, 80) + "..." : item.oldVal}
+                      </p>
+                    )}
+                    <p className="truncate text-xs text-emerald-400/70" title={item.newVal}>
+                      {item.newVal
+                        ? item.newVal.length > 80 ? item.newVal.slice(0, 80) + "..." : item.newVal
+                        : "(empty)"}
+                    </p>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        ))}
+      </div>
+      <div className="flex gap-2 border-t border-green-700/50 px-4 py-3">
+        <button
+          onClick={onPublish}
+          disabled={saving}
+          className="flex-1 rounded bg-gold-600 px-4 py-2 text-xs font-medium uppercase tracking-wider text-green-950 transition-colors hover:bg-gold-500 disabled:cursor-not-allowed disabled:opacity-40"
+        >
+          {saving ? "Publishing..." : "Publish"}
+        </button>
+        <button
+          onClick={onClose}
+          className="rounded border border-green-700 px-4 py-2 text-xs font-medium uppercase tracking-wider text-green-100/60 transition-colors hover:bg-green-800 hover:text-green-100"
+        >
+          Back
+        </button>
+      </div>
+    </div>
+  );
+}
+
+export default function ContentPanel() {
+  const cms = useCms();
+  const router = useRouter();
+  const pathname = usePathname();
+
+  const initialSlug = ROUTE_TO_SLUG[pathname] ?? CMS_PAGES[0].slug;
+  const [selectedPage, setSelectedPage] = useState<string>(initialSlug);
+  const [selectedLocale, setSelectedLocale] = useState<Locale>("en");
+  const [loading, setLoading] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [saveMessage, setSaveMessage] = useState<string | null>(null);
+  const [reviewing, setReviewing] = useState(false);
+  const navigatingFromDropdown = useRef(false);
+
+  useEffect(() => {
+    if (navigatingFromDropdown.current) {
+      navigatingFromDropdown.current = false;
+      return;
+    }
+    const slug = ROUTE_TO_SLUG[pathname];
+    if (slug && slug !== selectedPage) {
+      setSelectedPage(slug);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [pathname]);
+
+  const handlePageChange = useCallback(
+    (slug: string) => {
+      setSelectedPage(slug);
+      const route = SLUG_TO_ROUTE[slug];
+      if (route && pathname !== route) {
+        navigatingFromDropdown.current = true;
+        router.push(route);
+      }
+    },
+    [pathname, router]
+  );
+
+  useEffect(() => {
+    let cancelled = false;
+    setLoading(true);
+    setSaveMessage(null);
+
+    getCmsBlocks(selectedPage, selectedLocale).then((rows) => {
+      if (cancelled) return;
+      const blockMap: Record<string, string> = {};
+      for (const row of rows) {
+        blockMap[row.blockKey] = row.content;
+      }
+      cms.initPage(selectedPage, blockMap);
+      cms.setEditing(true);
+      setLoading(false);
+    });
+
+    return () => {
+      cancelled = true;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedPage, selectedLocale]);
+
+  useEffect(() => {
+    return () => {
+      cms.setEditing(false);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  const handleSave = useCallback(async () => {
+    const changes = cms.getChangedBlocks();
+    if (changes.length === 0) return;
+
+    setSaving(true);
+    setSaveMessage(null);
+
+    const result = await saveCmsBlocks(selectedPage, changes, selectedLocale);
+    if (result.error) {
+      setSaveMessage(result.error);
+    } else {
+      cms.commitDrafts();
+      setReviewing(false);
+      setSaveMessage("Published");
+      setTimeout(() => setSaveMessage(null), 2000);
+    }
+    setSaving(false);
+  }, [cms, selectedPage, selectedLocale]);
+
+  const handleRevert = useCallback(() => {
+    cms.revert();
+    setSaveMessage(null);
+  }, [cms]);
+
+  return (
+    <div className="relative flex h-full flex-col">
+      {reviewing && (
+        <ReviewDialog
+          changes={cms.getChangedBlocks()}
+          blocks={cms.blocks}
+          onClose={() => setReviewing(false)}
+          onPublish={handleSave}
+          saving={saving}
+        />
+      )}
+
+      {/* Toolbar */}
+      <div className="border-b border-green-700/50">
+        <div className="flex items-center justify-between gap-2 px-4 py-1.5">
+          <select
+            value={selectedPage}
+            onChange={(e) => handlePageChange(e.target.value)}
+            className="rounded border border-green-700 bg-green-900 px-2 py-1 text-xs text-green-100 focus:border-gold-500 focus:outline-none"
+          >
+            {CMS_PAGES.map((p) => (
+              <option key={p.slug} value={p.slug}>
+                {p.label}
+              </option>
+            ))}
+          </select>
+        </div>
+        {/* Locale tabs */}
+        <div className="flex border-t border-green-700/30 px-4">
+          {LOCALES.map((loc) => (
+            <button
+              key={loc}
+              type="button"
+              onClick={() => setSelectedLocale(loc)}
+              className={`px-3 py-1.5 text-[10px] font-semibold uppercase tracking-[0.15em] transition-colors ${
+                selectedLocale === loc
+                  ? "border-b-2 border-gold-500 text-gold-200"
+                  : "text-green-100/40 hover:text-green-100/60"
+              }`}
+            >
+              {LOCALE_SHORT[loc]}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {/* Editor */}
+      <div className="flex-1 overflow-y-auto px-4 py-3 space-y-4">
+        {loading ? (
+          <div className="flex items-center justify-center py-12">
+            <div className="h-5 w-5 animate-spin rounded-full border-2 border-green-100/20 border-t-gold-400" />
+          </div>
+        ) : (
+          <>
+            {selectedPage === "home" && <HomeEditor />}
+            {selectedPage === "for-students" && <ForStudentsEditor />}
+            {selectedPage === "for-pros" && <ForProsEditor />}
+            {selectedPage === "contact" && <ContactEditor />}
+          </>
+        )}
+      </div>
+
+      {/* Action bar */}
+      <div className="border-t border-green-700/50 px-4 py-3">
+        {saveMessage && (
+          <p
+            className={`mb-2 text-xs ${
+              saveMessage === "Published" ? "text-emerald-400" : "text-red-400"
+            }`}
+          >
+            {saveMessage}
+          </p>
+        )}
+        <div className="flex gap-2">
+          <button
+            onClick={() => setReviewing(true)}
+            disabled={!cms.isDirty || saving}
+            className="flex-1 rounded bg-gold-600 px-4 py-2 text-xs font-medium uppercase tracking-wider text-green-950 transition-colors hover:bg-gold-500 disabled:cursor-not-allowed disabled:opacity-40"
+          >
+            Publish
+          </button>
+          <button
+            onClick={() => setReviewing(true)}
+            disabled={!cms.isDirty}
+            className="rounded border border-green-700 px-4 py-2 text-xs font-medium uppercase tracking-wider text-green-100/60 transition-colors hover:bg-green-800 hover:text-green-100 disabled:cursor-not-allowed disabled:opacity-40"
+            title="Review changes"
+          >
+            <svg className="h-3.5 w-3.5" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth={1.5}>
+              <path d="M1 8s3-5 7-5 7 5 7 5-3 5-7 5-7-5-7-5z" />
+              <circle cx="8" cy="8" r="2" />
+            </svg>
+          </button>
+          <button
+            onClick={handleRevert}
+            disabled={!cms.isDirty}
+            className="rounded border border-green-700 px-4 py-2 text-xs font-medium uppercase tracking-wider text-green-100/60 transition-colors hover:bg-green-800 hover:text-green-100 disabled:cursor-not-allowed disabled:opacity-40"
+          >
+            Revert
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
