@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useState, useRef, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import LanguageSwitcher from "./LanguageSwitcher";
+import NotificationBell from "./notifications/NotificationBell";
 import type { Locale } from "@/lib/i18n";
 
 interface NavLink {
@@ -47,6 +48,8 @@ interface HeaderNavProps {
   impersonatorName: string | null;
   canImpersonate: boolean;
   impersonableUsers: ImpersonableUser[];
+  showNotifications: boolean;
+  sessionToken?: string;
   labels: Labels;
   locale: Locale;
 }
@@ -62,6 +65,8 @@ export default function HeaderNav({
   impersonatorName,
   canImpersonate,
   impersonableUsers,
+  showNotifications,
+  sessionToken,
   labels,
   locale,
 }: HeaderNavProps) {
@@ -343,6 +348,12 @@ export default function HeaderNav({
         <li>
           <LanguageSwitcher locale={locale} />
         </li>
+
+        {showNotifications && (
+          <li>
+            <NotificationBell sessionToken={sessionToken} />
+          </li>
+        )}
 
         <li>
           {loggedIn ? (

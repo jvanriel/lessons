@@ -6,6 +6,9 @@ import {
   text,
   timestamp,
   boolean,
+  jsonb,
+  date,
+  numeric,
 } from "drizzle-orm/pg-core";
 
 export const users = pgTable("users", {
@@ -34,4 +37,210 @@ export const cmsBlocks = pgTable("cms_blocks", {
   translatedAt: timestamp("translated_at"),
   updatedBy: integer("updated_by").references(() => users.id),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+export const notifications = pgTable("notifications", {
+  id: serial("id").primaryKey(),
+  type: varchar("type", { length: 50 }).notNull(),
+  priority: varchar("priority", { length: 20 }).notNull().default("normal"),
+  targetUserId: integer("target_user_id")
+    .references(() => users.id, { onDelete: "cascade" })
+    .notNull(),
+  title: varchar("title", { length: 255 }).notNull(),
+  message: text("message"),
+  actionUrl: varchar("action_url", { length: 500 }),
+  actionLabel: varchar("action_label", { length: 100 }),
+  metadata: jsonb("metadata").$type<Record<string, unknown>>(),
+  read: boolean("read").default(false).notNull(),
+  readAt: timestamp("read_at"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+// ─── Pro Profiles & Locations ───────────────────────────────
+
+export const proProfiles = pgTable("pro_profiles", {
+  id: serial("id").primaryKey(),
+  userId: integer("user_id")
+    .references(() => users.id, { onDelete: "cascade" })
+    .notNull()
+    .unique(),
+  slug: varchar("slug", { length: 100 }).notNull().unique(),
+  displayName: varchar("display_name", { length: 255 }).notNull(),
+  bio: text("bio"),
+  specialties: varchar("specialties", { length: 500 }),
+  photoUrl: varchar("photo_url", { length: 500 }),
+  lessonDurations: jsonb("lesson_durations")
+    .$type<number[]>()
+    .notNull()
+    .default([60]),
+  maxGroupSize: integer("max_group_size").notNull().default(4),
+  pricePerHour: numeric("price_per_hour"),
+  bookingEnabled: boolean("booking_enabled").notNull().default(true),
+  bookingNotice: integer("booking_notice").notNull().default(24),
+  bookingHorizon: integer("booking_horizon").notNull().default(60),
+  cancellationHours: integer("cancellation_hours").notNull().default(24),
+  googleCalendarEmail: varchar("google_calendar_email", { length: 255 }),
+  published: boolean("published").notNull().default(false),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+export const locations = pgTable("locations", {
+  id: serial("id").primaryKey(),
+  name: varchar("name", { length: 255 }).notNull(),
+  address: varchar("address", { length: 500 }),
+  city: varchar("city", { length: 255 }),
+  country: varchar("country", { length: 100 }),
+  lat: numeric("lat"),
+  lng: numeric("lng"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+export const proLocations = pgTable("pro_locations", {
+  id: serial("id").primaryKey(),
+  proProfileId: integer("pro_profile_id")
+    .references(() => proProfiles.id, { onDelete: "cascade" })
+    .notNull(),
+  locationId: integer("location_id")
+    .references(() => locations.id, { onDelete: "cascade" })
+    .notNull(),
+  priceIndication: varchar("price_indication", { length: 100 }),
+  lessonDuration: integer("lesson_duration"),
+  notes: text("notes"),
+  sortOrder: integer("sort_order").notNull().default(0),
+  active: boolean("active").notNull().default(true),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+// ─── Availability & Bookings ────────────────────────────────
+
+export const proAvailability = pgTable("pro_availability", {
+  id: serial("id").primaryKey(),
+  proProfileId: integer("pro_profile_id")
+    .references(() => proProfiles.id, { onDelete: "cascade" })
+    .notNull(),
+  proLocationId: integer("pro_location_id")
+    .references(() => proLocations.id, { onDelete: "cascade" })
+    .notNull(),
+  dayOfWeek: integer("day_of_week").notNull(),
+  startTime: varchar("start_time", { length: 5 }).notNull(),
+  endTime: varchar("end_time", { length: 5 }).notNull(),
+  validFrom: date("valid_from"),
+  validUntil: date("valid_until"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+export const proAvailabilityOverrides = pgTable(
+  "pro_availability_overrides",
+  {
+    id: serial("id").primaryKey(),
+    proProfileId: integer("pro_profile_id")
+      .references(() => proProfiles.id, { onDelete: "cascade" })
+      .notNull(),
+    proLocationId: integer("pro_location_id").references(
+      () => proLocations.id,
+      { onDelete: "cascade" }
+    ),
+    date: date("date").notNull(),
+    type: varchar("type", { length: 20 }).notNull(),
+    startTime: varchar("start_time", { length: 5 }),
+    endTime: varchar("end_time", { length: 5 }),
+    reason: varchar("reason", { length: 255 }),
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+  }
+);
+
+export const lessonBookings = pgTable("lesson_bookings", {
+  id: serial("id").primaryKey(),
+  proProfileId: integer("pro_profile_id")
+    .references(() => proProfiles.id)
+    .notNull(),
+  bookedById: integer("booked_by_id")
+    .references(() => users.id)
+    .notNull(),
+  proLocationId: integer("pro_location_id")
+    .references(() => proLocations.id)
+    .notNull(),
+  date: date("date").notNull(),
+  startTime: varchar("start_time", { length: 5 }).notNull(),
+  endTime: varchar("end_time", { length: 5 }).notNull(),
+  participantCount: integer("participant_count").notNull().default(1),
+  status: varchar("status", { length: 20 }).notNull().default("confirmed"),
+  notes: text("notes"),
+  manageToken: varchar("manage_token", { length: 64 }).notNull().unique(),
+  googleEventId: varchar("google_event_id", { length: 255 }),
+  cancelledAt: timestamp("cancelled_at"),
+  cancellationReason: text("cancellation_reason"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+export const lessonParticipants = pgTable("lesson_participants", {
+  id: serial("id").primaryKey(),
+  bookingId: integer("booking_id")
+    .references(() => lessonBookings.id, { onDelete: "cascade" })
+    .notNull(),
+  firstName: varchar("first_name", { length: 255 }).notNull(),
+  lastName: varchar("last_name", { length: 255 }).notNull(),
+  email: varchar("email", { length: 255 }),
+  phone: varchar("phone", { length: 50 }),
+});
+
+// ─── Pro Pages (Profiles & Flyers) ─────────────────────────
+
+export type ProPageSection = {
+  id: string;
+  type: "text" | "gallery" | "video" | "pricing" | "testimonial";
+  title?: string;
+  content?: string;
+  media?: string[];
+  mediaPosition?: "left" | "right";
+  visible: boolean;
+};
+
+export const proPages = pgTable("pro_pages", {
+  id: serial("id").primaryKey(),
+  proProfileId: integer("pro_profile_id")
+    .references(() => proProfiles.id, { onDelete: "cascade" })
+    .notNull(),
+  slug: varchar("slug", { length: 100 }).notNull(),
+  type: varchar("type", { length: 20 }).notNull().default("flyer"),
+  title: varchar("title", { length: 255 }).notNull(),
+  metaDescription: varchar("meta_description", { length: 300 }),
+  heroImage: varchar("hero_image", { length: 500 }),
+  intro: text("intro"),
+  sections: jsonb("sections").$type<ProPageSection[]>(),
+  ctaLabel: varchar("cta_label", { length: 100 }),
+  ctaUrl: varchar("cta_url", { length: 500 }),
+  ctaEmail: varchar("cta_email", { length: 255 }),
+  published: boolean("published").notNull().default(false),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+// ─── Pro Mailing ────────────────────────────────────────────
+
+export const proMailingContacts = pgTable("pro_mailing_contacts", {
+  id: serial("id").primaryKey(),
+  proProfileId: integer("pro_profile_id")
+    .references(() => proProfiles.id, { onDelete: "cascade" })
+    .notNull(),
+  email: varchar("email", { length: 255 }).notNull(),
+  firstName: varchar("first_name", { length: 255 }),
+  lastName: varchar("last_name", { length: 255 }),
+  source: varchar("source", { length: 20 }).notNull().default("manual"),
+  unsubscribed: boolean("unsubscribed").notNull().default(false),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+export const proMailings = pgTable("pro_mailings", {
+  id: serial("id").primaryKey(),
+  proProfileId: integer("pro_profile_id")
+    .references(() => proProfiles.id, { onDelete: "cascade" })
+    .notNull(),
+  subject: varchar("subject", { length: 255 }).notNull(),
+  bodyHtml: text("body_html").notNull(),
+  pageId: integer("page_id").references(() => proPages.id),
+  recipientCount: integer("recipient_count").notNull().default(0),
+  sentAt: timestamp("sent_at").defaultNow().notNull(),
 });

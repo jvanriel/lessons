@@ -2,6 +2,7 @@ import Link from "next/link";
 import HeaderNav from "./HeaderNav";
 import Logo from "./Logo";
 import { getSession, hasRole, getImpersonatorSession, parseRoles } from "@/lib/auth";
+import { cookies } from "next/headers";
 import { db } from "@/lib/db";
 import { users } from "@/lib/db/schema";
 import { eq, ne } from "drizzle-orm";
@@ -16,6 +17,7 @@ export default async function Header() {
     { href: "/", label: t("nav.home", locale) },
     { href: "/for-students", label: t("nav.forStudents", locale) },
     { href: "/for-pros", label: t("nav.forPros", locale) },
+    { href: "/pros", label: t("nav.browsePros", locale) },
     { href: "/contact", label: t("nav.contact", locale) },
   ];
 
@@ -29,6 +31,9 @@ export default async function Header() {
     session && hasRole(session, "pro")
       ? [
           { href: "/pro/dashboard", label: "Dashboard" },
+          { href: "/pro/profile", label: "Profile" },
+          { href: "/pro/pages", label: "Pages" },
+          { href: "/pro/mailings", label: "Mailings" },
           { href: "/pro/availability", label: "Availability" },
           { href: "/pro/bookings", label: "Bookings" },
         ]
@@ -52,6 +57,16 @@ export default async function Header() {
           { href: "/dev/logs", label: "Logs" },
         ]
       : [];
+
+  const showNotifications =
+    !!session &&
+    (hasRole(session, "admin") ||
+      hasRole(session, "pro") ||
+      hasRole(session, "dev"));
+  let sessionToken: string | undefined;
+  if (showNotifications) {
+    sessionToken = (await cookies()).get("user-session")?.value;
+  }
 
   let firstName: string | null = null;
   if (session) {
@@ -140,6 +155,8 @@ export default async function Header() {
           impersonatorName={impersonatorName}
           canImpersonate={canImpersonate}
           impersonableUsers={impersonableUsers}
+          showNotifications={showNotifications}
+          sessionToken={sessionToken}
           labels={{
             login: t("auth.login", locale),
             logout: t("auth.logout", locale),

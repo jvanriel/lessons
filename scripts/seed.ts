@@ -1,6 +1,7 @@
 import { neon } from "@neondatabase/serverless";
 import { drizzle } from "drizzle-orm/neon-http";
 import { hash } from "bcryptjs";
+import { eq } from "drizzle-orm";
 import * as schema from "../src/lib/db/schema";
 
 async function seed() {
@@ -15,6 +16,7 @@ async function seed() {
 
   const password = await hash("changeme123", 12);
 
+  // ─── Users ────────────────────────────────────────────
   const seedUsers = [
     {
       firstName: "Jan",
@@ -47,7 +49,36 @@ async function seed() {
           roles: user.roles,
         },
       });
-    console.log(`  Seeded: ${user.email} (${user.roles})`);
+    console.log(`  User: ${user.email} (${user.roles})`);
+  }
+
+  // ─── Pro Profile (test only — not published) ──────────
+  const [jan] = await db
+    .select({ id: schema.users.id })
+    .from(schema.users)
+    .where(eq(schema.users.email, "jan.vanriel@golflessons.be"))
+    .limit(1);
+
+  if (jan) {
+    await db
+      .insert(schema.proProfiles)
+      .values({
+        userId: jan.id,
+        slug: "jan-van-riel",
+        displayName: "Jan Van Riel",
+        bio: "Test pro account for development purposes. Not a real golf professional.",
+        specialties: "Platform testing",
+        published: false, // Test account — not shown on public browse page
+      })
+      .onConflictDoUpdate({
+        target: schema.proProfiles.userId,
+        set: {
+          displayName: "Jan Van Riel",
+          bio: "Test pro account for development purposes. Not a real golf professional.",
+          published: false,
+        },
+      });
+    console.log("  Pro profile: jan-van-riel (test, unpublished)");
   }
 
   console.log("Done!");

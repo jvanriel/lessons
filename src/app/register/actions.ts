@@ -5,6 +5,7 @@ import { db } from "@/lib/db";
 import { users } from "@/lib/db/schema";
 import { eq } from "drizzle-orm";
 import { hashPassword, setSessionCookie } from "@/lib/auth";
+import { createNotification } from "@/lib/notifications";
 
 export async function register(
   _prevState: { error: string } | null,
@@ -67,6 +68,15 @@ export async function register(
       .returning({ id: users.id });
     userId = inserted[0].id;
   }
+
+  createNotification({
+    type: "user_registered",
+    title: `New registration: ${firstName} ${lastName}`,
+    message: `${email} signed up as a member`,
+    actionUrl: "/admin/users",
+    actionLabel: "View users",
+    metadata: { userId, email },
+  }).catch(() => {});
 
   await setSessionCookie({
     userId,

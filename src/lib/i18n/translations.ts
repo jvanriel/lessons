@@ -89,6 +89,12 @@ const translations: Record<Locale, Record<string, string>> = {
     // Navigation (new pages)
     "nav.forStudents": "Students",
     "nav.forPros": "Pros",
+    "nav.browsePros": "Our Pros",
+
+    // Browse pros
+    "pros.browse.title": "Our Pros",
+    "pros.browse.subtitle": "Browse certified golf professionals and find the perfect coach for your game.",
+    "pros.browse.empty": "No pros available yet. Check back soon.",
 
     // For Students page
     "students.badge": "Free to join",
