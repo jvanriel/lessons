@@ -6,6 +6,7 @@ import Footer from "@/components/Footer";
 import { CmsProvider } from "@/components/cms/CmsProvider";
 import { ToolboxProvider } from "@/components/toolbox/ToolboxProvider";
 import AdminToolbox from "@/components/toolbox/AdminToolbox";
+import PreLaunchBanner from "@/components/PreLaunchBanner";
 import { getSession, hasRole } from "@/lib/auth";
 
 const cormorant = Cormorant_Garamond({
@@ -44,6 +45,7 @@ export default async function RootLayout({
             <ToolboxProvider>
               <div className="flex">
                 <div className="flex min-w-0 flex-1 flex-col">
+                  <PreLaunchBanner />
                   <Header />
                   <main className="min-h-screen">{children}</main>
                   <Footer />
@@ -53,6 +55,7 @@ export default async function RootLayout({
             </ToolboxProvider>
           ) : (
             <>
+              <PreLaunchBanner />
               <Header />
               <main className="min-h-screen">{children}</main>
               <Footer />
