@@ -6,13 +6,12 @@ import {
   moveTask,
   deleteTask,
   updateTask,
-  addTaskNote,
-  getTaskNotes,
   type SerializedTask,
   type AdminUser,
   type TaskColumn,
   type TaskPriority,
 } from "@/app/(admin)/admin/tasks/actions";
+import Comments from "@/components/comments/Comments";
 
 const COLUMNS: { id: TaskColumn; label: string; color: string }[] = [
   { id: "todo", label: "To Do", color: "border-blue-400" },
@@ -20,13 +19,29 @@ const COLUMNS: { id: TaskColumn; label: string; color: string }[] = [
   { id: "done", label: "Done", color: "border-green-400" },
 ];
 
-const PRIORITY_COLORS: Record<string, string> = {
+const PRIORITIES: { value: TaskPriority; label: string }[] = [
+  { value: "low", label: "Low" },
+  { value: "normal", label: "Normal" },
+  { value: "high", label: "High" },
+];
+
+const COLOR_LABELS = [
+  { value: "", label: "None" },
+  { value: "red", label: "Red" },
+  { value: "orange", label: "Orange" },
+  { value: "yellow", label: "Yellow" },
+  { value: "green", label: "Green" },
+  { value: "blue", label: "Blue" },
+  { value: "purple", label: "Purple" },
+];
+
+const PRIORITY_BADGE: Record<string, string> = {
   high: "bg-red-100 text-red-700",
   normal: "bg-blue-100 text-blue-700",
   low: "bg-gray-100 text-gray-600",
 };
 
-const COLOR_LABELS: Record<string, string> = {
+const COLOR_MAP: Record<string, string> = {
   red: "border-l-red-500",
   orange: "border-l-orange-500",
   yellow: "border-l-yellow-500",
@@ -35,18 +50,34 @@ const COLOR_LABELS: Record<string, string> = {
   purple: "border-l-purple-500",
 };
 
+type DetailTab = "task" | "comments" | "share";
+
+const TABS: { id: DetailTab; label: string }[] = [
+  { id: "task", label: "Task" },
+  { id: "comments", label: "Comments" },
+  { id: "share", label: "Share" },
+];
+
 export default function KanbanBoard({
   tasks: initialTasks,
   adminUsers,
+  currentUserId,
 }: {
   tasks: SerializedTask[];
   adminUsers: AdminUser[];
+  currentUserId: number;
 }) {
   const [allTasks, setAllTasks] = useState(initialTasks);
-  const [selectedTask, setSelectedTask] = useState<SerializedTask | null>(null);
+  const [selectedTask, setSelectedTask] = useState<SerializedTask | null>(
+    null
+  );
   const [createState, createAction, createPending] = useActionState(
     async (
-      prev: { error?: string; success?: boolean; task?: SerializedTask } | null,
+      prev: {
+        error?: string;
+        success?: boolean;
+        task?: SerializedTask;
+      } | null,
       formData: FormData
     ) => {
       const result = await createTask(prev, formData);
@@ -89,12 +120,18 @@ export default function KanbanBoard({
   }
 
   function handleDelete(taskId: number) {
-    if (!confirm("Delete this task?")) return;
     setAllTasks((prev) => prev.filter((t) => t.id !== taskId));
     setSelectedTask(null);
     startTransition(() => {
       deleteTask(taskId);
     });
+  }
+
+  function handleUpdate(updated: SerializedTask) {
+    setAllTasks((prev) =>
+      prev.map((t) => (t.id === updated.id ? updated : t))
+    );
+    setSelectedTask(updated);
   }
 
   const userMap = new Map(
@@ -117,9 +154,11 @@ export default function KanbanBoard({
             defaultValue="normal"
             className="rounded-lg border border-green-300 px-3 py-2 text-sm focus:border-gold-500 focus:outline-none"
           >
-            <option value="low">Low</option>
-            <option value="normal">Normal</option>
-            <option value="high">High</option>
+            {PRIORITIES.map((p) => (
+              <option key={p.value} value={p.value}>
+                {p.label}
+              </option>
+            ))}
           </select>
           <button
             type="submit"
@@ -180,19 +219,17 @@ export default function KanbanBoard({
           task={selectedTask}
           adminUsers={adminUsers}
           userMap={userMap}
+          currentUserId={currentUserId}
           onClose={() => setSelectedTask(null)}
           onDelete={handleDelete}
-          onUpdate={(updated) => {
-            setAllTasks((prev) =>
-              prev.map((t) => (t.id === updated.id ? updated : t))
-            );
-            setSelectedTask(updated);
-          }}
+          onUpdate={handleUpdate}
         />
       )}
     </div>
   );
 }
+
+// ─── Task Card ──────────────────────────────────────────
 
 function TaskCard({
   task,
@@ -206,7 +243,7 @@ function TaskCard({
   onMove: (taskId: number, column: TaskColumn) => void;
 }) {
   const borderClass = task.colorLabel
-    ? COLOR_LABELS[task.colorLabel] ?? ""
+    ? COLOR_MAP[task.colorLabel] ?? ""
     : "";
   const checkDone = task.checklist?.filter((c) => c.done).length ?? 0;
   const checkTotal = task.checklist?.length ?? 0;
@@ -221,7 +258,7 @@ function TaskCard({
       <div className="flex items-start justify-between gap-2">
         <h3 className="text-sm font-medium text-green-800">{task.title}</h3>
         <span
-          className={`shrink-0 rounded-full px-1.5 py-0.5 text-[10px] font-medium ${PRIORITY_COLORS[task.priority]}`}
+          className={`shrink-0 rounded-full px-1.5 py-0.5 text-[10px] font-medium ${PRIORITY_BADGE[task.priority]}`}
         >
           {task.priority}
         </span>
@@ -245,6 +282,11 @@ function TaskCard({
               {checkDone}/{checkTotal}
             </span>
           )}
+          {task.dueDate && (
+            <span className="text-[10px] text-green-400">
+              {new Date(task.dueDate).toLocaleDateString()}
+            </span>
+          )}
         </div>
         <div className="flex gap-1">
           {task.column !== "todo" && (
@@ -256,7 +298,6 @@ function TaskCard({
                 onMove(task.id, prev as TaskColumn);
               }}
               className="rounded p-1 text-green-400 hover:bg-green-100 hover:text-green-600"
-              title="Move left"
             >
               <svg className="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                 <path strokeLinecap="round" strokeLinejoin="round" d="M15.75 19.5 8.25 12l7.5-7.5" />
@@ -272,7 +313,6 @@ function TaskCard({
                 onMove(task.id, next as TaskColumn);
               }}
               className="rounded p-1 text-green-400 hover:bg-green-100 hover:text-green-600"
-              title="Move right"
             >
               <svg className="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                 <path strokeLinecap="round" strokeLinejoin="round" d="m8.25 4.5 7.5 7.5-7.5 7.5" />
@@ -285,10 +325,13 @@ function TaskCard({
   );
 }
 
+// ─── Detail Panel ───────────────────────────────────────
+
 function TaskDetailPanel({
   task,
   adminUsers,
   userMap,
+  currentUserId,
   onClose,
   onDelete,
   onUpdate,
@@ -296,172 +339,513 @@ function TaskDetailPanel({
   task: SerializedTask;
   adminUsers: AdminUser[];
   userMap: Map<number, string>;
+  currentUserId: number;
   onClose: () => void;
   onDelete: (id: number) => void;
   onUpdate: (task: SerializedTask) => void;
 }) {
-  const [title, setTitle] = useState(task.title);
-  const [priority, setPriority] = useState(task.priority);
-  const [saving, startSave] = useTransition();
-  const [notes, setNotes] = useState<
-    Array<{ id: number; content: string; authorName: string; createdAt: Date }>
-  >([]);
-  const [notesLoaded, setNotesLoaded] = useState(false);
-  const [noteContent, setNoteContent] = useState("");
-  const [addingNote, startAddNote] = useTransition();
+  const [activeTab, setActiveTab] = useState<DetailTab>("task");
+  const [prevTaskId, setPrevTaskId] = useState(task.id);
 
-  // Load notes on mount
-  if (!notesLoaded) {
-    getTaskNotes(task.id).then((n) => {
-      setNotes(n);
-      setNotesLoaded(true);
-    });
-  }
-
-  function handleSave() {
-    startSave(async () => {
-      await updateTask(task.id, {
-        title,
-        assigneeIds: task.assigneeIds,
-        priority,
-        colorLabel: task.colorLabel,
-        dueDate: task.dueDate,
-        checklist: task.checklist,
-      });
-      onUpdate({ ...task, title, priority: priority as SerializedTask["priority"] });
-    });
-  }
-
-  function handleAddNote() {
-    if (!noteContent.trim()) return;
-    startAddNote(async () => {
-      await addTaskNote(task.id, noteContent);
-      const updated = await getTaskNotes(task.id);
-      setNotes(updated);
-      setNoteContent("");
-    });
+  if (prevTaskId !== task.id) {
+    setPrevTaskId(task.id);
+    setActiveTab("task");
   }
 
   return (
     <div className="fixed inset-0 z-50 flex items-start justify-center bg-black/50 pt-12">
-      <div className="w-full max-w-lg rounded-xl border border-green-200 bg-white shadow-2xl">
+      <div className="flex w-full max-w-2xl flex-col rounded-xl border border-green-200 bg-white shadow-2xl" style={{ maxHeight: "85vh" }}>
         {/* Header */}
-        <div className="flex items-center justify-between border-b border-green-100 px-5 py-4">
-          <span className="text-xs text-green-500">#{task.id}</span>
-          <div className="flex items-center gap-2">
-            <button
-              onClick={() => onDelete(task.id)}
-              className="rounded px-2 py-1 text-xs text-red-400 hover:bg-red-50 hover:text-red-600"
-            >
-              Delete
-            </button>
-            <button
-              onClick={onClose}
-              className="rounded p-1 text-green-400 hover:bg-green-100 hover:text-green-600"
-            >
-              <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                <path strokeLinecap="round" strokeLinejoin="round" d="M6 18 18 6M6 6l12 12" />
-              </svg>
-            </button>
-          </div>
+        <div className="flex items-center justify-between border-b border-green-100 px-6 py-4">
+          <h2 className="font-display text-xl font-semibold text-green-950">
+            <span className="mr-2 text-sm font-medium text-green-800/40">
+              #{task.id}
+            </span>
+            {task.title}
+          </h2>
+          <button
+            onClick={onClose}
+            className="rounded-lg p-1 text-green-800/50 hover:bg-green-100 hover:text-green-800"
+          >
+            <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M6 18 18 6M6 6l12 12" />
+            </svg>
+          </button>
         </div>
 
-        {/* Body */}
-        <div className="max-h-[70vh] overflow-y-auto px-5 py-4 space-y-4">
+        {/* Tab bar */}
+        <div className="flex gap-1 border-b border-green-100 px-6">
+          {TABS.map((tab) => (
+            <button
+              key={tab.id}
+              onClick={() => setActiveTab(tab.id)}
+              className={`flex items-center gap-1.5 border-b-2 px-3 py-2.5 text-sm font-medium transition-colors ${
+                activeTab === tab.id
+                  ? "border-green-700 text-green-900"
+                  : "border-transparent text-green-800/50 hover:text-green-800"
+              }`}
+            >
+              {tab.label}
+              {tab.id === "share" && task.sharedWithIds.length > 0 && (
+                <span
+                  className={`inline-flex h-5 min-w-5 items-center justify-center rounded-full px-1 text-[10px] font-semibold ${
+                    activeTab === tab.id
+                      ? "bg-green-700 text-white"
+                      : "bg-green-100 text-green-700"
+                  }`}
+                >
+                  {task.sharedWithIds.length}
+                </span>
+              )}
+            </button>
+          ))}
+        </div>
+
+        {/* Tab content */}
+        <div className="flex-1 overflow-y-auto p-6">
+          {activeTab === "task" && (
+            <TaskTab
+              task={task}
+              adminUsers={adminUsers}
+              onSave={onUpdate}
+              onDelete={onDelete}
+              onClose={onClose}
+            />
+          )}
+          {activeTab === "comments" && (
+            <Comments
+              contextType="task"
+              contextId={task.id}
+              userId={currentUserId}
+              mentionUsers={adminUsers}
+            />
+          )}
+          {activeTab === "share" && (
+            <ShareTab
+              task={task}
+              adminUsers={adminUsers}
+              onSave={onUpdate}
+            />
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ─── Task Tab ───────────────────────────────────────────
+
+function TaskTab({
+  task,
+  adminUsers,
+  onSave,
+  onDelete,
+  onClose,
+}: {
+  task: SerializedTask;
+  adminUsers: AdminUser[];
+  onSave: (updated: SerializedTask) => void;
+  onDelete: (taskId: number) => void;
+  onClose: () => void;
+}) {
+  const [title, setTitle] = useState(task.title);
+  const [assigneeIds, setAssigneeIds] = useState<number[]>(task.assigneeIds);
+  const [priority, setPriority] = useState(task.priority);
+  const [colorLabel, setColorLabel] = useState(task.colorLabel ?? "");
+  const [dueDate, setDueDate] = useState(
+    task.dueDate ? task.dueDate.split("T")[0] : ""
+  );
+  const [checklist, setChecklist] = useState<
+    Array<{ text: string; done: boolean }>
+  >(task.checklist ?? []);
+  const [newCheckItem, setNewCheckItem] = useState("");
+  const [isPending, startTransition] = useTransition();
+  const [error, setError] = useState<string | null>(null);
+  const [prevTask, setPrevTask] = useState(task);
+
+  if (prevTask !== task) {
+    setPrevTask(task);
+    setTitle(task.title);
+    setAssigneeIds(task.assigneeIds);
+    setPriority(task.priority);
+    setColorLabel(task.colorLabel ?? "");
+    setDueDate(task.dueDate ? task.dueDate.split("T")[0] : "");
+    setChecklist(task.checklist ?? []);
+    setError(null);
+  }
+
+  function handleSave() {
+    startTransition(async () => {
+      const result = await updateTask(task.id, {
+        title,
+        assigneeIds,
+        priority,
+        colorLabel: colorLabel || null,
+        dueDate: dueDate || null,
+        checklist: checklist.length > 0 ? checklist : null,
+      });
+      if (result.error) {
+        setError(result.error);
+      } else {
+        onSave({
+          ...task,
+          title,
+          assigneeIds,
+          priority: priority as TaskPriority,
+          colorLabel: colorLabel || null,
+          dueDate: dueDate || null,
+          checklist: checklist.length > 0 ? checklist : null,
+          updatedAt: new Date().toISOString(),
+        });
+      }
+    });
+  }
+
+  function handleDeleteTask() {
+    if (!confirm("Delete this task? This cannot be undone.")) return;
+    startTransition(async () => {
+      await deleteTask(task.id);
+      onDelete(task.id);
+    });
+  }
+
+  return (
+    <>
+      {error && <p className="mb-3 text-sm text-red-600">{error}</p>}
+      <div className="space-y-4">
+        <div>
+          <label className="mb-1 block text-sm font-medium text-green-900">
+            Title *
+          </label>
+          <input
+            value={title}
+            onChange={(e) => setTitle(e.target.value)}
+            className="w-full rounded-lg border border-green-200 bg-white px-3 py-2 text-sm focus:border-green-500 focus:outline-none focus:ring-1 focus:ring-green-500"
+          />
+        </div>
+        <div>
+          <label className="mb-1 block text-sm font-medium text-green-900">
+            Assigned to
+          </label>
+          <div className="flex flex-wrap gap-x-4 gap-y-1.5 rounded-lg border border-green-200 bg-white px-3 py-2.5">
+            {adminUsers.map((u) => (
+              <label
+                key={u.id}
+                className="flex items-center gap-1.5 text-sm text-green-900"
+              >
+                <input
+                  type="checkbox"
+                  checked={assigneeIds.includes(u.id)}
+                  onChange={() =>
+                    setAssigneeIds((prev) =>
+                      prev.includes(u.id)
+                        ? prev.filter((a) => a !== u.id)
+                        : [...prev, u.id]
+                    )
+                  }
+                  className="h-4 w-4 rounded border-green-300 text-green-600 focus:ring-green-500"
+                />
+                {u.firstName} {u.lastName}
+              </label>
+            ))}
+          </div>
+        </div>
+        <div className="grid grid-cols-3 gap-4">
           <div>
-            <label className="block text-sm font-medium text-green-800">
-              Title
+            <label className="mb-1 block text-sm font-medium text-green-900">
+              Priority
+            </label>
+            <select
+              value={priority}
+              onChange={(e) => setPriority(e.target.value as TaskPriority)}
+              className="w-full rounded-lg border border-green-200 bg-white px-3 py-2 text-sm focus:border-green-500 focus:outline-none"
+            >
+              {PRIORITIES.map((p) => (
+                <option key={p.value} value={p.value}>
+                  {p.label}
+                </option>
+              ))}
+            </select>
+          </div>
+          <div>
+            <label className="mb-1 block text-sm font-medium text-green-900">
+              Color label
+            </label>
+            <select
+              value={colorLabel}
+              onChange={(e) => setColorLabel(e.target.value)}
+              className="w-full rounded-lg border border-green-200 bg-white px-3 py-2 text-sm focus:border-green-500 focus:outline-none"
+            >
+              {COLOR_LABELS.map((c) => (
+                <option key={c.value} value={c.value}>
+                  {c.label}
+                </option>
+              ))}
+            </select>
+          </div>
+          <div>
+            <label className="mb-1 block text-sm font-medium text-green-900">
+              Due date
             </label>
             <input
-              value={title}
-              onChange={(e) => setTitle(e.target.value)}
-              className="mt-1 block w-full rounded-lg border border-green-300 px-3 py-2 text-sm focus:border-gold-500 focus:outline-none focus:ring-1 focus:ring-gold-500"
+              type="date"
+              value={dueDate}
+              onChange={(e) => setDueDate(e.target.value)}
+              className="w-full rounded-lg border border-green-200 bg-white px-3 py-2 text-sm focus:border-green-500 focus:outline-none"
             />
           </div>
-          <div className="grid grid-cols-2 gap-3">
-            <div>
-              <label className="block text-sm font-medium text-green-800">
-                Priority
-              </label>
-              <select
-                value={priority}
-                onChange={(e) => setPriority(e.target.value as TaskPriority)}
-                className="mt-1 block w-full rounded-lg border border-green-300 px-3 py-2 text-sm focus:border-gold-500 focus:outline-none"
-              >
-                <option value="low">Low</option>
-                <option value="normal">Normal</option>
-                <option value="high">High</option>
-              </select>
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-green-800">
-                Status
-              </label>
-              <p className="mt-1 rounded-lg border border-green-200 bg-green-50 px-3 py-2 text-sm text-green-600">
-                {COLUMNS.find((c) => c.id === task.column)?.label}
-              </p>
-            </div>
-          </div>
-          {task.assigneeIds.length > 0 && (
-            <div>
-              <label className="block text-sm font-medium text-green-800">
-                Assignees
-              </label>
-              <p className="mt-1 text-sm text-green-600">
-                {task.assigneeIds
-                  .map((id) => userMap.get(id) ?? "Unknown")
-                  .join(", ")}
-              </p>
-            </div>
-          )}
-          <button
-            onClick={handleSave}
-            disabled={saving}
-            className="rounded-lg bg-green-800 px-4 py-2 text-sm font-medium text-white hover:bg-green-700 disabled:opacity-50"
-          >
-            {saving ? "Saving..." : "Save"}
-          </button>
+        </div>
 
-          {/* Notes */}
-          <div className="border-t border-green-100 pt-4">
-            <h3 className="text-sm font-medium text-green-800">Notes</h3>
-            <div className="mt-3 space-y-2">
-              {notes.map((note) => (
-                <div
-                  key={note.id}
-                  className="rounded-lg bg-green-50 px-3 py-2"
+        {/* Checklist */}
+        <div>
+          <label className="mb-2 block text-sm font-medium text-green-900">
+            Checklist
+          </label>
+          <div className="space-y-2">
+            {checklist.map((item, i) => (
+              <div key={i} className="flex items-center gap-2">
+                <input
+                  type="checkbox"
+                  checked={item.done}
+                  onChange={() => {
+                    const updated = checklist.map((c, j) =>
+                      j === i ? { ...c, done: !c.done } : c
+                    );
+                    setChecklist(updated);
+                  }}
+                  className="h-4 w-4 rounded border-green-300 text-green-600 focus:ring-green-500"
+                />
+                <span
+                  className={`flex-1 text-sm ${
+                    item.done
+                      ? "text-green-800/40 line-through"
+                      : "text-green-900"
+                  }`}
                 >
-                  <p className="text-sm text-green-700">{note.content}</p>
-                  <p className="mt-1 text-[10px] text-green-400">
-                    {note.authorName} &middot;{" "}
-                    {new Date(note.createdAt).toLocaleDateString()}
-                  </p>
-                </div>
-              ))}
-            </div>
-            <div className="mt-3 flex gap-2">
-              <input
-                value={noteContent}
-                onChange={(e) => setNoteContent(e.target.value)}
-                placeholder="Add a note..."
-                onKeyDown={(e) => {
-                  if (e.key === "Enter") {
-                    e.preventDefault();
-                    handleAddNote();
+                  {item.text}
+                </span>
+                <button
+                  onClick={() =>
+                    setChecklist(checklist.filter((_, j) => j !== i))
                   }
-                }}
-                className="flex-1 rounded-lg border border-green-300 px-3 py-2 text-sm focus:border-gold-500 focus:outline-none focus:ring-1 focus:ring-gold-500"
-              />
-              <button
-                onClick={handleAddNote}
-                disabled={addingNote || !noteContent.trim()}
-                className="rounded-lg bg-green-800 px-3 py-2 text-xs font-medium text-white hover:bg-green-700 disabled:opacity-50"
-              >
-                Add
-              </button>
-            </div>
+                  className="text-xs text-red-400 hover:text-red-600"
+                >
+                  &times;
+                </button>
+              </div>
+            ))}
+          </div>
+          <div className="mt-2 flex gap-2">
+            <input
+              value={newCheckItem}
+              onChange={(e) => setNewCheckItem(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter" && newCheckItem.trim()) {
+                  e.preventDefault();
+                  setChecklist([
+                    ...checklist,
+                    { text: newCheckItem.trim(), done: false },
+                  ]);
+                  setNewCheckItem("");
+                }
+              }}
+              placeholder="New item..."
+              className="flex-1 rounded-lg border border-green-200 bg-white px-3 py-1.5 text-sm focus:border-green-500 focus:outline-none"
+            />
+            <button
+              onClick={() => {
+                if (!newCheckItem.trim()) return;
+                setChecklist([
+                  ...checklist,
+                  { text: newCheckItem.trim(), done: false },
+                ]);
+                setNewCheckItem("");
+              }}
+              className="rounded-lg bg-green-100 px-3 py-1.5 text-sm font-medium text-green-700 hover:bg-green-200"
+            >
+              +
+            </button>
           </div>
         </div>
+      </div>
+
+      <div className="mt-6 flex items-center justify-between">
+        <button
+          onClick={handleDeleteTask}
+          className="rounded-lg px-3 py-2 text-sm font-medium text-red-600 hover:bg-red-50"
+        >
+          Delete
+        </button>
+        <div className="flex gap-3">
+          <button
+            onClick={onClose}
+            className="rounded-lg border border-green-200 px-4 py-2 text-sm font-medium text-green-800 hover:bg-green-50"
+          >
+            Cancel
+          </button>
+          <button
+            onClick={handleSave}
+            disabled={isPending}
+            className="rounded-lg bg-green-700 px-4 py-2 text-sm font-medium text-white hover:bg-green-800 disabled:opacity-50"
+          >
+            {isPending ? "Saving..." : "Save"}
+          </button>
+        </div>
+      </div>
+    </>
+  );
+}
+
+// ─── Share Tab ──────────────────────────────────────────
+
+function ShareTab({
+  task,
+  adminUsers,
+  onSave,
+}: {
+  task: SerializedTask;
+  adminUsers: AdminUser[];
+  onSave: (updated: SerializedTask) => void;
+}) {
+  const [sharedWithIds, setSharedWithIds] = useState<number[]>(
+    task.sharedWithIds
+  );
+  const [assigneeIds, setAssigneeIds] = useState<number[]>(task.assigneeIds);
+  const [isPending, startTransition] = useTransition();
+  const [saved, setSaved] = useState(false);
+  const [prevId, setPrevId] = useState(task.id);
+
+  if (prevId !== task.id) {
+    setPrevId(task.id);
+    setSharedWithIds(task.sharedWithIds);
+    setAssigneeIds(task.assigneeIds);
+    setSaved(false);
+  }
+
+  function toggleMember(userId: number) {
+    if (sharedWithIds.includes(userId)) {
+      setSharedWithIds((prev) => prev.filter((id) => id !== userId));
+      setAssigneeIds((prev) => prev.filter((id) => id !== userId));
+    } else {
+      setSharedWithIds((prev) => [...prev, userId]);
+    }
+  }
+
+  function toggleAssignee(userId: number) {
+    if (assigneeIds.includes(userId)) {
+      setAssigneeIds((prev) => prev.filter((id) => id !== userId));
+    } else {
+      setAssigneeIds((prev) => [...prev, userId]);
+      if (!sharedWithIds.includes(userId)) {
+        setSharedWithIds((prev) => [...prev, userId]);
+      }
+    }
+  }
+
+  function handleSave() {
+    startTransition(async () => {
+      const result = await updateTask(task.id, {
+        title: task.title,
+        assigneeIds,
+        priority: task.priority,
+        colorLabel: task.colorLabel || null,
+        dueDate: task.dueDate || null,
+        checklist: task.checklist,
+      });
+      if (!result.error) {
+        onSave({
+          ...task,
+          assigneeIds,
+          sharedWithIds,
+          updatedAt: new Date().toISOString(),
+        });
+        setSaved(true);
+        setTimeout(() => setSaved(false), 2000);
+      }
+    });
+  }
+
+  return (
+    <div className="max-w-lg space-y-6">
+      <div className="flex gap-4 text-xs text-green-800/60">
+        <span className="flex items-center gap-1.5">
+          <span className="inline-block h-3 w-3 rounded border border-green-300" />{" "}
+          Shared
+        </span>
+        <span className="flex items-center gap-1.5">
+          <span className="inline-block h-3 w-3 rounded bg-green-700" />{" "}
+          Assigned
+        </span>
+      </div>
+
+      <div className="space-y-1">
+        {adminUsers.map((u) => {
+          const isOwner = u.id === task.createdById;
+          const isShared = sharedWithIds.includes(u.id);
+          const isAssigned = assigneeIds.includes(u.id);
+          return (
+            <div
+              key={u.id}
+              className={`flex items-center gap-3 rounded-lg px-3 py-2 text-sm transition-colors ${
+                isShared ? "bg-green-50" : "hover:bg-green-50/50"
+              }`}
+            >
+              <span
+                className={`flex-1 ${
+                  isShared
+                    ? "font-medium text-green-900"
+                    : "text-green-800/50"
+                }`}
+              >
+                {u.firstName} {u.lastName}
+                {isOwner && (
+                  <span className="ml-1.5 text-[11px] font-normal text-green-800/40">
+                    Owner
+                  </span>
+                )}
+              </span>
+              <button
+                onClick={() => toggleAssignee(u.id)}
+                className={`rounded-full px-3 py-1 text-xs font-medium transition-colors ${
+                  isAssigned
+                    ? "bg-green-700 text-white hover:bg-green-800"
+                    : "border border-green-200 text-green-700 hover:bg-green-100"
+                }`}
+              >
+                {isAssigned ? "Assigned" : "Assign"}
+              </button>
+              {isOwner ? (
+                <span className="rounded-full bg-green-100 px-3 py-1 text-xs font-medium text-green-800/50">
+                  Shared
+                </span>
+              ) : (
+                <button
+                  onClick={() => toggleMember(u.id)}
+                  className={`rounded-full px-3 py-1 text-xs font-medium transition-colors ${
+                    isShared
+                      ? "bg-green-100 text-green-800 hover:bg-green-200"
+                      : "border border-dashed border-green-300 text-green-600 hover:bg-green-50"
+                  }`}
+                >
+                  {isShared ? "Shared" : "Share"}
+                </button>
+              )}
+            </div>
+          );
+        })}
+      </div>
+
+      <div className="flex items-center gap-3">
+        <button
+          onClick={handleSave}
+          disabled={isPending}
+          className="rounded-lg bg-green-800 px-5 py-2 text-sm font-medium text-white hover:bg-green-700 disabled:opacity-50"
+        >
+          {isPending ? "Saving..." : "Save"}
+        </button>
+        {saved && (
+          <span className="text-sm text-green-700">Saved</span>
+        )}
       </div>
     </div>
   );

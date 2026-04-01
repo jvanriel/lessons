@@ -276,3 +276,38 @@ export const taskNotes = pgTable("task_notes", {
   authorName: varchar("author_name", { length: 255 }).notNull(),
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
+
+// ─── Comments ──────────────────────────────────────────
+
+export const comments = pgTable("comments", {
+  id: serial("id").primaryKey(),
+  contextType: varchar("context_type", { length: 20 }).notNull(),
+  contextId: integer("context_id").notNull(),
+  authorId: integer("author_id").references(() => users.id, {
+    onDelete: "set null",
+  }),
+  content: text("content").notNull(),
+  type: varchar("type", { length: 20 }).notNull().default("comment"),
+  pinned: boolean("pinned").notNull().default(false),
+  replyToId: integer("reply_to_id"),
+  attachments: jsonb("attachments").$type<
+    Array<{ name: string; url: string; size: number; contentType: string }>
+  >(),
+  metadata: jsonb("metadata").$type<Record<string, unknown>>(),
+  editedAt: timestamp("edited_at"),
+  deletedAt: timestamp("deleted_at"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+export const commentReactions = pgTable("comment_reactions", {
+  id: serial("id").primaryKey(),
+  commentId: integer("comment_id")
+    .references(() => comments.id, { onDelete: "cascade" })
+    .notNull(),
+  userId: integer("user_id")
+    .references(() => users.id, { onDelete: "cascade" })
+    .notNull(),
+  emoji: varchar("emoji", { length: 20 }).notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});

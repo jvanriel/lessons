@@ -1,12 +1,14 @@
 import { db } from "@/lib/db";
 import { tasks, users } from "@/lib/db/schema";
 import { asc, or, like, and, not, ilike } from "drizzle-orm";
+import { getSession } from "@/lib/auth";
 import KanbanBoard from "@/components/KanbanBoard";
 import type { SerializedTask } from "./actions";
 
 export const metadata = { title: "Tasks — Admin — Golf Lessons" };
 
 export default async function AdminTasksPage() {
+  const session = await getSession();
   const [allTasks, adminUsers] = await Promise.all([
     db.select().from(tasks).orderBy(asc(tasks.column), asc(tasks.position)),
     db
@@ -50,7 +52,7 @@ export default async function AdminTasksPage() {
       <p className="mt-2 text-sm text-green-600">
         Manage tasks and track progress.
       </p>
-      <KanbanBoard tasks={serializedTasks} adminUsers={adminUsers} />
+      <KanbanBoard tasks={serializedTasks} adminUsers={adminUsers} currentUserId={session!.userId} />
     </div>
   );
 }

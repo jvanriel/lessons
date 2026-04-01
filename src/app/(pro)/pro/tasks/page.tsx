@@ -64,7 +64,7 @@ export default async function ProTasksPage() {
       <p className="mt-2 text-sm text-green-600">
         Tasks assigned to you or shared with you.
       </p>
-      <KanbanBoard tasks={serializedTasks} adminUsers={adminUsers} />
+      <KanbanBoard tasks={serializedTasks} adminUsers={adminUsers} currentUserId={session.userId} />
     </div>
   );
 }

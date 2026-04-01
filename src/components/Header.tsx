@@ -31,7 +31,6 @@ export default async function Header() {
     session && hasRole(session, "pro")
       ? [
           { href: "/pro/dashboard", label: "Dashboard" },
-          { href: "/pro/tasks", label: "Tasks" },
           { href: "/pro/profile", label: "Profile" },
           { href: "/pro/pages", label: "Pages" },
           { href: "/pro/mailings", label: "Mailings" },
