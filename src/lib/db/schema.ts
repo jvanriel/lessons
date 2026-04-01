@@ -26,6 +26,17 @@ export const users = pgTable("users", {
   createdAt: timestamp("created_at").defaultNow(),
 });
 
+export const userEmails = pgTable("user_emails", {
+  id: serial("id").primaryKey(),
+  userId: integer("user_id")
+    .references(() => users.id, { onDelete: "cascade" })
+    .notNull(),
+  email: varchar("email", { length: 255 }).notNull().unique(),
+  label: varchar("label", { length: 50 }),
+  isPrimary: boolean("is_primary").notNull().default(false),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
 export const cmsBlocks = pgTable("cms_blocks", {
   id: serial("id").primaryKey(),
   pageSlug: varchar("page_slug", { length: 100 }).notNull(),

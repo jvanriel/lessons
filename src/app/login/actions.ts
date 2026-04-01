@@ -2,8 +2,8 @@
 
 import { redirect } from "next/navigation";
 import { db } from "@/lib/db";
-import { users } from "@/lib/db/schema";
-import { eq } from "drizzle-orm";
+import { users, userEmails } from "@/lib/db/schema";
+import { eq, or } from "drizzle-orm";
 import { verifyPassword, setSessionCookie, parseRoles } from "@/lib/auth";
 
 export async function userLogin(
@@ -13,11 +13,29 @@ export async function userLogin(
   const email = (formData.get("email") as string).trim().toLowerCase();
   const password = formData.get("password") as string;
 
-  const result = await db
+  // Try primary email first, then check aliases
+  let result = await db
     .select()
     .from(users)
     .where(eq(users.email, email))
     .limit(1);
+
+  if (result.length === 0) {
+    // Look up by alias
+    const [alias] = await db
+      .select({ userId: userEmails.userId })
+      .from(userEmails)
+      .where(eq(userEmails.email, email))
+      .limit(1);
+
+    if (alias) {
+      result = await db
+        .select()
+        .from(users)
+        .where(eq(users.id, alias.userId))
+        .limit(1);
+    }
+  }
 
   if (result.length === 0) {
     return { error: "Invalid email or password" };
