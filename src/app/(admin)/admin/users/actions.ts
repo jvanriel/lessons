@@ -128,6 +128,85 @@ export async function deleteUser(userId: number) {
   return { success: true };
 }
 
+function generatePassword(length = 12): string {
+  const chars =
+    "ABCDEFGHJKLMNPQRSTUVWXYZabcdefghjkmnpqrstuvwxyz23456789!@#$%";
+  let pw = "";
+  const arr = new Uint8Array(length);
+  crypto.getRandomValues(arr);
+  for (const b of arr) pw += chars[b % chars.length];
+  return pw;
+}
+
+export async function inviteUser(
+  _prev: { error?: string; success?: boolean; password?: string } | null,
+  formData: FormData
+): Promise<{ error?: string; success?: boolean; password?: string }> {
+  await requireAdmin();
+
+  const firstName = (formData.get("firstName") as string).trim();
+  const lastName = (formData.get("lastName") as string).trim();
+  const email = (formData.get("email") as string).trim().toLowerCase();
+  const roles = (formData.get("roles") as string)?.trim() || "member";
+
+  if (!firstName || !lastName || !email) {
+    return { error: "First name, last name and email are required." };
+  }
+
+  const [existing] = await db
+    .select({ id: users.id })
+    .from(users)
+    .where(eq(users.email, email))
+    .limit(1);
+
+  if (existing) return { error: "A user with this email already exists." };
+
+  const tempPassword = generatePassword();
+  const hashed = await hashPassword(tempPassword);
+
+  const [inserted] = await db
+    .insert(users)
+    .values({ firstName, lastName, email, password: hashed, roles })
+    .returning({ id: users.id });
+
+  await db.insert(userEmails).values({
+    userId: inserted.id,
+    email,
+    label: "primary",
+    isPrimary: true,
+  });
+
+  // TODO: Send invitation email with tempPassword
+
+  revalidatePath("/admin/users");
+  return { success: true, password: tempPassword };
+}
+
+export async function resetPassword(
+  userId: number
+): Promise<{ error?: string; password?: string }> {
+  await requireAdmin();
+
+  const [user] = await db
+    .select({ id: users.id })
+    .from(users)
+    .where(eq(users.id, userId))
+    .limit(1);
+
+  if (!user) return { error: "User not found." };
+
+  const tempPassword = generatePassword();
+  const hashed = await hashPassword(tempPassword);
+
+  await db
+    .update(users)
+    .set({ password: hashed })
+    .where(eq(users.id, userId));
+
+  revalidatePath("/admin/users");
+  return { password: tempPassword };
+}
+
 // ─── Email aliases ──────────────────────────────────────
 
 export async function getUserEmails(userId: number) {
