@@ -87,8 +87,8 @@ const translations: Record<Locale, Record<string, string>> = {
     "member.noLessons": "No upcoming lessons. Browse our pros to book your first lesson.",
 
     // Navigation (new pages)
-    "nav.forStudents": "Students",
-    "nav.forPros": "Pros",
+    "nav.forStudents": "Info for Students",
+    "nav.forPros": "Info for Pros",
     "nav.browsePros": "Our Pros",
 
     // Browse pros
@@ -264,8 +264,8 @@ const translations: Record<Locale, Record<string, string>> = {
     "member.yourLessons": "Jouw Lessen",
     "member.noLessons": "Geen aankomende lessen. Blader door onze pro's om je eerste les te boeken.",
 
-    "nav.forStudents": "Leerlingen",
-    "nav.forPros": "Pro's",
+    "nav.forStudents": "Info Leerlingen",
+    "nav.forPros": "Info Pro's",
     "students.badge": "Gratis aanmelden",
     "students.hero.title": "Je Persoonlijke Golfcoach, Altijd Binnen Bereik",
     "students.hero.subtitle": "Meld je gratis aan en krijg toegang tot gecertificeerde golfprofessionals. Boek lessen, ontvang persoonlijke feedback en volg je vooruitgang — alles op één plek.",
@@ -431,8 +431,8 @@ const translations: Record<Locale, Record<string, string>> = {
     "member.yourLessons": "Vos Cours",
     "member.noLessons": "Aucun cours à venir. Parcourez nos pros pour réserver votre premier cours.",
 
-    "nav.forStudents": "Élèves",
-    "nav.forPros": "Pros",
+    "nav.forStudents": "Info Élèves",
+    "nav.forPros": "Info Pros",
     "students.badge": "Inscription gratuite",
     "students.hero.title": "Votre Coach de Golf Personnel, Toujours à Portée",
     "students.hero.subtitle": "Inscrivez-vous gratuitement et accédez à des professionnels de golf certifiés. Réservez des cours, recevez des retours personnalisés et suivez vos progrès — tout en un seul endroit.",
