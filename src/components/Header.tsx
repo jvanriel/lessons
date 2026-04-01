@@ -32,10 +32,11 @@ export default async function Header() {
       ? [
           { href: "/pro/dashboard", label: "Dashboard" },
           { href: "/pro/profile", label: "Profile" },
-          { href: "/pro/pages", label: "Pages" },
-          { href: "/pro/mailings", label: "Mailings" },
+          { href: "/pro/locations", label: "Locations" },
           { href: "/pro/availability", label: "Availability" },
           { href: "/pro/bookings", label: "Bookings" },
+          { href: "/pro/pages", label: "Pages" },
+          { href: "/pro/mailings", label: "Mailings" },
         ]
       : [];
 
