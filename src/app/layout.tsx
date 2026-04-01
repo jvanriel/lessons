@@ -7,6 +7,7 @@ import { CmsProvider } from "@/components/cms/CmsProvider";
 import { ToolboxProvider } from "@/components/toolbox/ToolboxProvider";
 import AdminToolbox from "@/components/toolbox/AdminToolbox";
 import PreLaunchBanner from "@/components/PreLaunchBanner";
+import DeploymentChecker from "@/components/DeploymentChecker";
 import { getSession, hasRole } from "@/lib/auth";
 
 const cormorant = Cormorant_Garamond({
@@ -62,6 +63,7 @@ export default async function RootLayout({
             </>
           )}
         </CmsProvider>
+        <DeploymentChecker />
       </body>
     </html>
   );
