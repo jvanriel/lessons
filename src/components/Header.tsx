@@ -31,6 +31,7 @@ export default async function Header() {
     session && hasRole(session, "pro")
       ? [
           { href: "/pro/dashboard", label: "Dashboard" },
+          { href: "/pro/tasks", label: "Tasks" },
           { href: "/pro/profile", label: "Profile" },
           { href: "/pro/pages", label: "Pages" },
           { href: "/pro/mailings", label: "Mailings" },
@@ -43,6 +44,7 @@ export default async function Header() {
     session && hasRole(session, "admin")
       ? [
           { href: "/admin/users", label: "Users" },
+          { href: "/admin/tasks", label: "Tasks" },
           { href: "/admin/bookings", label: "Bookings" },
           { href: "/admin/pros", label: "Pros" },
           { href: "/admin/settings", label: "Settings" },

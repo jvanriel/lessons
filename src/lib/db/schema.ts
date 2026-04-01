@@ -244,3 +244,35 @@ export const proMailings = pgTable("pro_mailings", {
   recipientCount: integer("recipient_count").notNull().default(0),
   sentAt: timestamp("sent_at").defaultNow().notNull(),
 });
+
+// ─── Tasks ──────────────────────────────────────────────
+
+export const tasks = pgTable("tasks", {
+  id: serial("id").primaryKey(),
+  title: varchar("title", { length: 255 }).notNull(),
+  description: text("description"),
+  column: varchar("column", { length: 20 }).notNull().default("todo"),
+  position: integer("position").notNull().default(0),
+  assigneeIds: jsonb("assignee_ids").$type<number[]>(),
+  sharedWithIds: jsonb("shared_with_ids").$type<number[]>(),
+  priority: varchar("priority", { length: 20 }).notNull().default("normal"),
+  colorLabel: varchar("color_label", { length: 20 }),
+  dueDate: timestamp("due_date"),
+  checklist: jsonb("checklist").$type<
+    Array<{ text: string; done: boolean }>
+  >(),
+  completedAt: timestamp("completed_at"),
+  createdById: integer("created_by_id").references(() => users.id),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+export const taskNotes = pgTable("task_notes", {
+  id: serial("id").primaryKey(),
+  taskId: integer("task_id")
+    .references(() => tasks.id, { onDelete: "cascade" })
+    .notNull(),
+  content: text("content").notNull(),
+  authorName: varchar("author_name", { length: 255 }).notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
