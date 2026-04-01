@@ -51,7 +51,7 @@ async function main() {
       photoUrl: "/images/thibault_leys.jpg",
       lessonDurations: [30, 60, 90],
       maxGroupSize: 4,
-      pricePerHour: "75",
+      pricePerHour: null, // TBD
       bookingEnabled: true,
       bookingNotice: 24,
       bookingHorizon: 60,
@@ -65,7 +65,7 @@ async function main() {
         bio: "Thibaut is a passionate golf professional with years of experience helping players of all levels improve their game. His patient teaching style and deep understanding of swing mechanics make him a favorite among both beginners and experienced golfers looking to take their game to the next level.\n\nWith a focus on building solid fundamentals and developing a repeatable, consistent swing, Thibaut ensures every student leaves each lesson with clear takeaways and a personalized practice plan.",
         specialties: "Swing mechanics, short game, course management",
         photoUrl: "/images/thibault_leys.jpg",
-        pricePerHour: "75",
+        pricePerHour: null, // TBD
         published: true,
       },
     });
@@ -97,7 +97,7 @@ async function main() {
       photoUrl: "/images/olivier_philips.jpg",
       lessonDurations: [30, 60, 90],
       maxGroupSize: 4,
-      pricePerHour: "80",
+      pricePerHour: null, // TBD
       bookingEnabled: true,
       bookingNotice: 24,
       bookingHorizon: 60,
@@ -111,7 +111,7 @@ async function main() {
         bio: "Olivier grew up with golf — he started at age ten at Drie Eycken in Edegem and knew early on that he wanted to make the game his profession. After a career as teaching professional at The National Golf Brussels, he now works from Kempense Golf in Mol, where he coaches golfers of every level.\n\nOlivier's approach is personal and long-term. He follows each student's development season after season, adapting his coaching to their individual game. No one-off clinics, but an ongoing collaboration that ensures real, lasting improvement.",
         specialties: "Full swing, putting, player development",
         photoUrl: "/images/olivier_philips.jpg",
-        pricePerHour: "80",
+        pricePerHour: null, // TBD
         published: true,
       },
     });
@@ -154,10 +154,10 @@ async function main() {
 
   const proLocLinks = [
     // Thibaut teaches at Drie Eycken and The National
-    { proProfileId: thibautProfile.id, locationId: locMap.get("Drie Eycken Golf")!, priceIndication: "€75/h", sortOrder: 0 },
-    { proProfileId: thibautProfile.id, locationId: locMap.get("The National Golf Brussels")!, priceIndication: "€75/h", sortOrder: 1 },
+    { proProfileId: thibautProfile.id, locationId: locMap.get("Drie Eycken Golf")!, priceIndication: null, sortOrder: 0 },
+    { proProfileId: thibautProfile.id, locationId: locMap.get("The National Golf Brussels")!, priceIndication: null, sortOrder: 1 },
     // Olivier teaches at Kempense Golf
-    { proProfileId: olivierProfile.id, locationId: locMap.get("Kempense Golf")!, priceIndication: "€80/h", sortOrder: 0 },
+    { proProfileId: olivierProfile.id, locationId: locMap.get("Kempense Golf")!, priceIndication: null, sortOrder: 0 },
   ];
 
   for (const link of proLocLinks) {
