@@ -52,20 +52,6 @@ export default async function MemberDashboard() {
     .orderBy(asc(lessonBookings.date), asc(lessonBookings.startTime))
     .limit(5);
 
-  // Get bookable pros for the CTA
-  const bookablePros = await db
-    .select({
-      slug: proProfiles.slug,
-      displayName: proProfiles.displayName,
-      photoUrl: proProfiles.photoUrl,
-      specialties: proProfiles.specialties,
-    })
-    .from(proProfiles)
-    .where(
-      and(eq(proProfiles.published, true), eq(proProfiles.bookingEnabled, true))
-    )
-    .limit(6);
-
   // Get my pros (via proStudents relationships)
   const myPros = await db
     .select({
@@ -216,47 +202,6 @@ export default async function MemberDashboard() {
         )}
       </div>
 
-      {/* Book a lesson CTA */}
-      {bookablePros.length > 0 && (
-        <div className="mt-8">
-          <h2 className="mb-4 font-display text-xl font-medium text-green-800">
-            Book a lesson
-          </h2>
-          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-            {bookablePros.map((pro) => (
-              <Link
-                key={pro.slug}
-                href={`/member/book/${pro.slug}`}
-                className="rounded-xl border border-green-200 bg-white p-4 transition-all hover:border-gold-400 hover:shadow-md"
-              >
-                <div className="flex items-center gap-3">
-                  {pro.photoUrl ? (
-                    <img
-                      src={pro.photoUrl}
-                      alt={pro.displayName}
-                      className="h-10 w-10 rounded-full object-cover"
-                    />
-                  ) : (
-                    <div className="flex h-10 w-10 items-center justify-center rounded-full bg-green-100 text-sm font-medium text-green-600">
-                      {pro.displayName.charAt(0)}
-                    </div>
-                  )}
-                  <div>
-                    <div className="text-sm font-medium text-green-900">
-                      {pro.displayName}
-                    </div>
-                    {pro.specialties && (
-                      <div className="text-xs text-green-500">
-                        {pro.specialties}
-                      </div>
-                    )}
-                  </div>
-                </div>
-              </Link>
-            ))}
-          </div>
-        </div>
-      )}
     </div>
   );
 }
