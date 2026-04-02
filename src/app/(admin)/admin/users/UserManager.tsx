@@ -123,7 +123,7 @@ export default function UserManager({ users }: { users: User[] }) {
                 </td>
                 <td className="px-4 py-3 text-green-500">
                   {user.lastLoginAt
-                    ? new Date(user.lastLoginAt).toLocaleDateString()
+                    ? new Date(user.lastLoginAt).toLocaleDateString("en-GB")
                     : "Never"}
                 </td>
                 <td className="px-4 py-3">
