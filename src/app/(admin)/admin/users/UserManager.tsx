@@ -242,7 +242,7 @@ function UserRowActions({
         </button>
         {menuOpen && (
           <div className="absolute right-0 top-full z-20 mt-1 w-44 rounded-lg border border-green-200 bg-white py-1 shadow-lg">
-            {!user.roles?.includes("pro") && (
+            {user.roles?.includes("pro_pending") && (
               <button
                 onClick={() => {
                   setMenuOpen(false);

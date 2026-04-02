@@ -42,8 +42,8 @@ export async function register(
 
   const hashed = await hashPassword(password);
 
-  // Pro registrations get member role initially — admin must approve pro role
-  const roles = accountType === "pro" ? "member" : "member";
+  // Pro registrations get member + pro_pending — admin activates to full pro
+  const roles = accountType === "pro" ? "member,pro_pending" : "member";
 
   let userId: number;
 

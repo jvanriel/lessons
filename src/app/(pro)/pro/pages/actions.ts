@@ -19,14 +19,6 @@ async function getProProfileId(): Promise<number | null> {
   return profile?.id ?? null;
 }
 
-function slugify(text: string): string {
-  return text
-    .toLowerCase()
-    .replace(/[^a-z0-9]+/g, "-")
-    .replace(/^-|-$/g, "")
-    .slice(0, 80);
-}
-
 export async function getProPages() {
   const proId = await getProProfileId();
   if (!proId) return [];
@@ -48,18 +40,22 @@ export async function createProPage(
   const title = (formData.get("title") as string).trim();
   if (!title) return { error: "Title is required." };
 
-  const slug = slugify(title) || `page-${Date.now()}`;
-
+  // Insert with temp slug, then update with the generated ID
   const [inserted] = await db
     .insert(proPages)
     .values({
       proProfileId: proId,
-      slug,
+      slug: `temp-${Date.now()}`,
       type: "flyer",
       title,
       published: false,
     })
     .returning({ id: proPages.id });
+
+  await db
+    .update(proPages)
+    .set({ slug: String(inserted.id) })
+    .where(eq(proPages.id, inserted.id));
 
   revalidatePath("/pro/pages");
   return { success: true, id: inserted.id };

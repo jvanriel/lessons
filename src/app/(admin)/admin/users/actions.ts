@@ -332,13 +332,7 @@ export async function sendInvite(
 
 // ─── Activate as Pro ────────────────────────────────────
 
-function slugify(text: string): string {
-  return text
-    .toLowerCase()
-    .replace(/[^a-z0-9]+/g, "-")
-    .replace(/^-|-$/g, "")
-    .slice(0, 80);
-}
+// Slugs use sequence numbers for consistency (no name-based slugs)
 
 export async function activateAsPro(
   userId: number
@@ -360,15 +354,16 @@ export async function activateAsPro(
 
   if (!user) return { error: "User not found." };
 
-  // Add pro role if not already present
-  const currentRoles = user.roles?.split(",").filter(Boolean) ?? [];
+  // Replace pro_pending with pro
+  let currentRoles = user.roles?.split(",").filter(Boolean) ?? [];
+  currentRoles = currentRoles.filter((r) => r !== "pro_pending");
   if (!currentRoles.includes("pro")) {
     currentRoles.push("pro");
-    await db
-      .update(users)
-      .set({ roles: currentRoles.join(",") })
-      .where(eq(users.id, userId));
   }
+  await db
+    .update(users)
+    .set({ roles: currentRoles.join(",") })
+    .where(eq(users.id, userId));
 
   // Create pro profile if doesn't exist
   const [existingProfile] = await db
@@ -378,13 +373,18 @@ export async function activateAsPro(
     .limit(1);
 
   if (!existingProfile) {
-    const slug = slugify(`${user.firstName} ${user.lastName}`) || `pro-${userId}`;
-    await db.insert(proProfiles).values({
+    // Insert with temporary slug, then update with the generated ID
+    const [inserted] = await db.insert(proProfiles).values({
       userId,
-      slug,
+      slug: `temp-${userId}`,
       displayName: `${user.firstName} ${user.lastName}`,
       published: false,
-    });
+    }).returning({ id: proProfiles.id });
+
+    await db
+      .update(proProfiles)
+      .set({ slug: String(inserted.id) })
+      .where(eq(proProfiles.id, inserted.id));
   }
 
   // Send activation email
