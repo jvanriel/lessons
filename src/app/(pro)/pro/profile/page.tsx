@@ -32,7 +32,12 @@ export default async function ProProfilePage() {
             bio: profile.bio,
             specialties: profile.specialties,
             pricePerHour: profile.pricePerHour,
+            lessonDurations: profile.lessonDurations as number[],
             maxGroupSize: profile.maxGroupSize,
+            bookingEnabled: profile.bookingEnabled,
+            bookingNotice: profile.bookingNotice,
+            bookingHorizon: profile.bookingHorizon,
+            cancellationHours: profile.cancellationHours,
             published: profile.published,
             slug: profile.slug,
           }}

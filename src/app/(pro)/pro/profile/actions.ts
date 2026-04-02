@@ -28,6 +28,18 @@ export async function updateProProfile(
   const specialties = (formData.get("specialties") as string)?.trim() || null;
   const pricePerHour = (formData.get("pricePerHour") as string)?.trim() || null;
   const maxGroupSize = parseInt(formData.get("maxGroupSize") as string) || 4;
+  const bookingEnabled = formData.get("bookingEnabled") === "true";
+  const bookingNotice = parseInt(formData.get("bookingNotice") as string) || 24;
+  const bookingHorizon = parseInt(formData.get("bookingHorizon") as string) || 60;
+  const cancellationHours = parseInt(formData.get("cancellationHours") as string) || 24;
+
+  let lessonDurations: number[] = [60];
+  try {
+    const parsed = JSON.parse(formData.get("lessonDurations") as string);
+    if (Array.isArray(parsed) && parsed.length > 0) {
+      lessonDurations = parsed;
+    }
+  } catch {}
 
   if (!displayName) return { error: "Display name is required." };
 
@@ -38,12 +50,17 @@ export async function updateProProfile(
       bio,
       specialties,
       pricePerHour,
+      lessonDurations,
       maxGroupSize,
+      bookingEnabled,
+      bookingNotice,
+      bookingHorizon,
+      cancellationHours,
       updatedAt: new Date(),
     })
     .where(eq(proProfiles.id, profile.id));
 
   revalidatePath("/pro/profile");
-  revalidatePath(`/pros/${profile.id}`);
+  revalidatePath("/pro/availability");
   return { success: true };
 }
