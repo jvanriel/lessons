@@ -5,6 +5,7 @@ import { register } from "./actions";
 import Link from "next/link";
 import { t } from "@/lib/i18n/translations";
 import type { Locale } from "@/lib/i18n";
+import PasswordInput from "@/components/PasswordInput";
 
 const inputClass =
   "mt-1 block w-full rounded-lg border border-green-700 bg-green-900 px-3 py-2 text-white placeholder-green-400 focus:border-gold-500 focus:outline-none focus:ring-1 focus:ring-gold-500";
@@ -137,13 +138,13 @@ export default function RegisterForm({ locale }: { locale: Locale }) {
             <label htmlFor="password" className="block text-sm font-medium text-green-100">
               {t("profile.newPassword", locale)}
             </label>
-            <input id="password" name="password" type="password" required className={inputClass} />
+            <PasswordInput id="password" name="password" required className={inputClass} />
           </div>
           <div>
             <label htmlFor="confirmPassword" className="block text-sm font-medium text-green-100">
               {t("profile.confirmPassword", locale)}
             </label>
-            <input id="confirmPassword" name="confirmPassword" type="password" required className={inputClass} />
+            <PasswordInput id="confirmPassword" name="confirmPassword" required className={inputClass} />
           </div>
 
           {accountType === "pro" && (

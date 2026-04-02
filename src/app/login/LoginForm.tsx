@@ -7,6 +7,7 @@ import Link from "next/link";
 import { Suspense } from "react";
 import { t } from "@/lib/i18n/translations";
 import type { Locale } from "@/lib/i18n";
+import PasswordInput from "@/components/PasswordInput";
 
 function LoginFormInner({ locale }: { locale: Locale }) {
   const searchParams = useSearchParams();
@@ -48,10 +49,9 @@ function LoginFormInner({ locale }: { locale: Locale }) {
             >
               {t("profile.currentPassword", locale)}
             </label>
-            <input
+            <PasswordInput
               id="password"
               name="password"
-              type="password"
               required
               className="mt-1 block w-full rounded-lg border border-green-700 bg-green-900 px-3 py-2 text-white placeholder-green-400 focus:border-gold-500 focus:outline-none focus:ring-1 focus:ring-gold-500"
             />
