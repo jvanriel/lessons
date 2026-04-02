@@ -6,6 +6,7 @@ import {
   updateUser,
   deleteUser,
   resetPassword,
+  sendInvite,
   addUserEmail,
   removeUserEmail,
 } from "./actions";
@@ -163,8 +164,8 @@ function UserRowActions({
   onEdit: () => void;
 }) {
   const [menuOpen, setMenuOpen] = useState(false);
+  const [showInvite, setShowInvite] = useState(false);
   const [, startTransition] = useTransition();
-  const [resetResult, setResetResult] = useState<string | null>(null);
   const ref = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -185,7 +186,8 @@ function UserRowActions({
       const result = await resetPassword(user.id);
       if (result.error) alert(result.error);
       else if (result.password) {
-        setResetResult(result.password);
+        navigator.clipboard.writeText(result.password).catch(() => {});
+        alert(`New password (copied to clipboard):\n\n${result.password}`);
       }
     });
   }
@@ -206,30 +208,12 @@ function UserRowActions({
 
   return (
     <div className="flex items-center gap-1" ref={ref}>
-      {/* Reset password result */}
-      {resetResult && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
-          <div className="w-full max-w-sm rounded-xl border border-green-200 bg-white p-6 shadow-2xl">
-            <h3 className="font-display text-lg font-semibold text-green-900">
-              Password Reset
-            </h3>
-            <p className="mt-2 text-sm text-green-700">
-              New password for {user.firstName} {user.lastName}:
-            </p>
-            <div className="mt-3 rounded-lg bg-green-50 px-4 py-3 font-mono text-sm text-green-900 select-all">
-              {resetResult}
-            </div>
-            <p className="mt-2 text-xs text-green-500">
-              Copy this password — it won't be shown again.
-            </p>
-            <button
-              onClick={() => setResetResult(null)}
-              className="mt-4 rounded-lg bg-green-700 px-4 py-2 text-sm font-medium text-white hover:bg-green-800"
-            >
-              Done
-            </button>
-          </div>
-        </div>
+      {/* Invite dialog */}
+      {showInvite && (
+        <InviteUserDialog
+          user={user}
+          onClose={() => setShowInvite(false)}
+        />
       )}
 
       {/* Edit icon */}
@@ -257,7 +241,10 @@ function UserRowActions({
         {menuOpen && (
           <div className="absolute right-0 top-full z-20 mt-1 w-44 rounded-lg border border-green-200 bg-white py-1 shadow-lg">
             <button
-              onClick={handleResetPassword}
+              onClick={() => {
+                setMenuOpen(false);
+                setShowInvite(true);
+              }}
               className="block w-full px-4 py-2 text-left text-sm text-green-700 hover:bg-green-50"
             >
               Invite user
@@ -277,6 +264,239 @@ function UserRowActions({
             </button>
           </div>
         )}
+      </div>
+    </div>
+  );
+}
+
+function InviteUserDialog({
+  user,
+  onClose,
+}: {
+  user: User;
+  onClose: () => void;
+}) {
+  // All emails for this user
+  const allEmails = [
+    user.email,
+    ...user.emails
+      .filter((e) => e.email !== user.email)
+      .map((e) => e.email),
+  ];
+
+  const [sendTo, setSendTo] = useState(user.email);
+  const [customEmail, setCustomEmail] = useState("");
+  const [copyToMe, setCopyToMe] = useState(true);
+  const [comment, setComment] = useState("");
+  const [sending, setSending] = useState(false);
+  const [sent, setSent] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [copied, setCopied] = useState(false);
+
+  // Generate password once on mount
+  const [generatedPassword] = useState(() => {
+    const chars = "ABCDEFGHJKLMNPQRSTUVWXYZabcdefghjkmnpqrstuvwxyz23456789!@#$%";
+    let pw = "";
+    const arr = new Uint8Array(12);
+    crypto.getRandomValues(arr);
+    for (const b of arr) pw += chars[b % chars.length];
+    return pw;
+  });
+
+  function handleCopyPassword() {
+    navigator.clipboard.writeText(generatedPassword).then(() => {
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    });
+  }
+
+  async function handleSend() {
+    const targetEmail =
+      sendTo === "__custom__" ? customEmail.trim().toLowerCase() : sendTo;
+    if (!targetEmail) {
+      setError("Please enter an email address.");
+      return;
+    }
+
+    setSending(true);
+    setError(null);
+
+    const result = await sendInvite(
+      user.id,
+      generatedPassword,
+      targetEmail,
+      comment,
+      copyToMe
+    );
+
+    if (result.error) {
+      setError(result.error);
+      setSending(false);
+      return;
+    }
+
+    setSent(true);
+    setSending(false);
+  }
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-start justify-center bg-black/50 pt-12">
+      <div className="w-full max-w-md rounded-xl border border-green-200 bg-white shadow-2xl">
+        <div className="flex items-center justify-between border-b border-green-100 px-6 py-4">
+          <h2 className="font-display text-lg font-semibold text-green-950">
+            Invite {user.firstName} {user.lastName}
+          </h2>
+          <button
+            onClick={onClose}
+            className="rounded-lg p-1 text-green-800/50 hover:bg-green-100"
+          >
+            <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M6 18 18 6M6 6l12 12" />
+            </svg>
+          </button>
+        </div>
+
+        <div className="px-6 py-4">
+          {sent ? (
+            /* Success state */
+            <div className="space-y-4">
+              <div className="rounded-lg border border-green-200 bg-green-50 p-4">
+                <p className="text-sm font-medium text-green-800">
+                  Invitation sent!
+                </p>
+                <p className="mt-1 text-sm text-green-600">
+                  {user.firstName} can now log in with the credentials below.
+                </p>
+              </div>
+              <div className="space-y-2 rounded-lg border border-green-200 bg-green-50/50 p-4">
+                <div className="text-xs text-green-600">
+                  Login: <span className="font-medium text-green-900">{user.email}</span>
+                </div>
+                <div className="flex items-center gap-2 text-xs text-green-600">
+                  Password:{" "}
+                  <span className="font-mono font-medium text-green-900">
+                    {generatedPassword}
+                  </span>
+                  <button
+                    onClick={handleCopyPassword}
+                    className={`rounded px-2 py-0.5 text-[10px] font-medium ${
+                      copied
+                        ? "bg-green-700 text-white"
+                        : "border border-green-300 text-green-600 hover:bg-green-100"
+                    }`}
+                  >
+                    {copied ? "Copied!" : "Copy"}
+                  </button>
+                </div>
+              </div>
+              <button
+                onClick={onClose}
+                className="w-full rounded-lg bg-green-700 px-4 py-2.5 text-sm font-medium text-white hover:bg-green-800"
+              >
+                Done
+              </button>
+            </div>
+          ) : (
+            /* Send form */
+            <div className="space-y-4">
+              {/* Generated password — shown upfront */}
+              <div>
+                <label className="block text-sm font-medium text-green-800">
+                  Generated password
+                </label>
+                <div className="mt-1 flex items-center gap-2">
+                  <div className="flex-1 rounded-lg border border-green-200 bg-green-50 px-4 py-2.5 font-mono text-sm text-green-900 select-all">
+                    {generatedPassword}
+                  </div>
+                  <button
+                    onClick={handleCopyPassword}
+                    className={`rounded-lg px-3 py-2.5 text-xs font-medium transition-colors ${
+                      copied
+                        ? "bg-green-700 text-white"
+                        : "border border-green-300 text-green-700 hover:bg-green-50"
+                    }`}
+                  >
+                    {copied ? "Copied!" : "Copy"}
+                  </button>
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-green-800">
+                  Send invitation to
+                </label>
+                <select
+                  value={sendTo}
+                  onChange={(e) => setSendTo(e.target.value)}
+                  className={inputClass + " mt-1"}
+                >
+                  {allEmails.map((email) => (
+                    <option key={email} value={email}>
+                      {email}
+                    </option>
+                  ))}
+                  <option value="__custom__">Other email address...</option>
+                </select>
+                {sendTo === "__custom__" && (
+                  <input
+                    type="email"
+                    value={customEmail}
+                    onChange={(e) => setCustomEmail(e.target.value)}
+                    placeholder="Enter email address"
+                    className={inputClass + " mt-2"}
+                  />
+                )}
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-green-800">
+                  Personal message (optional)
+                </label>
+                <textarea
+                  value={comment}
+                  onChange={(e) => setComment(e.target.value)}
+                  rows={3}
+                  placeholder="Add a personal note to the invitation..."
+                  className={inputClass + " mt-1 resize-none"}
+                />
+              </div>
+
+              <label className="flex items-center gap-2 text-sm text-green-700">
+                <input
+                  type="checkbox"
+                  checked={copyToMe}
+                  onChange={(e) => setCopyToMe(e.target.checked)}
+                  className="h-4 w-4 rounded border-green-300 text-green-600"
+                />
+                Send a copy to myself
+              </label>
+
+              {error && (
+                <p className="text-sm text-red-600">{error}</p>
+              )}
+
+              <div className="flex justify-end gap-3 pt-2">
+                <button
+                  type="button"
+                  onClick={onClose}
+                  className="rounded-lg border border-green-200 px-4 py-2 text-sm font-medium text-green-800 hover:bg-green-50"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={handleSend}
+                  disabled={
+                    sending ||
+                    (sendTo === "__custom__" && !customEmail.trim())
+                  }
+                  className="rounded-lg bg-gold-600 px-4 py-2 text-sm font-medium text-white hover:bg-gold-500 disabled:opacity-50"
+                >
+                  {sending ? "Sending..." : "Send Invite"}
+                </button>
+              </div>
+            </div>
+          )}
+        </div>
       </div>
     </div>
   );

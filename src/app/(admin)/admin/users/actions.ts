@@ -207,6 +207,48 @@ export async function resetPassword(
   return { password: tempPassword };
 }
 
+export async function sendInvite(
+  userId: number,
+  password: string,
+  sendToEmail: string,
+  comment: string,
+  copyToAdmin: boolean
+): Promise<{ error?: string; success?: boolean }> {
+  await requireAdmin();
+
+  const [user] = await db
+    .select({
+      id: users.id,
+      firstName: users.firstName,
+      lastName: users.lastName,
+      email: users.email,
+    })
+    .from(users)
+    .where(eq(users.id, userId))
+    .limit(1);
+
+  if (!user) return { error: "User not found." };
+
+  const hashed = await hashPassword(password);
+
+  await db
+    .update(users)
+    .set({ password: hashed })
+    .where(eq(users.id, userId));
+
+  // TODO: Send invite email via Gmail API when connected
+  // The email would contain:
+  // - Welcome message + personal comment
+  // - Login URL (https://golflessons.be/login)
+  // - Username (user.email)
+  // - Temporary password
+  // - Instruction to change password in profile
+  // - If copyToAdmin: send copy to admin's email
+
+  revalidatePath("/admin/users");
+  return { success: true };
+}
+
 // ─── Email aliases ──────────────────────────────────────
 
 export async function getUserEmails(userId: number) {
