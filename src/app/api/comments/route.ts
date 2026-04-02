@@ -9,7 +9,8 @@ async function requireAuth() {
     !(
       hasRole(session, "admin") ||
       hasRole(session, "pro") ||
-      hasRole(session, "dev")
+      hasRole(session, "dev") ||
+      hasRole(session, "member")
     )
   ) {
     return null;
@@ -51,7 +52,7 @@ export async function POST(request: NextRequest) {
   }
 
   const body = await request.json();
-  const { contextType, contextId, content, type, replyToId } = body;
+  const { contextType, contextId, content, type, replyToId, attachments } = body;
 
   if (!contextType || !contextId || !content?.trim()) {
     return NextResponse.json(
@@ -66,7 +67,10 @@ export async function POST(request: NextRequest) {
     session.userId,
     content.trim(),
     type || "comment",
-    { replyToId: replyToId ? parseInt(replyToId) : undefined }
+    {
+      replyToId: replyToId ? parseInt(replyToId) : undefined,
+      attachments: attachments ?? undefined,
+    }
   );
 
   return NextResponse.json(comment, { status: 201 });

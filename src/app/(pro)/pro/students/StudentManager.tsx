@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useActionState, useTransition } from "react";
+import Link from "next/link";
 import { inviteStudent, removeStudent } from "./actions";
 
 interface Student {
@@ -251,14 +252,20 @@ export default function StudentManager({
               className="flex items-center justify-between rounded-xl border border-green-200 bg-white p-4 transition-colors hover:border-green-300"
             >
               <div className="flex items-center gap-4">
-                <div className="flex h-10 w-10 items-center justify-center rounded-full bg-green-100 text-sm font-medium text-green-600">
+                <Link
+                  href={`/pro/students/${student.id}`}
+                  className="flex h-10 w-10 items-center justify-center rounded-full bg-green-100 text-sm font-medium text-green-600 transition-colors hover:bg-green-200"
+                >
                   {student.firstName.charAt(0)}
                   {student.lastName.charAt(0)}
-                </div>
+                </Link>
                 <div>
-                  <p className="text-sm font-medium text-green-900">
+                  <Link
+                    href={`/pro/students/${student.id}`}
+                    className="text-sm font-medium text-green-900 hover:text-gold-700"
+                  >
                     {student.firstName} {student.lastName}
-                  </p>
+                  </Link>
                   <p className="text-xs text-green-500">{student.email}</p>
                   {student.phone && (
                     <p className="text-xs text-green-400">{student.phone}</p>
@@ -282,6 +289,17 @@ export default function StudentManager({
                     })}
                   </p>
                 </div>
+                {student.status === "active" && (
+                  <Link
+                    href={`/pro/students/${student.id}`}
+                    className="rounded p-1.5 text-green-400 transition-colors hover:bg-green-50 hover:text-green-600"
+                    title="Open chat"
+                  >
+                    <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M8.625 12a.375.375 0 1 1-.75 0 .375.375 0 0 1 .75 0Zm0 0H8.25m4.125 0a.375.375 0 1 1-.75 0 .375.375 0 0 1 .75 0Zm0 0H12m4.125 0a.375.375 0 1 1-.75 0 .375.375 0 0 1 .75 0Zm0 0h-.375M21 12c0 4.556-4.03 8.25-9 8.25a9.764 9.764 0 0 1-2.555-.337A5.972 5.972 0 0 1 5.41 20.97a5.969 5.969 0 0 1-.474-.065 4.48 4.48 0 0 0 .978-2.025c.09-.457-.133-.901-.467-1.226C3.93 16.178 3 14.189 3 12c0-4.556 4.03-8.25 9-8.25s9 3.694 9 8.25Z" />
+                    </svg>
+                  </Link>
+                )}
                 {student.status === "active" && (
                   <button
                     type="button"

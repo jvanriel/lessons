@@ -41,11 +41,20 @@ interface MentionUser {
   lastName: string;
 }
 
+interface Attachment {
+  name: string;
+  url: string;
+  size: number;
+  contentType: string;
+}
+
 interface CommentsProps {
   contextType: string;
   contextId: number;
   userId: number;
   mentionUsers?: MentionUser[];
+  onUpload?: (file: File) => Promise<Attachment | null>;
+  fillHeight?: boolean;
 }
 
 const QUICK_REACTIONS = ["👍", "❤️", "😂", "🎯", "✅"];
@@ -57,6 +66,8 @@ export default function Comments({
   contextId,
   userId,
   mentionUsers = [],
+  onUpload,
+  fillHeight = false,
 }: CommentsProps) {
   const [comments, setComments] = useState<Comment[]>([]);
   const [loading, setLoading] = useState(true);
@@ -66,8 +77,13 @@ export default function Comments({
   const [showMentions, setShowMentions] = useState(false);
   const [mentionFilter, setMentionFilter] = useState("");
   const [mentionCursorPos, setMentionCursorPos] = useState(0);
+  const [uploading, setUploading] = useState(false);
+  const [dragOver, setDragOver] = useState(false);
+  const [lightboxUrl, setLightboxUrl] = useState<string | null>(null);
+  const [videoUrl, setVideoUrl] = useState<string | null>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
   const shouldAutoScroll = useRef(true);
   const prevContextId = useRef(contextId);
 
@@ -174,6 +190,63 @@ export default function Comments({
     } finally {
       setSending(false);
     }
+  }
+
+  // ─── File Upload ────────────────────────────────────
+
+  async function handleFileUpload(file: File) {
+    if (!onUpload || uploading) return;
+    setUploading(true);
+    shouldAutoScroll.current = true;
+
+    try {
+      const attachment = await onUpload(file);
+      if (!attachment) return;
+
+      // Create a comment with the attachment
+      const caption = isImageType(attachment.contentType)
+        ? "📷 Photo"
+        : isVideoType(attachment.contentType)
+          ? "🎬 Video"
+          : `📎 ${attachment.name}`;
+
+      const res = await fetch("/api/comments", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          contextType,
+          contextId,
+          content: caption,
+          attachments: [attachment],
+        }),
+      });
+
+      if (res.ok) {
+        const newComment: Comment = await res.json();
+        setComments((prev) => [...prev, newComment]);
+      }
+    } catch {
+      // Handle silently
+    } finally {
+      setUploading(false);
+    }
+  }
+
+  function handleDrop(e: React.DragEvent) {
+    e.preventDefault();
+    setDragOver(false);
+    const file = e.dataTransfer.files[0];
+    if (file) handleFileUpload(file);
+  }
+
+  function handleDragOver(e: React.DragEvent) {
+    e.preventDefault();
+    setDragOver(true);
+  }
+
+  function handleDragLeave(e: React.DragEvent) {
+    e.preventDefault();
+    setDragOver(false);
   }
 
   // ─── Delete Comment ────────────────────────────────
@@ -358,7 +431,61 @@ export default function Comments({
   }
 
   return (
-    <div className="flex h-[400px] flex-col">
+    <div
+      className={`flex flex-col ${fillHeight ? "h-full" : "h-[400px]"} relative`}
+      onDrop={onUpload ? handleDrop : undefined}
+      onDragOver={onUpload ? handleDragOver : undefined}
+      onDragLeave={onUpload ? handleDragLeave : undefined}
+    >
+      {/* Drag overlay */}
+      {dragOver && (
+        <div className="absolute inset-0 z-50 flex items-center justify-center rounded-xl border-2 border-dashed border-gold-500 bg-gold-50/80">
+          <p className="text-sm font-medium text-gold-700">Drop file to send</p>
+        </div>
+      )}
+
+      {/* Lightbox overlay */}
+      {lightboxUrl && (
+        <div
+          className="fixed inset-0 z-[100] flex items-center justify-center bg-black/80 p-4"
+          onClick={() => setLightboxUrl(null)}
+        >
+          <button
+            onClick={() => setLightboxUrl(null)}
+            className="absolute top-4 right-4 rounded-full bg-white/10 p-2 text-white hover:bg-white/20"
+          >
+            <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M6 18 18 6M6 6l12 12" />
+            </svg>
+          </button>
+          <img src={lightboxUrl} alt="" className="max-h-[90vh] max-w-[90vw] rounded-lg object-contain" />
+        </div>
+      )}
+
+      {/* Video overlay */}
+      {videoUrl && (
+        <div
+          className="fixed inset-0 z-[100] flex items-center justify-center bg-black/80 p-4"
+          onClick={() => setVideoUrl(null)}
+        >
+          <button
+            onClick={() => setVideoUrl(null)}
+            className="absolute top-4 right-4 rounded-full bg-white/10 p-2 text-white hover:bg-white/20"
+          >
+            <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M6 18 18 6M6 6l12 12" />
+            </svg>
+          </button>
+          <video
+            src={videoUrl}
+            controls
+            autoPlay
+            className="max-h-[90vh] max-w-[90vw] rounded-lg"
+            onClick={(e) => e.stopPropagation()}
+          />
+        </div>
+      )}
+
       {/* Messages area */}
       <div
         ref={scrollRef}
@@ -431,6 +558,87 @@ export default function Comments({
                       <p className="text-sm">(deleted)</p>
                     ) : (
                       <>
+                        {/* Attachment rendering */}
+                        {comment.attachments && comment.attachments.length > 0 && (
+                          <div className="mb-1.5 space-y-1.5">
+                            {comment.attachments.map((att, ai) => {
+                              if (isImageType(att.contentType)) {
+                                return (
+                                  <button
+                                    key={ai}
+                                    type="button"
+                                    onClick={() => setLightboxUrl(att.url)}
+                                    className="block overflow-hidden rounded-lg"
+                                  >
+                                    <img
+                                      src={att.url}
+                                      alt={att.name}
+                                      className="max-w-[300px] rounded-lg object-cover transition-opacity hover:opacity-90"
+                                    />
+                                  </button>
+                                );
+                              }
+                              if (isVideoType(att.contentType)) {
+                                return (
+                                  <button
+                                    key={ai}
+                                    type="button"
+                                    onClick={() => setVideoUrl(att.url)}
+                                    className="relative block max-w-[300px] overflow-hidden rounded-lg"
+                                  >
+                                    <video
+                                      src={att.url}
+                                      className="max-w-[300px] rounded-lg"
+                                      muted
+                                      preload="metadata"
+                                    />
+                                    <div className="absolute inset-0 flex items-center justify-center bg-black/20">
+                                      <div className="flex h-12 w-12 items-center justify-center rounded-full bg-white/90 shadow-lg">
+                                        <svg className="h-5 w-5 text-green-700 ml-0.5" fill="currentColor" viewBox="0 0 24 24">
+                                          <path d="M8 5v14l11-7z" />
+                                        </svg>
+                                      </div>
+                                    </div>
+                                  </button>
+                                );
+                              }
+                              // Document card
+                              return (
+                                <a
+                                  key={ai}
+                                  href={att.url}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  className={`flex items-center gap-2.5 rounded-lg border p-2.5 transition-colors ${
+                                    isOwn
+                                      ? "border-green-600 bg-green-600/30 hover:bg-green-600/40"
+                                      : "border-green-200 bg-white hover:bg-green-50"
+                                  }`}
+                                >
+                                  <div className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-lg ${
+                                    isOwn ? "bg-green-600/40" : "bg-green-100"
+                                  }`}>
+                                    <svg className={`h-4 w-4 ${isOwn ? "text-white" : "text-green-600"}`} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                                      <path strokeLinecap="round" strokeLinejoin="round" d="M19.5 14.25v-2.625a3.375 3.375 0 0 0-3.375-3.375h-1.5A1.125 1.125 0 0 1 13.5 7.125v-1.5a3.375 3.375 0 0 0-3.375-3.375H8.25m2.25 0H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 0 0-9-9Z" />
+                                    </svg>
+                                  </div>
+                                  <div className="min-w-0 flex-1">
+                                    <p className={`truncate text-xs font-medium ${isOwn ? "text-white" : "text-green-800"}`}>
+                                      {att.name}
+                                    </p>
+                                    <p className={`text-[10px] ${isOwn ? "text-green-200" : "text-green-400"}`}>
+                                      {formatFileSize(att.size)}
+                                    </p>
+                                  </div>
+                                  <svg className={`h-4 w-4 shrink-0 ${isOwn ? "text-green-200" : "text-green-400"}`} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                                    <path strokeLinecap="round" strokeLinejoin="round" d="M3 16.5v2.25A2.25 2.25 0 0 0 5.25 21h13.5A2.25 2.25 0 0 0 21 18.75V16.5M16.5 12 12 16.5m0 0L7.5 12m4.5 4.5V3" />
+                                  </svg>
+                                </a>
+                              );
+                            })}
+                          </div>
+                        )}
+
                         <p className="whitespace-pre-wrap text-sm leading-relaxed">
                           {renderContentWithMentions(comment.content)}
                         </p>
@@ -612,8 +820,44 @@ export default function Comments({
         </div>
       )}
 
+      {/* Upload progress */}
+      {uploading && (
+        <div className="flex items-center gap-2 border-t border-green-100 bg-gold-50 px-4 py-2">
+          <div className="h-4 w-4 animate-spin rounded-full border-2 border-gold-400 border-t-transparent" />
+          <span className="text-xs text-gold-700">Uploading file...</span>
+        </div>
+      )}
+
+      {/* Hidden file input */}
+      {onUpload && (
+        <input
+          ref={fileInputRef}
+          type="file"
+          className="hidden"
+          accept="image/jpeg,image/png,image/gif,image/webp,video/mp4,video/quicktime,video/webm,application/pdf,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document,application/vnd.ms-excel,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+          onChange={(e) => {
+            const file = e.target.files?.[0];
+            if (file) handleFileUpload(file);
+            e.target.value = "";
+          }}
+        />
+      )}
+
       {/* Input area */}
       <div className="flex items-end gap-2 border-t border-green-100 bg-white px-3 py-2">
+        {onUpload && (
+          <button
+            type="button"
+            onClick={() => fileInputRef.current?.click()}
+            disabled={uploading}
+            className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-green-400 transition-colors hover:bg-green-50 hover:text-green-600 disabled:opacity-40"
+            title="Attach file"
+          >
+            <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="m18.375 12.739-7.693 7.693a4.5 4.5 0 0 1-6.364-6.364l10.94-10.94A3 3 0 1 1 19.5 7.372L8.552 18.32m.009-.01-.01.01m5.699-9.941-7.81 7.81a1.5 1.5 0 0 0 2.112 2.13" />
+            </svg>
+          </button>
+        )}
         <textarea
           ref={inputRef}
           value={input}
@@ -648,6 +892,20 @@ export default function Comments({
 }
 
 // ─── Helpers ───────────────────────────────────────────
+
+function isImageType(contentType: string): boolean {
+  return contentType.startsWith("image/");
+}
+
+function isVideoType(contentType: string): boolean {
+  return contentType.startsWith("video/");
+}
+
+function formatFileSize(bytes: number): string {
+  if (bytes < 1024) return `${bytes} B`;
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
+  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+}
 
 function renderContentWithMentions(content: string): React.ReactNode {
   const parts = content.split(/(@\w+)/g);

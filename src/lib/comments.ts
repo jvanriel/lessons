@@ -4,6 +4,7 @@ import {
   commentReactions,
   users,
   tasks,
+  proStudents,
 } from "@/lib/db/schema";
 import { createNotification } from "@/lib/notifications";
 import { eq, and, sql, desc, gt, isNull, inArray } from "drizzle-orm";
@@ -145,7 +146,15 @@ export async function addComment(
   authorId: number,
   content: string,
   type: string = "comment",
-  opts?: { replyToId?: number }
+  opts?: {
+    replyToId?: number;
+    attachments?: Array<{
+      name: string;
+      url: string;
+      size: number;
+      contentType: string;
+    }>;
+  }
 ): Promise<CommentWithAuthor> {
   const [inserted] = await db
     .insert(comments)
@@ -156,8 +165,17 @@ export async function addComment(
       content,
       type,
       replyToId: opts?.replyToId ?? null,
+      attachments: opts?.attachments ?? null,
     })
     .returning();
+
+  // Update lastMessageAt on proStudents when coaching context
+  if (contextType === "coaching") {
+    db.update(proStudents)
+      .set({ lastMessageAt: new Date() })
+      .where(eq(proStudents.id, contextId))
+      .catch(() => {});
+  }
 
   // Get the author info
   const [author] = await db

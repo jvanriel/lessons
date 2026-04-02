@@ -241,6 +241,7 @@ export const proStudents = pgTable("pro_students", {
     .notNull(),
   source: varchar("source", { length: 20 }).notNull().default("self"),
   status: varchar("status", { length: 20 }).notNull().default("active"),
+  lastMessageAt: timestamp("last_message_at"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
 
