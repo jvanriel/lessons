@@ -421,7 +421,7 @@ export async function activateAsPro(
     <p style="margin:0 0 16px 0;">${s.body}</p>
     <p style="margin:0 0 24px 0;color:#555;">${s.note}</p>
     <p style="margin:0 0 24px 0;">
-      <a href="https://golflessons.be/pro/dashboard" style="display:inline-block;background:#a68523;color:#ffffff;padding:12px 28px;border-radius:6px;text-decoration:none;font-weight:500;font-size:14px;">
+      <a href="https://golflessons.be/login?from=/pro/dashboard&email=${encodeURIComponent(user.email)}" style="display:inline-block;background:#a68523;color:#ffffff;padding:12px 28px;border-radius:6px;text-decoration:none;font-weight:500;font-size:14px;">
         ${s.button}
       </a>
     </p>

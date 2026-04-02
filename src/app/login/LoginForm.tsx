@@ -12,6 +12,7 @@ import PasswordInput from "@/components/PasswordInput";
 function LoginFormInner({ locale }: { locale: Locale }) {
   const searchParams = useSearchParams();
   const from = searchParams.get("from");
+  const prefillEmail = searchParams.get("email") ?? "";
   const [state, action, pending] = useActionState(userLogin, null);
 
   return (
@@ -38,7 +39,8 @@ function LoginFormInner({ locale }: { locale: Locale }) {
               name="email"
               type="email"
               required
-              autoFocus
+              autoFocus={!prefillEmail}
+              defaultValue={prefillEmail}
               className="mt-1 block w-full rounded-lg border border-green-700 bg-green-900 px-3 py-2 text-white placeholder-green-400 focus:border-gold-500 focus:outline-none focus:ring-1 focus:ring-gold-500"
             />
           </div>

@@ -231,7 +231,7 @@ export function buildInviteEmail(opts: {
   locale: Locale;
 }): string {
   const s = EMAIL_STRINGS[opts.locale] ?? EMAIL_STRINGS.en;
-  const loginUrl = "https://golflessons.be/login";
+  const loginUrl = `https://golflessons.be/login?email=${encodeURIComponent(opts.loginEmail)}`;
 
   const commentBlock = opts.comment
     ? `<div style="background:${COLORS.cream};border-left:3px solid ${COLORS.gold500};padding:12px 16px;margin:20px 0;border-radius:0 8px 8px 0;">
@@ -279,7 +279,7 @@ export function buildPasswordResetEmail(opts: {
   locale: Locale;
 }): string {
   const s = EMAIL_STRINGS[opts.locale] ?? EMAIL_STRINGS.en;
-  const loginUrl = "https://golflessons.be/login";
+  const loginUrl = `https://golflessons.be/login?email=${encodeURIComponent(opts.loginEmail)}`;
 
   const body = `
     <h2 style="font-family:Georgia,'Times New Roman',serif;font-size:22px;color:${COLORS.green950};margin:0 0 16px 0;font-weight:normal;">
