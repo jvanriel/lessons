@@ -8,38 +8,42 @@ export default async function Footer() {
 
   return (
     <footer className="border-t border-gold-500/30 bg-green-950">
-      <div className="mx-auto max-w-6xl px-6 py-12">
-        <div className="flex flex-col items-center gap-5">
-          <Logo size={36} variant="cream" />
-          <p className="font-display text-lg font-light text-gold-200">
-            Golf Lessons
-          </p>
-          <p className="text-sm text-green-100/70">
-            {t("footer.tagline", locale)}
-          </p>
+      <div className="mx-auto max-w-6xl px-6 py-6">
+        <div className="flex flex-col items-center gap-4 sm:flex-row sm:justify-between">
+          {/* Left: logo + tagline */}
           <div className="flex items-center gap-3">
-            <div className="h-px w-6 bg-gold-500/40" />
-            <div className="h-1 w-1 rotate-45 bg-gold-500/50" />
-            <div className="h-px w-6 bg-gold-500/40" />
+            <Logo size={24} variant="cream" />
+            <span className="font-display text-sm font-light text-gold-200">
+              Golf Lessons
+            </span>
+            <span className="hidden text-xs text-green-100/40 sm:inline">
+              &middot;
+            </span>
+            <span className="hidden text-xs text-green-100/50 sm:inline">
+              {t("footer.tagline", locale)}
+            </span>
           </div>
-          <div className="flex flex-wrap items-center justify-center gap-x-4 gap-y-1">
+
+          {/* Right: links + copyright */}
+          <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-green-100/40">
             <Link
               href="/privacy"
-              className="text-xs text-green-100/40 transition hover:text-green-100/70"
+              className="transition hover:text-green-100/70"
             >
               {t("footer.privacy", locale)}
             </Link>
-            <span className="text-xs text-green-100/20">|</span>
+            <span className="text-green-100/20">|</span>
             <Link
               href="/terms"
-              className="text-xs text-green-100/40 transition hover:text-green-100/70"
+              className="transition hover:text-green-100/70"
             >
               {t("footer.terms", locale)}
             </Link>
+            <span className="text-green-100/20">|</span>
+            <span className="text-green-100/30">
+              &copy; {new Date().getFullYear()} Golf Lessons
+            </span>
           </div>
-          <p className="text-xs text-green-100/50">
-            &copy; {new Date().getFullYear()} Golf Lessons. {t("footer.rights", locale)}.
-          </p>
         </div>
       </div>
     </footer>
