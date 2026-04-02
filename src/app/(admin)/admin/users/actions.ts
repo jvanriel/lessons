@@ -6,6 +6,8 @@ import { users, userEmails } from "@/lib/db/schema";
 import { eq, and } from "drizzle-orm";
 import { getSession, hasRole, hashPassword } from "@/lib/auth";
 import { sendEmail } from "@/lib/mail";
+import { buildInviteEmail, getEmailStrings } from "@/lib/email-templates";
+import { resolveLocale } from "@/lib/i18n";
 
 async function requireAdmin() {
   const session = await getSession();
@@ -223,6 +225,7 @@ export async function sendInvite(
       firstName: users.firstName,
       lastName: users.lastName,
       email: users.email,
+      preferredLocale: users.preferredLocale,
     })
     .from(users)
     .where(eq(users.id, userId))
@@ -237,33 +240,22 @@ export async function sendInvite(
     .set({ password: hashed })
     .where(eq(users.id, userId));
 
-  // Build invitation email
-  const loginUrl = "https://golflessons.be/login";
-  const html = `
-    <div style="font-family: system-ui, sans-serif; max-width: 500px; margin: 0 auto;">
-      <h2 style="color: #1a3d2a;">Welcome to Golf Lessons!</h2>
-      <p>Hi ${user.firstName},</p>
-      <p>You've been invited to join <strong>Golf Lessons</strong>. Here are your login credentials:</p>
-      <div style="background: #f0f7f2; border: 1px solid #b4d6c1; border-radius: 8px; padding: 16px; margin: 16px 0;">
-        <p style="margin: 0 0 8px 0;"><strong>Login:</strong> ${user.email}</p>
-        <p style="margin: 0;"><strong>Password:</strong> <code style="background: #fff; padding: 2px 6px; border-radius: 4px;">${password}</code></p>
-      </div>
-      <p>
-        <a href="${loginUrl}" style="display: inline-block; background: #a68523; color: white; padding: 10px 24px; border-radius: 6px; text-decoration: none; font-weight: 500;">
-          Log in now
-        </a>
-      </p>
-      <p style="color: #666; font-size: 14px;">Please change your password after first login via <strong>Profile → Change Password</strong>.</p>
-      ${comment ? `<div style="background: #faf8f0; border-left: 3px solid #c4a035; padding: 12px 16px; margin: 16px 0; border-radius: 0 8px 8px 0;"><p style="margin: 0; color: #555; font-size: 14px;">${comment.replace(/\n/g, "<br>")}</p></div>` : ""}
-      <hr style="border: none; border-top: 1px solid #eee; margin: 24px 0;">
-      <p style="color: #999; font-size: 12px;">Golf Lessons — golflessons.be</p>
-    </div>
-  `;
+  // Use recipient's preferred locale
+  const locale = resolveLocale(user.preferredLocale);
+  const strings = getEmailStrings(locale);
+
+  const html = buildInviteEmail({
+    firstName: user.firstName,
+    loginEmail: user.email,
+    password,
+    comment: comment || undefined,
+    locale,
+  });
 
   // Send to the selected recipient
   const emailResult = await sendEmail({
     to: sendToEmail,
-    subject: `You're invited to Golf Lessons`,
+    subject: strings.inviteSubject,
     html,
   });
 
@@ -277,8 +269,8 @@ export async function sendInvite(
     if (session) {
       sendEmail({
         to: session.email,
-        subject: `[Copy] Invitation sent to ${user.firstName} ${user.lastName}`,
-        html: `<p style="color: #999; font-size: 13px;">Copy of invitation sent to ${sendToEmail}:</p><hr style="border: none; border-top: 1px solid #eee; margin: 12px 0;">${html}`,
+        subject: `${strings.inviteCopySubject} ${user.firstName} ${user.lastName}`,
+        html,
       }).catch(() => {});
     }
   }
