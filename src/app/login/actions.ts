@@ -2,7 +2,8 @@
 
 import { redirect } from "next/navigation";
 import { db } from "@/lib/db";
-import { users, userEmails } from "@/lib/db/schema";
+import { users, userEmails, proStudents } from "@/lib/db/schema";
+import { and } from "drizzle-orm";
 import { eq, or } from "drizzle-orm";
 import { verifyPassword, setSessionCookie, parseRoles } from "@/lib/auth";
 
@@ -56,6 +57,17 @@ export async function userLogin(
     .update(users)
     .set({ lastLoginAt: new Date() })
     .where(eq(users.id, user.id));
+
+  // Activate any pending pro-student relationships (e.g. from pro invites)
+  await db
+    .update(proStudents)
+    .set({ status: "active" })
+    .where(
+      and(
+        eq(proStudents.userId, user.id),
+        eq(proStudents.status, "pending")
+      )
+    );
 
   await setSessionCookie({
     userId: user.id,
