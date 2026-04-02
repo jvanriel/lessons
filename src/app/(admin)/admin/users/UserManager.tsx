@@ -8,6 +8,7 @@ import {
   resetPassword,
   resetPasswordWithNotification,
   sendInvite,
+  activateAsPro,
   addUserEmail,
   removeUserEmail,
 } from "./actions";
@@ -241,6 +242,26 @@ function UserRowActions({
         </button>
         {menuOpen && (
           <div className="absolute right-0 top-full z-20 mt-1 w-44 rounded-lg border border-green-200 bg-white py-1 shadow-lg">
+            {!user.roles?.includes("pro") && (
+              <button
+                onClick={() => {
+                  setMenuOpen(false);
+                  if (
+                    !confirm(
+                      `Activate ${user.firstName} ${user.lastName} as a Golf Pro? This will create a pro profile and send a notification email.`
+                    )
+                  )
+                    return;
+                  startTransition(async () => {
+                    const result = await activateAsPro(user.id);
+                    if (result.error) alert(result.error);
+                  });
+                }}
+                className="block w-full px-4 py-2 text-left text-sm text-gold-600 hover:bg-gold-50"
+              >
+                Activate as Pro
+              </button>
+            )}
             <button
               onClick={() => {
                 setMenuOpen(false);

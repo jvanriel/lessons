@@ -2,7 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { db } from "@/lib/db";
-import { users, userEmails } from "@/lib/db/schema";
+import { users, userEmails, proProfiles } from "@/lib/db/schema";
 import { eq, and } from "drizzle-orm";
 import { getSession, hasRole, hashPassword } from "@/lib/auth";
 import { sendEmail } from "@/lib/mail";
@@ -325,6 +325,125 @@ export async function sendInvite(
       }).catch(() => {});
     }
   }
+
+  revalidatePath("/admin/users");
+  return { success: true };
+}
+
+// ─── Activate as Pro ────────────────────────────────────
+
+function slugify(text: string): string {
+  return text
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-|-$/g, "")
+    .slice(0, 80);
+}
+
+export async function activateAsPro(
+  userId: number
+): Promise<{ error?: string; success?: boolean }> {
+  await requireAdmin();
+
+  const [user] = await db
+    .select({
+      id: users.id,
+      firstName: users.firstName,
+      lastName: users.lastName,
+      email: users.email,
+      roles: users.roles,
+      preferredLocale: users.preferredLocale,
+    })
+    .from(users)
+    .where(eq(users.id, userId))
+    .limit(1);
+
+  if (!user) return { error: "User not found." };
+
+  // Add pro role if not already present
+  const currentRoles = user.roles?.split(",").filter(Boolean) ?? [];
+  if (!currentRoles.includes("pro")) {
+    currentRoles.push("pro");
+    await db
+      .update(users)
+      .set({ roles: currentRoles.join(",") })
+      .where(eq(users.id, userId));
+  }
+
+  // Create pro profile if doesn't exist
+  const [existingProfile] = await db
+    .select({ id: proProfiles.id })
+    .from(proProfiles)
+    .where(eq(proProfiles.userId, userId))
+    .limit(1);
+
+  if (!existingProfile) {
+    const slug = slugify(`${user.firstName} ${user.lastName}`) || `pro-${userId}`;
+    await db.insert(proProfiles).values({
+      userId,
+      slug,
+      displayName: `${user.firstName} ${user.lastName}`,
+      published: false,
+    });
+  }
+
+  // Send activation email
+  const locale = resolveLocale(user.preferredLocale);
+
+  const emailStrings: Record<string, { subject: string; body: string; note: string; button: string }> = {
+    en: {
+      subject: "Your pro account has been activated!",
+      body: "Great news! Your Golf Lessons pro account has been activated. You can now set up your profile, manage your availability, and start receiving bookings.",
+      note: "Start by completing your pro profile and adding your teaching locations.",
+      button: "Go to Pro Dashboard",
+    },
+    nl: {
+      subject: "Je pro-account is geactiveerd!",
+      body: "Goed nieuws! Je Golf Lessons pro-account is geactiveerd. Je kunt nu je profiel instellen, je beschikbaarheid beheren en beginnen met het ontvangen van boekingen.",
+      note: "Begin met het voltooien van je pro-profiel en het toevoegen van je leslocaties.",
+      button: "Naar Pro Dashboard",
+    },
+    fr: {
+      subject: "Votre compte pro a été activé !",
+      body: "Bonne nouvelle ! Votre compte pro Golf Lessons a été activé. Vous pouvez maintenant configurer votre profil, gérer vos disponibilités et commencer à recevoir des réservations.",
+      note: "Commencez par compléter votre profil pro et ajouter vos lieux d'enseignement.",
+      button: "Aller au Tableau de Bord Pro",
+    },
+  };
+
+  const s = emailStrings[locale] ?? emailStrings.en;
+  const { emailLayout } = await import("@/lib/email-templates");
+
+  const body = `
+    <h2 style="font-family:Georgia,'Times New Roman',serif;font-size:22px;color:#091a12;margin:0 0 16px 0;font-weight:normal;">
+      ${(getEmailStrings(locale)).inviteGreeting} ${user.firstName},
+    </h2>
+    <p style="margin:0 0 16px 0;">${s.body}</p>
+    <p style="margin:0 0 24px 0;color:#555;">${s.note}</p>
+    <p style="margin:0 0 24px 0;">
+      <a href="https://golflessons.be/pro/dashboard" style="display:inline-block;background:#a68523;color:#ffffff;padding:12px 28px;border-radius:6px;text-decoration:none;font-weight:500;font-size:14px;">
+        ${s.button}
+      </a>
+    </p>
+  `;
+
+  sendEmail({
+    to: user.email,
+    subject: s.subject,
+    html: emailLayout(body, undefined, locale),
+  }).catch(() => {});
+
+  // Notify the user in-app
+  const { createNotification } = await import("@/lib/notifications");
+  createNotification({
+    type: "pro_activated",
+    priority: "high",
+    targetUserId: userId,
+    title: "Your pro account has been activated!",
+    message: "You can now set up your profile and start receiving bookings.",
+    actionUrl: "/pro/dashboard",
+    actionLabel: "Go to dashboard",
+  }).catch(() => {});
 
   revalidatePath("/admin/users");
   return { success: true };
