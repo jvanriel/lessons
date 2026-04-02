@@ -27,6 +27,7 @@ const translations: Record<Locale, Record<string, string>> = {
     "auth.passwordMinLength": "Password must be at least 8 characters.",
     "auth.passwordMismatch": "Passwords do not match.",
     "auth.emailExists": "An account with this email already exists.",
+    "auth.forgotPassword": "Forgot password?",
 
     // Registration
     "register.chooseType": "How would you like to use Golf Lessons?",
@@ -218,6 +219,7 @@ const translations: Record<Locale, Record<string, string>> = {
     "auth.passwordMinLength": "Wachtwoord moet minimaal 8 tekens zijn.",
     "auth.passwordMismatch": "Wachtwoorden komen niet overeen.",
     "auth.emailExists": "Er bestaat al een account met dit e-mailadres.",
+    "auth.forgotPassword": "Wachtwoord vergeten?",
     "register.chooseType": "Hoe wil je Golf Lessons gebruiken?",
     "register.student": "Leerling",
     "register.studentDesc": "Vind een pro, boek lessen, ontvang persoonlijke coaching en feedback.",
@@ -396,6 +398,7 @@ const translations: Record<Locale, Record<string, string>> = {
     "auth.passwordMinLength": "Le mot de passe doit contenir au moins 8 caractères.",
     "auth.passwordMismatch": "Les mots de passe ne correspondent pas.",
     "auth.emailExists": "Un compte avec cette adresse e-mail existe déjà.",
+    "auth.forgotPassword": "Mot de passe oublié ?",
     "register.chooseType": "Comment souhaitez-vous utiliser Golf Lessons ?",
     "register.student": "Élève",
     "register.studentDesc": "Trouvez un pro, réservez des cours, recevez du coaching et des retours personnalisés.",

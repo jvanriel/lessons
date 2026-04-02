@@ -56,6 +56,14 @@ function LoginFormInner({ locale }: { locale: Locale }) {
               className="mt-1 block w-full rounded-lg border border-green-700 bg-green-900 px-3 py-2 text-white placeholder-green-400 focus:border-gold-500 focus:outline-none focus:ring-1 focus:ring-gold-500"
             />
           </div>
+          <div className="text-right">
+            <Link
+              href="/forgot-password"
+              className="text-xs text-green-100/40 hover:text-gold-200"
+            >
+              {t("auth.forgotPassword", locale)}
+            </Link>
+          </div>
           {state?.error && (
             <p className="text-sm text-red-400">{state.error}</p>
           )}
