@@ -24,10 +24,15 @@ export async function sendEmail({
   try {
     const gmail = getGmailClient();
 
+    // RFC 2047 encode subject for non-ASCII characters
+    const encodedSubject = /[^\x20-\x7E]/.test(subject)
+      ? `=?UTF-8?B?${Buffer.from(subject).toString("base64")}?=`
+      : subject;
+
     const message = [
       `From: Golf Lessons <${SEND_AS}>`,
       `To: ${to}`,
-      `Subject: ${subject}`,
+      `Subject: ${encodedSubject}`,
       `MIME-Version: 1.0`,
       `Content-Type: text/html; charset=utf-8`,
       ``,
