@@ -229,6 +229,21 @@ export const proPages = pgTable("pro_pages", {
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });
 
+// ─── Pro-Student Relationships ──────────────────────────────
+
+export const proStudents = pgTable("pro_students", {
+  id: serial("id").primaryKey(),
+  proProfileId: integer("pro_profile_id")
+    .references(() => proProfiles.id, { onDelete: "cascade" })
+    .notNull(),
+  userId: integer("user_id")
+    .references(() => users.id, { onDelete: "cascade" })
+    .notNull(),
+  source: varchar("source", { length: 20 }).notNull().default("self"),
+  status: varchar("status", { length: 20 }).notNull().default("active"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
 // ─── Pro Mailing ────────────────────────────────────────────
 
 export const proMailingContacts = pgTable("pro_mailing_contacts", {

@@ -10,7 +10,7 @@ import PasswordInput from "@/components/PasswordInput";
 const inputClass =
   "mt-1 block w-full rounded-lg border border-green-700 bg-green-900 px-3 py-2 text-white placeholder-green-400 focus:border-gold-500 focus:outline-none focus:ring-1 focus:ring-gold-500";
 
-export default function RegisterForm({ locale }: { locale: Locale }) {
+export default function RegisterForm({ locale, proId }: { locale: Locale; proId?: string }) {
   const [accountType, setAccountType] = useState<"student" | "pro" | null>(
     null
   );
@@ -108,6 +108,7 @@ export default function RegisterForm({ locale }: { locale: Locale }) {
 
         <form action={action} className="mt-6 space-y-4">
           <input type="hidden" name="accountType" value={accountType} />
+          {proId && <input type="hidden" name="proId" value={proId} />}
           <div className="grid grid-cols-2 gap-3">
             <div>
               <label htmlFor="firstName" className="block text-sm font-medium text-green-100">

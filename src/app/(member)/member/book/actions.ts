@@ -9,6 +9,7 @@ import {
   proAvailabilityOverrides,
   lessonBookings,
   lessonParticipants,
+  proStudents,
 } from "@/lib/db/schema";
 import { eq, and, gte, lte, sql } from "drizzle-orm";
 import { getSession, hasRole } from "@/lib/auth";
@@ -340,6 +341,27 @@ export async function createBooking(formData: FormData) {
     email,
     phone,
   });
+
+  // Ensure pro-student relationship exists
+  const [existingRelation] = await db
+    .select({ id: proStudents.id })
+    .from(proStudents)
+    .where(
+      and(
+        eq(proStudents.proProfileId, proProfileId),
+        eq(proStudents.userId, session.userId)
+      )
+    )
+    .limit(1);
+
+  if (!existingRelation) {
+    await db.insert(proStudents).values({
+      proProfileId: proProfileId,
+      userId: session.userId,
+      source: "self",
+      status: "active",
+    });
+  }
 
   // Notify the pro
   const [pro] = await db

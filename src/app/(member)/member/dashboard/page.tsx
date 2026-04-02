@@ -3,6 +3,7 @@ import {
   lessonBookings,
   proProfiles,
   proLocations,
+  proStudents,
   locations,
 } from "@/lib/db/schema";
 import { eq, and, gte, asc } from "drizzle-orm";
@@ -65,12 +66,100 @@ export default async function MemberDashboard() {
     )
     .limit(6);
 
+  // Get my pros (via proStudents relationships)
+  const myPros = await db
+    .select({
+      proStudentId: proStudents.id,
+      slug: proProfiles.slug,
+      displayName: proProfiles.displayName,
+      photoUrl: proProfiles.photoUrl,
+      specialties: proProfiles.specialties,
+      bookingEnabled: proProfiles.bookingEnabled,
+    })
+    .from(proStudents)
+    .innerJoin(proProfiles, eq(proStudents.proProfileId, proProfiles.id))
+    .where(
+      and(
+        eq(proStudents.userId, session.userId),
+        eq(proStudents.status, "active")
+      )
+    );
+
   return (
     <div className="mx-auto max-w-4xl px-6 py-12">
       <h1 className="font-display text-3xl font-semibold text-green-900">
         {t("member.welcome", locale)}
       </h1>
       <p className="mt-2 text-green-700">{session.email}</p>
+
+      {/* My Pros */}
+      <div className="mt-8">
+        <div className="flex items-center justify-between mb-4">
+          <h2 className="font-display text-xl font-medium text-green-800">
+            My Pros
+          </h2>
+          <Link
+            href="/member/choose-pros"
+            className="text-sm text-gold-600 hover:text-gold-500"
+          >
+            {myPros.length > 0 ? "Manage" : "Find pros"}
+          </Link>
+        </div>
+        {myPros.length === 0 ? (
+          <div className="rounded-xl border border-green-200 bg-white p-6 text-center">
+            <p className="text-sm text-green-600">
+              You haven&apos;t connected with any pros yet.
+            </p>
+            <Link
+              href="/member/choose-pros"
+              className="mt-3 inline-block rounded-md bg-gold-600 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-gold-500"
+            >
+              Find a pro
+            </Link>
+          </div>
+        ) : (
+          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+            {myPros.map((pro) => (
+              <div
+                key={pro.proStudentId}
+                className="rounded-xl border border-green-200 bg-white p-4 transition-all hover:border-green-300"
+              >
+                <div className="flex items-center gap-3">
+                  {pro.photoUrl ? (
+                    <img
+                      src={pro.photoUrl}
+                      alt={pro.displayName}
+                      className="h-10 w-10 rounded-full object-cover"
+                    />
+                  ) : (
+                    <div className="flex h-10 w-10 items-center justify-center rounded-full bg-green-100 text-sm font-medium text-green-600">
+                      {pro.displayName.charAt(0)}
+                    </div>
+                  )}
+                  <div className="min-w-0 flex-1">
+                    <p className="text-sm font-medium text-green-900 truncate">
+                      {pro.displayName}
+                    </p>
+                    {pro.specialties && (
+                      <p className="text-xs text-green-500 truncate">
+                        {pro.specialties}
+                      </p>
+                    )}
+                  </div>
+                </div>
+                {pro.bookingEnabled && (
+                  <Link
+                    href={`/member/book/${pro.slug}`}
+                    className="mt-3 block rounded-md bg-gold-600 px-3 py-1.5 text-center text-xs font-medium text-white transition-colors hover:bg-gold-500"
+                  >
+                    Book a lesson
+                  </Link>
+                )}
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
 
       {/* Upcoming bookings */}
       <div className="mt-8 rounded-xl border border-green-200 bg-white p-6">

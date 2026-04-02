@@ -21,6 +21,7 @@ export async function register(
   const password = formData.get("password") as string;
   const confirm = formData.get("confirmPassword") as string;
   const accountType = (formData.get("accountType") as string) || "student";
+  const proId = (formData.get("proId") as string)?.trim() || "";
 
   if (!firstName || !lastName || !email || !password) {
     return { error: "All fields are required." };
@@ -109,5 +110,8 @@ export async function register(
     roles: ["member"],
   });
 
-  redirect("/member/dashboard");
+  const chooseProsUrl = proId
+    ? `/member/choose-pros?pro=${encodeURIComponent(proId)}`
+    : "/member/choose-pros";
+  redirect(chooseProsUrl);
 }

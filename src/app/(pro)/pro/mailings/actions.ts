@@ -7,6 +7,7 @@ import {
   proMailingContacts,
   proMailings,
   proPages,
+  proStudents,
   lessonBookings,
   lessonParticipants,
   users,
@@ -98,10 +99,25 @@ export async function syncStudentContacts() {
   const proId = await getProProfileId();
   if (!proId) return { error: "Unauthorized", count: 0 };
 
-  // Get all students who booked with this pro
+  // Get all students from proStudents relationships (primary source)
+  const studentRelations = await db
+    .select({
+      email: users.email,
+      firstName: users.firstName,
+      lastName: users.lastName,
+    })
+    .from(proStudents)
+    .innerJoin(users, eq(proStudents.userId, users.id))
+    .where(
+      and(
+        eq(proStudents.proProfileId, proId),
+        eq(proStudents.status, "active")
+      )
+    );
+
+  // Also get students from bookings (catch any not in proStudents)
   const bookings = await db
     .select({
-      bookedById: lessonBookings.bookedById,
       email: users.email,
       firstName: users.firstName,
       lastName: users.lastName,
@@ -118,11 +134,22 @@ export async function syncStudentContacts() {
 
   const existingEmails = new Set(existing.map((e) => e.email));
 
-  // Deduplicate bookings by email
+  // Merge both sources, deduplicate by email
   const newContacts = new Map<
     string,
     { email: string; firstName: string; lastName: string }
   >();
+
+  for (const s of studentRelations) {
+    if (!existingEmails.has(s.email) && !newContacts.has(s.email)) {
+      newContacts.set(s.email, {
+        email: s.email,
+        firstName: s.firstName,
+        lastName: s.lastName,
+      });
+    }
+  }
+
   for (const b of bookings) {
     if (!existingEmails.has(b.email) && !newContacts.has(b.email)) {
       newContacts.set(b.email, {

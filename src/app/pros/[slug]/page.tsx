@@ -9,6 +9,8 @@ import {
   proPages,
 } from "@/lib/db/schema";
 import { eq, and } from "drizzle-orm";
+import { checkStudentRelationship } from "./actions";
+import JoinButton from "./JoinButton";
 
 interface Props {
   params: Promise<{ slug: string }>;
@@ -69,6 +71,8 @@ export default async function ProProfilePage({ params }: Props) {
       )
     );
 
+  const relationship = await checkStudentRelationship(pro.id);
+
   const flyerPages = await db
     .select({
       slug: proPages.slug,
@@ -126,14 +130,22 @@ export default async function ProProfilePage({ params }: Props) {
                 Max {pro.maxGroupSize} per group
               </span>
             </div>
-            {pro.bookingEnabled && (
-              <Link
-                href={`/member/book/${slug}`}
-                className="mt-4 inline-block rounded-md bg-gold-600 px-5 py-2.5 text-sm font-medium text-white transition-colors hover:bg-gold-500"
-              >
-                Book a Lesson
-              </Link>
-            )}
+            <div className="mt-4 flex flex-wrap gap-3">
+              {pro.bookingEnabled && (
+                <Link
+                  href={`/member/book/${slug}`}
+                  className="inline-block rounded-md bg-gold-600 px-5 py-2.5 text-sm font-medium text-white transition-colors hover:bg-gold-500"
+                >
+                  Book a Lesson
+                </Link>
+              )}
+              <JoinButton
+                proProfileId={pro.id}
+                slug={slug}
+                isLoggedIn={relationship.isLoggedIn}
+                isStudent={relationship.isStudent}
+              />
+            </div>
           </div>
         </div>
 
