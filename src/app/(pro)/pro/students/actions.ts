@@ -124,15 +124,16 @@ export async function inviteStudent(
   }
 
   // Create pro-student relationship
+  // "pro_added" is always active immediately; "invited" is pending until first login
   await db.insert(proStudents).values({
     proProfileId: profile.id,
     userId,
     source,
-    status: tempPassword ? "pending" : "active",
+    status: source === "pro_added" ? "active" : (tempPassword ? "pending" : "active"),
   });
 
-  // Send invite email if new user
-  if (tempPassword && source === "invited") {
+  // Send invite email if new user was created
+  if (tempPassword) {
     const locale = resolveLocale("en");
     const strings = getEmailStrings(locale);
 
