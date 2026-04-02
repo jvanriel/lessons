@@ -6,6 +6,9 @@ import { eq, and, desc, inArray, sql, lt } from "drizzle-orm";
 
 const GATEWAY_URL = process.env.GATEWAY_URL;
 const GATEWAY_API_KEY = process.env.GATEWAY_API_KEY;
+const NTFY_URL = process.env.NTFY_URL;
+const NTFY_AUTH = process.env.NTFY_AUTH;
+const NTFY_TOPIC = process.env.NTFY_TOPIC || "golf-alerts";
 
 async function getUserIdsByRoles(roles: string[]): Promise<number[]> {
   const pattern = `%(${roles.join("|")})%`;
@@ -62,6 +65,26 @@ export async function createNotification(opts: {
         userIds: targetUserIds,
         priority: opts.priority ?? "normal",
       }),
+    }).catch(() => {});
+  }
+
+  // ntfy mobile push for high/urgent priority
+  if (
+    NTFY_URL &&
+    NTFY_AUTH &&
+    (opts.priority === "high" || opts.priority === "urgent")
+  ) {
+    fetch(`${NTFY_URL}/${NTFY_TOPIC}`, {
+      method: "POST",
+      headers: {
+        Title: opts.title,
+        Priority: opts.priority === "urgent" ? "urgent" : "high",
+        Authorization: `Basic ${NTFY_AUTH}`,
+        ...(opts.actionUrl
+          ? { Actions: `view, Open, https://golflessons.be${opts.actionUrl}` }
+          : {}),
+      },
+      body: opts.message ?? opts.title,
     }).catch(() => {});
   }
 }
