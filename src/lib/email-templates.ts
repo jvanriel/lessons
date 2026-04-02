@@ -36,6 +36,9 @@ const EMAIL_STRINGS: Record<
     invitePassword: string;
     inviteChangePassword: string;
     inviteCopySubject: string;
+    resetSubject: string;
+    resetBody: string;
+    resetChangePassword: string;
   }
 > = {
   en: {
@@ -52,6 +55,9 @@ const EMAIL_STRINGS: Record<
     invitePassword: "Password",
     inviteChangePassword: "Please change your password after first login via Profile → Change Password.",
     inviteCopySubject: "Copy: Invitation sent to",
+    resetSubject: "Your password has been reset",
+    resetBody: "Your password for Golf Lessons has been reset by an administrator. Here are your new credentials:",
+    resetChangePassword: "Please log in and change your password via Profile → Change Password.",
   },
   nl: {
     tagline: "Boek lessen bij gecertificeerde golfprofessionals",
@@ -67,6 +73,9 @@ const EMAIL_STRINGS: Record<
     invitePassword: "Wachtwoord",
     inviteChangePassword: "Wijzig je wachtwoord na de eerste login via Profiel → Wachtwoord wijzigen.",
     inviteCopySubject: "Kopie: Uitnodiging verstuurd naar",
+    resetSubject: "Je wachtwoord is gewijzigd",
+    resetBody: "Je wachtwoord voor Golf Lessons is gewijzigd door een beheerder. Hier zijn je nieuwe inloggegevens:",
+    resetChangePassword: "Log in en wijzig je wachtwoord via Profiel → Wachtwoord wijzigen.",
   },
   fr: {
     tagline: "Réservez des cours avec des professionnels de golf certifiés",
@@ -82,6 +91,9 @@ const EMAIL_STRINGS: Record<
     invitePassword: "Mot de passe",
     inviteChangePassword: "Veuillez changer votre mot de passe après la première connexion via Profil → Changer le mot de passe.",
     inviteCopySubject: "Copie : Invitation envoyée à",
+    resetSubject: "Votre mot de passe a été réinitialisé",
+    resetBody: "Votre mot de passe pour Golf Lessons a été réinitialisé par un administrateur. Voici vos nouveaux identifiants :",
+    resetChangePassword: "Connectez-vous et changez votre mot de passe via Profil → Changer le mot de passe.",
   },
 };
 
@@ -252,6 +264,47 @@ export function buildInviteEmail(opts: {
     </p>
     <p style="color:#666;font-size:13px;margin:0 0 8px 0;">${s.inviteChangePassword}</p>
     ${commentBlock}
+  `;
+
+  return emailLayout(body, undefined, opts.locale);
+}
+
+/**
+ * Build a password reset notification email.
+ */
+export function buildPasswordResetEmail(opts: {
+  firstName: string;
+  loginEmail: string;
+  password: string;
+  locale: Locale;
+}): string {
+  const s = EMAIL_STRINGS[opts.locale] ?? EMAIL_STRINGS.en;
+  const loginUrl = "https://golflessons.be/login";
+
+  const body = `
+    <h2 style="font-family:Georgia,'Times New Roman',serif;font-size:22px;color:${COLORS.green950};margin:0 0 16px 0;font-weight:normal;">
+      ${s.inviteGreeting} ${opts.firstName},
+    </h2>
+    <p style="margin:0 0 20px 0;">${s.resetBody}</p>
+    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:${COLORS.green100};border:1px solid #b4d6c1;border-radius:8px;margin:0 0 20px 0;">
+      <tr>
+        <td style="padding:16px 20px;">
+          <p style="margin:0 0 8px 0;font-size:14px;">
+            <strong>${s.inviteLogin}:</strong> ${opts.loginEmail}
+          </p>
+          <p style="margin:0;font-size:14px;">
+            <strong>${s.invitePassword}:</strong>
+            <code style="background:${COLORS.white};padding:2px 8px;border-radius:4px;font-family:monospace;font-size:14px;">${opts.password}</code>
+          </p>
+        </td>
+      </tr>
+    </table>
+    <p style="margin:0 0 24px 0;">
+      <a href="${loginUrl}" style="display:inline-block;background:${COLORS.gold600};color:${COLORS.white};padding:12px 28px;border-radius:6px;text-decoration:none;font-weight:500;font-size:14px;">
+        ${s.loginButton}
+      </a>
+    </p>
+    <p style="color:#666;font-size:13px;margin:0 0 8px 0;">${s.resetChangePassword}</p>
   `;
 
   return emailLayout(body, undefined, opts.locale);

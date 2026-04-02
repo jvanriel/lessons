@@ -6,7 +6,7 @@ import { users, userEmails } from "@/lib/db/schema";
 import { eq, and } from "drizzle-orm";
 import { getSession, hasRole, hashPassword } from "@/lib/auth";
 import { sendEmail } from "@/lib/mail";
-import { buildInviteEmail, getEmailStrings } from "@/lib/email-templates";
+import { buildInviteEmail, buildPasswordResetEmail, getEmailStrings } from "@/lib/email-templates";
 import { resolveLocale } from "@/lib/i18n";
 
 async function requireAdmin() {
@@ -208,6 +208,57 @@ export async function resetPassword(
 
   revalidatePath("/admin/users");
   return { password: tempPassword };
+}
+
+export async function resetPasswordWithNotification(
+  userId: number,
+  password: string,
+  notify: boolean
+): Promise<{ error?: string; success?: boolean }> {
+  await requireAdmin();
+
+  const [user] = await db
+    .select({
+      id: users.id,
+      firstName: users.firstName,
+      email: users.email,
+      preferredLocale: users.preferredLocale,
+    })
+    .from(users)
+    .where(eq(users.id, userId))
+    .limit(1);
+
+  if (!user) return { error: "User not found." };
+
+  const hashed = await hashPassword(password);
+  await db
+    .update(users)
+    .set({ password: hashed })
+    .where(eq(users.id, userId));
+
+  if (notify) {
+    const locale = resolveLocale(user.preferredLocale);
+    const strings = getEmailStrings(locale);
+    const html = buildPasswordResetEmail({
+      firstName: user.firstName,
+      loginEmail: user.email,
+      password,
+      locale,
+    });
+
+    const result = await sendEmail({
+      to: user.email,
+      subject: strings.resetSubject,
+      html,
+    });
+
+    if (result.error) {
+      return { error: `Password set but email failed: ${result.error}` };
+    }
+  }
+
+  revalidatePath("/admin/users");
+  return { success: true };
 }
 
 export async function sendInvite(

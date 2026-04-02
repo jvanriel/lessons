@@ -6,6 +6,7 @@ import {
   updateUser,
   deleteUser,
   resetPassword,
+  resetPasswordWithNotification,
   sendInvite,
   addUserEmail,
   removeUserEmail,
@@ -165,6 +166,7 @@ function UserRowActions({
 }) {
   const [menuOpen, setMenuOpen] = useState(false);
   const [showInvite, setShowInvite] = useState(false);
+  const [showReset, setShowReset] = useState(false);
   const [, startTransition] = useTransition();
   const ref = useRef<HTMLDivElement>(null);
 
@@ -180,16 +182,7 @@ function UserRowActions({
 
   function handleResetPassword() {
     setMenuOpen(false);
-    if (!confirm(`Reset password for ${user.firstName} ${user.lastName}?`))
-      return;
-    startTransition(async () => {
-      const result = await resetPassword(user.id);
-      if (result.error) alert(result.error);
-      else if (result.password) {
-        navigator.clipboard.writeText(result.password).catch(() => {});
-        alert(`New password (copied to clipboard):\n\n${result.password}`);
-      }
-    });
+    setShowReset(true);
   }
 
   function handleDelete() {
@@ -213,6 +206,14 @@ function UserRowActions({
         <InviteUserDialog
           user={user}
           onClose={() => setShowInvite(false)}
+        />
+      )}
+
+      {/* Reset password dialog */}
+      {showReset && (
+        <ResetPasswordDialog
+          user={user}
+          onClose={() => setShowReset(false)}
         />
       )}
 
@@ -492,6 +493,172 @@ function InviteUserDialog({
                   className="rounded-lg bg-gold-600 px-4 py-2 text-sm font-medium text-white hover:bg-gold-500 disabled:opacity-50"
                 >
                   {sending ? "Sending..." : "Send Invite"}
+                </button>
+              </div>
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function ResetPasswordDialog({
+  user,
+  onClose,
+}: {
+  user: User;
+  onClose: () => void;
+}) {
+  const [sending, setSending] = useState(false);
+  const [done, setDone] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [copied, setCopied] = useState(false);
+  const [sendNotification, setSendNotification] = useState(true);
+
+  // Generate password on mount
+  const [generatedPassword] = useState(() => {
+    const chars =
+      "ABCDEFGHJKLMNPQRSTUVWXYZabcdefghjkmnpqrstuvwxyz23456789!@#$%";
+    let pw = "";
+    const arr = new Uint8Array(12);
+    crypto.getRandomValues(arr);
+    for (const b of arr) pw += chars[b % chars.length];
+    return pw;
+  });
+
+  function handleCopy() {
+    navigator.clipboard.writeText(generatedPassword).then(() => {
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    });
+  }
+
+  async function handleReset() {
+    setSending(true);
+    setError(null);
+
+    const result = await resetPasswordWithNotification(
+      user.id,
+      generatedPassword,
+      sendNotification
+    );
+
+    if (result.error) {
+      setError(result.error);
+      setSending(false);
+      return;
+    }
+
+    setDone(true);
+    setSending(false);
+  }
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-start justify-center bg-black/50 pt-12">
+      <div className="w-full max-w-md rounded-xl border border-green-200 bg-white shadow-2xl">
+        <div className="flex items-center justify-between border-b border-green-100 px-6 py-4">
+          <h2 className="font-display text-lg font-semibold text-green-950">
+            Reset Password
+          </h2>
+          <button
+            onClick={onClose}
+            className="rounded-lg p-1 text-green-800/50 hover:bg-green-100"
+          >
+            <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M6 18 18 6M6 6l12 12" />
+            </svg>
+          </button>
+        </div>
+
+        <div className="px-6 py-4">
+          {done ? (
+            <div className="space-y-4">
+              <div className="rounded-lg border border-green-200 bg-green-50 p-4">
+                <p className="text-sm font-medium text-green-800">
+                  Password reset for {user.firstName} {user.lastName}
+                </p>
+                {sendNotification && (
+                  <p className="mt-1 text-xs text-green-600">
+                    A notification email has been sent to {user.email}.
+                  </p>
+                )}
+              </div>
+              <div className="flex items-center gap-2">
+                <div className="flex-1 rounded-lg border border-green-200 bg-green-50 px-4 py-2.5 font-mono text-sm text-green-900 select-all">
+                  {generatedPassword}
+                </div>
+                <button
+                  onClick={handleCopy}
+                  className={`rounded-lg px-3 py-2.5 text-xs font-medium transition-colors ${
+                    copied
+                      ? "bg-green-700 text-white"
+                      : "border border-green-300 text-green-700 hover:bg-green-50"
+                  }`}
+                >
+                  {copied ? "Copied!" : "Copy"}
+                </button>
+              </div>
+              <button
+                onClick={onClose}
+                className="w-full rounded-lg bg-green-700 px-4 py-2.5 text-sm font-medium text-white hover:bg-green-800"
+              >
+                Done
+              </button>
+            </div>
+          ) : (
+            <div className="space-y-4">
+              <p className="text-sm text-green-700">
+                Reset the password for{" "}
+                <strong>{user.firstName} {user.lastName}</strong> ({user.email}).
+              </p>
+
+              <div>
+                <label className="block text-sm font-medium text-green-800">
+                  New password
+                </label>
+                <div className="mt-1 flex items-center gap-2">
+                  <div className="flex-1 rounded-lg border border-green-200 bg-green-50 px-4 py-2.5 font-mono text-sm text-green-900 select-all">
+                    {generatedPassword}
+                  </div>
+                  <button
+                    onClick={handleCopy}
+                    className={`rounded-lg px-3 py-2.5 text-xs font-medium transition-colors ${
+                      copied
+                        ? "bg-green-700 text-white"
+                        : "border border-green-300 text-green-700 hover:bg-green-50"
+                    }`}
+                  >
+                    {copied ? "Copied!" : "Copy"}
+                  </button>
+                </div>
+              </div>
+
+              <label className="flex items-center gap-2 text-sm text-green-700">
+                <input
+                  type="checkbox"
+                  checked={sendNotification}
+                  onChange={(e) => setSendNotification(e.target.checked)}
+                  className="h-4 w-4 rounded border-green-300 text-green-600"
+                />
+                Notify the user by email
+              </label>
+
+              {error && <p className="text-sm text-red-600">{error}</p>}
+
+              <div className="flex justify-end gap-3 pt-2">
+                <button
+                  onClick={onClose}
+                  className="rounded-lg border border-green-200 px-4 py-2 text-sm font-medium text-green-800 hover:bg-green-50"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={handleReset}
+                  disabled={sending}
+                  className="rounded-lg bg-red-600 px-4 py-2 text-sm font-medium text-white hover:bg-red-500 disabled:opacity-50"
+                >
+                  {sending ? "Resetting..." : "Reset Password"}
                 </button>
               </div>
             </div>
