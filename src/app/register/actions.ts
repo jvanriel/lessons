@@ -6,6 +6,9 @@ import { users, userEmails } from "@/lib/db/schema";
 import { eq } from "drizzle-orm";
 import { hashPassword, setSessionCookie } from "@/lib/auth";
 import { createNotification } from "@/lib/notifications";
+import { sendEmail } from "@/lib/mail";
+import { buildWelcomeEmail, getWelcomeSubject } from "@/lib/email-templates";
+import { resolveLocale } from "@/lib/i18n";
 
 export async function register(
   _prevState: { error: string } | null,
@@ -89,6 +92,15 @@ export async function register(
     actionUrl: "/admin/users",
     actionLabel: "View users",
     metadata: { userId, email, accountType },
+  }).catch(() => {});
+
+  // Send welcome email
+  const locale = resolveLocale("en"); // new users default to en
+  const acctType = accountType === "pro" ? "pro" : "student";
+  sendEmail({
+    to: email,
+    subject: getWelcomeSubject(acctType, locale),
+    html: buildWelcomeEmail({ firstName, accountType: acctType, locale }),
   }).catch(() => {});
 
   await setSessionCookie({

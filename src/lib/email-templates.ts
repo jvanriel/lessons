@@ -309,3 +309,64 @@ export function buildPasswordResetEmail(opts: {
 
   return emailLayout(body, undefined, opts.locale);
 }
+
+/**
+ * Build a welcome/registration confirmation email.
+ */
+export function buildWelcomeEmail(opts: {
+  firstName: string;
+  accountType: "student" | "pro";
+  locale: Locale;
+}): string {
+  const strings: Record<string, { subject: string; body: string; proNote: string; studentNote: string; button: string }> = {
+    en: {
+      subject: "Welcome to Golf Lessons!",
+      body: "Thank you for signing up. Your account has been created successfully.",
+      proNote: "Our team will review your registration and set up your pro profile. You'll receive a notification once your account is activated as a golf professional.",
+      studentNote: "You can now browse our pros and book your first lesson.",
+      button: "Explore Golf Lessons",
+    },
+    nl: {
+      subject: "Welkom bij Golf Lessons!",
+      body: "Bedankt voor je registratie. Je account is succesvol aangemaakt.",
+      proNote: "Ons team beoordeelt je registratie en stelt je pro-profiel in. Je ontvangt een melding zodra je account is geactiveerd als golfprofessional.",
+      studentNote: "Je kunt nu onze pro's bekijken en je eerste les boeken.",
+      button: "Ontdek Golf Lessons",
+    },
+    fr: {
+      subject: "Bienvenue sur Golf Lessons !",
+      body: "Merci de vous être inscrit. Votre compte a été créé avec succès.",
+      proNote: "Notre équipe examinera votre inscription et configurera votre profil pro. Vous recevrez une notification une fois votre compte activé en tant que professionnel de golf.",
+      studentNote: "Vous pouvez maintenant parcourir nos pros et réserver votre premier cours.",
+      button: "Découvrir Golf Lessons",
+    },
+  };
+
+  const s = strings[opts.locale] ?? strings.en;
+  const greeting = (EMAIL_STRINGS[opts.locale] ?? EMAIL_STRINGS.en).inviteGreeting;
+  const note = opts.accountType === "pro" ? s.proNote : s.studentNote;
+
+  const body = `
+    <h2 style="font-family:Georgia,'Times New Roman',serif;font-size:22px;color:${COLORS.green950};margin:0 0 16px 0;font-weight:normal;">
+      ${greeting} ${opts.firstName},
+    </h2>
+    <p style="margin:0 0 16px 0;">${s.body}</p>
+    <p style="margin:0 0 24px 0;color:#555;">${note}</p>
+    <p style="margin:0 0 24px 0;">
+      <a href="https://golflessons.be" style="display:inline-block;background:${COLORS.gold600};color:${COLORS.white};padding:12px 28px;border-radius:6px;text-decoration:none;font-weight:500;font-size:14px;">
+        ${s.button}
+      </a>
+    </p>
+  `;
+
+  return emailLayout(body, undefined, opts.locale);
+}
+
+export function getWelcomeSubject(accountType: "student" | "pro", locale: Locale): string {
+  const subjects: Record<string, Record<string, string>> = {
+    en: { student: "Welcome to Golf Lessons!", pro: "Welcome to Golf Lessons — Registration received" },
+    nl: { student: "Welkom bij Golf Lessons!", pro: "Welkom bij Golf Lessons — Registratie ontvangen" },
+    fr: { student: "Bienvenue sur Golf Lessons !", pro: "Bienvenue sur Golf Lessons — Inscription reçue" },
+  };
+  return (subjects[locale] ?? subjects.en)[accountType];
+}
