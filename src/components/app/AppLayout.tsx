@@ -5,6 +5,13 @@ import AppTopBar from "./AppTopBar";
 import AppSidebar from "./AppSidebar";
 import BottomNav from "./BottomNav";
 
+interface ImpersonableUser {
+  id: number;
+  name: string;
+  email: string;
+  roles: string;
+}
+
 interface AppLayoutProps {
   children: ReactNode;
   roles: string[];
@@ -12,6 +19,10 @@ interface AppLayoutProps {
   showNotifications: boolean;
   sessionToken?: string;
   locale: string;
+  impersonating: boolean;
+  impersonatorName: string | null;
+  canImpersonate: boolean;
+  impersonableUsers: ImpersonableUser[];
 }
 
 const STORAGE_KEY = "app-sidebar-collapsed";
@@ -23,6 +34,10 @@ export default function AppLayout({
   showNotifications,
   sessionToken,
   locale,
+  impersonating,
+  impersonatorName,
+  canImpersonate,
+  impersonableUsers,
 }: AppLayoutProps) {
   const [collapsed, setCollapsed] = useState(false);
 
@@ -56,6 +71,10 @@ export default function AppLayout({
         showNotifications={showNotifications}
         sessionToken={sessionToken}
         locale={locale}
+        impersonating={impersonating}
+        impersonatorName={impersonatorName}
+        canImpersonate={canImpersonate}
+        impersonableUsers={impersonableUsers}
       />
       <div className="flex flex-1 overflow-hidden">
         <AppSidebar

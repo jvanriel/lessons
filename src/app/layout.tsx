@@ -8,11 +8,11 @@ import { ToolboxProvider } from "@/components/toolbox/ToolboxProvider";
 import AdminToolbox from "@/components/toolbox/AdminToolbox";
 import PreLaunchBanner from "@/components/PreLaunchBanner";
 import DeploymentChecker from "@/components/DeploymentChecker";
-import { getSession, hasRole } from "@/lib/auth";
+import { getSession, hasRole, getImpersonatorSession, parseRoles } from "@/lib/auth";
 import { cookies } from "next/headers";
 import { db } from "@/lib/db";
 import { users } from "@/lib/db/schema";
-import { eq } from "drizzle-orm";
+import { eq, ne } from "drizzle-orm";
 import { getLocale } from "@/lib/locale";
 import AppLayout from "@/components/app/AppLayout";
 
@@ -53,6 +53,10 @@ export default async function RootLayout({
         showNotifications: boolean;
         sessionToken?: string;
         locale: string;
+        impersonating: boolean;
+        impersonatorName: string | null;
+        canImpersonate: boolean;
+        impersonableUsers: { id: number; name: string; email: string; roles: string }[];
       }
     | null = null;
 
@@ -76,12 +80,66 @@ export default async function RootLayout({
       .limit(1);
     firstName = user?.firstName ?? null;
 
+    // Impersonation state
+    const impersonator = await getImpersonatorSession();
+    let impersonatorName: string | null = null;
+    if (impersonator) {
+      const [imp] = await db
+        .select({ firstName: users.firstName, lastName: users.lastName })
+        .from(users)
+        .where(eq(users.id, impersonator.userId))
+        .limit(1);
+      impersonatorName = [imp?.firstName, imp?.lastName].filter(Boolean).join(" ") || impersonator.email;
+    }
+
+    let canImpersonate = false;
+    let impersonableUsers: { id: number; name: string; email: string; roles: string }[] = [];
+    const realSession = impersonator || session;
+    if (realSession && !impersonator) {
+      const isRealDev = realSession.roles.includes("dev");
+      const isRealAdmin = realSession.roles.includes("admin");
+      if (isRealDev || isRealAdmin) {
+        canImpersonate = true;
+        try {
+        const allUsers = await db
+          .select({
+            id: users.id,
+            firstName: users.firstName,
+            lastName: users.lastName,
+            email: users.email,
+            roles: users.roles,
+          })
+          .from(users)
+          .where(ne(users.id, realSession.userId));
+        impersonableUsers = allUsers
+          .filter((u) => {
+            const r = parseRoles(u.roles);
+            if (isRealDev) return true;
+            return !r.includes("admin") && !r.includes("dev");
+          })
+          .map((u) => ({
+            id: u.id,
+            name: [u.firstName, u.lastName].filter(Boolean).join(" ") || u.email,
+            email: u.email,
+            roles: u.roles || "",
+          }));
+        } catch (err) {
+          console.error("[layout] impersonation query error:", err);
+          canImpersonate = false;
+        }
+      }
+    }
+
     appProps = {
       roles: session.roles as string[],
       firstName,
       showNotifications,
       sessionToken,
       locale,
+      impersonating: !!impersonator,
+      impersonatorName,
+      canImpersonate,
+      impersonableUsers,
     };
   }
 

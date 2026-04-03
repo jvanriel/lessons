@@ -8,12 +8,23 @@ import LanguageSwitcher from "@/components/LanguageSwitcher";
 import NotificationBell from "@/components/notifications/NotificationBell";
 import type { Locale } from "@/lib/i18n";
 
+interface ImpersonableUser {
+  id: number;
+  name: string;
+  email: string;
+  roles: string;
+}
+
 interface AppTopBarProps {
   firstName: string | null;
   onSidebarToggle: () => void;
   showNotifications: boolean;
   sessionToken?: string;
   locale: string;
+  impersonating: boolean;
+  impersonatorName: string | null;
+  canImpersonate: boolean;
+  impersonableUsers: ImpersonableUser[];
 }
 
 export default function AppTopBar({
@@ -22,9 +33,16 @@ export default function AppTopBar({
   showNotifications,
   sessionToken,
   locale,
+  impersonating,
+  impersonatorName,
+  canImpersonate,
+  impersonableUsers,
 }: AppTopBarProps) {
   const [userMenuOpen, setUserMenuOpen] = useState(false);
+  const [impersonateOpen, setImpersonateOpen] = useState(false);
+  const [impersonateSearch, setImpersonateSearch] = useState("");
   const userMenuRef = useRef<HTMLDivElement>(null);
+  const impersonateRef = useRef<HTMLDivElement>(null);
   const router = useRouter();
 
   useEffect(() => {
@@ -41,6 +59,43 @@ export default function AppTopBar({
     return () => document.removeEventListener("mousedown", handleClick);
   }, [userMenuOpen]);
 
+  // Close impersonate on outside click
+  useEffect(() => {
+    if (!impersonateOpen) return;
+    function handleClick(e: MouseEvent) {
+      if (impersonateRef.current && !impersonateRef.current.contains(e.target as Node)) {
+        setImpersonateOpen(false);
+        setImpersonateSearch("");
+      }
+    }
+    document.addEventListener("mousedown", handleClick);
+    return () => document.removeEventListener("mousedown", handleClick);
+  }, [impersonateOpen]);
+
+  async function handleStopImpersonating() {
+    await fetch("/api/auth/stop-impersonate", { method: "POST" });
+    router.push("/");
+    router.refresh();
+  }
+
+  async function handleImpersonate(userId: number) {
+    setImpersonateOpen(false);
+    setUserMenuOpen(false);
+    await fetch("/api/auth/impersonate", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ userId }),
+    });
+    router.push("/");
+    router.refresh();
+  }
+
+  const filteredUsers = (impersonableUsers ?? []).filter((u) => {
+    if (!impersonateSearch) return true;
+    const q = impersonateSearch.toLowerCase();
+    return u.name.toLowerCase().includes(q) || u.email.toLowerCase().includes(q) || u.roles.toLowerCase().includes(q);
+  });
+
   async function handleLogout() {
     setUserMenuOpen(false);
     const res = await fetch("/api/auth/logout", { method: "POST" });
@@ -55,6 +110,70 @@ export default function AppTopBar({
   }
 
   return (
+    <>
+    {/* Impersonation banner */}
+    {impersonating && (
+      <div className="flex h-8 shrink-0 items-center justify-center gap-3 bg-gold-600 text-xs text-white">
+        <span>
+          Impersonating <strong>{firstName}</strong>
+          {impersonatorName && <> (by {impersonatorName})</>}
+        </span>
+        <button
+          onClick={handleStopImpersonating}
+          className="rounded bg-white/20 px-2 py-0.5 text-xs font-medium hover:bg-white/30"
+        >
+          Stop
+        </button>
+      </div>
+    )}
+
+    {/* Impersonate picker modal */}
+    {impersonateOpen && (
+      <div className="fixed inset-0 z-50 flex items-start justify-center bg-black/50 pt-16" ref={impersonateRef}>
+        <div className="w-full max-w-md rounded-xl border border-green-700 bg-green-900 shadow-2xl">
+          <div className="border-b border-green-700 px-4 py-3">
+            <h3 className="text-sm font-medium text-gold-200">Log in as...</h3>
+            <input
+              type="text"
+              value={impersonateSearch}
+              onChange={(e) => setImpersonateSearch(e.target.value)}
+              placeholder="Search by name, email or role..."
+              autoFocus
+              className="mt-2 block w-full rounded-lg border border-green-700 bg-green-950 px-3 py-2 text-sm text-white placeholder-green-400 focus:border-gold-500 focus:outline-none"
+            />
+          </div>
+          <div className="max-h-80 overflow-y-auto py-1">
+            {filteredUsers.slice(0, 20).map((u) => (
+              <button
+                key={u.id}
+                onClick={() => handleImpersonate(u.id)}
+                className="block w-full px-4 py-2.5 text-left hover:bg-green-800"
+              >
+                <span className="text-sm text-green-100">{u.name}</span>
+                <span className="ml-2 text-xs text-green-100/40">{u.email}</span>
+                {u.roles && (
+                  <span className="ml-2 rounded-full bg-green-800 px-2 py-0.5 text-[10px] text-green-300">
+                    {u.roles}
+                  </span>
+                )}
+              </button>
+            ))}
+            {filteredUsers.length === 0 && (
+              <p className="px-4 py-3 text-sm text-green-100/40">No users found.</p>
+            )}
+          </div>
+          <div className="border-t border-green-700 px-4 py-2">
+            <button
+              onClick={() => { setImpersonateOpen(false); setImpersonateSearch(""); }}
+              className="text-xs text-green-100/50 hover:text-green-100"
+            >
+              Cancel
+            </button>
+          </div>
+        </div>
+      </div>
+    )}
+
     <header className="flex h-12 shrink-0 items-center justify-between border-b border-green-800 bg-green-950 px-4">
       {/* Left: hamburger + logo */}
       <div className="flex items-center gap-3">
@@ -125,16 +244,39 @@ export default function AppTopBar({
               >
                 Profile
               </Link>
+              {canImpersonate && (
+                <button
+                  onClick={() => {
+                    setUserMenuOpen(false);
+                    setImpersonateOpen(true);
+                  }}
+                  className="block w-full px-4 py-2 text-left text-sm text-gold-200/80 hover:bg-green-800 hover:text-gold-200"
+                >
+                  Log in as...
+                </button>
+              )}
+              {impersonating && (
+                <button
+                  onClick={() => {
+                    setUserMenuOpen(false);
+                    handleStopImpersonating();
+                  }}
+                  className="block w-full px-4 py-2 text-left text-sm text-gold-200/80 hover:bg-green-800 hover:text-gold-200"
+                >
+                  Stop impersonating
+                </button>
+              )}
               <button
                 onClick={handleLogout}
                 className="block w-full px-4 py-2 text-left text-sm text-green-100/70 hover:bg-green-800 hover:text-gold-200"
               >
-                Log out
+                {impersonating ? "Log out (return)" : "Log out"}
               </button>
             </div>
           )}
         </div>
       </div>
     </header>
+    </>
   );
 }
