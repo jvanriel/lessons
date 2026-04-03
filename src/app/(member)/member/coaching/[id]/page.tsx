@@ -44,7 +44,7 @@ export default async function MemberCoachingChatPage({
   }
 
   return (
-    <div className="-mb-[100vh] flex flex-col overflow-hidden" style={{ height: "calc(100dvh - 110px)" }}>
+    <div className="flex h-full flex-col overflow-hidden">
       {/* Header */}
       <div className="flex items-center gap-3 border-b border-green-100 bg-white px-4 py-3">
         <Link
