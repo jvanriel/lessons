@@ -22,6 +22,7 @@ const DEVICE_WIDTHS: Record<PreviewDevice, number> = {
 export default function CmsEditorPage() {
   const iframeRef = useRef<HTMLIFrameElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
+  const previewAreaRef = useRef<HTMLDivElement>(null);
   const [device, setDevice] = useState<PreviewDevice>("tablet");
   const [scale, setScale] = useState(1);
   const cms = useCms();
@@ -37,35 +38,31 @@ export default function CmsEditorPage() {
     return () => cms.setEditing(false);
   }, []);
 
-  // Calculate preview scale to fit container
-  useEffect(() => {
-    if (!containerRef.current) return;
+  const DEVICE_HEIGHTS: Record<PreviewDevice, number> = {
+    phone: 844,
+    tablet: 1024,
+    desktop: 900,
+  };
 
-    const DEVICE_HEIGHTS: Record<PreviewDevice, number> = {
-      phone: 844,
-      tablet: 1024,
-      desktop: 900,
-    };
+  // Calculate preview scale to fit the preview area (below toolbar)
+  useEffect(() => {
+    if (!previewAreaRef.current) return;
 
     const observer = new ResizeObserver((entries) => {
       const entry = entries[0];
       if (!entry) return;
-      const margin = 48; // 24px each side
-      const containerWidth = entry.contentRect.width - margin;
-      const containerHeight = entry.contentRect.height - margin;
-      const deviceWidth = DEVICE_WIDTHS[device];
-      const deviceHeight = DEVICE_HEIGHTS[device];
+      const margin = 48;
+      const areaWidth = entry.contentRect.width - margin;
+      const areaHeight = entry.contentRect.height - margin;
+      const dw = DEVICE_WIDTHS[device];
+      const dh = DEVICE_HEIGHTS[device];
 
-      // Scale to fit both width and height with margin
-      const scaleW = containerWidth / deviceWidth;
-      const scaleH = containerHeight / deviceHeight;
-      const fitScale = Math.min(scaleW, scaleH);
-
-      // Phone/tablet: scale down to fit. Desktop: scale up to fill.
-      setScale(Math.max(0.2, fitScale));
+      const scaleW = areaWidth / dw;
+      const scaleH = areaHeight / dh;
+      setScale(Math.max(0.15, Math.min(scaleW, scaleH)));
     });
 
-    observer.observe(containerRef.current);
+    observer.observe(previewAreaRef.current);
     return () => observer.disconnect();
   }, [device]);
 
@@ -187,28 +184,35 @@ export default function CmsEditorPage() {
         </div>
 
         {/* Preview iframe with device bezel */}
-        <div className="flex flex-1 items-start justify-center overflow-auto py-4">
+        <div
+          ref={previewAreaRef}
+          className="relative flex-1 overflow-hidden"
+        >
           <div
-            className={`origin-top overflow-hidden bg-white ${
-              device === "phone"
-                ? "rounded-[2rem] border-[3px] border-gray-800 shadow-xl"
-                : device === "tablet"
-                  ? "rounded-2xl border-2 border-gray-300 shadow-lg"
-                  : "rounded-lg border border-gray-200 shadow-md"
-            }`}
+            className="absolute left-1/2 top-4"
             style={{
               width: deviceWidth,
-              height: device === "phone" ? 844 : device === "tablet" ? 1024 : 900,
-              transform: `scale(${scale})`,
+              height: DEVICE_HEIGHTS[device],
+              transform: `translateX(-50%) scale(${scale})`,
               transformOrigin: "top center",
             }}
           >
-            <iframe
-              ref={iframeRef}
-              src={previewUrl}
-              className="h-full w-full border-0"
-              title="Page preview"
-            />
+            <div
+              className={`h-full w-full overflow-hidden bg-white ${
+                device === "phone"
+                  ? "rounded-[2rem] border-[3px] border-gray-800 shadow-xl"
+                  : device === "tablet"
+                    ? "rounded-2xl border-2 border-gray-300 shadow-lg"
+                    : "rounded-lg border border-gray-200 shadow-md"
+              }`}
+            >
+              <iframe
+                ref={iframeRef}
+                src={previewUrl}
+                className="h-full w-full border-0"
+                title="Page preview"
+              />
+            </div>
           </div>
         </div>
       </div>
