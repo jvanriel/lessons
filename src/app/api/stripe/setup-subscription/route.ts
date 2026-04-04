@@ -3,12 +3,7 @@ import { getSession, hasRole } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { users, proProfiles } from "@/lib/db/schema";
 import { eq } from "drizzle-orm";
-import {
-  getStripe,
-  STRIPE_PRICE_MONTHLY,
-  STRIPE_PRICE_ANNUAL,
-  TRIAL_PERIOD_DAYS,
-} from "@/lib/stripe";
+import { getStripe } from "@/lib/stripe";
 
 export async function POST(request: NextRequest) {
   const session = await getSession();
@@ -22,8 +17,6 @@ export async function POST(request: NextRequest) {
   if (plan !== "monthly" && plan !== "annual") {
     return NextResponse.json({ error: "Invalid plan" }, { status: 400 });
   }
-
-  const priceId = plan === "annual" ? STRIPE_PRICE_ANNUAL : STRIPE_PRICE_MONTHLY;
 
   // Get user and pro profile
   const [user] = await db
@@ -49,7 +42,6 @@ export async function POST(request: NextRequest) {
     );
   }
 
-  // Check if already subscribed
   if (
     profile.subscriptionStatus === "active" ||
     profile.subscriptionStatus === "trialing"
@@ -81,33 +73,19 @@ export async function POST(request: NextRequest) {
       .where(eq(users.id, user.id));
   }
 
-  // Determine base URL
-  const baseUrl =
-    process.env.NEXT_PUBLIC_BASE_URL ||
-    request.headers.get("origin") ||
-    "http://localhost:3000";
-
-  // Create Checkout session with trial
-  const checkoutSession = await stripe.checkout.sessions.create({
+  // Create SetupIntent to collect payment method without charging
+  const setupIntent = await stripe.setupIntents.create({
     customer: stripeCustomerId,
-    mode: "subscription",
-    line_items: [{ price: priceId, quantity: 1 }],
-    subscription_data: {
-      trial_period_days: TRIAL_PERIOD_DAYS,
-      metadata: {
-        userId: String(user.id),
-        proProfileId: String(profile.id),
-      },
-    },
-    success_url: `${baseUrl}/pro/dashboard?subscription=success`,
-    cancel_url: `${baseUrl}/pro/subscribe?cancelled=true`,
+    payment_method_types: ["card", "bancontact", "sepa_debit"],
     metadata: {
       userId: String(user.id),
       proProfileId: String(profile.id),
       plan,
     },
-    locale: (user.preferredLocale as "en" | "nl" | "fr") || "en",
   });
 
-  return NextResponse.json({ url: checkoutSession.url });
+  return NextResponse.json({
+    clientSecret: setupIntent.client_secret,
+    customerId: stripeCustomerId,
+  });
 }

@@ -4,11 +4,7 @@ import SubscribePage from "./SubscribePage";
 
 export const metadata = { title: "Subscribe — Golf Lessons" };
 
-export default async function Subscribe({
-  searchParams,
-}: {
-  searchParams: Promise<{ cancelled?: string }>;
-}) {
+export default async function Subscribe() {
   const { profile } = await requireProProfile();
   if (!profile) redirect("/login");
 
@@ -20,7 +16,5 @@ export default async function Subscribe({
     redirect("/pro/dashboard");
   }
 
-  const params = await searchParams;
-
-  return <SubscribePage cancelled={params.cancelled === "true"} />;
+  return <SubscribePage />;
 }
