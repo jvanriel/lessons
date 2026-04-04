@@ -10,13 +10,18 @@ export async function GET(request: NextRequest) {
   const path = request.nextUrl.searchParams.get("path") || "/";
   const baseUrl = request.nextUrl.origin;
 
-  // Fetch the page HTML WITHOUT session cookie — renders public website mode
-  // Pass Vercel deployment protection bypass headers so the fetch works on
-  // password-protected deployments (preview/production pre-launch)
+  // Fetch the page HTML WITHOUT user-session cookie — renders public website mode
+  // But DO pass site-access and Vercel deployment protection cookies so the
+  // fetch works on password-protected deployments
+  const cookieParts: string[] = [];
+  const siteAccess = request.cookies.get("site-access")?.value;
+  if (siteAccess) cookieParts.push(`site-access=${siteAccess}`);
+  const vercelJwt = request.cookies.get("_vercel_jwt")?.value;
+  if (vercelJwt) cookieParts.push(`_vercel_jwt=${vercelJwt}`);
+
   const fetchHeaders: Record<string, string> = {};
-  const bypassCookie = request.cookies.get("_vercel_jwt")?.value;
-  if (bypassCookie) {
-    fetchHeaders.cookie = `_vercel_jwt=${bypassCookie}`;
+  if (cookieParts.length > 0) {
+    fetchHeaders.cookie = cookieParts.join("; ");
   }
   const res = await fetch(`${baseUrl}${path}`, { headers: fetchHeaders });
 

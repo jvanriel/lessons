@@ -21,8 +21,9 @@ export async function middleware(request: NextRequest) {
     !hostname.startsWith("127.0.0.1")
   ) {
     const hasAccess = request.cookies.get(SITE_PASSWORD_COOKIE)?.value === "granted";
+    const hasSession = !!request.cookies.get("user-session")?.value;
 
-    if (!hasAccess) {
+    if (!hasAccess && !hasSession) {
       // Check if password is being submitted
       if (pathname === "/site-access" && request.method === "POST") {
         // Handled by the API route below — let it through
