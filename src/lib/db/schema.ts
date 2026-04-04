@@ -51,6 +51,30 @@ export const cmsBlocks = pgTable("cms_blocks", {
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });
 
+export const cmsBlockHistory = pgTable("cms_block_history", {
+  id: serial("id").primaryKey(),
+  blockId: integer("block_id")
+    .references(() => cmsBlocks.id, { onDelete: "cascade" })
+    .notNull(),
+  pageSlug: varchar("page_slug", { length: 100 }).notNull(),
+  blockKey: varchar("block_key", { length: 200 }).notNull(),
+  locale: varchar("locale", { length: 5 }).notNull().default("en"),
+  content: text("content").notNull(),
+  changedBy: integer("changed_by").references(() => users.id),
+  changedAt: timestamp("changed_at").defaultNow().notNull(),
+});
+
+export const cmsPageVersions = pgTable("cms_page_versions", {
+  id: serial("id").primaryKey(),
+  pageSlug: varchar("page_slug", { length: 100 }).notNull(),
+  locale: varchar("locale", { length: 5 }).notNull().default("en"),
+  version: integer("version").notNull(),
+  blocks: jsonb("blocks").$type<Record<string, string>>().notNull(),
+  publishedBy: integer("published_by").references(() => users.id),
+  publishedAt: timestamp("published_at").defaultNow().notNull(),
+  message: varchar("message", { length: 500 }),
+});
+
 export const notifications = pgTable("notifications", {
   id: serial("id").primaryKey(),
   type: varchar("type", { length: 50 }).notNull(),
