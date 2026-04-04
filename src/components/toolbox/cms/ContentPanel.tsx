@@ -11,6 +11,10 @@ import {
   restoreCmsPageVersion,
   type CmsPageVersion,
 } from "@/app/(admin)/admin/cms/actions";
+import {
+  translateBlocks,
+  translateAllBlocks,
+} from "@/app/(admin)/admin/cms/translate-actions";
 import { LOCALES, LOCALE_SHORT, type Locale } from "@/lib/i18n";
 
 const CMS_PAGES: { slug: string; label: string; route: string }[] = [
@@ -27,19 +31,46 @@ for (const p of CMS_PAGES) {
   SLUG_TO_ROUTE[p.slug] = p.route;
 }
 
+const STATUS_CONFIG = {
+  missing: { label: "Missing", cls: "text-red-400 bg-red-400/10 border-red-400/30" },
+  stale: { label: "Stale", cls: "text-amber-400 bg-amber-400/10 border-amber-400/30" },
+  current: { label: "Current", cls: "text-emerald-400 bg-emerald-400/10 border-emerald-400/30" },
+};
+
 function CmsBlockField({
   blockKey,
   label,
   multiline,
+  translationStatus,
+  sourceContent,
+  pageSlug,
+  locale,
 }: {
   blockKey: string;
   label: string;
   multiline?: boolean;
+  translationStatus?: "missing" | "stale" | "current";
+  sourceContent?: string;
+  pageSlug?: string;
+  locale?: string;
 }) {
-  const { getContent, updateDraft, blocks } = useCms();
+  const { getContent, updateDraft, blocks, setActiveBlock } = useCms();
   const value = getContent(blockKey) ?? "";
   const saved = blocks[blockKey] ?? "";
   const isDirty = value !== saved;
+  const [showSource, setShowSource] = useState(false);
+  const [translating, setTranslating] = useState(false);
+  const isTranslation = locale && locale !== "en";
+
+  async function handleTranslateBlock() {
+    if (!pageSlug || !locale) return;
+    setTranslating(true);
+    const result = await translateBlocks(pageSlug, [blockKey], locale as Locale);
+    if (result.translations[blockKey]) {
+      updateDraft(blockKey, result.translations[blockKey]);
+    }
+    setTranslating(false);
+  }
 
   return (
     <div>
@@ -48,19 +79,58 @@ function CmsBlockField({
         {isDirty && (
           <span className="h-1.5 w-1.5 rounded-full bg-gold-400" />
         )}
+        {isTranslation && translationStatus && (
+          <span className={`inline-flex rounded-full border px-1.5 py-0.5 text-[9px] uppercase ${STATUS_CONFIG[translationStatus].cls}`}>
+            {STATUS_CONFIG[translationStatus].label}
+          </span>
+        )}
+        {isTranslation && sourceContent && (
+          <button
+            type="button"
+            onClick={() => setShowSource(!showSource)}
+            className="text-[10px] text-green-100/30 hover:text-green-100/50"
+          >
+            {showSource ? "▼" : "▶"} EN
+          </button>
+        )}
+        {isTranslation && (
+          <button
+            type="button"
+            onClick={handleTranslateBlock}
+            disabled={translating}
+            className="ml-auto flex items-center gap-1 text-[10px] text-gold-500/50 hover:text-gold-200 disabled:opacity-40"
+          >
+            {translating ? (
+              <span className="h-2.5 w-2.5 animate-spin rounded-full border border-gold-400/30 border-t-gold-400" />
+            ) : (
+              <svg className="h-2.5 w-2.5" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth={1.5}>
+                <path d="M2 5h8M5 2v6M10 14l4-4m0 0l-4-4m4 4H6" />
+              </svg>
+            )}
+            Translate
+          </button>
+        )}
       </label>
+      {showSource && sourceContent && (
+        <div className="mb-2 rounded border border-green-700/30 bg-green-900/40 px-3 py-2">
+          <p className="mb-1 text-[9px] font-semibold uppercase tracking-[0.15em] text-green-100/30">EN source</p>
+          <p className="whitespace-pre-wrap text-xs leading-relaxed text-green-100/50">{sourceContent}</p>
+        </div>
+      )}
       {multiline ? (
         <textarea
           value={value}
           onChange={(e) => updateDraft(blockKey, e.target.value)}
+          onFocus={() => setActiveBlock(blockKey)}
           rows={3}
-          className="block w-full resize-none rounded border border-green-700 bg-green-900 px-2.5 py-1.5 text-xs text-green-100 placeholder-green-100/20 focus:border-gold-500/50 focus:outline-none focus:ring-1 focus:ring-gold-500/50"
+          className={`block w-full resize-none rounded border bg-green-900/80 px-2.5 py-1.5 text-xs text-green-100 placeholder-green-100/20 focus:border-gold-500/50 focus:outline-none focus:ring-1 focus:ring-gold-500/50 ${isDirty ? "border-l-2 border-l-gold-400 border-green-700" : "border-green-700"}`}
         />
       ) : (
         <input
           value={value}
           onChange={(e) => updateDraft(blockKey, e.target.value)}
-          className="block w-full rounded border border-green-700 bg-green-900 px-2.5 py-1.5 text-xs text-green-100 placeholder-green-100/20 focus:border-gold-500/50 focus:outline-none focus:ring-1 focus:ring-gold-500/50"
+          onFocus={() => setActiveBlock(blockKey)}
+          className={`block w-full rounded border bg-green-900/80 px-2.5 py-1.5 text-xs text-green-100 placeholder-green-100/20 focus:border-gold-500/50 focus:outline-none focus:ring-1 focus:ring-gold-500/50 ${isDirty ? "border-l-2 border-l-gold-400 border-green-700" : "border-green-700"}`}
         />
       )}
     </div>
@@ -549,6 +619,7 @@ export default function ContentPanel() {
   const [saveMessage, setSaveMessage] = useState<string | null>(null);
   const [reviewing, setReviewing] = useState(false);
   const [showVersions, setShowVersions] = useState(false);
+  const [translatingAll, setTranslatingAll] = useState(false);
   const navigatingFromDropdown = useRef(false);
 
   useEffect(() => {
@@ -639,6 +710,27 @@ export default function ContentPanel() {
     setShowVersions(false);
     setSaveMessage("Restored");
     setTimeout(() => setSaveMessage(null), 2000);
+  }, [cms, selectedPage, selectedLocale]);
+
+  const handleTranslateAll = useCallback(async () => {
+    if (selectedLocale === "en") return;
+    setTranslatingAll(true);
+    setSaveMessage(null);
+    const result = await translateAllBlocks(selectedPage, selectedLocale);
+    if (result.error) {
+      setSaveMessage(result.error);
+    } else {
+      setSaveMessage(`${result.count} block(s) translated`);
+      // Reload blocks to show translations
+      const rows = await getCmsBlocks(selectedPage, selectedLocale);
+      const blockMap: Record<string, string> = {};
+      for (const row of rows) {
+        blockMap[row.blockKey] = row.content;
+      }
+      cms.initPage(selectedPage, blockMap);
+      setTimeout(() => setSaveMessage(null), 3000);
+    }
+    setTranslatingAll(false);
   }, [cms, selectedPage, selectedLocale]);
 
   return (
@@ -732,7 +824,7 @@ export default function ContentPanel() {
         {saveMessage && (
           <p
             className={`mb-2 text-xs ${
-              saveMessage === "Published" || saveMessage === "Restored"
+              saveMessage === "Published" || saveMessage === "Restored" || saveMessage.includes("translated")
                 ? "text-emerald-400"
                 : "text-red-400"
             }`}
@@ -741,6 +833,7 @@ export default function ContentPanel() {
           </p>
         )}
         <div className="flex gap-2">
+          {/* Publish */}
           <button
             onClick={() => setReviewing(true)}
             disabled={!cms.isDirty || saving}
@@ -748,22 +841,42 @@ export default function ContentPanel() {
           >
             Publish
           </button>
+          {/* Translate All (non-EN only) */}
+          {selectedLocale !== "en" && (
+            <button
+              onClick={handleTranslateAll}
+              disabled={translatingAll}
+              className="rounded border border-gold-600/50 px-3 py-2 text-xs font-medium uppercase tracking-wider text-gold-500 transition-colors hover:text-gold-200 disabled:cursor-not-allowed disabled:opacity-40"
+              title="Translate all missing/stale blocks"
+            >
+              {translatingAll ? (
+                <span className="flex items-center gap-1.5">
+                  <span className="h-3 w-3 animate-spin rounded-full border border-gold-400/30 border-t-gold-400" />
+                  Translating...
+                </span>
+              ) : (
+                "Translate all"
+              )}
+            </button>
+          )}
+          {/* Revert */}
           <button
-            onClick={() => setReviewing(true)}
+            onClick={handleRevert}
             disabled={!cms.isDirty}
-            className="rounded border border-green-700 px-4 py-2 text-xs font-medium uppercase tracking-wider text-green-100/60 transition-colors hover:bg-green-800 hover:text-green-100 disabled:cursor-not-allowed disabled:opacity-40"
-            title="Review changes"
+            className={`rounded border px-4 py-2 text-xs font-medium uppercase tracking-wider transition-colors disabled:cursor-not-allowed disabled:opacity-40 ${
+              cms.isDirty
+                ? "border-red-500/50 text-red-400 hover:bg-red-500/10"
+                : "border-green-700 text-green-100/60"
+            }`}
           >
-            <svg className="h-3.5 w-3.5" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth={1.5}>
-              <path d="M1 8s3-5 7-5 7 5 7 5-3 5-7 5-7-5-7-5z" />
-              <circle cx="8" cy="8" r="2" />
-            </svg>
+            Revert
           </button>
+          {/* Version history */}
           <button
             onClick={() => setShowVersions(!showVersions)}
-            className={`rounded border px-4 py-2 text-xs font-medium uppercase tracking-wider transition-colors ${
+            className={`rounded border px-3 py-2 text-xs transition-colors ${
               showVersions
-                ? "border-gold-500/50 bg-green-800 text-gold-300"
+                ? "border-gold-500/50 text-gold-400"
                 : "border-green-700 text-green-100/60 hover:bg-green-800 hover:text-green-100"
             }`}
             title="Version history"
@@ -772,13 +885,6 @@ export default function ContentPanel() {
               <path d="M8 4v4l3 2" />
               <circle cx="8" cy="8" r="6" />
             </svg>
-          </button>
-          <button
-            onClick={handleRevert}
-            disabled={!cms.isDirty}
-            className="rounded border border-green-700 px-4 py-2 text-xs font-medium uppercase tracking-wider text-green-100/60 transition-colors hover:bg-green-800 hover:text-green-100 disabled:cursor-not-allowed disabled:opacity-40"
-          >
-            Revert
           </button>
         </div>
       </div>

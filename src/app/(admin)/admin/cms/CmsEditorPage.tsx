@@ -109,62 +109,78 @@ export default function CmsEditorPage() {
   return (
     <div className="flex h-[calc(100dvh-64px)] gap-0">
       {/* Left: CMS editor panel */}
-      <div className="w-[420px] shrink-0 overflow-y-auto bg-green-950">
+      <div className="w-[420px] shrink-0 overflow-y-auto rounded-xl border border-green-800 bg-green-950">
         <ContentPanel />
       </div>
 
       {/* Right: Preview */}
       <div
         ref={containerRef}
-        className="flex min-h-0 min-w-0 flex-1 flex-col bg-gray-100"
+        className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden rounded-xl border border-green-200 bg-gray-100 ml-6"
       >
         {/* Preview toolbar */}
         <div className="flex items-center justify-between border-b border-gray-200 bg-white px-4 py-2">
-          <div className="flex items-center gap-1">
+          <div className="inline-flex rounded-lg border border-green-200 bg-white p-1">
             {(["phone", "tablet", "desktop"] as const).map((d) => (
               <button
                 key={d}
                 onClick={() => setDevice(d)}
-                className={`rounded-md px-3 py-1.5 text-xs font-medium transition-colors ${
+                className={`flex items-center gap-1.5 rounded-md px-3 py-1.5 text-xs font-medium transition-colors ${
                   device === d
-                    ? "bg-green-900 text-white"
-                    : "text-green-600 hover:bg-green-100"
+                    ? "bg-green-100 text-green-800"
+                    : "text-green-500 hover:text-green-700"
                 }`}
               >
-                {d === "phone" ? "Phone" : d === "tablet" ? "Tablet" : "Desktop"}
+                {d === "phone" && (
+                  <svg className="h-4 w-4" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth={1.2}>
+                    <rect x="4" y="1" width="8" height="14" rx="1.5" />
+                    <line x1="7" y1="12.5" x2="9" y2="12.5" />
+                  </svg>
+                )}
+                {d === "tablet" && (
+                  <svg className="h-4 w-4" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth={1.2}>
+                    <rect x="2" y="1.5" width="12" height="13" rx="1.5" />
+                    <line x1="7" y1="12" x2="9" y2="12" />
+                  </svg>
+                )}
+                {d === "desktop" && (
+                  <svg className="h-4 w-4" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth={1.2}>
+                    <rect x="1" y="2" width="14" height="10" rx="1" />
+                    <line x1="5" y1="14" x2="11" y2="14" />
+                    <line x1="8" y1="12" x2="8" y2="14" />
+                  </svg>
+                )}
+                {d.charAt(0).toUpperCase() + d.slice(1)}
+                <span className="text-[10px] opacity-50">{DEVICE_WIDTHS[d]}px</span>
               </button>
             ))}
           </div>
           <div className="flex items-center gap-3">
-            <span className="text-xs text-gray-400">
-              {deviceWidth}px &middot; {Math.round(scale * 100)}%
+            <span className="text-[10px] text-gray-400">
+              {Math.round(scale * 100)}%
             </span>
             <button
               onClick={handleReload}
-              className="rounded p-1 text-gray-400 hover:bg-gray-100 hover:text-gray-600"
+              className="rounded p-1.5 text-gray-400 hover:bg-gray-100 hover:text-gray-600"
               title="Reload preview"
             >
-              <svg
-                className="h-4 w-4"
-                fill="none"
-                viewBox="0 0 24 24"
-                stroke="currentColor"
-                strokeWidth={2}
-              >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  d="M16.023 9.348h4.992v-.001M2.985 19.644v-4.992m0 0h4.992m-4.993 0 3.181 3.183a8.25 8.25 0 0 0 13.803-3.7M4.031 9.865a8.25 8.25 0 0 1 13.803-3.7l3.181 3.182"
-                />
+              <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M16.023 9.348h4.992v-.001M2.985 19.644v-4.992m0 0h4.992m-4.993 0 3.181 3.183a8.25 8.25 0 0 0 13.803-3.7M4.031 9.865a8.25 8.25 0 0 1 13.803-3.7l3.181 3.182" />
               </svg>
             </button>
           </div>
         </div>
 
-        {/* Preview iframe */}
-        <div className="flex flex-1 items-start justify-center overflow-auto p-4">
+        {/* Preview iframe with device bezel */}
+        <div className="flex flex-1 items-start justify-center overflow-auto py-4">
           <div
-            className="origin-top overflow-hidden rounded-lg border border-gray-300 bg-white shadow-lg"
+            className={`origin-top overflow-hidden bg-white ${
+              device === "phone"
+                ? "rounded-[2rem] border-[3px] border-gray-800 shadow-xl"
+                : device === "tablet"
+                  ? "rounded-2xl border-2 border-gray-300 shadow-lg"
+                  : "rounded-lg border border-gray-200 shadow-md"
+            }`}
             style={{
               width: deviceWidth,
               height: device === "phone" ? 844 : device === "tablet" ? 1024 : 900,
