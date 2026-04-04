@@ -10,12 +10,8 @@ export async function GET(request: NextRequest) {
   const path = request.nextUrl.searchParams.get("path") || "/";
   const baseUrl = request.nextUrl.origin;
 
-  // Fetch the page HTML and inject CMS preview script
-  const res = await fetch(`${baseUrl}${path}`, {
-    headers: {
-      cookie: request.headers.get("cookie") || "",
-    },
-  });
+  // Fetch the page HTML WITHOUT session cookie — renders public website mode
+  const res = await fetch(`${baseUrl}${path}`);
 
   let html = await res.text();
 
