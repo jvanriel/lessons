@@ -259,10 +259,10 @@ export default function BillingClient({
               students. This uses Stripe Connect for secure payouts.
             </p>
             <Button
+              onClick={() => (window.location.href = "/pro/billing/connect")}
               className="mt-3 bg-gold-600 text-white hover:bg-gold-500"
-              disabled
             >
-              Set up payments (coming soon)
+              Set up payments
             </Button>
           </div>
         )}

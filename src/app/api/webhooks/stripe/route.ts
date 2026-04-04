@@ -69,6 +69,9 @@ export async function POST(request: NextRequest) {
       case "invoice.payment_failed":
         await handleInvoicePaymentFailed(event.data.object as StripeObject);
         break;
+      case "account.updated":
+        await handleAccountUpdated(event.data.object as StripeObject);
+        break;
       default:
         console.log(`Unhandled webhook event: ${event.type}`);
     }
@@ -268,4 +271,33 @@ async function handleInvoicePaymentFailed(invoice: StripeObject) {
 
   // TODO: Send "update payment method" email via Resend
   console.log(`Payment failed for pro ${profile.id}`);
+}
+
+async function handleAccountUpdated(account: StripeObject) {
+  // Find pro profile by Connect account ID
+  const [profile] = await db
+    .select()
+    .from(proProfiles)
+    .where(eq(proProfiles.stripeConnectAccountId, account.id))
+    .limit(1);
+
+  if (!profile) return;
+
+  const chargesEnabled = account.charges_enabled ?? false;
+  const payoutsEnabled = account.payouts_enabled ?? false;
+  const detailsSubmitted = account.details_submitted ?? false;
+
+  await db
+    .update(proProfiles)
+    .set({
+      stripeConnectOnboarded: detailsSubmitted,
+      stripeConnectChargesEnabled: chargesEnabled,
+      stripeConnectPayoutsEnabled: payoutsEnabled,
+      updatedAt: new Date(),
+    })
+    .where(eq(proProfiles.id, profile.id));
+
+  console.log(
+    `Connect account updated for pro ${profile.id}: charges=${chargesEnabled}, payouts=${payoutsEnabled}, onboarded=${detailsSubmitted}`
+  );
 }

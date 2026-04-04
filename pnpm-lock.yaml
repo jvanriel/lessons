@@ -14,6 +14,12 @@ importers:
       '@neondatabase/serverless':
         specifier: ^1.0.2
         version: 1.0.2
+      '@stripe/connect-js':
+        specifier: ^3.3.35
+        version: 3.3.35
+      '@stripe/react-connect-js':
+        specifier: ^3.3.34
+        version: 3.3.34(@stripe/connect-js@3.3.35)(react-dom@19.2.4(react@19.2.4))(react@19.2.4)
       '@stripe/react-stripe-js':
         specifier: ^6.1.0
         version: 6.1.0(@stripe/stripe-js@9.0.1)(react-dom@19.2.4(react@19.2.4))(react@19.2.4)
@@ -1257,6 +1263,16 @@ packages:
 
   '@standard-schema/spec@1.1.0':
     resolution: {integrity: sha512-l2aFy5jALhniG5HgqrD6jXLi/rUWrKvqN/qJx6yoJsgKhblVd+iqqU4RCXavm/jPityDo5TCvKMnpjKnOriy0w==}
+
+  '@stripe/connect-js@3.3.35':
+    resolution: {integrity: sha512-9qGDe+G5MWPHdFK05lBRX+wjHIafZ72hCNrXzXnM4Uf7X/rbRe04/EOgaur0/aza5UlDcmEWJ+LSNmeoxytX6w==}
+
+  '@stripe/react-connect-js@3.3.34':
+    resolution: {integrity: sha512-eNyvlWeh90SBUC5dQhNfVPXOFuliO2Va3ZOfhZfybJoAYyZx4Jwy6SBOq5lEUU5+4RwRj/JJQfMeezSS9xQBng==}
+    peerDependencies:
+      '@stripe/connect-js': '>=3.3.35'
+      react: '>=16.8.0'
+      react-dom: '>=16.8.0'
 
   '@stripe/react-stripe-js@6.1.0':
     resolution: {integrity: sha512-LbKbRv4+wUSHLb5VNxqiYcKaqXPvTju0bJaF0RrzH0h4+aKWDXAk4RzUBcpNxxj8KtjuxICElANs1Li7aTv1IQ==}
@@ -4912,6 +4928,14 @@ snapshots:
   '@sindresorhus/merge-streams@4.0.0': {}
 
   '@standard-schema/spec@1.1.0': {}
+
+  '@stripe/connect-js@3.3.35': {}
+
+  '@stripe/react-connect-js@3.3.34(@stripe/connect-js@3.3.35)(react-dom@19.2.4(react@19.2.4))(react@19.2.4)':
+    dependencies:
+      '@stripe/connect-js': 3.3.35
+      react: 19.2.4
+      react-dom: 19.2.4(react@19.2.4)
 
   '@stripe/react-stripe-js@6.1.0(@stripe/stripe-js@9.0.1)(react-dom@19.2.4(react@19.2.4))(react@19.2.4)':
     dependencies:
