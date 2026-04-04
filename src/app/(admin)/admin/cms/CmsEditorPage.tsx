@@ -107,7 +107,7 @@ export default function CmsEditorPage() {
   const deviceWidth = DEVICE_WIDTHS[device];
 
   return (
-    <div className="flex h-[calc(100dvh-64px)] gap-0">
+    <div className="flex h-[calc(100dvh-64px)] gap-0 p-4">
       {/* Left: CMS editor panel */}
       <div className="w-[420px] shrink-0 overflow-y-auto rounded-xl border border-green-800 bg-green-950">
         <ContentPanel />
