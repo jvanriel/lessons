@@ -11,7 +11,14 @@ export async function GET(request: NextRequest) {
   const baseUrl = request.nextUrl.origin;
 
   // Fetch the page HTML WITHOUT session cookie — renders public website mode
-  const res = await fetch(`${baseUrl}${path}`);
+  // Pass Vercel deployment protection bypass headers so the fetch works on
+  // password-protected deployments (preview/production pre-launch)
+  const fetchHeaders: Record<string, string> = {};
+  const bypassCookie = request.cookies.get("_vercel_jwt")?.value;
+  if (bypassCookie) {
+    fetchHeaders.cookie = `_vercel_jwt=${bypassCookie}`;
+  }
+  const res = await fetch(`${baseUrl}${path}`, { headers: fetchHeaders });
 
   let html = await res.text();
 
