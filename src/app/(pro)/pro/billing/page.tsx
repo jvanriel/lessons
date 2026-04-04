@@ -28,8 +28,9 @@ export default async function BillingPage() {
         profile.subscriptionTrialEnd?.toISOString() ?? null
       }
       hasStripeCustomer={!!user?.stripeCustomerId}
-      connectOnboarded={profile.stripeConnectOnboarded ?? false}
-      connectChargesEnabled={profile.stripeConnectChargesEnabled ?? false}
+      bankAccountHolder={profile.bankAccountHolder ?? null}
+      bankIban={profile.bankIban ?? null}
+      bankBic={profile.bankBic ?? null}
     />
   );
 }

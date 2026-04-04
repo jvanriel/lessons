@@ -9,8 +9,9 @@ interface BillingProps {
   subscriptionCurrentPeriodEnd: string | null;
   subscriptionTrialEnd: string | null;
   hasStripeCustomer: boolean;
-  connectOnboarded: boolean;
-  connectChargesEnabled: boolean;
+  bankAccountHolder: string | null;
+  bankIban: string | null;
+  bankBic: string | null;
 }
 
 function StatusBadge({ status }: { status: string }) {
@@ -50,6 +51,10 @@ function formatDate(iso: string | null) {
   });
 }
 
+function formatIban(iban: string) {
+  return iban.replace(/(.{4})/g, "$1 ").trim();
+}
+
 function daysUntil(iso: string | null) {
   if (!iso) return null;
   const diff = Math.ceil(
@@ -58,16 +63,126 @@ function daysUntil(iso: string | null) {
   return diff > 0 ? diff : 0;
 }
 
+// ─── Bank Details Form ──────────────────────────────────
+
+function BankDetailsForm({
+  initialHolder,
+  initialIban,
+  initialBic,
+  onSaved,
+}: {
+  initialHolder: string;
+  initialIban: string;
+  initialBic: string;
+  onSaved: (holder: string, iban: string, bic: string) => void;
+}) {
+  const [holder, setHolder] = useState(initialHolder);
+  const [iban, setIban] = useState(initialIban);
+  const [bic, setBic] = useState(initialBic);
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  async function handleSave(e: React.FormEvent) {
+    e.preventDefault();
+    setSaving(true);
+    setError(null);
+
+    const res = await fetch("/api/pro/bank-details", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ accountHolder: holder, iban, bic }),
+    });
+
+    const data = await res.json();
+
+    if (res.ok) {
+      onSaved(holder, iban.replace(/\s/g, "").toUpperCase(), bic.toUpperCase());
+    } else {
+      setError(data.error || "Failed to save");
+    }
+    setSaving(false);
+  }
+
+  return (
+    <form onSubmit={handleSave} className="space-y-4">
+      {error && (
+        <div className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+          {error}
+        </div>
+      )}
+
+      <div>
+        <label className="block text-sm font-medium text-green-800">
+          Account holder name
+        </label>
+        <input
+          type="text"
+          value={holder}
+          onChange={(e) => setHolder(e.target.value)}
+          placeholder="e.g. Jan Van Riel"
+          className="mt-1 w-full rounded-md border border-green-200 bg-white px-3 py-2 text-sm text-green-900 placeholder:text-green-400 focus:border-green-400 focus:outline-none focus:ring-1 focus:ring-green-400"
+          required
+        />
+      </div>
+
+      <div>
+        <label className="block text-sm font-medium text-green-800">
+          IBAN
+        </label>
+        <input
+          type="text"
+          value={iban}
+          onChange={(e) => setIban(e.target.value)}
+          placeholder="e.g. BE68 5390 0754 7034"
+          className="mt-1 w-full rounded-md border border-green-200 bg-white px-3 py-2 text-sm font-mono text-green-900 placeholder:text-green-400 focus:border-green-400 focus:outline-none focus:ring-1 focus:ring-green-400"
+          required
+        />
+      </div>
+
+      <div>
+        <label className="block text-sm font-medium text-green-800">
+          BIC / SWIFT{" "}
+          <span className="font-normal text-green-500">(optional)</span>
+        </label>
+        <input
+          type="text"
+          value={bic}
+          onChange={(e) => setBic(e.target.value)}
+          placeholder="e.g. GKCCBEBB"
+          className="mt-1 w-full rounded-md border border-green-200 bg-white px-3 py-2 text-sm font-mono text-green-900 placeholder:text-green-400 focus:border-green-400 focus:outline-none focus:ring-1 focus:ring-green-400"
+        />
+      </div>
+
+      <div className="flex gap-3 pt-2">
+        <Button
+          type="submit"
+          disabled={saving}
+          className="bg-gold-600 text-white hover:bg-gold-500"
+        >
+          {saving ? "Saving..." : "Save bank details"}
+        </Button>
+      </div>
+    </form>
+  );
+}
+
+// ─── Main Billing Page ──────────────────────────────────
+
 export default function BillingClient({
   subscriptionStatus,
   subscriptionPlan,
   subscriptionCurrentPeriodEnd,
   subscriptionTrialEnd,
   hasStripeCustomer,
-  connectOnboarded,
-  connectChargesEnabled,
+  bankAccountHolder: initialHolder,
+  bankIban: initialIban,
+  bankBic: initialBic,
 }: BillingProps) {
   const [portalLoading, setPortalLoading] = useState(false);
+  const [editingBank, setEditingBank] = useState(false);
+  const [bankHolder, setBankHolder] = useState(initialHolder);
+  const [bankIban, setBankIban] = useState(initialIban);
+  const [bankBic, setBankBic] = useState(initialBic);
 
   const isTrialing = subscriptionStatus === "trialing";
   const isActive =
@@ -75,6 +190,7 @@ export default function BillingClient({
     subscriptionStatus === "trialing" ||
     subscriptionStatus === "past_due";
   const trialDays = daysUntil(subscriptionTrialEnd);
+  const hasBankDetails = !!bankIban;
 
   async function openPortal() {
     setPortalLoading(true);
@@ -97,7 +213,7 @@ export default function BillingClient({
         Billing
       </h1>
       <p className="mt-2 text-green-700">
-        Manage your subscription and payment details.
+        Manage your subscription and payout details.
       </p>
 
       {/* Subscription Card */}
@@ -130,7 +246,6 @@ export default function BillingClient({
           )}
         </div>
 
-        {/* Trial banner */}
         {isTrialing && trialDays !== null && (
           <div className="mt-4 rounded-lg border border-blue-200 bg-blue-50 px-4 py-3">
             <p className="text-sm font-medium text-blue-800">
@@ -145,7 +260,6 @@ export default function BillingClient({
           </div>
         )}
 
-        {/* Past due warning */}
         {subscriptionStatus === "past_due" && (
           <div className="mt-4 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3">
             <p className="text-sm font-medium text-amber-800">
@@ -158,7 +272,6 @@ export default function BillingClient({
           </div>
         )}
 
-        {/* Details */}
         {isActive && (
           <div className="mt-6 grid grid-cols-2 gap-4 border-t border-green-100 pt-4">
             <div>
@@ -182,7 +295,6 @@ export default function BillingClient({
           </div>
         )}
 
-        {/* Not subscribed */}
         {!isActive && (
           <div className="mt-4">
             <p className="text-sm text-green-600">
@@ -222,48 +334,75 @@ export default function BillingClient({
         </div>
       )}
 
-      {/* Stripe Connect Status */}
+      {/* Bank Account for Payouts */}
       <div className="mt-6 rounded-xl border border-green-200 bg-white p-6 shadow-sm">
-        <h2 className="text-lg font-semibold text-green-900">
-          Lesson Payments
-        </h2>
-        {connectOnboarded && connectChargesEnabled ? (
-          <div className="mt-2">
-            <div className="flex items-center gap-2">
-              <span className="inline-flex h-2 w-2 rounded-full bg-green-500" />
-              <span className="text-sm text-green-700">
-                Connected — you can receive lesson payments
-              </span>
+        <div className="flex items-start justify-between">
+          <h2 className="text-lg font-semibold text-green-900">
+            Bank Account for Payouts
+          </h2>
+          {hasBankDetails && !editingBank && (
+            <Button
+              variant="outline"
+              onClick={() => setEditingBank(true)}
+              className="border-green-200 text-green-700 hover:bg-green-50"
+            >
+              Edit
+            </Button>
+          )}
+        </div>
+
+        <p className="mt-1 text-sm text-green-600">
+          Lesson payments from students are paid out monthly to this account.
+        </p>
+
+        {hasBankDetails && !editingBank ? (
+          <div className="mt-4 grid grid-cols-1 gap-3 rounded-lg border border-green-100 bg-green-50/50 p-4 sm:grid-cols-3">
+            <div>
+              <p className="text-xs font-medium uppercase text-green-500">
+                Account holder
+              </p>
+              <p className="mt-1 text-sm font-medium text-green-900">
+                {bankHolder}
+              </p>
             </div>
-            <p className="mt-2 text-sm text-green-600">
-              View your lesson earnings and payout details on the{" "}
-              <a
-                href="/pro/earnings"
-                className="font-medium text-gold-600 hover:text-gold-500"
-              >
-                Earnings page
-              </a>
-              .
-            </p>
+            <div>
+              <p className="text-xs font-medium uppercase text-green-500">
+                IBAN
+              </p>
+              <p className="mt-1 text-sm font-mono text-green-900">
+                {formatIban(bankIban!)}
+              </p>
+            </div>
+            {bankBic && (
+              <div>
+                <p className="text-xs font-medium uppercase text-green-500">
+                  BIC
+                </p>
+                <p className="mt-1 text-sm font-mono text-green-900">
+                  {bankBic}
+                </p>
+              </div>
+            )}
           </div>
         ) : (
-          <div className="mt-2">
-            <div className="flex items-center gap-2">
-              <span className="inline-flex h-2 w-2 rounded-full bg-amber-400" />
-              <span className="text-sm text-amber-700">
-                Not connected — set up payments to receive lesson fees
-              </span>
-            </div>
-            <p className="mt-3 text-sm text-green-600">
-              Connect your bank account to start accepting lesson payments from
-              students. This uses Stripe Connect for secure payouts.
-            </p>
-            <Button
-              onClick={() => (window.location.href = "/pro/billing/connect")}
-              className="mt-3 bg-gold-600 text-white hover:bg-gold-500"
-            >
-              Set up payments
-            </Button>
+          <div className="mt-4">
+            {!hasBankDetails && (
+              <div className="mb-4 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-700">
+                Please add your bank details so we can pay out your lesson
+                earnings.
+              </div>
+            )}
+            <BankDetailsForm
+              initialHolder={bankHolder ?? ""}
+              initialIban={bankIban ? formatIban(bankIban) : ""}
+              initialBic={bankBic ?? ""}
+              onSaved={(h, i, b) => {
+                setBankHolder(h);
+                setBankIban(i);
+                setBankBic(b);
+                setEditingBank(false);
+              }}
+            />
           </div>
         )}
       </div>

@@ -100,11 +100,10 @@ export const proProfiles = pgTable("pro_profiles", {
   subscriptionPlan: varchar("subscription_plan", { length: 20 }),
   subscriptionCurrentPeriodEnd: timestamp("subscription_current_period_end"),
   subscriptionTrialEnd: timestamp("subscription_trial_end"),
-  // Stripe Connect
-  stripeConnectAccountId: varchar("stripe_connect_account_id", { length: 255 }),
-  stripeConnectOnboarded: boolean("stripe_connect_onboarded").notNull().default(false),
-  stripeConnectChargesEnabled: boolean("stripe_connect_charges_enabled").notNull().default(false),
-  stripeConnectPayoutsEnabled: boolean("stripe_connect_payouts_enabled").notNull().default(false),
+  // Bank account (for manual payouts by accountant)
+  bankAccountHolder: varchar("bank_account_holder", { length: 255 }),
+  bankIban: varchar("bank_iban", { length: 34 }),
+  bankBic: varchar("bank_bic", { length: 11 }),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });
