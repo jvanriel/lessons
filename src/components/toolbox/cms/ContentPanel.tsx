@@ -6,6 +6,10 @@ import { useCms } from "@/components/cms/CmsProvider";
 import {
   getCmsBlocks,
   saveCmsBlocks,
+  getCmsPageVersions,
+  getCmsPageVersion,
+  restoreCmsPageVersion,
+  type CmsPageVersion,
 } from "@/app/(admin)/admin/cms/actions";
 import { LOCALES, LOCALE_SHORT, type Locale } from "@/lib/i18n";
 
@@ -320,6 +324,218 @@ function ReviewDialog({
   );
 }
 
+// ─── Version Diff ───────────────────────────────────────
+
+function VersionDiff({
+  current,
+  previous,
+}: {
+  current: Record<string, string>;
+  previous: Record<string, string> | null;
+}) {
+  const allKeys = new Set([
+    ...Object.keys(current),
+    ...(previous ? Object.keys(previous) : []),
+  ]);
+
+  const changes: {
+    key: string;
+    type: "added" | "removed" | "changed";
+    oldVal?: string;
+    newVal?: string;
+  }[] = [];
+
+  for (const key of allKeys) {
+    if (key.startsWith("_")) continue;
+    const cur = current[key];
+    const prev = previous?.[key];
+    if (prev === undefined && cur !== undefined) {
+      changes.push({ key, type: "added", newVal: cur });
+    } else if (cur === undefined && prev !== undefined) {
+      changes.push({ key, type: "removed", oldVal: prev });
+    } else if (cur !== prev) {
+      changes.push({ key, type: "changed", oldVal: prev, newVal: cur });
+    }
+  }
+
+  if (changes.length === 0) {
+    return (
+      <p className="py-2 text-[10px] text-green-100/40">No changes in this version.</p>
+    );
+  }
+
+  const shown = changes.slice(0, 20);
+  const remaining = changes.length - shown.length;
+
+  return (
+    <div className="space-y-2">
+      {shown.map((c) => (
+        <div key={c.key} className="rounded border border-green-700/30 bg-green-900/40 px-3 py-2">
+          <p className="mb-1 text-[10px] text-green-100/40">
+            {c.key}
+            {c.type === "added" && (
+              <span className="ml-2 text-emerald-400">(added)</span>
+            )}
+            {c.type === "removed" && (
+              <span className="ml-2 text-red-400">(removed)</span>
+            )}
+          </p>
+          {c.oldVal && (
+            <p className="truncate text-xs text-red-400/70 line-through">
+              {c.oldVal.length > 60 ? c.oldVal.slice(0, 60) + "..." : c.oldVal}
+            </p>
+          )}
+          {c.newVal && (
+            <p className="truncate text-xs text-emerald-400/70">
+              {c.newVal.length > 60 ? c.newVal.slice(0, 60) + "..." : c.newVal}
+            </p>
+          )}
+        </div>
+      ))}
+      {remaining > 0 && (
+        <p className="text-[10px] text-green-100/30">
+          ...and {remaining} more changes
+        </p>
+      )}
+    </div>
+  );
+}
+
+// ─── Version Panel ──────────────────────────────────────
+
+function VersionPanel({
+  pageSlug,
+  locale,
+  onRestore,
+}: {
+  pageSlug: string;
+  locale: string;
+  onRestore: () => void;
+}) {
+  const [versions, setVersions] = useState<CmsPageVersion[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [expandedId, setExpandedId] = useState<number | null>(null);
+  const [diffData, setDiffData] = useState<{
+    current: Record<string, string>;
+    previous: Record<string, string> | null;
+  } | null>(null);
+  const [restoring, setRestoring] = useState(false);
+
+  useEffect(() => {
+    setLoading(true);
+    setExpandedId(null);
+    setDiffData(null);
+    getCmsPageVersions(pageSlug, locale as "en").then((v) => {
+      setVersions(v);
+      setLoading(false);
+    });
+  }, [pageSlug, locale]);
+
+  async function handleViewDiff(versionId: number, version: number) {
+    if (expandedId === versionId) {
+      setExpandedId(null);
+      setDiffData(null);
+      return;
+    }
+
+    const currentData = await getCmsPageVersion(versionId);
+    if (!currentData) return;
+
+    // Find previous version
+    const prevVersion = versions.find(
+      (v) => v.version === version - 1 && v.locale === locale
+    );
+    let previousData: Record<string, string> | null = null;
+    if (prevVersion) {
+      const prev = await getCmsPageVersion(prevVersion.id);
+      previousData = prev?.blocks ?? null;
+    }
+
+    setExpandedId(versionId);
+    setDiffData({ current: currentData.blocks, previous: previousData });
+  }
+
+  async function handleRestore(versionId: number) {
+    if (!confirm("Restore this version? Current content will be replaced.")) return;
+    setRestoring(true);
+    const result = await restoreCmsPageVersion(versionId);
+    setRestoring(false);
+    if (!result.error) {
+      onRestore();
+    }
+  }
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center py-6">
+        <div className="h-4 w-4 animate-spin rounded-full border-2 border-green-100/20 border-t-gold-400" />
+      </div>
+    );
+  }
+
+  if (versions.length === 0) {
+    return (
+      <p className="py-4 text-center text-[10px] text-green-100/40">
+        No versions yet. Publish to create the first version.
+      </p>
+    );
+  }
+
+  return (
+    <div className="space-y-2">
+      {versions.map((v) => (
+        <div key={v.id} className="rounded border border-green-700/30 bg-green-900/30">
+          <div className="flex items-center justify-between px-3 py-2">
+            <div className="flex items-center gap-2">
+              <span className="rounded bg-green-800 px-1.5 py-0.5 text-[10px] font-semibold text-green-100/80">
+                v{v.version}
+              </span>
+              <span className="text-[10px] text-green-100/40">
+                {new Date(v.publishedAt).toLocaleDateString("en-GB", {
+                  day: "numeric",
+                  month: "short",
+                  hour: "2-digit",
+                  minute: "2-digit",
+                })}
+              </span>
+              <span className="text-[10px] text-green-100/30">
+                {v.blockCount} blocks
+              </span>
+            </div>
+            <div className="flex gap-1">
+              <button
+                onClick={() => handleViewDiff(v.id, v.version)}
+                className="rounded px-2 py-0.5 text-[10px] text-green-100/50 hover:bg-green-800 hover:text-green-100/80"
+              >
+                {expandedId === v.id ? "Hide" : "Diff"}
+              </button>
+              <button
+                onClick={() => handleRestore(v.id)}
+                disabled={restoring}
+                className="rounded px-2 py-0.5 text-[10px] text-gold-400/70 hover:bg-green-800 hover:text-gold-300 disabled:opacity-40"
+              >
+                Restore
+              </button>
+            </div>
+          </div>
+          {v.message && (
+            <p className="px-3 pb-2 text-[10px] italic text-green-100/30">
+              {v.message}
+            </p>
+          )}
+          {expandedId === v.id && diffData && (
+            <div className="border-t border-green-700/20 px-3 py-2">
+              <VersionDiff current={diffData.current} previous={diffData.previous} />
+            </div>
+          )}
+        </div>
+      ))}
+    </div>
+  );
+}
+
+// ─── Main Content Panel ─────────────────────────────────
+
 export default function ContentPanel() {
   const cms = useCms();
   const router = useRouter();
@@ -332,6 +548,7 @@ export default function ContentPanel() {
   const [saving, setSaving] = useState(false);
   const [saveMessage, setSaveMessage] = useState<string | null>(null);
   const [reviewing, setReviewing] = useState(false);
+  const [showVersions, setShowVersions] = useState(false);
   const navigatingFromDropdown = useRef(false);
 
   useEffect(() => {
@@ -411,6 +628,19 @@ export default function ContentPanel() {
     setSaveMessage(null);
   }, [cms]);
 
+  const handleVersionRestore = useCallback(async () => {
+    // Reload blocks from DB after restore
+    const rows = await getCmsBlocks(selectedPage, selectedLocale);
+    const blockMap: Record<string, string> = {};
+    for (const row of rows) {
+      blockMap[row.blockKey] = row.content;
+    }
+    cms.initPage(selectedPage, blockMap);
+    setShowVersions(false);
+    setSaveMessage("Restored");
+    setTimeout(() => setSaveMessage(null), 2000);
+  }, [cms, selectedPage, selectedLocale]);
+
   return (
     <div className="relative flex h-full flex-col">
       {reviewing && (
@@ -473,12 +703,38 @@ export default function ContentPanel() {
         )}
       </div>
 
+      {/* Version history panel */}
+      {showVersions && (
+        <div className="border-t border-green-700/50 px-4 py-3 max-h-[40%] overflow-y-auto">
+          <div className="mb-2 flex items-center justify-between">
+            <p className="text-[10px] font-semibold uppercase tracking-[0.2em] text-gold-500/60">
+              Version History
+            </p>
+            <button
+              onClick={() => setShowVersions(false)}
+              className="rounded p-1 text-green-100/40 hover:bg-green-800 hover:text-green-100/70"
+            >
+              <svg className="h-3 w-3" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth={2}>
+                <path d="M4 4l8 8M12 4l-8 8" />
+              </svg>
+            </button>
+          </div>
+          <VersionPanel
+            pageSlug={selectedPage}
+            locale={selectedLocale}
+            onRestore={handleVersionRestore}
+          />
+        </div>
+      )}
+
       {/* Action bar */}
       <div className="border-t border-green-700/50 px-4 py-3">
         {saveMessage && (
           <p
             className={`mb-2 text-xs ${
-              saveMessage === "Published" ? "text-emerald-400" : "text-red-400"
+              saveMessage === "Published" || saveMessage === "Restored"
+                ? "text-emerald-400"
+                : "text-red-400"
             }`}
           >
             {saveMessage}
@@ -501,6 +757,20 @@ export default function ContentPanel() {
             <svg className="h-3.5 w-3.5" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth={1.5}>
               <path d="M1 8s3-5 7-5 7 5 7 5-3 5-7 5-7-5-7-5z" />
               <circle cx="8" cy="8" r="2" />
+            </svg>
+          </button>
+          <button
+            onClick={() => setShowVersions(!showVersions)}
+            className={`rounded border px-4 py-2 text-xs font-medium uppercase tracking-wider transition-colors ${
+              showVersions
+                ? "border-gold-500/50 bg-green-800 text-gold-300"
+                : "border-green-700 text-green-100/60 hover:bg-green-800 hover:text-green-100"
+            }`}
+            title="Version history"
+          >
+            <svg className="h-3.5 w-3.5" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth={1.5}>
+              <path d="M8 4v4l3 2" />
+              <circle cx="8" cy="8" r="6" />
             </svg>
           </button>
           <button
