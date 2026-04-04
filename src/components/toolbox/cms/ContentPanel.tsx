@@ -1,7 +1,6 @@
 "use client";
 
 import { useState, useEffect, useCallback, useRef, useMemo } from "react";
-import { usePathname, useRouter } from "next/navigation";
 import { useCms } from "@/components/cms/CmsProvider";
 import {
   getCmsBlocks,
@@ -608,11 +607,7 @@ function VersionPanel({
 
 export default function ContentPanel() {
   const cms = useCms();
-  const router = useRouter();
-  const pathname = usePathname();
-
-  const initialSlug = ROUTE_TO_SLUG[pathname] ?? CMS_PAGES[0].slug;
-  const [selectedPage, setSelectedPage] = useState<string>(initialSlug);
+  const [selectedPage, setSelectedPage] = useState<string>(CMS_PAGES[0].slug);
   const [selectedLocale, setSelectedLocale] = useState<Locale>("nl");
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -620,30 +615,12 @@ export default function ContentPanel() {
   const [reviewing, setReviewing] = useState(false);
   const [showVersions, setShowVersions] = useState(false);
   const [translatingAll, setTranslatingAll] = useState(false);
-  const navigatingFromDropdown = useRef(false);
-
-  useEffect(() => {
-    if (navigatingFromDropdown.current) {
-      navigatingFromDropdown.current = false;
-      return;
-    }
-    const slug = ROUTE_TO_SLUG[pathname];
-    if (slug && slug !== selectedPage) {
-      setSelectedPage(slug);
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [pathname]);
-
   const handlePageChange = useCallback(
     (slug: string) => {
       setSelectedPage(slug);
-      const route = SLUG_TO_ROUTE[slug];
-      if (route && pathname !== route) {
-        navigatingFromDropdown.current = true;
-        router.push(route);
-      }
+      // Don't navigate — the CmsEditorPage updates the preview iframe via pageSlug
     },
-    [pathname, router]
+    []
   );
 
   useEffect(() => {
