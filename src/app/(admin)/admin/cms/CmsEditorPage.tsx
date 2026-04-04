@@ -41,13 +41,28 @@ export default function CmsEditorPage() {
   useEffect(() => {
     if (!containerRef.current) return;
 
+    const DEVICE_HEIGHTS: Record<PreviewDevice, number> = {
+      phone: 844,
+      tablet: 1024,
+      desktop: 900,
+    };
+
     const observer = new ResizeObserver((entries) => {
       const entry = entries[0];
       if (!entry) return;
-      const containerWidth = entry.contentRect.width - 32; // padding
+      const margin = 48; // 24px each side
+      const containerWidth = entry.contentRect.width - margin;
+      const containerHeight = entry.contentRect.height - margin;
       const deviceWidth = DEVICE_WIDTHS[device];
-      const newScale = Math.min(1, containerWidth / deviceWidth);
-      setScale(newScale);
+      const deviceHeight = DEVICE_HEIGHTS[device];
+
+      // Scale to fit both width and height with margin
+      const scaleW = containerWidth / deviceWidth;
+      const scaleH = containerHeight / deviceHeight;
+      const fitScale = Math.min(scaleW, scaleH);
+
+      // Phone/tablet: scale down to fit. Desktop: scale up to fill.
+      setScale(Math.max(0.2, fitScale));
     });
 
     observer.observe(containerRef.current);
