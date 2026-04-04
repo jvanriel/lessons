@@ -35,26 +35,26 @@ export async function translateBlocks(
 ): Promise<{ translations: Record<string, string>; error?: string }> {
   const session = await requireAdmin();
 
-  if (targetLocale === "en") {
-    return { translations: {}, error: "Cannot translate to English (source language)" };
+  if (targetLocale === "nl") {
+    return { translations: {}, error: "Cannot translate to Dutch (source language)" };
   }
 
-  // Fetch EN source content for the requested blocks
-  const enRows = await db
+  // Fetch NL source content for the requested blocks
+  const nlRows = await db
     .select()
     .from(cmsBlocks)
     .where(
-      and(eq(cmsBlocks.pageSlug, pageSlug), eq(cmsBlocks.locale, "en"))
+      and(eq(cmsBlocks.pageSlug, pageSlug), eq(cmsBlocks.locale, "nl"))
     );
 
-  const enMap = new Map<string, string>();
-  for (const row of enRows) {
-    enMap.set(row.blockKey, row.content);
+  const nlMap = new Map<string, string>();
+  for (const row of nlRows) {
+    nlMap.set(row.blockKey, row.content);
   }
 
   const toTranslate: { key: string; content: string }[] = [];
   for (const key of blockKeys) {
-    const content = enMap.get(key);
+    const content = nlMap.get(key);
     if (content && !key.endsWith("._index") && !key.endsWith("._config")) {
       toTranslate.push({ key, content });
     }
@@ -77,7 +77,7 @@ export async function translateBlocks(
       messages: [
         {
           role: "user",
-          content: `Translate the following CMS content blocks from English to ${targetLang}.
+          content: `Translate the following CMS content blocks from Dutch to ${targetLang}.
 
 Rules:
 - Maintain tone: professional, welcoming, trustworthy (for a golf lesson booking platform)
@@ -109,7 +109,7 @@ ${blocksText}`,
 
     // Save translations to DB with source_hash
     for (const [key, translatedContent] of Object.entries(translations)) {
-      const sourceContent = enMap.get(key);
+      const sourceContent = nlMap.get(key);
       if (!sourceContent) continue;
 
       const sourceHash = await computeHash(sourceContent);
@@ -169,15 +169,15 @@ export async function translateAllBlocks(
 ): Promise<{ count: number; error?: string }> {
   await requireAdmin();
 
-  if (targetLocale === "en") {
-    return { count: 0, error: "Cannot translate to English (source language)" };
+  if (targetLocale === "nl") {
+    return { count: 0, error: "Cannot translate to Dutch (source language)" };
   }
 
-  const enRows = await db
+  const nlRows = await db
     .select()
     .from(cmsBlocks)
     .where(
-      and(eq(cmsBlocks.pageSlug, pageSlug), eq(cmsBlocks.locale, "en"))
+      and(eq(cmsBlocks.pageSlug, pageSlug), eq(cmsBlocks.locale, "nl"))
     );
 
   const targetRows = await db
@@ -193,17 +193,17 @@ export async function translateAllBlocks(
   }
 
   const needsTranslation: string[] = [];
-  for (const enRow of enRows) {
-    if (enRow.blockKey.endsWith("._index") || enRow.blockKey.endsWith("._config")) continue;
+  for (const nlRow of nlRows) {
+    if (nlRow.blockKey.endsWith("._index") || nlRow.blockKey.endsWith("._config")) continue;
 
-    const target = targetMap.get(enRow.blockKey);
+    const target = targetMap.get(nlRow.blockKey);
     if (!target) {
-      needsTranslation.push(enRow.blockKey);
+      needsTranslation.push(nlRow.blockKey);
     } else if (
       target.sourceHash !== null &&
-      enRow.updatedAt > (target.translatedAt ?? target.updatedAt)
+      nlRow.updatedAt > (target.translatedAt ?? target.updatedAt)
     ) {
-      needsTranslation.push(enRow.blockKey);
+      needsTranslation.push(nlRow.blockKey);
     }
   }
 

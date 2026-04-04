@@ -60,7 +60,7 @@ function CmsBlockField({
   const isDirty = value !== saved;
   const [showSource, setShowSource] = useState(false);
   const [translating, setTranslating] = useState(false);
-  const isTranslation = locale && locale !== "en";
+  const isTranslation = locale && locale !== "nl";
 
   async function handleTranslateBlock() {
     if (!pageSlug || !locale) return;
@@ -90,7 +90,7 @@ function CmsBlockField({
             onClick={() => setShowSource(!showSource)}
             className="text-[10px] text-green-100/30 hover:text-green-100/50"
           >
-            {showSource ? "▼" : "▶"} EN
+            {showSource ? "▼" : "▶"} NL
           </button>
         )}
         {isTranslation && (
@@ -113,7 +113,7 @@ function CmsBlockField({
       </label>
       {showSource && sourceContent && (
         <div className="mb-2 rounded border border-green-700/30 bg-green-900/40 px-3 py-2">
-          <p className="mb-1 text-[9px] font-semibold uppercase tracking-[0.15em] text-green-100/30">EN source</p>
+          <p className="mb-1 text-[9px] font-semibold uppercase tracking-[0.15em] text-green-100/30">NL bron</p>
           <p className="whitespace-pre-wrap text-xs leading-relaxed text-green-100/50">{sourceContent}</p>
         </div>
       )}
@@ -495,7 +495,7 @@ function VersionPanel({
     setLoading(true);
     setExpandedId(null);
     setDiffData(null);
-    getCmsPageVersions(pageSlug, locale as "en").then((v) => {
+    getCmsPageVersions(pageSlug, locale as Locale).then((v) => {
       setVersions(v);
       setLoading(false);
     });
@@ -613,7 +613,7 @@ export default function ContentPanel() {
 
   const initialSlug = ROUTE_TO_SLUG[pathname] ?? CMS_PAGES[0].slug;
   const [selectedPage, setSelectedPage] = useState<string>(initialSlug);
-  const [selectedLocale, setSelectedLocale] = useState<Locale>("en");
+  const [selectedLocale, setSelectedLocale] = useState<Locale>("nl");
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
   const [saveMessage, setSaveMessage] = useState<string | null>(null);
@@ -713,7 +713,7 @@ export default function ContentPanel() {
   }, [cms, selectedPage, selectedLocale]);
 
   const handleTranslateAll = useCallback(async () => {
-    if (selectedLocale === "en") return;
+    if (selectedLocale === "nl") return;
     setTranslatingAll(true);
     setSaveMessage(null);
     const result = await translateAllBlocks(selectedPage, selectedLocale);
@@ -842,7 +842,7 @@ export default function ContentPanel() {
             Publish
           </button>
           {/* Translate All (non-EN only) */}
-          {selectedLocale !== "en" && (
+          {selectedLocale !== "nl" && (
             <button
               onClick={handleTranslateAll}
               disabled={translatingAll}

@@ -65,7 +65,7 @@ export async function getCmsBlocksWithTranslationStatus(
       .select({ blockKey: cmsBlocks.blockKey, content: cmsBlocks.content })
       .from(cmsBlocks)
       .where(
-        and(eq(cmsBlocks.pageSlug, pageSlug), eq(cmsBlocks.locale, "en"))
+        and(eq(cmsBlocks.pageSlug, pageSlug), eq(cmsBlocks.locale, "nl"))
       ),
   ]);
 
@@ -112,12 +112,12 @@ export async function saveCmsBlocks(
 
   // For translations: fetch EN source blocks for hash computation
   let sourceMap: Map<string, string> | null = null;
-  if (locale !== "en") {
+  if (locale !== "nl") {
     const sourceRows = await db
       .select({ blockKey: cmsBlocks.blockKey, content: cmsBlocks.content })
       .from(cmsBlocks)
       .where(
-        and(eq(cmsBlocks.pageSlug, pageSlug), eq(cmsBlocks.locale, "en"))
+        and(eq(cmsBlocks.pageSlug, pageSlug), eq(cmsBlocks.locale, "nl"))
       );
     sourceMap = new Map(sourceRows.map((r) => [r.blockKey, r.content]));
   }
@@ -166,7 +166,7 @@ export async function saveCmsBlocks(
         .set({
           content: block.content,
           sourceHash,
-          translatedAt: locale !== "en" ? now : null,
+          translatedAt: locale !== "nl" ? now : null,
           updatedBy: session.userId,
           updatedAt: now,
         })
@@ -179,7 +179,7 @@ export async function saveCmsBlocks(
         locale,
         content: block.content,
         sourceHash,
-        translatedAt: locale !== "en" ? now : null,
+        translatedAt: locale !== "nl" ? now : null,
         updatedBy: session.userId,
         updatedAt: now,
       });
