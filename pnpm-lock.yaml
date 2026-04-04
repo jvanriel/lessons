@@ -14,6 +14,9 @@ importers:
       '@neondatabase/serverless':
         specifier: ^1.0.2
         version: 1.0.2
+      '@stripe/stripe-js':
+        specifier: ^9.0.1
+        version: 9.0.1
       '@vercel/blob':
         specifier: ^2.3.3
         version: 2.3.3
@@ -53,6 +56,9 @@ importers:
       shadcn:
         specifier: ^4.1.1
         version: 4.1.1(@types/node@22.19.15)(typescript@5.9.3)
+      stripe:
+        specifier: ^22.0.0
+        version: 22.0.0(@types/node@22.19.15)
       tailwind-merge:
         specifier: ^3.5.0
         version: 3.5.0
@@ -1248,6 +1254,10 @@ packages:
 
   '@standard-schema/spec@1.1.0':
     resolution: {integrity: sha512-l2aFy5jALhniG5HgqrD6jXLi/rUWrKvqN/qJx6yoJsgKhblVd+iqqU4RCXavm/jPityDo5TCvKMnpjKnOriy0w==}
+
+  '@stripe/stripe-js@9.0.1':
+    resolution: {integrity: sha512-un0URSosrW7wNr7xZ5iI2mC9mdeXZ3KERoVlA2RdmeLXYxHUPXq0yHzir2n/MtyXXEdSaELtz4WXGS6dzPEeKA==}
+    engines: {node: '>=12.16'}
 
   '@swc/helpers@0.5.15':
     resolution: {integrity: sha512-JQ5TuMi45Owi4/BIMAJBoSQoOJu12oOk/gADqlcUL9JEdHB8vyjUSsxqeNXnmXHjYKMi2WcYtezGEEhqUI/E2g==}
@@ -3624,6 +3634,15 @@ packages:
     resolution: {integrity: sha512-6fPc+R4ihwqP6N/aIv2f1gMH8lOVtWQHoqC4yK6oSDVVocumAsfCqjkXnqiYMhmMwS/mEHLp7Vehlt3ql6lEig==}
     engines: {node: '>=8'}
 
+  stripe@22.0.0:
+    resolution: {integrity: sha512-q1UgXXpSfZCmkyzZEh3vFEWT7+ajuaFGqaP9Tsi2NMtwlkigIWNr+KBIUQqtNeNEsreDKgdn+BP5HRW9JDj22Q==}
+    engines: {node: '>=18'}
+    peerDependencies:
+      '@types/node': '>=18'
+    peerDependenciesMeta:
+      '@types/node':
+        optional: true
+
   styled-jsx@5.1.6:
     resolution: {integrity: sha512-qSVyDTeMotdvQYoHWLNGwRFJHC+i+ZvdBRYosOFgC+Wg1vx4frN2/RG/NA7SYqqvKNLf39P2LSRA2pu6n0XYZA==}
     engines: {node: '>= 12.0.0'}
@@ -4883,6 +4902,8 @@ snapshots:
   '@sindresorhus/merge-streams@4.0.0': {}
 
   '@standard-schema/spec@1.1.0': {}
+
+  '@stripe/stripe-js@9.0.1': {}
 
   '@swc/helpers@0.5.15':
     dependencies:
@@ -7490,6 +7511,10 @@ snapshots:
   strip-final-newline@4.0.0: {}
 
   strip-json-comments@3.1.1: {}
+
+  stripe@22.0.0(@types/node@22.19.15):
+    optionalDependencies:
+      '@types/node': 22.19.15
 
   styled-jsx@5.1.6(@babel/core@7.29.0)(react@19.2.4):
     dependencies:

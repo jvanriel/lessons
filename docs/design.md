@@ -16,10 +16,10 @@ Sister project of [silverswing.golf](https://silverswing.golf) — standalone pr
 | 2 | Auth | **Custom JWT** (reuse silverswing pattern) | Proven, no external dependency |
 | 3 | Stripe model | **Stripe Connect Express** | Pro receives directly minus platform fee. See §7 |
 | 4 | Video hosting | **Deferred** | Start with Vercel Blob, revisit when video needs are clearer |
-| 5 | Subscription tiers | **One annual plan** | Schema ready for multiple tiers later |
+| 5 | Subscription tiers | **Monthly (€12.50) + Annual (€125)** | 14-day free trial. See `docs/stripe-integration.md` |
 | 6 | Code sharing | **Copy from silverswing** | Lesson engine moves here, gets removed from silverswing |
 | 7 | Locales | **EN, NL, FR from the start** | All three from day one |
-| 8 | Commission | **TBD** | May be 0% commission + higher annual sub, or small % — decide before launch |
+| 8 | Commission | **2.5% per lesson** | Platform keeps 2.5% via `application_fee_amount`. See `docs/stripe-integration.md` |
 | 9 | Student page interaction | **WhatsApp-style reply/comment** | Two-way conversation per entry, not just one-way |
 | 10 | Domain | **golflessons.be** | Purchased via Vercel |
 | 11 | Pre-launch access | **Password-protected preview** | Vercel password protection on preview + staging |
@@ -180,17 +180,23 @@ Access: student sees only their own page. Pro sees all their students' pages.
 /(pro)/pro/lessen                     # Lesson management
 /(pro)/pro/studenten                  # Student roster
 /(pro)/pro/studenten/[id]             # Student personal page (pro edits)
-/(pro)/pro/inkomsten                  # Earnings / subscription
+/(pro)/pro/billing                    # Subscription, plan, invoices, payment method
+/(pro)/pro/earnings                   # Lesson revenue, payouts, Connect dashboard
 
 /(student)/student/                   # Student dashboard
 /(student)/student/lessen             # My bookings
 /(student)/student/boeken             # Book a lesson
+/(student)/student/payments           # Payment history, methods, refunds
 /(student)/student/mijn-pagina        # My personal page (read-only)
 
 /(admin)/admin/                       # Admin dashboard
 /(admin)/admin/gebruikers             # User management
 /(admin)/admin/pros                   # Pro management
-/(admin)/admin/abonnementen           # Subscription overview
+/(admin)/admin/payments                # Payment dashboard (MRR, commissions, volume)
+/(admin)/admin/payments/subscriptions # Subscription management
+/(admin)/admin/payments/lessons       # Lesson payment management + refunds
+/(admin)/admin/payments/connect       # Connect account overview
+/(admin)/admin/payments/payouts       # Payout monitoring
 
 /api/webhooks/stripe                  # Stripe webhooks
 /api/cron/...                         # Scheduled jobs

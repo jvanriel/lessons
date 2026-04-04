@@ -22,6 +22,7 @@ export const users = pgTable("users", {
   preferredLocale: varchar("preferred_locale", { length: 5 }).default("en"),
   emailOptOut: boolean("email_opt_out").default(false),
   emailVerifiedAt: timestamp("email_verified_at"),
+  stripeCustomerId: varchar("stripe_customer_id", { length: 255 }),
   lastLoginAt: timestamp("last_login_at"),
   createdAt: timestamp("created_at").defaultNow(),
 });
@@ -90,8 +91,20 @@ export const proProfiles = pgTable("pro_profiles", {
   bookingNotice: integer("booking_notice").notNull().default(24),
   bookingHorizon: integer("booking_horizon").notNull().default(60),
   cancellationHours: integer("cancellation_hours").notNull().default(24),
+  lateCancelRefundPercent: integer("late_cancel_refund_percent").notNull().default(0),
   googleCalendarEmail: varchar("google_calendar_email", { length: 255 }),
   published: boolean("published").notNull().default(false),
+  // Stripe subscription
+  subscriptionStatus: varchar("subscription_status", { length: 20 }).notNull().default("none"),
+  stripeSubscriptionId: varchar("stripe_subscription_id", { length: 255 }),
+  subscriptionPlan: varchar("subscription_plan", { length: 20 }),
+  subscriptionCurrentPeriodEnd: timestamp("subscription_current_period_end"),
+  subscriptionTrialEnd: timestamp("subscription_trial_end"),
+  // Stripe Connect
+  stripeConnectAccountId: varchar("stripe_connect_account_id", { length: 255 }),
+  stripeConnectOnboarded: boolean("stripe_connect_onboarded").notNull().default(false),
+  stripeConnectChargesEnabled: boolean("stripe_connect_charges_enabled").notNull().default(false),
+  stripeConnectPayoutsEnabled: boolean("stripe_connect_payouts_enabled").notNull().default(false),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });
@@ -178,6 +191,16 @@ export const lessonBookings = pgTable("lesson_bookings", {
   participantCount: integer("participant_count").notNull().default(1),
   status: varchar("status", { length: 20 }).notNull().default("confirmed"),
   notes: text("notes"),
+  // Payment
+  priceCents: integer("price_cents"),
+  currency: varchar("currency", { length: 3 }).notNull().default("eur"),
+  paymentStatus: varchar("payment_status", { length: 20 }).notNull().default("pending"),
+  stripePaymentIntentId: varchar("stripe_payment_intent_id", { length: 255 }),
+  stripeCheckoutSessionId: varchar("stripe_checkout_session_id", { length: 255 }),
+  platformFeeCents: integer("platform_fee_cents"),
+  paidAt: timestamp("paid_at"),
+  refundedAt: timestamp("refunded_at"),
+  // Existing
   manageToken: varchar("manage_token", { length: 64 }).notNull().unique(),
   googleEventId: varchar("google_event_id", { length: 255 }),
   cancelledAt: timestamp("cancelled_at"),
@@ -337,4 +360,18 @@ export const commentReactions = pgTable("comment_reactions", {
     .notNull(),
   emoji: varchar("emoji", { length: 20 }).notNull(),
   createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+// ─── Stripe Events (Webhook Audit Trail) ──────────────
+
+export const stripeEvents = pgTable("stripe_events", {
+  id: serial("id").primaryKey(),
+  stripeEventId: varchar("stripe_event_id", { length: 255 }).notNull().unique(),
+  eventType: varchar("event_type", { length: 100 }).notNull(),
+  relatedUserId: integer("related_user_id").references(() => users.id),
+  relatedBookingId: integer("related_booking_id").references(
+    () => lessonBookings.id
+  ),
+  payload: jsonb("payload").$type<Record<string, unknown>>().notNull(),
+  processedAt: timestamp("processed_at").defaultNow().notNull(),
 });
