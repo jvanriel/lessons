@@ -1,13 +1,22 @@
 import Link from "next/link";
+import { redirect } from "next/navigation";
 import { getLocale } from "@/lib/locale";
 import { t } from "@/lib/i18n/translations";
 import { getCmsData } from "@/lib/cms";
+import { getSession, hasRole } from "@/lib/auth";
 import CmsBlock from "@/components/cms/CmsBlock";
 import CmsPageInit from "@/components/cms/CmsPageInit";
 
 const PAGE = "home";
 
 export default async function Home() {
+  const session = await getSession();
+  if (session) {
+    if (hasRole(session, "pro")) redirect("/pro/dashboard");
+    if (hasRole(session, "admin")) redirect("/admin/users");
+    redirect("/member/dashboard");
+  }
+
   const locale = await getLocale();
   const cms = await getCmsData(PAGE, locale);
 
