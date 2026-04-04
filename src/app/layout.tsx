@@ -4,8 +4,6 @@ import "./globals.css";
 import Header from "@/components/Header";
 import Footer from "@/components/Footer";
 import { CmsProvider } from "@/components/cms/CmsProvider";
-import { ToolboxProvider } from "@/components/toolbox/ToolboxProvider";
-import AdminToolbox from "@/components/toolbox/AdminToolbox";
 import PreLaunchBanner from "@/components/PreLaunchBanner";
 import DeploymentChecker from "@/components/DeploymentChecker";
 import { getSession, hasRole, getImpersonatorSession, parseRoles } from "@/lib/auth";
@@ -38,10 +36,6 @@ export default async function RootLayout({
   children: React.ReactNode;
 }>) {
   const session = await getSession();
-  const showToolbox =
-    session &&
-    (hasRole(session, "admin") || hasRole(session, "dev"));
-
   // Determine if this is an app-mode session (logged in user)
   const isAppMode = !!session;
 
@@ -150,22 +144,10 @@ export default async function RootLayout({
       >
         <CmsProvider>
           {isAppMode && appProps ? (
-            showToolbox ? (
-              <ToolboxProvider>
-                <div className="flex h-dvh">
-                  <div className="flex min-w-0 flex-1 flex-col">
-                    <PreLaunchBanner />
-                    <AppLayout {...appProps}>{children}</AppLayout>
-                  </div>
-                  <AdminToolbox />
-                </div>
-              </ToolboxProvider>
-            ) : (
-              <>
-                <PreLaunchBanner />
-                <AppLayout {...appProps}>{children}</AppLayout>
-              </>
-            )
+            <>
+              <PreLaunchBanner />
+              <AppLayout {...appProps}>{children}</AppLayout>
+            </>
           ) : (
             /* Website mode — not logged in */
             <>
