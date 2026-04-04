@@ -2,7 +2,7 @@
 
 import { redirect } from "next/navigation";
 import { db } from "@/lib/db";
-import { users, userEmails } from "@/lib/db/schema";
+import { users, userEmails, proProfiles } from "@/lib/db/schema";
 import { eq } from "drizzle-orm";
 import { hashPassword, setSessionCookie } from "@/lib/auth";
 import { createNotification } from "@/lib/notifications";
@@ -43,8 +43,8 @@ export async function register(
 
   const hashed = await hashPassword(password);
 
-  // Pro registrations get member + pro_pending — admin activates to full pro
-  const roles = accountType === "pro" ? "member,pro_pending" : "member";
+  // Pro registrations get member + pro role immediately (onboarding wizard follows)
+  const roles = accountType === "pro" ? "member,pro" : "member";
 
   let userId: number;
 
@@ -104,11 +104,35 @@ export async function register(
     html: buildWelcomeEmail({ firstName, accountType: acctType, locale }),
   }).catch(() => {});
 
+  const sessionRoles = accountType === "pro" ? ["member", "pro"] : ["member"];
+
   await setSessionCookie({
     userId,
     email,
-    roles: ["member"],
+    roles: sessionRoles as ("member" | "pro" | "admin" | "dev")[],
   });
+
+  // For pro registrations: create pro profile and redirect to onboarding
+  if (accountType === "pro") {
+    const slug = `${firstName}-${lastName}`.toLowerCase().replace(/[^a-z0-9-]/g, "-").replace(/-+/g, "-");
+
+    // Check if profile already exists (e.g. account upgrade)
+    const [existingProfile] = await db
+      .select({ id: proProfiles.id })
+      .from(proProfiles)
+      .where(eq(proProfiles.userId, userId))
+      .limit(1);
+
+    if (!existingProfile) {
+      await db.insert(proProfiles).values({
+        userId,
+        slug: `${slug}-${userId}`,
+        displayName: `${firstName} ${lastName}`,
+      });
+    }
+
+    redirect("/pro/onboarding");
+  }
 
   const chooseProsUrl = proId
     ? `/member/choose-pros?pro=${encodeURIComponent(proId)}`
