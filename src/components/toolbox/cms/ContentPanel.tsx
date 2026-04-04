@@ -20,7 +20,6 @@ const CMS_PAGES: { slug: string; label: string; route: string }[] = [
   { slug: "home", label: "Home", route: "/" },
   { slug: "for-students", label: "For Students", route: "/for-students" },
   { slug: "for-pros", label: "For Pros", route: "/for-pros" },
-  { slug: "contact", label: "Contact", route: "/contact" },
 ];
 
 const ROUTE_TO_SLUG: Record<string, string> = {};
@@ -767,7 +766,6 @@ export default function ContentPanel() {
             {selectedPage === "home" && <HomeEditor />}
             {selectedPage === "for-students" && <ForStudentsEditor />}
             {selectedPage === "for-pros" && <ForProsEditor />}
-            {selectedPage === "contact" && <ContactEditor />}
           </>
         )}
       </div>

@@ -5,7 +5,7 @@ import type { Locale } from "@/lib/i18n";
 
 export async function getCmsData(
   pageSlug: string,
-  locale: Locale = "en"
+  locale: Locale = "nl"
 ): Promise<Record<string, string>> {
   try {
     const rows = await db
@@ -18,15 +18,15 @@ export async function getCmsData(
     const map: Record<string, string> = {};
     for (const r of rows) map[r.blockKey] = r.content;
 
-    // Fallback: fill in missing blocks from EN (default locale)
-    if (locale !== "en") {
-      const enRows = await db
+    // Fallback: fill in missing blocks from NL (source locale)
+    if (locale !== "nl") {
+      const nlRows = await db
         .select({ blockKey: cmsBlocks.blockKey, content: cmsBlocks.content })
         .from(cmsBlocks)
         .where(
-          and(eq(cmsBlocks.pageSlug, pageSlug), eq(cmsBlocks.locale, "en"))
+          and(eq(cmsBlocks.pageSlug, pageSlug), eq(cmsBlocks.locale, "nl"))
         );
-      for (const r of enRows) {
+      for (const r of nlRows) {
         if (!(r.blockKey in map)) {
           map[r.blockKey] = r.content;
         }
