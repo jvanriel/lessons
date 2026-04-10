@@ -1,9 +1,10 @@
 "use client";
 
-import { useState, useActionState, useTransition } from "react";
+import { useState, useActionState } from "react";
 import Link from "next/link";
-import { inviteStudent, removeStudent } from "./actions";
+import { inviteStudent, type ProQuickBookData } from "./actions";
 import { ProQuickBook } from "./ProQuickBook";
+import { EditStudentDialog } from "./EditStudentDialog";
 
 interface Student {
   id: number;
@@ -66,8 +67,14 @@ function statusBadge(status: string) {
 
 export default function StudentManager({
   students,
+  currentStudentId,
+  currentBooking,
+  currentQuickBook,
 }: {
   students: Student[];
+  currentStudentId: number | null;
+  currentBooking: { date: string; startTime: string; endTime: string } | null;
+  currentQuickBook: ProQuickBookData | null;
 }) {
   const [showInviteForm, setShowInviteForm] = useState(false);
   const [inviteMode, setInviteMode] = useState<"invited" | "pro_added">(
@@ -77,22 +84,26 @@ export default function StudentManager({
     inviteStudent,
     null
   );
-  const [removingId, setRemovingId] = useState<number | null>(null);
-  const [, startTransition] = useTransition();
   const [filter, setFilter] = useState<"all" | "active" | "pending" | "inactive">("all");
+  const [search, setSearch] = useState("");
+  const [selectedStudentId, setSelectedStudentId] = useState<number | null>(null);
+  const [editingStudent, setEditingStudent] = useState<Student | null>(null);
 
-  const filtered = students.filter((s) =>
-    filter === "all" ? true : s.status === filter
-  );
+  const currentStudent = currentStudentId
+    ? students.find((s) => s.id === currentStudentId) ?? null
+    : null;
 
-  function handleRemove(id: number) {
-    if (!confirm("Remove this student? They can rejoin later.")) return;
-    setRemovingId(id);
-    startTransition(async () => {
-      await removeStudent(id);
-      setRemovingId(null);
+  const filtered = students
+    .filter((s) => (filter === "all" ? true : s.status === filter))
+    .filter((s) => {
+      if (!search) return true;
+      const q = search.toLowerCase();
+      return (
+        s.firstName.toLowerCase().includes(q) ||
+        s.lastName.toLowerCase().includes(q) ||
+        s.email.toLowerCase().includes(q)
+      );
     });
-  }
 
   const activeCounts = {
     all: students.length,
@@ -121,7 +132,8 @@ export default function StudentManager({
             }}
             className="rounded-md bg-gold-600 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-gold-500"
           >
-            Invite student
+            <span className="sm:hidden">Invite</span>
+            <span className="hidden sm:inline">Invite student</span>
           </button>
           <button
             type="button"
@@ -131,7 +143,8 @@ export default function StudentManager({
             }}
             className="rounded-md border border-green-300 bg-white px-4 py-2 text-sm font-medium text-green-700 transition-colors hover:bg-green-50"
           >
-            Add student
+            <span className="sm:hidden">Add</span>
+            <span className="hidden sm:inline">Add student</span>
           </button>
         </div>
       </div>
@@ -223,8 +236,91 @@ export default function StudentManager({
         </div>
       )}
 
+      {/* Current student — next lesson */}
+      {currentStudent && currentBooking && (
+        <div className="mt-6 rounded-xl border-2 border-gold-300 bg-white p-5">
+          <div className="flex items-center justify-between mb-3">
+            <div className="flex items-center gap-3">
+              <div className="flex h-10 w-10 items-center justify-center rounded-full bg-gold-100 text-sm font-medium text-gold-700">
+                {currentStudent.firstName.charAt(0)}
+                {currentStudent.lastName.charAt(0)}
+              </div>
+              <div>
+                <p className="text-sm font-medium text-green-900">
+                  {currentStudent.firstName} {currentStudent.lastName}
+                </p>
+                <p className="text-xs text-green-500">
+                  {new Date(currentBooking.date + "T00:00:00").toLocaleDateString(
+                    "en-US",
+                    { weekday: "short", month: "short", day: "numeric" }
+                  )}
+                </p>
+                <p className="text-xs text-green-400">
+                  {currentBooking.startTime} - {currentBooking.endTime}
+                </p>
+              </div>
+            </div>
+            <div className="flex gap-2">
+              <Link
+                href={`/pro/students/${currentStudent.id}`}
+                className="flex items-center gap-1.5 rounded-md border border-green-200 px-3 py-1.5 text-xs font-medium text-green-700 transition-colors hover:bg-green-50"
+              >
+                <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M8.625 12a.375.375 0 1 1-.75 0 .375.375 0 0 1 .75 0Zm0 0H8.25m4.125 0a.375.375 0 1 1-.75 0 .375.375 0 0 1 .75 0Zm0 0H12m4.125 0a.375.375 0 1 1-.75 0 .375.375 0 0 1 .75 0Zm0 0h-.375M21 12c0 4.556-4.03 8.25-9 8.25a9.764 9.764 0 0 1-2.555-.337A5.972 5.972 0 0 1 5.41 20.97a5.969 5.969 0 0 1-.474-.065 4.48 4.48 0 0 0 .978-2.025c.09-.457-.133-.901-.467-1.226C3.93 16.178 3 14.189 3 12c0-4.556 4.03-8.25 9-8.25s9 3.694 9 8.25Z" />
+                </svg>
+                Chat
+              </Link>
+              <button
+                type="button"
+                onClick={() => setEditingStudent(currentStudent)}
+                className="flex items-center gap-1.5 rounded-md border border-green-200 px-3 py-1.5 text-xs font-medium text-green-700 transition-colors hover:bg-green-50"
+              >
+                <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="m16.862 4.487 1.687-1.688a1.875 1.875 0 1 1 2.652 2.652L10.582 16.07a4.5 4.5 0 0 1-1.897 1.13L6 18l.8-2.685a4.5 4.5 0 0 1 1.13-1.897l8.932-8.931Zm0 0L19.5 7.125M18 14v4.75A2.25 2.25 0 0 1 15.75 21H5.25A2.25 2.25 0 0 1 3 18.75V8.25A2.25 2.25 0 0 1 5.25 6H10" />
+                </svg>
+                Edit
+              </button>
+            </div>
+          </div>
+          {currentQuickBook && (
+            <ProQuickBook
+              proStudentId={currentStudent.id}
+              studentName={`${currentStudent.firstName} ${currentStudent.lastName}`}
+              initialData={currentQuickBook}
+              autoOpen
+            />
+          )}
+        </div>
+      )}
+
+      {/* Search + filter */}
+      <div className="mt-6 flex items-center gap-3">
+        <div className="relative flex-1">
+          <svg
+            className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-green-400"
+            fill="none"
+            viewBox="0 0 24 24"
+            stroke="currentColor"
+            strokeWidth={2}
+          >
+            <path
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              d="m21 21-5.197-5.197m0 0A7.5 7.5 0 1 0 5.196 5.196a7.5 7.5 0 0 0 10.607 10.607Z"
+            />
+          </svg>
+          <input
+            type="text"
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            placeholder="Search students..."
+            className="w-full rounded-lg border border-green-200 bg-white py-2 pl-9 pr-3 text-sm text-green-900 outline-none focus:border-gold-400 focus:ring-1 focus:ring-gold-400/30"
+          />
+        </div>
+      </div>
+
       {/* Filter tabs */}
-      <div className="mt-6 flex gap-1 rounded-lg bg-green-50 p-1">
+      <div className="mt-3 flex gap-1 rounded-lg bg-green-50 p-1">
         {(["all", "active", "pending", "inactive"] as const).map((f) => (
           <button
             key={f}
@@ -252,83 +348,138 @@ export default function StudentManager({
         </div>
       ) : (
         <div className="mt-4 space-y-2">
-          {filtered.map((student) => (
-            <div
-              key={student.id}
-              className="flex items-center justify-between rounded-xl border border-green-200 bg-white p-4 transition-colors hover:border-green-300"
-            >
-              <div className="flex items-center gap-4">
-                <Link
-                  href={`/pro/students/${student.id}`}
-                  className="flex h-10 w-10 items-center justify-center rounded-full bg-green-100 text-sm font-medium text-green-600 transition-colors hover:bg-green-200"
+          {filtered.map((student) => {
+            const isSelected = selectedStudentId === student.id;
+            return (
+              <div
+                key={student.id}
+                className={`rounded-xl border bg-white transition-colors ${
+                  isSelected
+                    ? "border-gold-300"
+                    : "border-green-200 hover:border-green-300"
+                }`}
+              >
+                {/* Row header — click to expand */}
+                <button
+                  type="button"
+                  onClick={() =>
+                    setSelectedStudentId(isSelected ? null : student.id)
+                  }
+                  className="flex w-full items-center justify-between p-4 text-left"
                 >
-                  {student.firstName.charAt(0)}
-                  {student.lastName.charAt(0)}
-                </Link>
-                <div>
-                  <Link
-                    href={`/pro/students/${student.id}`}
-                    className="text-sm font-medium text-green-900 hover:text-gold-700"
-                  >
-                    {student.firstName} {student.lastName}
-                  </Link>
-                  <p className="text-xs text-green-500">{student.email}</p>
-                  {student.phone && (
-                    <p className="text-xs text-green-400">{student.phone}</p>
-                  )}
-                </div>
-              </div>
-              <div className="flex items-center gap-3">
-                <div className="text-right">
-                  <div className="flex items-center gap-2">
-                    {statusBadge(student.status)}
-                    <span className="text-xs text-green-400">
-                      {sourceLabel(student.source)}
-                    </span>
+                  <div className="flex items-center gap-4">
+                    <div
+                      className={`flex h-10 w-10 items-center justify-center rounded-full text-sm font-medium ${
+                        isSelected
+                          ? "bg-gold-100 text-gold-700"
+                          : "bg-green-100 text-green-600"
+                      }`}
+                    >
+                      {student.firstName.charAt(0)}
+                      {student.lastName.charAt(0)}
+                    </div>
+                    <div>
+                      <p className="text-sm font-medium text-green-900">
+                        {student.firstName} {student.lastName}
+                      </p>
+                      <p className="text-xs text-green-500">{student.email}</p>
+                    </div>
                   </div>
-                  <p className="mt-0.5 text-xs text-green-400">
-                    Joined{" "}
-                    {new Date(student.createdAt).toLocaleDateString("en-US", {
-                      month: "short",
-                      day: "numeric",
-                      year: "numeric",
-                    })}
-                  </p>
-                </div>
-                {student.status === "active" && (
-                  <ProQuickBook
-                    proStudentId={student.id}
-                    studentName={`${student.firstName} ${student.lastName}`}
-                  />
-                )}
-                {student.status === "active" && (
-                  <Link
-                    href={`/pro/students/${student.id}`}
-                    className="rounded p-1.5 text-green-400 transition-colors hover:bg-green-50 hover:text-green-600"
-                    title="Open chat"
-                  >
-                    <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                      <path strokeLinecap="round" strokeLinejoin="round" d="M8.625 12a.375.375 0 1 1-.75 0 .375.375 0 0 1 .75 0Zm0 0H8.25m4.125 0a.375.375 0 1 1-.75 0 .375.375 0 0 1 .75 0Zm0 0H12m4.125 0a.375.375 0 1 1-.75 0 .375.375 0 0 1 .75 0Zm0 0h-.375M21 12c0 4.556-4.03 8.25-9 8.25a9.764 9.764 0 0 1-2.555-.337A5.972 5.972 0 0 1 5.41 20.97a5.969 5.969 0 0 1-.474-.065 4.48 4.48 0 0 0 .978-2.025c.09-.457-.133-.901-.467-1.226C3.93 16.178 3 14.189 3 12c0-4.556 4.03-8.25 9-8.25s9 3.694 9 8.25Z" />
+                  <div className="flex items-center gap-3">
+                    <div className="text-right">
+                      <div className="flex items-center gap-2">
+                        {statusBadge(student.status)}
+                      </div>
+                    </div>
+                    <svg
+                      className={`h-4 w-4 text-green-400 transition-transform ${
+                        isSelected ? "rotate-180" : ""
+                      }`}
+                      fill="none"
+                      viewBox="0 0 24 24"
+                      stroke="currentColor"
+                      strokeWidth={2}
+                    >
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        d="M19.5 8.25l-7.5 7.5-7.5-7.5"
+                      />
                     </svg>
-                  </Link>
-                )}
-                {student.status === "active" && (
-                  <button
-                    type="button"
-                    onClick={() => handleRemove(student.id)}
-                    disabled={removingId === student.id}
-                    className="rounded p-1 text-green-300 transition-colors hover:bg-red-50 hover:text-red-500"
-                    title="Remove student"
-                  >
-                    <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                      <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
-                    </svg>
-                  </button>
+                  </div>
+                </button>
+
+                {/* Expanded panel */}
+                {isSelected && (
+                  <div className="border-t border-green-100 px-4 pb-4">
+                    {/* Action buttons */}
+                    <div className="mt-3 flex gap-2">
+                      <Link
+                        href={`/pro/students/${student.id}`}
+                        className="flex items-center gap-1.5 rounded-md border border-green-200 px-3 py-1.5 text-xs font-medium text-green-700 transition-colors hover:bg-green-50"
+                      >
+                        <svg
+                          className="h-3.5 w-3.5"
+                          fill="none"
+                          viewBox="0 0 24 24"
+                          stroke="currentColor"
+                          strokeWidth={2}
+                        >
+                          <path
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                            d="M8.625 12a.375.375 0 1 1-.75 0 .375.375 0 0 1 .75 0Zm0 0H8.25m4.125 0a.375.375 0 1 1-.75 0 .375.375 0 0 1 .75 0Zm0 0H12m4.125 0a.375.375 0 1 1-.75 0 .375.375 0 0 1 .75 0Zm0 0h-.375M21 12c0 4.556-4.03 8.25-9 8.25a9.764 9.764 0 0 1-2.555-.337A5.972 5.972 0 0 1 5.41 20.97a5.969 5.969 0 0 1-.474-.065 4.48 4.48 0 0 0 .978-2.025c.09-.457-.133-.901-.467-1.226C3.93 16.178 3 14.189 3 12c0-4.556 4.03-8.25 9-8.25s9 3.694 9 8.25Z"
+                          />
+                        </svg>
+                        Chat
+                      </Link>
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setEditingStudent(student);
+                        }}
+                        className="flex items-center gap-1.5 rounded-md border border-green-200 px-3 py-1.5 text-xs font-medium text-green-700 transition-colors hover:bg-green-50"
+                      >
+                        <svg
+                          className="h-3.5 w-3.5"
+                          fill="none"
+                          viewBox="0 0 24 24"
+                          stroke="currentColor"
+                          strokeWidth={2}
+                        >
+                          <path
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                            d="m16.862 4.487 1.687-1.688a1.875 1.875 0 1 1 2.652 2.652L10.582 16.07a4.5 4.5 0 0 1-1.897 1.13L6 18l.8-2.685a4.5 4.5 0 0 1 1.13-1.897l8.932-8.931Zm0 0L19.5 7.125M18 14v4.75A2.25 2.25 0 0 1 15.75 21H5.25A2.25 2.25 0 0 1 3 18.75V8.25A2.25 2.25 0 0 1 5.25 6H10"
+                          />
+                        </svg>
+                        Edit
+                      </button>
+                    </div>
+
+                    {/* Quick book */}
+                    {student.status === "active" && (
+                      <ProQuickBook
+                        proStudentId={student.id}
+                        studentName={`${student.firstName} ${student.lastName}`}
+                        autoOpen
+                      />
+                    )}
+                  </div>
                 )}
               </div>
-            </div>
-          ))}
+            );
+          })}
         </div>
+      )}
+
+      {/* Edit student dialog */}
+      {editingStudent && (
+        <EditStudentDialog
+          student={editingStudent}
+          onClose={() => setEditingStudent(null)}
+        />
       )}
     </div>
   );

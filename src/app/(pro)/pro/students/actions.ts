@@ -206,6 +206,244 @@ export async function removeStudent(proStudentId: number) {
   return { success: true };
 }
 
+export async function updateStudentInfo(
+  proStudentId: number,
+  data: {
+    firstName: string;
+    lastName: string;
+    email: string;
+    phone: string;
+    preferredDuration: number | null;
+    preferredInterval: string | null;
+    preferredDayOfWeek: number | null;
+    preferredTime: string | null;
+  }
+) {
+  const { profile } = await requireProProfile();
+  if (!profile) return { error: "No pro profile found." };
+
+  // Verify relationship and get userId
+  const [rel] = await db
+    .select({ userId: proStudents.userId })
+    .from(proStudents)
+    .where(
+      and(
+        eq(proStudents.id, proStudentId),
+        eq(proStudents.proProfileId, profile.id)
+      )
+    )
+    .limit(1);
+
+  if (!rel) return { error: "Student not found." };
+
+  if (!data.firstName.trim() || !data.lastName.trim() || !data.email.trim()) {
+    return { error: "Name and email are required." };
+  }
+
+  // Update user record
+  await db
+    .update(users)
+    .set({
+      firstName: data.firstName.trim(),
+      lastName: data.lastName.trim(),
+      email: data.email.trim().toLowerCase(),
+      phone: data.phone.trim() || null,
+    })
+    .where(eq(users.id, rel.userId));
+
+  // Update preferences
+  await db
+    .update(proStudents)
+    .set({
+      preferredDuration: data.preferredDuration,
+      preferredInterval: data.preferredInterval,
+      preferredDayOfWeek: data.preferredDayOfWeek,
+      preferredTime: data.preferredTime,
+    })
+    .where(eq(proStudents.id, proStudentId));
+
+  revalidatePath("/pro/students");
+  return { success: true };
+}
+
+export async function resetStudentPassword(proStudentId: number) {
+  const { profile } = await requireProProfile();
+  if (!profile) return { error: "No pro profile found." };
+
+  const [rel] = await db
+    .select({
+      userId: proStudents.userId,
+      firstName: users.firstName,
+      email: users.email,
+    })
+    .from(proStudents)
+    .innerJoin(users, eq(proStudents.userId, users.id))
+    .where(
+      and(
+        eq(proStudents.id, proStudentId),
+        eq(proStudents.proProfileId, profile.id)
+      )
+    )
+    .limit(1);
+
+  if (!rel) return { error: "Student not found." };
+
+  const newPassword = generatePassword();
+  const hashed = await hashPassword(newPassword);
+
+  await db
+    .update(users)
+    .set({ password: hashed })
+    .where(eq(users.id, rel.userId));
+
+  // Send email with new password
+  const locale = resolveLocale("en");
+  const strings = getEmailStrings(locale);
+  const html = buildInviteEmail({
+    firstName: rel.firstName,
+    loginEmail: rel.email,
+    password: newPassword,
+    comment: `Your password has been reset by ${profile.displayName}.`,
+    locale,
+  });
+
+  sendEmail({
+    to: rel.email,
+    subject: "Your password has been reset — Golf Lessons",
+    html,
+  }).catch(() => {});
+
+  return { success: true, password: newPassword };
+}
+
+/**
+ * Get all available dates for a pro-student's preferred location/duration.
+ * Used by "More dates" in the ProQuickBook panel.
+ */
+export async function getProAllAvailableDates(
+  proStudentId: number,
+  locationId: number,
+  duration: number
+): Promise<string[]> {
+  const { profile } = await requireProProfile();
+  if (!profile) return [];
+
+  // Verify the pro-student relationship
+  const [rel] = await db
+    .select({ id: proStudents.id })
+    .from(proStudents)
+    .where(
+      and(
+        eq(proStudents.id, proStudentId),
+        eq(proStudents.proProfileId, profile.id)
+      )
+    )
+    .limit(1);
+  if (!rel) return [];
+
+  const now = new Date();
+  const [proSettings] = await db
+    .select({
+      bookingHorizon: proProfiles.bookingHorizon,
+      bookingNotice: proProfiles.bookingNotice,
+    })
+    .from(proProfiles)
+    .where(eq(proProfiles.id, profile.id))
+    .limit(1);
+
+  if (!proSettings) return [];
+
+  const horizonEnd = new Date(now);
+  horizonEnd.setDate(horizonEnd.getDate() + proSettings.bookingHorizon);
+  const todayStr = now.toISOString().split("T")[0];
+  const horizonStr = horizonEnd.toISOString().split("T")[0];
+
+  const [templateRows, overrideRows, bookingRows] = await Promise.all([
+    db
+      .select({
+        dayOfWeek: proAvailability.dayOfWeek,
+        startTime: proAvailability.startTime,
+        endTime: proAvailability.endTime,
+        validFrom: proAvailability.validFrom,
+        validUntil: proAvailability.validUntil,
+      })
+      .from(proAvailability)
+      .where(
+        and(
+          eq(proAvailability.proProfileId, profile.id),
+          eq(proAvailability.proLocationId, locationId)
+        )
+      ),
+    db
+      .select({
+        date: proAvailabilityOverrides.date,
+        type: proAvailabilityOverrides.type,
+        startTime: proAvailabilityOverrides.startTime,
+        endTime: proAvailabilityOverrides.endTime,
+        proLocationId: proAvailabilityOverrides.proLocationId,
+      })
+      .from(proAvailabilityOverrides)
+      .where(
+        and(
+          eq(proAvailabilityOverrides.proProfileId, profile.id),
+          gte(proAvailabilityOverrides.date, todayStr),
+          lte(proAvailabilityOverrides.date, horizonStr)
+        )
+      ),
+    db
+      .select({
+        date: lessonBookings.date,
+        startTime: lessonBookings.startTime,
+        endTime: lessonBookings.endTime,
+      })
+      .from(lessonBookings)
+      .where(
+        and(
+          eq(lessonBookings.proProfileId, profile.id),
+          eq(lessonBookings.proLocationId, locationId),
+          eq(lessonBookings.status, "confirmed"),
+          gte(lessonBookings.date, todayStr),
+          lte(lessonBookings.date, horizonStr)
+        )
+      ),
+  ]);
+
+  function normalizeDate(d: string | Date): string {
+    if (d instanceof Date) return d.toISOString().split("T")[0];
+    if (d.includes("T")) return d.split("T")[0];
+    return d;
+  }
+
+  const availableDates: string[] = [];
+  const cursor = new Date(now);
+  cursor.setHours(0, 0, 0, 0);
+
+  while (cursor <= horizonEnd) {
+    const dateStr = cursor.toISOString().split("T")[0];
+    const dateOverrides = overrideRows.filter(
+      (o) =>
+        normalizeDate(o.date as string | Date) === dateStr &&
+        (o.proLocationId === null || o.proLocationId === locationId)
+    );
+    const dateBookings = bookingRows.filter(
+      (b) => normalizeDate(b.date as string | Date) === dateStr
+    );
+    const slots = computeAvailableSlots(
+      dateStr,
+      templateRows as AvailabilityTemplate[],
+      dateOverrides as AvailabilityOverride[],
+      dateBookings as ExistingBooking[],
+      proSettings.bookingNotice,
+      duration,
+      now
+    );
+    if (slots.length > 0) availableDates.push(dateStr);
+    cursor.setDate(cursor.getDate() + 1);
+  }
+
+  return availableDates;
+}
+
 // ─── Slot Availability (no member auth required) ─────
 
 async function fetchAvailableSlots(
@@ -283,6 +521,20 @@ async function fetchAvailableSlots(
     pro.bookingNotice,
     duration
   );
+}
+
+/**
+ * Fetch available slots for a specific date. Exposed as a server action
+ * for the ProQuickBook component to call when switching dates.
+ */
+export async function fetchSlotsForDate(
+  locationId: number,
+  date: string,
+  duration: number
+) {
+  const { profile } = await requireProProfile();
+  if (!profile) return [];
+  return fetchAvailableSlots(profile.id, locationId, date, duration);
 }
 
 // ─── Pro Quick Book for Student ──────────────────────

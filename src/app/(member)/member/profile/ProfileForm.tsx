@@ -7,7 +7,7 @@ import {
   useState,
   useTransition,
 } from "react";
-import { updateProfile, changePassword, updateEmailPreference, updateLocalePreference } from "./actions";
+import { updateProfile, changePassword, updateEmailPreference, updateLocalePreference, sendVerificationEmail } from "./actions";
 import { useRouter } from "next/navigation";
 import { t } from "@/lib/i18n/translations";
 import { LOCALE_LABELS, type Locale } from "@/lib/i18n";
@@ -215,6 +215,52 @@ function LocalePreference({
   );
 }
 
+function VerificationBanner({ locale }: { locale: Locale }) {
+  const [isPending, startTransition] = useTransition();
+  const [sent, setSent] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  function handleResend() {
+    setError(null);
+    setSent(false);
+    startTransition(async () => {
+      const result = await sendVerificationEmail();
+      if (result.error) {
+        setError(result.error);
+      } else {
+        setSent(true);
+      }
+    });
+  }
+
+  return (
+    <div className="rounded-lg border border-gold-300/50 bg-gold-100 px-5 py-4">
+      <p className="text-sm font-medium text-green-900">
+        {t("profile.emailNotVerified", locale)}
+      </p>
+      <p className="mt-1 text-sm text-green-700/60">
+        {t("profile.checkInbox", locale)}
+      </p>
+      <div className="mt-3">
+        {sent ? (
+          <p className="text-sm text-green-700">Verification email sent! Check your inbox.</p>
+        ) : (
+          <button
+            onClick={handleResend}
+            disabled={isPending}
+            className="rounded-md bg-gold-600 px-4 py-1.5 text-xs font-medium text-white transition-colors hover:bg-gold-500 disabled:opacity-50"
+          >
+            {isPending ? "Sending..." : "Resend verification email"}
+          </button>
+        )}
+        {error && (
+          <p className="mt-1 text-xs text-red-600">{error}</p>
+        )}
+      </div>
+    </div>
+  );
+}
+
 const inputClass =
   "block w-full rounded-lg border border-green-300 px-3 py-2 text-sm focus:border-gold-500 focus:outline-none focus:ring-1 focus:ring-gold-500";
 
@@ -234,14 +280,7 @@ export default function ProfileForm({
     <div className="space-y-12">
       {/* Email verification banner */}
       {!user.emailVerifiedAt && (
-        <div className="rounded-lg border border-gold-300/50 bg-gold-100 px-5 py-4">
-          <p className="text-sm font-medium text-green-900">
-            {t("profile.emailNotVerified", locale)}
-          </p>
-          <p className="mt-1 text-sm text-green-700/60">
-            {t("profile.checkInbox", locale)}
-          </p>
-        </div>
+        <VerificationBanner locale={locale} />
       )}
 
       {/* Profile details */}

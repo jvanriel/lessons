@@ -1,15 +1,19 @@
 "use client";
 
-import { useState, useRef, useCallback, useTransition } from "react";
+import { useState, useEffect, useRef, useCallback, useTransition } from "react";
 import {
   proQuickBookForStudent,
   getProQuickBookData,
+  getProAllAvailableDates,
+  fetchSlotsForDate,
   type ProQuickBookData,
 } from "./actions";
 
 interface Props {
   proStudentId: number;
   studentName: string;
+  initialData?: ProQuickBookData;
+  autoOpen?: boolean;
 }
 
 const HOLD_MS = 600;
@@ -28,14 +32,41 @@ function formatDatePill(dateStr: string) {
   return d.toLocaleDateString("en-US", { month: "short", day: "numeric" });
 }
 
-export function ProQuickBook({ proStudentId, studentName }: Props) {
+export function ProQuickBook({ proStudentId, studentName, initialData, autoOpen }: Props) {
   const [isPending, startTransition] = useTransition();
-  const [data, setData] = useState<ProQuickBookData | null>(null);
-  const [open, setOpen] = useState(false);
+  const [data, setData] = useState<ProQuickBookData | null>(initialData ?? null);
+  const [open, setOpen] = useState(!!initialData);
+
+  // Auto-open: fetch data immediately on mount
+  useEffect(() => {
+    if (autoOpen && !data && !open) {
+      setOpen(true);
+      startTransition(async () => {
+        const result = await getProQuickBookData(proStudentId);
+        if (!result.hasPreferences) {
+          setNoPrefs(true);
+          return;
+        }
+        setData(result);
+        setSelectedDate(result.suggestedDate);
+        setSlots(
+          result.suggestedSlot
+            ? [result.suggestedSlot, ...result.alternativeSlots]
+            : result.alternativeSlots
+        );
+      });
+    }
+  }, [autoOpen]); // eslint-disable-line react-hooks/exhaustive-deps
   const [noPrefs, setNoPrefs] = useState(false);
-  const [selectedDate, setSelectedDate] = useState<string>("");
+  const [selectedDate, setSelectedDate] = useState<string>(
+    initialData?.suggestedDate ?? ""
+  );
   const [slots, setSlots] = useState<{ startTime: string; endTime: string }[]>(
-    []
+    initialData
+      ? initialData.suggestedSlot
+        ? [initialData.suggestedSlot, ...initialData.alternativeSlots]
+        : initialData.alternativeSlots
+      : []
   );
   const [status, setStatus] = useState<
     "idle" | "holding" | "booking" | "booked" | "error"
@@ -47,6 +78,7 @@ export function ProQuickBook({ proStudentId, studentName }: Props) {
     startTime: string;
     endTime: string;
   } | null>(null);
+  const [allDates, setAllDates] = useState<string[] | null>(null);
 
   const holdTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const animFrame = useRef<number | null>(null);
@@ -144,13 +176,16 @@ export function ProQuickBook({ proStudentId, studentName }: Props) {
     setSelectedDate(dateStr);
     setSlots([]);
     startTransition(async () => {
-      const result = await getProQuickBookData(proStudentId);
-      if (!result.hasPreferences) return;
-      setData(result);
+      const newSlots = await fetchSlotsForDate(
+        data.locationId,
+        dateStr,
+        data.duration
+      );
+      setSlots(newSlots);
     });
   }
 
-  if (!open) {
+  if (!open && !autoOpen) {
     return (
       <button
         onClick={handleOpen}
@@ -176,36 +211,38 @@ export function ProQuickBook({ proStudentId, studentName }: Props) {
 
   return (
     <div className="mt-2 rounded-lg border border-green-100 bg-green-50/50 p-3">
-      {/* Header */}
-      <div className="mb-2 flex items-center justify-between">
-        <span className="text-xs font-medium text-green-800">
-          Book for {studentName}
-        </span>
-        <button
-          onClick={() => {
-            setOpen(false);
-            setStatus("idle");
-            setHoldProgress(0);
-            setError(null);
-            setHoldingSlot(null);
-          }}
-          className="text-green-400 hover:text-green-600"
-        >
-          <svg
-            className="h-3.5 w-3.5"
-            fill="none"
-            viewBox="0 0 24 24"
-            stroke="currentColor"
-            strokeWidth={2}
+      {/* Header — only when not auto-opened (standalone mode) */}
+      {!autoOpen && (
+        <div className="mb-2 flex items-center justify-between">
+          <span className="text-xs font-medium text-green-800">
+            Book for {studentName}
+          </span>
+          <button
+            onClick={() => {
+              setOpen(false);
+              setStatus("idle");
+              setHoldProgress(0);
+              setError(null);
+              setHoldingSlot(null);
+            }}
+            className="text-green-400 hover:text-green-600"
           >
-            <path
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              d="M6 18L18 6M6 6l12 12"
-            />
-          </svg>
-        </button>
-      </div>
+            <svg
+              className="h-3.5 w-3.5"
+              fill="none"
+              viewBox="0 0 24 24"
+              stroke="currentColor"
+              strokeWidth={2}
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                d="M6 18L18 6M6 6l12 12"
+              />
+            </svg>
+          </button>
+        </div>
+      )}
 
       {/* Loading */}
       {isPending && !data && !noPrefs && (
@@ -354,6 +391,50 @@ export function ProQuickBook({ proStudentId, studentName }: Props) {
           {error && (
             <div className="mb-2 rounded border border-red-200 bg-red-50 px-2 py-1.5 text-xs text-red-700">
               {error}
+            </div>
+          )}
+
+          {/* More options — load all available dates */}
+          {!allDates && (
+            <button
+              type="button"
+              onClick={() => {
+                startTransition(async () => {
+                  const dates = await getProAllAvailableDates(
+                    data.proStudentId,
+                    data.locationId,
+                    data.duration
+                  );
+                  setAllDates(dates);
+                });
+              }}
+              className="text-xs text-green-500 hover:text-green-700"
+            >
+              {isPending ? "Loading..." : "More dates"}
+            </button>
+          )}
+
+          {/* All dates grid */}
+          {allDates && (
+            <div className="mt-2">
+              <p className="mb-1.5 text-[10px] font-medium uppercase tracking-wider text-green-400">
+                All available dates
+              </p>
+              <div className="flex flex-wrap gap-1">
+                {allDates.map((d) => (
+                  <button
+                    key={d}
+                    onClick={() => switchDate(d)}
+                    className={`shrink-0 rounded-full px-2 py-0.5 text-[11px] font-medium transition-colors ${
+                      selectedDate === d
+                        ? "bg-gold-600 text-white"
+                        : "bg-white text-green-700 hover:bg-green-100"
+                    }`}
+                  >
+                    {formatDatePill(d)}
+                  </button>
+                ))}
+              </div>
             </div>
           )}
         </>
