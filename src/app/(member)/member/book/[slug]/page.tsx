@@ -1,7 +1,8 @@
 import { db } from "@/lib/db";
-import { proProfiles, proLocations, locations } from "@/lib/db/schema";
+import { proProfiles, proLocations, locations, users } from "@/lib/db/schema";
 import { eq, and } from "drizzle-orm";
 import { notFound } from "next/navigation";
+import { getSession } from "@/lib/auth";
 import { BookingWizard } from "./BookingWizard";
 
 export async function generateMetadata({
@@ -53,6 +54,23 @@ export default async function BookingPage({
     notFound();
   }
 
+  // Load logged-in user details for form pre-fill
+  const session = await getSession();
+  let userDetails: { firstName: string; lastName: string; email: string; phone: string | null } | null = null;
+  if (session) {
+    const [u] = await db
+      .select({
+        firstName: users.firstName,
+        lastName: users.lastName,
+        email: users.email,
+        phone: users.phone,
+      })
+      .from(users)
+      .where(eq(users.id, session.userId))
+      .limit(1);
+    if (u) userDetails = u;
+  }
+
   // Load pro locations
   const proLocs = await db
     .select({
@@ -87,6 +105,7 @@ export default async function BookingPage({
           maxGroupSize: pro.maxGroupSize,
         }}
         locations={proLocs}
+        userDetails={userDetails}
       />
     </div>
   );

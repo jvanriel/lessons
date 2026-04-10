@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useState, useEffect, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import {
@@ -32,26 +32,43 @@ interface LocationInfo {
   lessonDuration: number | null;
 }
 
+interface UserDetails {
+  firstName: string;
+  lastName: string;
+  email: string;
+  phone: string | null;
+}
+
 interface Props {
   pro: ProInfo;
   locations: LocationInfo[];
+  userDetails?: UserDetails | null;
 }
 
 const STEPS = ["Location", "Duration", "Date", "Time", "Details", "Confirm"];
 
 // ─── Component ──────────────────────────────────────
 
-export function BookingWizard({ pro, locations }: Props) {
+export function BookingWizard({ pro, locations, userDetails }: Props) {
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
 
-  // Step state
-  const [step, setStep] = useState(0);
+  // Determine which steps to skip
+  const singleLocation = locations.length === 1 ? locations[0] : null;
+  const singleDuration = pro.lessonDurations.length === 1 ? pro.lessonDurations[0] : null;
 
-  // Selection state
+  // Compute initial step: skip Location and/or Duration if only one option
+  const firstStep = singleLocation ? (singleDuration ? 2 : 1) : 0;
+
+  // Step state
+  const [step, setStep] = useState(firstStep);
+
+  // Selection state — auto-select when only one option
   const [selectedLocation, setSelectedLocation] =
-    useState<LocationInfo | null>(null);
-  const [selectedDuration, setSelectedDuration] = useState<number | null>(null);
+    useState<LocationInfo | null>(singleLocation);
+  const [selectedDuration, setSelectedDuration] = useState<number | null>(
+    singleLocation && singleDuration ? singleDuration : null
+  );
   const [availableDates, setAvailableDates] = useState<string[]>([]);
   const [selectedDate, setSelectedDate] = useState<string | null>(null);
   const [availableSlots, setAvailableSlots] = useState<
@@ -62,11 +79,11 @@ export function BookingWizard({ pro, locations }: Props) {
     endTime: string;
   } | null>(null);
 
-  // Participant details
-  const [firstName, setFirstName] = useState("");
-  const [lastName, setLastName] = useState("");
-  const [email, setEmail] = useState("");
-  const [phone, setPhone] = useState("");
+  // Pre-fill participant details from logged-in user
+  const [firstName, setFirstName] = useState(userDetails?.firstName ?? "");
+  const [lastName, setLastName] = useState(userDetails?.lastName ?? "");
+  const [email, setEmail] = useState(userDetails?.email ?? "");
+  const [phone, setPhone] = useState(userDetails?.phone ?? "");
   const [notes, setNotes] = useState("");
   const [participantCount, setParticipantCount] = useState(1);
 
@@ -74,6 +91,24 @@ export function BookingWizard({ pro, locations }: Props) {
   const [error, setError] = useState<string | null>(null);
   const [loadingDates, setLoadingDates] = useState(false);
   const [loadingSlots, setLoadingSlots] = useState(false);
+
+  // Auto-fetch available dates when both location and duration are pre-selected
+  const [initialFetchDone, setInitialFetchDone] = useState(false);
+  useEffect(() => {
+    if (singleLocation && singleDuration && !initialFetchDone) {
+      setInitialFetchDone(true);
+      setLoadingDates(true);
+      startTransition(async () => {
+        const dates = await getAvailableDates(
+          pro.id,
+          singleLocation.id,
+          singleDuration
+        );
+        setAvailableDates(dates);
+        setLoadingDates(false);
+      });
+    }
+  }, [singleLocation, singleDuration, initialFetchDone, pro.id, startTransition]);
 
   // Calendar navigation
   const [calendarMonth, setCalendarMonth] = useState(() => {
@@ -83,7 +118,14 @@ export function BookingWizard({ pro, locations }: Props) {
 
   function goBack() {
     setError(null);
-    setStep((s) => Math.max(0, s - 1));
+    setStep((s) => {
+      let prev = s - 1;
+      // Skip duration step if only one option
+      if (prev === 1 && singleDuration) prev = 0;
+      // Skip location step if only one option
+      if (prev === 0 && singleLocation) prev = 0; // can't go further back
+      return Math.max(firstStep, prev);
+    });
   }
 
   // ─── Step 0: Location ──────────────────────────────
@@ -93,7 +135,19 @@ export function BookingWizard({ pro, locations }: Props) {
     setSelectedDuration(null);
     setSelectedDate(null);
     setSelectedSlot(null);
-    setStep(1);
+    // Skip duration step if only one option
+    if (singleDuration) {
+      setSelectedDuration(singleDuration);
+      setLoadingDates(true);
+      setStep(2);
+      startTransition(async () => {
+        const dates = await getAvailableDates(pro.id, loc.id, singleDuration);
+        setAvailableDates(dates);
+        setLoadingDates(false);
+      });
+    } else {
+      setStep(1);
+    }
   }
 
   // ─── Step 1: Duration ──────────────────────────────
@@ -522,7 +576,7 @@ export function BookingWizard({ pro, locations }: Props) {
                 Loading time slots...
               </div>
             ) : (
-              <div className="grid grid-cols-3 gap-2 sm:grid-cols-4">
+              <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
                 {availableSlots.map((slot) => (
                   <button
                     key={slot.startTime}

@@ -288,6 +288,14 @@ export const proStudents = pgTable("pro_students", {
   source: varchar("source", { length: 20 }).notNull().default("self"),
   status: varchar("status", { length: 20 }).notNull().default("active"),
   lastMessageAt: timestamp("last_message_at"),
+  // Booking preferences (auto-populated from booking history)
+  preferredLocationId: integer("preferred_location_id").references(
+    () => proLocations.id
+  ),
+  preferredDuration: integer("preferred_duration"),
+  preferredDayOfWeek: integer("preferred_day_of_week"), // ISO: 0=Mon..6=Sun
+  preferredTime: varchar("preferred_time", { length: 5 }), // HH:MM
+  preferredInterval: varchar("preferred_interval", { length: 20 }), // weekly, biweekly, monthly
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
 

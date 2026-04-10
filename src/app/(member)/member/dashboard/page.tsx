@@ -12,6 +12,12 @@ import { getLocale } from "@/lib/locale";
 import { t } from "@/lib/i18n/translations";
 import { redirect } from "next/navigation";
 import Link from "next/link";
+import { QRLoginButton } from "./QRLoginDialog";
+import { QuickRebook } from "./QuickRebook";
+import {
+  getQuickRebookData,
+  type QuickRebookData,
+} from "../book/actions";
 
 export const metadata = { title: "Dashboard — Golf Lessons" };
 
@@ -52,15 +58,17 @@ export default async function MemberDashboard() {
     .orderBy(asc(lessonBookings.date), asc(lessonBookings.startTime))
     .limit(5);
 
-  // Get my pros (via proStudents relationships)
+  // Get my pros (via proStudents relationships) with booking preferences
   const myPros = await db
     .select({
       proStudentId: proStudents.id,
+      proProfileId: proStudents.proProfileId,
       slug: proProfiles.slug,
       displayName: proProfiles.displayName,
       photoUrl: proProfiles.photoUrl,
       specialties: proProfiles.specialties,
       bookingEnabled: proProfiles.bookingEnabled,
+      hasPreferences: proStudents.preferredLocationId,
     })
     .from(proStudents)
     .innerJoin(proProfiles, eq(proStudents.proProfileId, proProfiles.id))
@@ -71,12 +79,30 @@ export default async function MemberDashboard() {
       )
     );
 
+  // Fetch quick rebook data for pros with saved preferences
+  const quickRebookMap: Record<number, QuickRebookData> = {};
+  await Promise.all(
+    myPros
+      .filter((p) => p.hasPreferences !== null && p.bookingEnabled)
+      .map(async (p) => {
+        const data = await getQuickRebookData(p.proProfileId, p.proStudentId);
+        if (data.hasPreferences) {
+          quickRebookMap[p.proStudentId] = data;
+        }
+      })
+  );
+
   return (
     <div className="mx-auto max-w-4xl px-6 py-12">
-      <h1 className="font-display text-3xl font-semibold text-green-900">
-        {t("member.welcome", locale)}
-      </h1>
-      <p className="mt-2 text-green-700">{session.email}</p>
+      <div className="flex items-start justify-between gap-4">
+        <div>
+          <h1 className="font-display text-3xl font-semibold text-green-900">
+            {t("member.welcome", locale)}
+          </h1>
+          <p className="mt-2 text-green-700">{session.email}</p>
+        </div>
+        <QRLoginButton />
+      </div>
 
       {/* My Pros */}
       <div className="mt-8">
@@ -146,13 +172,19 @@ export default async function MemberDashboard() {
                     </svg>
                     Chat
                   </Link>
-                  {pro.bookingEnabled && (
+                  {pro.bookingEnabled && !quickRebookMap[pro.proStudentId] && (
                     <Link
                       href={`/member/book/${pro.slug}`}
                       className="flex flex-1 items-center justify-center rounded-md bg-gold-600 px-3 py-1.5 text-xs font-medium text-white transition-colors hover:bg-gold-500"
                     >
                       Book a lesson
                     </Link>
+                  )}
+                  {quickRebookMap[pro.proStudentId] && (
+                    <QuickRebook
+                      data={quickRebookMap[pro.proStudentId]}
+                      proSlug={pro.slug}
+                    />
                   )}
                 </div>
               </div>
