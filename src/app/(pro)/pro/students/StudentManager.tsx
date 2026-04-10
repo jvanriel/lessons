@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useActionState } from "react";
+import { useState, useRef, useActionState } from "react";
 import Link from "next/link";
 import { inviteStudent, type ProQuickBookData } from "./actions";
 import { ProQuickBook } from "./ProQuickBook";
@@ -89,6 +89,7 @@ export default function StudentManager({
   const [search, setSearch] = useState("");
   const [selectedStudentId, setSelectedStudentId] = useState<number | null>(null);
   const [editingStudent, setEditingStudent] = useState<Student | null>(null);
+  const [showHelp, setShowHelp] = useState(false);
 
   const currentStudent = currentStudentId
     ? students.find((s) => s.id === currentStudentId) ?? null
@@ -117,9 +118,22 @@ export default function StudentManager({
     <div className="mx-auto max-w-4xl px-6 py-12">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="font-display text-3xl font-semibold text-green-900">
-            Students
-          </h1>
+          <div className="flex items-center gap-2">
+            <h1 className="font-display text-3xl font-semibold text-green-900">
+              Students
+            </h1>
+            <button
+              type="button"
+              onClick={() => setShowHelp(true)}
+              className="rounded-full p-1 text-green-400 transition-colors hover:bg-green-50 hover:text-green-600"
+              title="Help"
+            >
+              <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M9.879 7.519c1.171-1.025 3.071-1.025 4.242 0 1.172 1.025 1.172 2.687 0 3.712-.203.179-.43.326-.67.442-.745.361-1.45.999-1.45 1.827m0 0v.5m0 2h.008v.008H12v-.008Z" />
+                <path strokeLinecap="round" strokeLinejoin="round" d="M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z" />
+              </svg>
+            </button>
+          </div>
           <p className="mt-1 text-sm text-green-600">
             {activeCounts.active} active student{activeCounts.active !== 1 ? "s" : ""}
           </p>
@@ -513,6 +527,137 @@ export default function StudentManager({
           onClose={() => setEditingStudent(null)}
         />
       )}
+
+      {/* Help dialog */}
+      {showHelp && (
+        <HelpDialog onClose={() => setShowHelp(false)} />
+      )}
+    </div>
+  );
+}
+
+function HelpDialog({ onClose }: { onClose: () => void }) {
+  const backdropRef = useRef<HTMLDivElement>(null);
+  return (
+    <div
+      ref={backdropRef}
+      className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-black/50 p-4 pt-16"
+      onClick={(e) => {
+        if (e.target === backdropRef.current) onClose();
+      }}
+    >
+      <div className="w-full max-w-lg rounded-xl border border-green-200 bg-white shadow-2xl">
+        <div className="flex items-center justify-between border-b border-green-100 px-5 py-4">
+          <h3 className="font-display text-lg font-semibold text-green-900">
+            Managing your students
+          </h3>
+          <button
+            onClick={onClose}
+            className="rounded-md p-1 text-green-400 hover:text-green-600"
+          >
+            <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+            </svg>
+          </button>
+        </div>
+        <div className="space-y-5 px-5 py-5 text-sm text-green-700 leading-relaxed">
+          <div>
+            <h4 className="font-medium text-green-900">Adding students</h4>
+            <p className="mt-1">
+              There are two ways to add a student:
+            </p>
+            <ul className="mt-2 space-y-2 pl-4">
+              <li className="relative pl-3 before:absolute before:left-0 before:top-2 before:h-1.5 before:w-1.5 before:rounded-full before:bg-gold-500">
+                <strong className="text-green-900">Invite</strong> — sends an email
+                with login credentials. The student&apos;s status is &quot;pending&quot; until
+                they log in for the first time.
+              </li>
+              <li className="relative pl-3 before:absolute before:left-0 before:top-2 before:h-1.5 before:w-1.5 before:rounded-full before:bg-gold-500">
+                <strong className="text-green-900">Add</strong> — creates the student
+                account immediately as &quot;active&quot;. Use this when you&apos;re setting up
+                the account in person, e.g. during a lesson.
+              </li>
+            </ul>
+            <p className="mt-2">
+              Both require a password. Click <strong>Generate</strong> to create a
+              secure random password, or type one manually.
+            </p>
+          </div>
+
+          <div>
+            <h4 className="font-medium text-green-900">Quick Book</h4>
+            <p className="mt-1">
+              Once a student has booked at least one lesson, the system remembers
+              their preferred location, duration, day, and time. You&apos;ll see date and
+              time buttons on each student card — <strong>hold any time slot</strong> to
+              instantly book a lesson for them.
+            </p>
+          </div>
+
+          <div>
+            <h4 className="font-medium text-green-900">Edit &amp; manage</h4>
+            <p className="mt-1">
+              Click the <strong>Edit</strong> button on a student card to update their
+              name, email, phone, and booking preferences. From the same dialog you
+              can also reset their password or remove them.
+            </p>
+          </div>
+
+          <div>
+            <h4 className="font-medium text-green-900">Invite vs. Reset password</h4>
+            <div className="mt-2 rounded-lg border border-green-100 overflow-hidden">
+              <table className="w-full text-left text-xs">
+                <thead>
+                  <tr className="bg-green-50 text-green-800">
+                    <th className="px-3 py-2 font-medium"></th>
+                    <th className="px-3 py-2 font-medium">Invite / Add</th>
+                    <th className="px-3 py-2 font-medium">Reset password</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-green-100">
+                  <tr>
+                    <td className="px-3 py-2 font-medium text-green-800">When to use</td>
+                    <td className="px-3 py-2">Someone <strong>new</strong> who has never used Golf Lessons before</td>
+                    <td className="px-3 py-2">An <strong>existing</strong> student who can&apos;t log in anymore</td>
+                  </tr>
+                  <tr>
+                    <td className="px-3 py-2 font-medium text-green-800">What it does</td>
+                    <td className="px-3 py-2"><strong>Creates a new account</strong>, connects them to you, and sends a welcome email with login instructions</td>
+                    <td className="px-3 py-2"><strong>Changes the password</strong> on their existing account and emails them the new one</td>
+                  </tr>
+                  <tr>
+                    <td className="px-3 py-2 font-medium text-green-800">Their data</td>
+                    <td className="px-3 py-2">Fresh account — no bookings or history</td>
+                    <td className="px-3 py-2">Everything stays: bookings, preferences, chat history</td>
+                  </tr>
+                  <tr>
+                    <td className="px-3 py-2 font-medium text-green-800">Where</td>
+                    <td className="px-3 py-2"><strong>Invite</strong> / <strong>Add</strong> buttons at the top of this page</td>
+                    <td className="px-3 py-2"><strong>Edit</strong> button on the student card → Account section</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          <div>
+            <h4 className="font-medium text-green-900">Student status</h4>
+            <ul className="mt-1 space-y-1 pl-4">
+              <li className="relative pl-3 before:absolute before:left-0 before:top-2 before:h-1.5 before:w-1.5 before:rounded-full before:bg-green-500">
+                <strong className="text-green-900">Active</strong> — can book lessons and chat with you.
+              </li>
+              <li className="relative pl-3 before:absolute before:left-0 before:top-2 before:h-1.5 before:w-1.5 before:rounded-full before:bg-yellow-500">
+                <strong className="text-green-900">Pending</strong> — invited but hasn&apos;t logged in yet.
+                Becomes active on first login.
+              </li>
+              <li className="relative pl-3 before:absolute before:left-0 before:top-2 before:h-1.5 before:w-1.5 before:rounded-full before:bg-gray-400">
+                <strong className="text-green-900">Inactive</strong> — removed. They
+                can be re-invited later.
+              </li>
+            </ul>
+          </div>
+        </div>
+      </div>
     </div>
   );
 }

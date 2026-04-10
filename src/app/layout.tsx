@@ -144,10 +144,7 @@ export default async function RootLayout({
       >
         <CmsProvider>
           {isAppMode && appProps ? (
-            <>
-              <PreLaunchBanner />
-              <AppLayout {...appProps}>{children}</AppLayout>
-            </>
+            <AppLayout {...appProps}>{children}</AppLayout>
           ) : (
             /* Website mode — not logged in */
             <>

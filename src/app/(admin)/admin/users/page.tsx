@@ -50,9 +50,6 @@ export default async function AdminUsersPage() {
 
   return (
     <div className="mx-auto max-w-5xl px-6 py-12">
-      <h1 className="font-display text-3xl font-semibold text-green-900">
-        Users
-      </h1>
       <UserManager users={serialized} />
     </div>
   );

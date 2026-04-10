@@ -41,6 +41,7 @@ export default function UserManager({ users }: { users: User[] }) {
   const [selectedUser, setSelectedUser] = useState<User | null>(null);
   const [showCreate, setShowCreate] = useState(false);
   const [search, setSearch] = useState("");
+  const [showHelp, setShowHelp] = useState(false);
 
   const filtered = users.filter((u) => {
     if (!search) return true;
@@ -55,7 +56,25 @@ export default function UserManager({ users }: { users: User[] }) {
   });
 
   return (
-    <div className="mt-6">
+    <div>
+      {/* Title */}
+      <div className="flex items-center gap-2 mb-6">
+        <h1 className="font-display text-3xl font-semibold text-green-900">
+          Users
+        </h1>
+        <button
+          type="button"
+          onClick={() => setShowHelp(true)}
+          className="rounded-full p-1 text-green-400 transition-colors hover:bg-green-50 hover:text-green-600"
+          title="Help"
+        >
+          <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+            <path strokeLinecap="round" strokeLinejoin="round" d="M9.879 7.519c1.171-1.025 3.071-1.025 4.242 0 1.172 1.025 1.172 2.687 0 3.712-.203.179-.43.326-.67.442-.745.361-1.45.999-1.45 1.827m0 0v.5m0 2h.008v.008H12v-.008Z" />
+            <path strokeLinecap="round" strokeLinejoin="round" d="M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z" />
+          </svg>
+        </button>
+      </div>
+
       {/* Toolbar */}
       <div className="mb-4 flex items-center gap-3">
         <input
@@ -154,6 +173,146 @@ export default function UserManager({ users }: { users: User[] }) {
           onClose={() => setSelectedUser(null)}
         />
       )}
+
+      {showHelp && (
+        <AdminUsersHelp onClose={() => setShowHelp(false)} />
+      )}
+    </div>
+  );
+}
+
+function AdminUsersHelp({ onClose }: { onClose: () => void }) {
+  const backdropRef = useRef<HTMLDivElement>(null);
+  return (
+    <div
+      ref={backdropRef}
+      className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-black/50 p-4 pt-16"
+      onClick={(e) => {
+        if (e.target === backdropRef.current) onClose();
+      }}
+    >
+      <div className="w-full max-w-lg rounded-xl border border-green-200 bg-white shadow-2xl">
+        <div className="flex items-center justify-between border-b border-green-100 px-5 py-4">
+          <h3 className="font-display text-lg font-semibold text-green-900">
+            User management
+          </h3>
+          <button
+            onClick={onClose}
+            className="rounded-md p-1 text-green-400 hover:text-green-600"
+          >
+            <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+            </svg>
+          </button>
+        </div>
+        <div className="space-y-5 px-5 py-5 text-sm text-green-700 leading-relaxed">
+          <div>
+            <h4 className="font-medium text-green-900">Creating users</h4>
+            <p className="mt-1">
+              Click <strong>Create user</strong> to add a new account. Assign one
+              or more roles:
+            </p>
+            <ul className="mt-2 space-y-1 pl-4">
+              <li className="relative pl-3 before:absolute before:left-0 before:top-2 before:h-1.5 before:w-1.5 before:rounded-full before:bg-gold-500">
+                <strong className="text-green-900">Member</strong> — can browse pros, book lessons, and use coaching chat.
+              </li>
+              <li className="relative pl-3 before:absolute before:left-0 before:top-2 before:h-1.5 before:w-1.5 before:rounded-full before:bg-gold-500">
+                <strong className="text-green-900">Pro</strong> — can manage students, availability, bookings, and earnings.
+              </li>
+              <li className="relative pl-3 before:absolute before:left-0 before:top-2 before:h-1.5 before:w-1.5 before:rounded-full before:bg-gold-500">
+                <strong className="text-green-900">Admin</strong> — can manage all users, CMS, tasks, payouts, and settings.
+              </li>
+              <li className="relative pl-3 before:absolute before:left-0 before:top-2 before:h-1.5 before:w-1.5 before:rounded-full before:bg-gold-500">
+                <strong className="text-green-900">Dev</strong> — access to database, blob store, and logs.
+              </li>
+            </ul>
+            <p className="mt-2">
+              A user can have multiple roles (e.g. a pro who is also a member).
+            </p>
+          </div>
+
+          <div>
+            <h4 className="font-medium text-green-900">Editing users</h4>
+            <p className="mt-1">
+              Click any user row to open their detail panel. You can update their
+              name, email, phone, roles, and manage their email aliases.
+            </p>
+          </div>
+
+          <div>
+            <h4 className="font-medium text-green-900">Email aliases</h4>
+            <p className="mt-1">
+              Users can have multiple email addresses. The primary email is used for
+              login and notifications. Aliases allow login from additional addresses
+              without changing the primary email.
+            </p>
+          </div>
+
+          <div>
+            <h4 className="font-medium text-green-900">Password management</h4>
+            <div className="mt-2 rounded-lg border border-green-100 overflow-hidden">
+              <table className="w-full text-left text-xs">
+                <thead>
+                  <tr className="bg-green-50 text-green-800">
+                    <th className="px-3 py-2 font-medium">Action</th>
+                    <th className="px-3 py-2 font-medium">What it does</th>
+                    <th className="px-3 py-2 font-medium">When to use</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-green-100">
+                  <tr>
+                    <td className="px-3 py-2 font-medium text-green-800">Create user</td>
+                    <td className="px-3 py-2">Creates a <strong>new account</strong> with the given password and roles</td>
+                    <td className="px-3 py-2">Someone new who has never used Golf Lessons</td>
+                  </tr>
+                  <tr>
+                    <td className="px-3 py-2 font-medium text-green-800">Send invite</td>
+                    <td className="px-3 py-2">Sends a <strong>welcome email</strong> with login instructions to an existing account</td>
+                    <td className="px-3 py-2">User was created but hasn&apos;t received or lost their invite email</td>
+                  </tr>
+                  <tr>
+                    <td className="px-3 py-2 font-medium text-green-800">Reset password</td>
+                    <td className="px-3 py-2">Generates a new password on an <strong>existing account</strong>. Shows it once for you to share.</td>
+                    <td className="px-3 py-2">Existing user forgot password, you&apos;re with them in person</td>
+                  </tr>
+                  <tr>
+                    <td className="px-3 py-2 font-medium text-green-800">Reset + email</td>
+                    <td className="px-3 py-2">Same as reset, but also <strong>emails</strong> the new password to the user</td>
+                    <td className="px-3 py-2">Existing user forgot password, not with you in person</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          <div>
+            <h4 className="font-medium text-green-900">Activate as Pro</h4>
+            <p className="mt-1">
+              Creates a pro profile for a user so they can start managing students,
+              availability, and receive bookings. The user also gets the &quot;pro&quot; role
+              if they don&apos;t have it yet.
+            </p>
+          </div>
+
+          <div>
+            <h4 className="font-medium text-green-900">Impersonation</h4>
+            <p className="mt-1">
+              Admins can impersonate any member or pro account to troubleshoot
+              issues. Use the impersonation feature in the top bar — it shows a
+              yellow banner while active and doesn&apos;t affect the original user&apos;s session.
+            </p>
+          </div>
+
+          <div>
+            <h4 className="font-medium text-green-900">Deleting users</h4>
+            <p className="mt-1">
+              Permanently removes the user account and all associated data. This
+              action cannot be undone. Use with caution — consider deactivating
+              instead when possible.
+            </p>
+          </div>
+        </div>
+      </div>
     </div>
   );
 }

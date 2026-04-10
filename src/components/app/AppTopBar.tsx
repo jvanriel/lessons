@@ -179,7 +179,7 @@ export default function AppTopBar({
       <div className="flex items-center gap-3">
         <button
           onClick={onSidebarToggle}
-          className="text-green-100/60 transition-colors hover:text-green-100"
+          className="hidden md:block text-green-100/60 transition-colors hover:text-green-100"
           aria-label="Toggle sidebar"
         >
           <svg

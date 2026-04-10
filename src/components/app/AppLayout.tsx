@@ -4,6 +4,7 @@ import { useState, useEffect, type ReactNode } from "react";
 import AppTopBar from "./AppTopBar";
 import AppSidebar from "./AppSidebar";
 import BottomNav from "./BottomNav";
+import PreLaunchBanner from "@/components/PreLaunchBanner";
 
 interface ImpersonableUser {
   id: number;
@@ -65,6 +66,7 @@ export default function AppLayout({
 
   return (
     <div className="flex h-dvh flex-col">
+      <PreLaunchBanner />
       <AppTopBar
         firstName={firstName}
         onSidebarToggle={handleToggle}
