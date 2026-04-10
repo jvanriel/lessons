@@ -229,27 +229,6 @@ export default function ProfileForm({
     updateProfile,
     null
   );
-  const [passwordState, passwordAction, passwordPending] = useActionState(
-    changePassword,
-    null
-  );
-
-  const passwordFormRef = useRef<HTMLFormElement>(null);
-  const [currentPassword, setCurrentPassword] = useState("");
-  const [newPassword, setNewPassword] = useState("");
-  const [confirmPassword, setConfirmPassword] = useState("");
-
-  const passwordMismatch =
-    !newPassword || !confirmPassword || newPassword !== confirmPassword;
-
-  useEffect(() => {
-    if (passwordState?.success) {
-      passwordFormRef.current?.reset();
-      setCurrentPassword("");
-      setNewPassword("");
-      setConfirmPassword("");
-    }
-  }, [passwordState]);
 
   return (
     <div className="space-y-12">
@@ -346,74 +325,100 @@ export default function ProfileForm({
         locale={locale}
       />
 
-      {/* Change password */}
-      <div>
-        <h2 className="font-display text-xl font-semibold text-green-950">
-          {t("profile.changePassword", locale)}
-        </h2>
-        <form
-          ref={passwordFormRef}
-          action={passwordAction}
-          className="mt-6 space-y-5"
-        >
-          <div className="grid gap-4 sm:grid-cols-2">
-            <div className="sm:col-span-2">
-              <label className="block text-sm font-medium text-green-800">
-                {t("profile.currentPassword", locale)}
-              </label>
-              <PasswordInput
-                name="currentPassword"
-                required
-                value={currentPassword}
-                onChange={setCurrentPassword}
-              />
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-green-800">
-                {t("profile.newPassword", locale)}
-              </label>
-              <PasswordInput
-                name="newPassword"
-                required
-                minLength={8}
-                value={newPassword}
-                onChange={setNewPassword}
-              />
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-green-800">
-                {t("profile.confirmPassword", locale)}
-              </label>
-              <PasswordInput
-                name="confirmPassword"
-                required
-                minLength={8}
-                value={confirmPassword}
-                onChange={setConfirmPassword}
-              />
-            </div>
+    </div>
+  );
+}
+
+export function ChangePasswordForm({ locale }: { locale: Locale }) {
+  const [passwordState, passwordAction, passwordPending] = useActionState(
+    changePassword,
+    null
+  );
+
+  const passwordFormRef = useRef<HTMLFormElement>(null);
+  const [currentPassword, setCurrentPassword] = useState("");
+  const [newPassword, setNewPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
+
+  const passwordMismatch =
+    !newPassword || !confirmPassword || newPassword !== confirmPassword;
+
+  useEffect(() => {
+    if (passwordState?.success) {
+      passwordFormRef.current?.reset();
+      setCurrentPassword("");
+      setNewPassword("");
+      setConfirmPassword("");
+    }
+  }, [passwordState]);
+
+  return (
+    <div>
+      <h2 className="font-display text-xl font-semibold text-green-950">
+        {t("profile.changePassword", locale)}
+      </h2>
+      <form
+        ref={passwordFormRef}
+        action={passwordAction}
+        className="mt-6 space-y-5"
+      >
+        <div className="grid gap-4 sm:grid-cols-2">
+          <div className="sm:col-span-2">
+            <label className="block text-sm font-medium text-green-800">
+              {t("profile.currentPassword", locale)}
+            </label>
+            <PasswordInput
+              name="currentPassword"
+              required
+              value={currentPassword}
+              onChange={setCurrentPassword}
+            />
           </div>
+          <div>
+            <label className="block text-sm font-medium text-green-800">
+              {t("profile.newPassword", locale)}
+            </label>
+            <PasswordInput
+              name="newPassword"
+              required
+              minLength={8}
+              value={newPassword}
+              onChange={setNewPassword}
+            />
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-green-800">
+              {t("profile.confirmPassword", locale)}
+            </label>
+            <PasswordInput
+              name="confirmPassword"
+              required
+              minLength={8}
+              value={confirmPassword}
+              onChange={setConfirmPassword}
+            />
+          </div>
+        </div>
 
-          {passwordState?.error && (
-            <p className="text-sm text-red-600">{passwordState.error}</p>
-          )}
-          {passwordState?.success && (
-            <p className="text-sm text-green-700">
-              {t("profile.passwordChanged", locale)}
-            </p>
-          )}
+        {passwordState?.error && (
+          <p className="text-sm text-red-600">{passwordState.error}</p>
+        )}
+        {passwordState?.success && (
+          <p className="text-sm text-green-700">
+            {t("profile.passwordChanged", locale)}
+          </p>
+        )}
 
-          <button
-            type="submit"
-            disabled={passwordPending || passwordMismatch}
-            className="rounded-lg bg-green-800 px-5 py-2 text-sm font-medium text-white hover:bg-green-700 disabled:opacity-50"
-          >
-            {passwordPending
-              ? t("profile.saving", locale)
-              : t("profile.changePasswordBtn", locale)}
-          </button>
-        </form>
-      </div>
+        <button
+          type="submit"
+          disabled={passwordPending || passwordMismatch}
+          className="rounded-lg bg-green-800 px-5 py-2 text-sm font-medium text-white hover:bg-green-700 disabled:opacity-50"
+        >
+          {passwordPending
+            ? t("profile.saving", locale)
+            : t("profile.changePasswordBtn", locale)}
+        </button>
+      </form>
     </div>
   );
 }

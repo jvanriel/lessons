@@ -470,10 +470,11 @@ async function updateBookingPreferences(
     );
 }
 
-// ─── Quick Rebook ────────────────────────────────────
+// ─── Quick Book ────────────────────────────────────
 
-export interface QuickRebookData {
+export interface QuickBookData {
   hasPreferences: true;
+  proStudentId: number;
   proProfileId: number;
   locationId: number;
   locationName: string;
@@ -530,12 +531,12 @@ function computeSuggestedDate(
 }
 
 /**
- * Fetch quick rebook data: suggested date/time based on saved preferences.
+ * Fetch quick book data: suggested date/time based on saved preferences.
  */
-export async function getQuickRebookData(
+export async function getQuickBookData(
   proProfileId: number,
   proStudentId: number
-): Promise<{ hasPreferences: false } | QuickRebookData> {
+): Promise<{ hasPreferences: false } | QuickBookData> {
   const session = await requireMember();
 
   // Get preferences from proStudents
@@ -596,52 +597,145 @@ export async function getQuickRebookData(
     lastBooking?.date ?? null
   );
 
-  // Get slots for the suggested date
-  const slots = await getAvailableSlots(
-    proProfileId,
-    rel.preferredLocationId,
-    suggestedDate,
-    rel.preferredDuration
-  );
+  // Batch-fetch availability data once for the full 4-week window,
+  // then compute slots in-memory per date (avoids N+1 DB round-trips)
+  const now = new Date();
+  const windowStart = suggestedDate;
+  const windowEndDate = new Date(suggestedDate + "T00:00:00");
+  windowEndDate.setDate(windowEndDate.getDate() + 28);
+  const windowEnd = windowEndDate.toISOString().split("T")[0];
 
-  // Check if preferred time slot exists
-  const suggestedSlot =
-    slots.find((s) => s.startTime === rel.preferredTime) ?? null;
+  const [proSettings, templateRows, overrideRows, bookingRows] =
+    await Promise.all([
+      db
+        .select({ bookingNotice: proProfiles.bookingNotice })
+        .from(proProfiles)
+        .where(eq(proProfiles.id, proProfileId))
+        .limit(1),
+      db
+        .select({
+          dayOfWeek: proAvailability.dayOfWeek,
+          startTime: proAvailability.startTime,
+          endTime: proAvailability.endTime,
+          validFrom: proAvailability.validFrom,
+          validUntil: proAvailability.validUntil,
+        })
+        .from(proAvailability)
+        .where(
+          and(
+            eq(proAvailability.proProfileId, proProfileId),
+            eq(proAvailability.proLocationId, rel.preferredLocationId)
+          )
+        ),
+      db
+        .select({
+          date: proAvailabilityOverrides.date,
+          type: proAvailabilityOverrides.type,
+          startTime: proAvailabilityOverrides.startTime,
+          endTime: proAvailabilityOverrides.endTime,
+          proLocationId: proAvailabilityOverrides.proLocationId,
+        })
+        .from(proAvailabilityOverrides)
+        .where(
+          and(
+            eq(proAvailabilityOverrides.proProfileId, proProfileId),
+            gte(proAvailabilityOverrides.date, windowStart),
+            lte(proAvailabilityOverrides.date, windowEnd)
+          )
+        ),
+      db
+        .select({
+          date: lessonBookings.date,
+          startTime: lessonBookings.startTime,
+          endTime: lessonBookings.endTime,
+        })
+        .from(lessonBookings)
+        .where(
+          and(
+            eq(lessonBookings.proProfileId, proProfileId),
+            eq(lessonBookings.proLocationId, rel.preferredLocationId),
+            eq(lessonBookings.status, "confirmed"),
+            gte(lessonBookings.date, windowStart),
+            lte(lessonBookings.date, windowEnd)
+          )
+        ),
+    ]);
 
-  // Find up to 3 alternative dates (scan forward up to 4 weeks)
+  const bookingNotice = proSettings[0]?.bookingNotice ?? 0;
+
+  // Normalize date values from DB (may be Date objects or timezone-shifted strings)
+  function normalizeDate(d: string | Date): string {
+    if (d instanceof Date) return d.toISOString().split("T")[0];
+    if (d.includes("T")) return d.split("T")[0];
+    return d;
+  }
+
+  function slotsForDate(dateStr: string) {
+    const dateOverrides = overrideRows.filter(
+      (o) =>
+        normalizeDate(o.date as string | Date) === dateStr &&
+        (o.proLocationId === null ||
+          o.proLocationId === rel.preferredLocationId)
+    );
+    const dateBookings = bookingRows.filter(
+      (b) => normalizeDate(b.date as string | Date) === dateStr
+    );
+    return computeAvailableSlots(
+      dateStr,
+      templateRows as AvailabilityTemplate[],
+      dateOverrides as AvailabilityOverride[],
+      dateBookings as ExistingBooking[],
+      bookingNotice,
+      rel.preferredDuration!,
+      now
+    );
+  }
+
+  // Collect dates with available slots — suggested date first, then scan forward
+  let bestDate = suggestedDate;
+  let bestSlots = slotsForDate(suggestedDate);
   const alternativeDates: string[] = [];
   const cursor = new Date(suggestedDate + "T00:00:00");
 
-  for (let i = 0; i < 28 && alternativeDates.length < 3; i++) {
+  for (let i = 0; i < 28 && alternativeDates.length < 4; i++) {
     cursor.setDate(cursor.getDate() + 1);
     const dateStr = cursor.toISOString().split("T")[0];
-    const daySlots = await getAvailableSlots(
-      proProfileId,
-      rel.preferredLocationId,
-      dateStr,
-      rel.preferredDuration
-    );
-    if (daySlots.some((s) => s.startTime === rel.preferredTime)) {
+    const daySlots = slotsForDate(dateStr);
+    if (daySlots.length > 0) {
       alternativeDates.push(dateStr);
     }
   }
 
+  // If suggested date has no slots, promote the first alternative
+  if (bestSlots.length === 0 && alternativeDates.length > 0) {
+    bestDate = alternativeDates.shift()!;
+    bestSlots = slotsForDate(bestDate);
+  }
+
+  const suggestedSlot =
+    bestSlots.find((s) => s.startTime === rel.preferredTime) ??
+    bestSlots[0] ??
+    null;
+
   return {
     hasPreferences: true,
+    proStudentId,
     proProfileId,
     locationId: rel.preferredLocationId,
     locationName: loc.name,
     duration: rel.preferredDuration,
     interval: rel.preferredInterval,
-    suggestedDate,
+    suggestedDate: bestDate,
     suggestedSlot,
-    alternativeSlots: slots.filter((s) => s.startTime !== rel.preferredTime),
+    alternativeSlots: bestSlots.filter(
+      (s) => s.startTime !== suggestedSlot?.startTime
+    ),
     alternativeDates,
   };
 }
 
 /**
- * Streamlined booking for quick rebook — reads user details from DB.
+ * Streamlined booking for quick book — reads user details from DB.
  */
 export async function quickCreateBooking(data: {
   proProfileId: number;
@@ -739,4 +833,62 @@ export async function quickCreateBooking(data: {
   );
 
   return { success: true, bookingId: booking.id };
+}
+
+// ─── Manual Preference Updates ───────────────────────
+
+/**
+ * Update the preferred interval for a specific pro-student relationship.
+ * Used from the Quick Book panel inline selector.
+ */
+export async function updatePreferredInterval(
+  proStudentId: number,
+  interval: string | null
+) {
+  const session = await requireMember();
+
+  await db
+    .update(proStudents)
+    .set({ preferredInterval: interval })
+    .where(
+      and(
+        eq(proStudents.id, proStudentId),
+        eq(proStudents.userId, session.userId)
+      )
+    );
+
+  return { success: true };
+}
+
+/**
+ * Update all booking preferences for a specific pro.
+ * Used from the member profile preferences section.
+ */
+export async function updateMemberBookingPrefs(
+  proStudentId: number,
+  prefs: {
+    preferredDuration: number | null;
+    preferredInterval: string | null;
+    preferredDayOfWeek: number | null;
+    preferredTime: string | null;
+  }
+) {
+  const session = await requireMember();
+
+  await db
+    .update(proStudents)
+    .set({
+      preferredDuration: prefs.preferredDuration,
+      preferredInterval: prefs.preferredInterval,
+      preferredDayOfWeek: prefs.preferredDayOfWeek,
+      preferredTime: prefs.preferredTime,
+    })
+    .where(
+      and(
+        eq(proStudents.id, proStudentId),
+        eq(proStudents.userId, session.userId)
+      )
+    );
+
+  return { success: true };
 }

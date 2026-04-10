@@ -43,19 +43,20 @@ interface Props {
   pro: ProInfo;
   locations: LocationInfo[];
   userDetails?: UserDetails | null;
+  showAllSteps?: boolean;
 }
 
 const STEPS = ["Location", "Duration", "Date", "Time", "Details", "Confirm"];
 
 // ─── Component ──────────────────────────────────────
 
-export function BookingWizard({ pro, locations, userDetails }: Props) {
+export function BookingWizard({ pro, locations, userDetails, showAllSteps }: Props) {
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
 
-  // Determine which steps to skip
-  const singleLocation = locations.length === 1 ? locations[0] : null;
-  const singleDuration = pro.lessonDurations.length === 1 ? pro.lessonDurations[0] : null;
+  // Determine which steps to skip (disabled when showAllSteps is true)
+  const singleLocation = !showAllSteps && locations.length === 1 ? locations[0] : null;
+  const singleDuration = !showAllSteps && pro.lessonDurations.length === 1 ? pro.lessonDurations[0] : null;
 
   // Compute initial step: skip Location and/or Duration if only one option
   const firstStep = singleLocation ? (singleDuration ? 2 : 1) : 0;
@@ -123,8 +124,13 @@ export function BookingWizard({ pro, locations, userDetails }: Props) {
       // Skip duration step if only one option
       if (prev === 1 && singleDuration) prev = 0;
       // Skip location step if only one option
-      if (prev === 0 && singleLocation) prev = 0; // can't go further back
-      return Math.max(firstStep, prev);
+      if (prev === 0 && singleLocation) prev = -1;
+      // Navigate back to dashboard if we've gone past the first step
+      if (prev < firstStep) {
+        router.back();
+        return s; // keep current step while navigating
+      }
+      return prev;
     });
   }
 

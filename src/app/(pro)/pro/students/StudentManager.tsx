@@ -3,6 +3,7 @@
 import { useState, useActionState, useTransition } from "react";
 import Link from "next/link";
 import { inviteStudent, removeStudent } from "./actions";
+import { ProQuickBook } from "./ProQuickBook";
 
 interface Student {
   id: number;
@@ -14,6 +15,11 @@ interface Student {
   lastName: string;
   email: string;
   phone: string | null;
+  preferredLocationId: number | null;
+  preferredDuration: number | null;
+  preferredDayOfWeek: number | null;
+  preferredTime: string | null;
+  preferredInterval: string | null;
 }
 
 function sourceLabel(source: string) {
@@ -289,6 +295,12 @@ export default function StudentManager({
                     })}
                   </p>
                 </div>
+                {student.status === "active" && (
+                  <ProQuickBook
+                    proStudentId={student.id}
+                    studentName={`${student.firstName} ${student.lastName}`}
+                  />
+                )}
                 {student.status === "active" && (
                   <Link
                     href={`/pro/students/${student.id}`}

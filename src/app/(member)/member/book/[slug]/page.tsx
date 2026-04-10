@@ -26,10 +26,13 @@ export async function generateMetadata({
 
 export default async function BookingPage({
   params,
+  searchParams,
 }: {
   params: Promise<{ slug: string }>;
+  searchParams: Promise<{ full?: string }>;
 }) {
   const { slug } = await params;
+  const { full } = await searchParams;
 
   const [pro] = await db
     .select({
@@ -106,6 +109,7 @@ export default async function BookingPage({
         }}
         locations={proLocs}
         userDetails={userDetails}
+        showAllSteps={full === "1"}
       />
     </div>
   );

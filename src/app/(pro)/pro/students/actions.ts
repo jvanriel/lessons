@@ -2,14 +2,32 @@
 
 import { revalidatePath } from "next/cache";
 import { db } from "@/lib/db";
-import { users, userEmails, proStudents } from "@/lib/db/schema";
-import { eq, and } from "drizzle-orm";
+import {
+  users,
+  userEmails,
+  proStudents,
+  proLocations,
+  locations,
+  lessonBookings,
+  lessonParticipants,
+  proProfiles,
+  proAvailability,
+  proAvailabilityOverrides,
+} from "@/lib/db/schema";
+import { eq, and, desc, gte, lte } from "drizzle-orm";
 import { requireProProfile } from "@/lib/pro";
 import { hashPassword } from "@/lib/auth";
 import { sendEmail } from "@/lib/mail";
 import { buildInviteEmail, getEmailStrings } from "@/lib/email-templates";
 import { resolveLocale } from "@/lib/i18n";
 import { createNotification } from "@/lib/notifications";
+import {
+  computeAvailableSlots,
+  type AvailabilityTemplate,
+  type AvailabilityOverride,
+  type ExistingBooking,
+} from "@/lib/lesson-slots";
+import crypto from "node:crypto";
 
 function generatePassword(length = 12): string {
   const chars =
@@ -36,6 +54,11 @@ export async function getMyStudents() {
       lastName: users.lastName,
       email: users.email,
       phone: users.phone,
+      preferredLocationId: proStudents.preferredLocationId,
+      preferredDuration: proStudents.preferredDuration,
+      preferredDayOfWeek: proStudents.preferredDayOfWeek,
+      preferredTime: proStudents.preferredTime,
+      preferredInterval: proStudents.preferredInterval,
     })
     .from(proStudents)
     .innerJoin(users, eq(proStudents.userId, users.id))
@@ -181,4 +204,484 @@ export async function removeStudent(proStudentId: number) {
 
   revalidatePath("/pro/students");
   return { success: true };
+}
+
+// ─── Slot Availability (no member auth required) ─────
+
+async function fetchAvailableSlots(
+  proProfileId: number,
+  locationId: number,
+  date: string,
+  duration: number
+) {
+  const [pro] = await db
+    .select({ bookingNotice: proProfiles.bookingNotice })
+    .from(proProfiles)
+    .where(eq(proProfiles.id, proProfileId))
+    .limit(1);
+
+  if (!pro) return [];
+
+  const templates = await db
+    .select({
+      dayOfWeek: proAvailability.dayOfWeek,
+      startTime: proAvailability.startTime,
+      endTime: proAvailability.endTime,
+      validFrom: proAvailability.validFrom,
+      validUntil: proAvailability.validUntil,
+    })
+    .from(proAvailability)
+    .where(
+      and(
+        eq(proAvailability.proProfileId, proProfileId),
+        eq(proAvailability.proLocationId, locationId)
+      )
+    );
+
+  const overrides = await db
+    .select({
+      date: proAvailabilityOverrides.date,
+      type: proAvailabilityOverrides.type,
+      startTime: proAvailabilityOverrides.startTime,
+      endTime: proAvailabilityOverrides.endTime,
+      proLocationId: proAvailabilityOverrides.proLocationId,
+    })
+    .from(proAvailabilityOverrides)
+    .where(
+      and(
+        eq(proAvailabilityOverrides.proProfileId, proProfileId),
+        eq(proAvailabilityOverrides.date, date)
+      )
+    );
+
+  const bookings = await db
+    .select({
+      startTime: lessonBookings.startTime,
+      endTime: lessonBookings.endTime,
+    })
+    .from(lessonBookings)
+    .where(
+      and(
+        eq(lessonBookings.proProfileId, proProfileId),
+        eq(lessonBookings.proLocationId, locationId),
+        eq(lessonBookings.date, date),
+        eq(lessonBookings.status, "confirmed")
+      )
+    );
+
+  const dateOverrides = overrides.filter(
+    (o) =>
+      o.date === date &&
+      (o.proLocationId === null || o.proLocationId === locationId)
+  );
+
+  return computeAvailableSlots(
+    date,
+    templates as AvailabilityTemplate[],
+    dateOverrides as AvailabilityOverride[],
+    bookings as ExistingBooking[],
+    pro.bookingNotice,
+    duration
+  );
+}
+
+// ─── Pro Quick Book for Student ──────────────────────
+
+/** Convert JS Date.getDay() (0=Sun) to ISO weekday (0=Mon..6=Sun) */
+function jsDayToIso(jsDay: number): number {
+  return jsDay === 0 ? 6 : jsDay - 1;
+}
+
+function computeSuggestedDate(
+  interval: string | null,
+  preferredDayOfWeek: number,
+  lastBookingDate: string | null
+): string {
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+
+  if (interval === "biweekly" && lastBookingDate) {
+    const base = new Date(lastBookingDate + "T00:00:00");
+    base.setDate(base.getDate() + 14);
+    const baseIso = jsDayToIso(base.getDay());
+    let diff = preferredDayOfWeek - baseIso;
+    if (diff < 0) diff += 7;
+    base.setDate(base.getDate() + diff);
+    if (base <= today) base.setDate(base.getDate() + 14);
+    return base.toISOString().split("T")[0];
+  }
+
+  if (interval === "monthly" && lastBookingDate) {
+    const last = new Date(lastBookingDate + "T00:00:00");
+    let candidate = new Date(last.getFullYear(), last.getMonth() + 1, last.getDate());
+    if (candidate <= today) {
+      candidate = new Date(candidate.getFullYear(), candidate.getMonth() + 1, candidate.getDate());
+    }
+    return candidate.toISOString().split("T")[0];
+  }
+
+  // Default / weekly
+  const todayIso = jsDayToIso(today.getDay());
+  let daysAhead = preferredDayOfWeek - todayIso;
+  if (daysAhead <= 0) daysAhead += 7;
+  const next = new Date(today);
+  next.setDate(next.getDate() + daysAhead);
+  return next.toISOString().split("T")[0];
+}
+
+export interface ProQuickBookData {
+  hasPreferences: true;
+  proStudentId: number;
+  studentName: string;
+  studentUserId: number;
+  locationId: number;
+  locationName: string;
+  duration: number;
+  interval: string | null;
+  suggestedDate: string;
+  suggestedSlot: { startTime: string; endTime: string } | null;
+  alternativeSlots: { startTime: string; endTime: string }[];
+  alternativeDates: string[];
+}
+
+/**
+ * Fetch quick-book data for a student based on their saved preferences.
+ * Called by the pro from the students page.
+ */
+export async function getProQuickBookData(
+  proStudentId: number
+): Promise<{ hasPreferences: false } | ProQuickBookData> {
+  const { profile } = await requireProProfile();
+  if (!profile) return { hasPreferences: false };
+
+  const [rel] = await db
+    .select({
+      id: proStudents.id,
+      userId: proStudents.userId,
+      firstName: users.firstName,
+      lastName: users.lastName,
+      preferredLocationId: proStudents.preferredLocationId,
+      preferredDuration: proStudents.preferredDuration,
+      preferredDayOfWeek: proStudents.preferredDayOfWeek,
+      preferredTime: proStudents.preferredTime,
+      preferredInterval: proStudents.preferredInterval,
+    })
+    .from(proStudents)
+    .innerJoin(users, eq(proStudents.userId, users.id))
+    .where(
+      and(
+        eq(proStudents.id, proStudentId),
+        eq(proStudents.proProfileId, profile.id)
+      )
+    )
+    .limit(1);
+
+  if (
+    !rel ||
+    rel.preferredLocationId === null ||
+    rel.preferredDuration === null ||
+    rel.preferredDayOfWeek === null ||
+    rel.preferredTime === null
+  ) {
+    return { hasPreferences: false };
+  }
+
+  // Get location name
+  const [loc] = await db
+    .select({ name: locations.name })
+    .from(proLocations)
+    .innerJoin(locations, eq(proLocations.locationId, locations.id))
+    .where(eq(proLocations.id, rel.preferredLocationId))
+    .limit(1);
+
+  if (!loc) return { hasPreferences: false };
+
+  // Get last booking date
+  const [lastBooking] = await db
+    .select({ date: lessonBookings.date })
+    .from(lessonBookings)
+    .where(
+      and(
+        eq(lessonBookings.bookedById, rel.userId),
+        eq(lessonBookings.proProfileId, profile.id),
+        eq(lessonBookings.status, "confirmed")
+      )
+    )
+    .orderBy(desc(lessonBookings.date))
+    .limit(1);
+
+  const suggestedDate = computeSuggestedDate(
+    rel.preferredInterval,
+    rel.preferredDayOfWeek,
+    lastBooking?.date ?? null
+  );
+
+  // Batch-fetch availability data once for the 4-week window
+  const now = new Date();
+  const windowStart = suggestedDate;
+  const windowEndDate = new Date(suggestedDate + "T00:00:00");
+  windowEndDate.setDate(windowEndDate.getDate() + 28);
+  const windowEnd = windowEndDate.toISOString().split("T")[0];
+
+  const [proSettings, templateRows, overrideRows, bookingRows] =
+    await Promise.all([
+      db
+        .select({ bookingNotice: proProfiles.bookingNotice })
+        .from(proProfiles)
+        .where(eq(proProfiles.id, profile.id))
+        .limit(1),
+      db
+        .select({
+          dayOfWeek: proAvailability.dayOfWeek,
+          startTime: proAvailability.startTime,
+          endTime: proAvailability.endTime,
+          validFrom: proAvailability.validFrom,
+          validUntil: proAvailability.validUntil,
+        })
+        .from(proAvailability)
+        .where(
+          and(
+            eq(proAvailability.proProfileId, profile.id),
+            eq(proAvailability.proLocationId, rel.preferredLocationId)
+          )
+        ),
+      db
+        .select({
+          date: proAvailabilityOverrides.date,
+          type: proAvailabilityOverrides.type,
+          startTime: proAvailabilityOverrides.startTime,
+          endTime: proAvailabilityOverrides.endTime,
+          proLocationId: proAvailabilityOverrides.proLocationId,
+        })
+        .from(proAvailabilityOverrides)
+        .where(
+          and(
+            eq(proAvailabilityOverrides.proProfileId, profile.id),
+            gte(proAvailabilityOverrides.date, windowStart),
+            lte(proAvailabilityOverrides.date, windowEnd)
+          )
+        ),
+      db
+        .select({
+          date: lessonBookings.date,
+          startTime: lessonBookings.startTime,
+          endTime: lessonBookings.endTime,
+        })
+        .from(lessonBookings)
+        .where(
+          and(
+            eq(lessonBookings.proProfileId, profile.id),
+            eq(lessonBookings.proLocationId, rel.preferredLocationId),
+            eq(lessonBookings.status, "confirmed"),
+            gte(lessonBookings.date, windowStart),
+            lte(lessonBookings.date, windowEnd)
+          )
+        ),
+    ]);
+
+  const bookingNotice = proSettings[0]?.bookingNotice ?? 0;
+
+  function normalizeDate(d: string | Date): string {
+    if (d instanceof Date) return d.toISOString().split("T")[0];
+    if (d.includes("T")) return d.split("T")[0];
+    return d;
+  }
+
+  function slotsForDate(dateStr: string) {
+    const dateOverrides = overrideRows.filter(
+      (o) =>
+        normalizeDate(o.date as string | Date) === dateStr &&
+        (o.proLocationId === null ||
+          o.proLocationId === rel.preferredLocationId)
+    );
+    const dateBookings = bookingRows.filter(
+      (b) => normalizeDate(b.date as string | Date) === dateStr
+    );
+    return computeAvailableSlots(
+      dateStr,
+      templateRows as AvailabilityTemplate[],
+      dateOverrides as AvailabilityOverride[],
+      dateBookings as ExistingBooking[],
+      bookingNotice,
+      rel.preferredDuration!,
+      now
+    );
+  }
+
+  let bestDate = suggestedDate;
+  let bestSlots = slotsForDate(suggestedDate);
+  const alternativeDates: string[] = [];
+  const cursor = new Date(suggestedDate + "T00:00:00");
+
+  for (let i = 0; i < 28 && alternativeDates.length < 4; i++) {
+    cursor.setDate(cursor.getDate() + 1);
+    const dateStr = cursor.toISOString().split("T")[0];
+    const daySlots = slotsForDate(dateStr);
+    if (daySlots.length > 0) {
+      alternativeDates.push(dateStr);
+    }
+  }
+
+  if (bestSlots.length === 0 && alternativeDates.length > 0) {
+    bestDate = alternativeDates.shift()!;
+    bestSlots = slotsForDate(bestDate);
+  }
+
+  const suggestedSlot =
+    bestSlots.find((s) => s.startTime === rel.preferredTime) ??
+    bestSlots[0] ??
+    null;
+
+  return {
+    hasPreferences: true,
+    proStudentId: rel.id,
+    studentName: `${rel.firstName} ${rel.lastName}`,
+    studentUserId: rel.userId,
+    locationId: rel.preferredLocationId,
+    locationName: loc.name,
+    duration: rel.preferredDuration,
+    interval: rel.preferredInterval,
+    suggestedDate: bestDate,
+    suggestedSlot,
+    alternativeSlots: bestSlots.filter(
+      (s) => s.startTime !== suggestedSlot?.startTime
+    ),
+    alternativeDates,
+  };
+}
+
+/**
+ * Pro books a lesson on behalf of a student.
+ * Uses the student's user details and saves as booked by the student.
+ */
+export async function proQuickBookForStudent(data: {
+  proStudentId: number;
+  proLocationId: number;
+  date: string;
+  startTime: string;
+  endTime: string;
+  duration: number;
+}) {
+  const { profile } = await requireProProfile();
+  if (!profile) return { error: "No pro profile found." };
+
+  // Verify the pro-student relationship
+  const [rel] = await db
+    .select({
+      userId: proStudents.userId,
+      firstName: users.firstName,
+      lastName: users.lastName,
+      email: users.email,
+      phone: users.phone,
+    })
+    .from(proStudents)
+    .innerJoin(users, eq(proStudents.userId, users.id))
+    .where(
+      and(
+        eq(proStudents.id, data.proStudentId),
+        eq(proStudents.proProfileId, profile.id)
+      )
+    )
+    .limit(1);
+
+  if (!rel) return { error: "Student not found." };
+
+  // Verify slot availability
+  const slots = await fetchAvailableSlots(
+    profile.id,
+    data.proLocationId,
+    data.date,
+    data.duration
+  );
+  const slotAvailable = slots.some(
+    (s) => s.startTime === data.startTime && s.endTime === data.endTime
+  );
+
+  if (!slotAvailable) {
+    return { error: "This time slot is no longer available." };
+  }
+
+  // Create booking (booked by the student, initiated by pro)
+  const manageToken = crypto.randomBytes(32).toString("hex");
+
+  const [booking] = await db
+    .insert(lessonBookings)
+    .values({
+      proProfileId: profile.id,
+      bookedById: rel.userId,
+      proLocationId: data.proLocationId,
+      date: data.date,
+      startTime: data.startTime,
+      endTime: data.endTime,
+      participantCount: 1,
+      status: "confirmed",
+      manageToken,
+    })
+    .returning({ id: lessonBookings.id });
+
+  // Create participant
+  await db.insert(lessonParticipants).values({
+    bookingId: booking.id,
+    firstName: rel.firstName,
+    lastName: rel.lastName,
+    email: rel.email,
+    phone: rel.phone,
+  });
+
+  // Update student preferences
+  const dayOfWeek = jsDayToIso(new Date(data.date + "T00:00:00").getDay());
+
+  // Detect interval from recent bookings
+  const recentBookings = await db
+    .select({ date: lessonBookings.date })
+    .from(lessonBookings)
+    .where(
+      and(
+        eq(lessonBookings.bookedById, rel.userId),
+        eq(lessonBookings.proProfileId, profile.id),
+        eq(lessonBookings.status, "confirmed")
+      )
+    )
+    .orderBy(desc(lessonBookings.date))
+    .limit(4);
+
+  let interval: string | null = null;
+  if (recentBookings.length >= 2) {
+    const gaps: number[] = [];
+    for (let i = 0; i < recentBookings.length - 1 && i < 3; i++) {
+      const d1 = new Date(recentBookings[i].date + "T00:00:00");
+      const d2 = new Date(recentBookings[i + 1].date + "T00:00:00");
+      gaps.push(Math.round((d1.getTime() - d2.getTime()) / (1000 * 60 * 60 * 24)));
+    }
+    const avgGap = gaps.reduce((sum, g) => sum + g, 0) / gaps.length;
+    if (avgGap >= 6 && avgGap <= 8) interval = "weekly";
+    else if (avgGap >= 13 && avgGap <= 15) interval = "biweekly";
+    else if (avgGap >= 27 && avgGap <= 32) interval = "monthly";
+  }
+
+  await db
+    .update(proStudents)
+    .set({
+      preferredLocationId: data.proLocationId,
+      preferredDuration: data.duration,
+      preferredDayOfWeek: dayOfWeek,
+      preferredTime: data.startTime,
+      ...(interval !== null ? { preferredInterval: interval } : {}),
+    })
+    .where(eq(proStudents.id, data.proStudentId));
+
+  // Notify the student
+  await createNotification({
+    type: "new_booking",
+    priority: "high",
+    targetUserId: rel.userId,
+    title: "New lesson booked",
+    message: `${profile.displayName} booked a lesson for you on ${data.date} at ${data.startTime}.`,
+    actionUrl: "/member/bookings",
+    actionLabel: "View bookings",
+  }).catch(() => {});
+
+  revalidatePath("/pro/students");
+  revalidatePath("/pro/bookings");
+  return { success: true, bookingId: booking.id };
 }

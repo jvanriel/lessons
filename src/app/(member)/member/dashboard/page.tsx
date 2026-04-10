@@ -13,10 +13,11 @@ import { t } from "@/lib/i18n/translations";
 import { redirect } from "next/navigation";
 import Link from "next/link";
 import { QRLoginButton } from "./QRLoginDialog";
-import { QuickRebook } from "./QuickRebook";
+import { CancelBookingButton } from "./CancelBookingDialog";
+import { QuickBook } from "./QuickRebook";
 import {
-  getQuickRebookData,
-  type QuickRebookData,
+  getQuickBookData,
+  type QuickBookData,
 } from "../book/actions";
 
 export const metadata = { title: "Dashboard — Golf Lessons" };
@@ -79,15 +80,15 @@ export default async function MemberDashboard() {
       )
     );
 
-  // Fetch quick rebook data for pros with saved preferences
-  const quickRebookMap: Record<number, QuickRebookData> = {};
+  // Fetch quick book data for pros with saved preferences
+  const quickBookMap: Record<number, QuickBookData> = {};
   await Promise.all(
     myPros
       .filter((p) => p.hasPreferences !== null && p.bookingEnabled)
       .map(async (p) => {
-        const data = await getQuickRebookData(p.proProfileId, p.proStudentId);
+        const data = await getQuickBookData(p.proProfileId, p.proStudentId);
         if (data.hasPreferences) {
-          quickRebookMap[p.proStudentId] = data;
+          quickBookMap[p.proStudentId] = data;
         }
       })
   );
@@ -172,7 +173,7 @@ export default async function MemberDashboard() {
                     </svg>
                     Chat
                   </Link>
-                  {pro.bookingEnabled && !quickRebookMap[pro.proStudentId] && (
+                  {pro.bookingEnabled && !quickBookMap[pro.proStudentId] && (
                     <Link
                       href={`/member/book/${pro.slug}`}
                       className="flex flex-1 items-center justify-center rounded-md bg-gold-600 px-3 py-1.5 text-xs font-medium text-white transition-colors hover:bg-gold-500"
@@ -180,13 +181,13 @@ export default async function MemberDashboard() {
                       Book a lesson
                     </Link>
                   )}
-                  {quickRebookMap[pro.proStudentId] && (
-                    <QuickRebook
-                      data={quickRebookMap[pro.proStudentId]}
-                      proSlug={pro.slug}
-                    />
-                  )}
                 </div>
+                {quickBookMap[pro.proStudentId] && (
+                  <QuickBook
+                    data={quickBookMap[pro.proStudentId]}
+                    proSlug={pro.slug}
+                  />
+                )}
               </div>
             ))}
           </div>
@@ -236,12 +237,12 @@ export default async function MemberDashboard() {
                     with {booking.proName} at {booking.locationName}
                   </div>
                 </div>
-                <Link
-                  href="/member/bookings"
-                  className="text-xs text-gold-600 hover:text-gold-500"
-                >
-                  Details
-                </Link>
+                <CancelBookingButton
+                  bookingId={booking.id}
+                  date={booking.date}
+                  startTime={booking.startTime}
+                  proName={booking.proName}
+                />
               </div>
             ))}
           </div>
