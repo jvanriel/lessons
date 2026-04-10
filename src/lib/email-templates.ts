@@ -7,6 +7,12 @@
 
 import type { Locale } from "@/lib/i18n";
 
+function getBaseUrl(): string {
+  if (process.env.NEXT_PUBLIC_APP_URL) return process.env.NEXT_PUBLIC_APP_URL;
+  if (process.env.VERCEL_URL) return `https://${process.env.VERCEL_URL}`;
+  return "http://localhost:3000";
+}
+
 const COLORS = {
   green950: "#091a12",
   green900: "#0f2b1d",
@@ -231,7 +237,7 @@ export function buildInviteEmail(opts: {
   locale: Locale;
 }): string {
   const s = EMAIL_STRINGS[opts.locale] ?? EMAIL_STRINGS.en;
-  const loginUrl = `https://golflessons.be/login?email=${encodeURIComponent(opts.loginEmail)}`;
+  const loginUrl = `${getBaseUrl()}/login?email=${encodeURIComponent(opts.loginEmail)}`;
 
   const commentBlock = opts.comment
     ? `<div style="background:${COLORS.cream};border-left:3px solid ${COLORS.gold500};padding:12px 16px;margin:20px 0;border-radius:0 8px 8px 0;">
@@ -279,7 +285,7 @@ export function buildPasswordResetEmail(opts: {
   locale: Locale;
 }): string {
   const s = EMAIL_STRINGS[opts.locale] ?? EMAIL_STRINGS.en;
-  const loginUrl = `https://golflessons.be/login?email=${encodeURIComponent(opts.loginEmail)}`;
+  const loginUrl = `${getBaseUrl()}/login?email=${encodeURIComponent(opts.loginEmail)}`;
 
   const body = `
     <h2 style="font-family:Georgia,'Times New Roman',serif;font-size:22px;color:${COLORS.green950};margin:0 0 16px 0;font-weight:normal;">
@@ -353,7 +359,7 @@ export function buildWelcomeEmail(opts: {
     <p style="margin:0 0 16px 0;">${s.body}</p>
     <p style="margin:0 0 24px 0;color:#555;">${note}</p>
     <p style="margin:0 0 24px 0;">
-      <a href="https://golflessons.be" style="display:inline-block;background:${COLORS.gold600};color:${COLORS.white};padding:12px 28px;border-radius:6px;text-decoration:none;font-weight:500;font-size:14px;">
+      <a href="${getBaseUrl()}" style="display:inline-block;background:${COLORS.gold600};color:${COLORS.white};padding:12px 28px;border-radius:6px;text-decoration:none;font-weight:500;font-size:14px;">
         ${s.button}
       </a>
     </p>
