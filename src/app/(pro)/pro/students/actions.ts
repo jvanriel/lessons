@@ -78,15 +78,19 @@ export async function inviteStudent(
   const firstName = (formData.get("firstName") as string).trim();
   const lastName = (formData.get("lastName") as string).trim();
   const email = (formData.get("email") as string).trim().toLowerCase();
+  const password = (formData.get("password") as string)?.trim();
   const source = (formData.get("source") as string) || "invited";
 
   if (!firstName || !lastName || !email) {
     return { error: "First name, last name and email are required." };
   }
+  if (!password) {
+    return { error: "Password is required. Use the Generate button." };
+  }
 
   // Check if user already exists
   let userId: number;
-  let tempPassword: string | undefined;
+  const tempPassword = password;
 
   const [existing] = await db
     .select({ id: users.id, roles: users.roles })
@@ -123,8 +127,7 @@ export async function inviteStudent(
       return { success: true };
     }
   } else {
-    // Create new user with member role and generated password
-    tempPassword = generatePassword();
+    // Create new user with member role
     const hashed = await hashPassword(tempPassword);
 
     const [inserted] = await db

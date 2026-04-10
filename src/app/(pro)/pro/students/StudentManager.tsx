@@ -85,6 +85,7 @@ export default function StudentManager({
     null
   );
   const [filter, setFilter] = useState<"all" | "active" | "pending" | "inactive">("all");
+  const [generatedPassword, setGeneratedPassword] = useState("");
   const [search, setSearch] = useState("");
   const [selectedStudentId, setSelectedStudentId] = useState<number | null>(null);
   const [editingStudent, setEditingStudent] = useState<Student | null>(null);
@@ -128,6 +129,7 @@ export default function StudentManager({
             type="button"
             onClick={() => {
               setInviteMode("invited");
+              setGeneratedPassword("");
               setShowInviteForm(true);
             }}
             className="rounded-md bg-gold-600 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-gold-500"
@@ -139,6 +141,7 @@ export default function StudentManager({
             type="button"
             onClick={() => {
               setInviteMode("pro_added");
+              setGeneratedPassword("");
               setShowInviteForm(true);
             }}
             className="rounded-md border border-green-300 bg-white px-4 py-2 text-sm font-medium text-green-700 transition-colors hover:bg-green-50"
@@ -205,6 +208,35 @@ export default function StudentManager({
                 required
                 className="mt-1 block w-full rounded-lg border border-green-200 px-3 py-2 text-sm focus:border-gold-500 focus:outline-none focus:ring-1 focus:ring-gold-500"
               />
+            </div>
+            <div>
+              <label className="text-sm font-medium text-green-700">
+                Password
+              </label>
+              <div className="mt-1 flex gap-2">
+                <input
+                  name="password"
+                  type="text"
+                  required
+                  value={generatedPassword}
+                  onChange={(e) => setGeneratedPassword(e.target.value)}
+                  className="block w-full rounded-lg border border-green-200 px-3 py-2 text-sm font-mono focus:border-gold-500 focus:outline-none focus:ring-1 focus:ring-gold-500"
+                />
+                <button
+                  type="button"
+                  onClick={() => {
+                    const chars = "ABCDEFGHJKLMNPQRSTUVWXYZabcdefghjkmnpqrstuvwxyz23456789!@#$%";
+                    let pw = "";
+                    const arr = new Uint8Array(12);
+                    crypto.getRandomValues(arr);
+                    for (const b of arr) pw += chars[b % chars.length];
+                    setGeneratedPassword(pw);
+                  }}
+                  className="shrink-0 rounded-lg border border-green-200 px-3 py-2 text-xs font-medium text-green-700 transition-colors hover:bg-green-50"
+                >
+                  Generate
+                </button>
+              </div>
             </div>
 
             {inviteState?.error && (
