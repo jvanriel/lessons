@@ -82,9 +82,9 @@ export async function userLogin(
 
   // Route to the appropriate dashboard based on role
   const roles = parseRoles(user.roles);
-  if (roles.includes("admin") || roles.includes("dev")) {
-    redirect("/admin");
-  } else if (roles.includes("pro")) {
+  if (roles.includes("pro")) {
+    redirect("/pro/dashboard");
+  } else if (roles.includes("admin") || roles.includes("dev")) {
     redirect("/pro/dashboard");
   } else {
     redirect("/member/dashboard");
