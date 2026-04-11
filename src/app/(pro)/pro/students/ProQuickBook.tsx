@@ -11,7 +11,7 @@ import {
   type ProQuickBookData,
 } from "./actions";
 import { explainDateSlots, type SlotExplanation } from "@/app/(member)/member/book/actions";
-import { SlotExplanationDialog } from "@/components/SlotExplanationDialog";
+import { TabbedExplanationDialog } from "@/components/SlotExplanationDialog";
 
 interface Props {
   proStudentId: number;
@@ -90,7 +90,8 @@ export function ProQuickBook({ proStudentId, studentName, initialData, autoOpen 
     endTime: string;
   } | null>(null);
   const [allDates, setAllDates] = useState<string[] | null>(null);
-  const [explanation, setExplanation] = useState<SlotExplanation | null>(null);
+  const [explanationPro, setExplanationPro] = useState<SlotExplanation | null>(null);
+  const [explanationStudent, setExplanationStudent] = useState<SlotExplanation | null>(null);
   const dateHoldTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [calendarMonth, setCalendarMonth] = useState(() => new Date());
 
@@ -347,8 +348,12 @@ export function ProQuickBook({ proStudentId, studentName, initialData, autoOpen 
                     dateHoldTimer.current = setTimeout(() => {
                       dateHoldTimer.current = null;
                       startTransition(async () => {
-                        const result = await explainDateSlots(data.proProfileId, data.locationId, d, data.duration, idx === 0, true);
-                        setExplanation(result);
+                        const [proView, studentView] = await Promise.all([
+                          explainDateSlots(data.proProfileId, data.locationId, d, data.duration, idx === 0, true),
+                          explainDateSlots(data.proProfileId, data.locationId, d, data.duration, idx === 0, false, null),
+                        ]);
+                        setExplanationPro(proView);
+                        setExplanationStudent(studentView);
                       });
                     }, 600);
                   }}
@@ -562,9 +567,13 @@ export function ProQuickBook({ proStudentId, studentName, initialData, autoOpen 
         </>
       )}
 
-      {/* Slot explanation dialog */}
-      {explanation && (
-        <SlotExplanationDialog data={explanation} onClose={() => setExplanation(null)} />
+      {/* Slot explanation dialog — tabbed: pro view + student view */}
+      {explanationPro && explanationStudent && (
+        <TabbedExplanationDialog
+          proData={explanationPro}
+          studentData={explanationStudent}
+          onClose={() => { setExplanationPro(null); setExplanationStudent(null); }}
+        />
       )}
     </div>
   );
