@@ -17,7 +17,7 @@ const GRID_START_HOUR = 7;
 const GRID_END_HOUR = 22;
 const ROWS = (GRID_END_HOUR - GRID_START_HOUR) * 2; // 30 half-hour rows
 const CELL_H_DESKTOP = 22;
-const CELL_H_MOBILE = 36;
+const CELL_H_MOBILE = 44;
 
 function useCellHeight() {
   const [cellH, setCellH] = useState(CELL_H_DESKTOP);
@@ -292,10 +292,24 @@ function WeeklyTemplateGrid({
     }
   }
 
+  const lastPaintedCell = useRef<string | null>(null);
+
   function handlePointerEnter(day: number, row: number) {
     if (dragRef.current.active) {
       updateCell(day, row, dragRef.current.adding);
     }
+  }
+
+  function handlePointerMove(e: React.PointerEvent) {
+    if (!dragRef.current.active || e.pointerType === "mouse") return;
+    // Touch: find cell under finger using elementFromPoint
+    const el = document.elementFromPoint(e.clientX, e.clientY);
+    if (!el) return;
+    const cellKey = el.getAttribute("data-cell");
+    if (!cellKey || cellKey === lastPaintedCell.current) return;
+    lastPaintedCell.current = cellKey;
+    const [d, r] = cellKey.split("-").map(Number);
+    updateCell(d, r, dragRef.current.adding);
   }
 
   function handlePointerUp() {
@@ -305,6 +319,7 @@ function WeeklyTemplateGrid({
     }
     dragRef.current.active = false;
     setPaintingMode(false);
+    lastPaintedCell.current = null;
   }
 
   return (
@@ -371,6 +386,7 @@ function WeeklyTemplateGrid({
         className={`mt-4 select-none overflow-x-auto ${paintingMode ? "touch-none" : ""}`}
         onPointerUp={handlePointerUp}
         onPointerLeave={handlePointerUp}
+        onPointerMove={handlePointerMove}
       >
         <div className="grid" style={{
           gridTemplateColumns: `48px repeat(7, minmax(0, 1fr))`,
@@ -431,6 +447,7 @@ function WeeklyTemplateGrid({
                 return (
                   <div
                     key={`${day}-${row}`}
+                    data-cell={`${day}-${row}`}
                     onPointerDown={(e) => {
                       e.preventDefault();
                       handlePointerDown(day, row, e);
@@ -708,9 +725,24 @@ function PreviewBlockingGrid({
     }
   }
 
+  const lastPaintedCell2 = useRef<string | null>(null);
+
   function handlePointerEnter(dayIdx: number, row: number) {
     if (dragRef.current.active && !fullDayBlocked[dayIdx]) {
       paintCell(dayIdx, row, dragRef.current.adding);
+    }
+  }
+
+  function handlePointerMove2(e: React.PointerEvent) {
+    if (!dragRef.current.active || e.pointerType === "mouse") return;
+    const el = document.elementFromPoint(e.clientX, e.clientY);
+    if (!el) return;
+    const cellKey = el.getAttribute("data-cell");
+    if (!cellKey || cellKey === lastPaintedCell2.current) return;
+    lastPaintedCell2.current = cellKey;
+    const [d, r] = cellKey.split("-").map(Number);
+    if (!fullDayBlocked[d]) {
+      paintCell(d, r, dragRef.current.adding);
     }
   }
 
@@ -721,6 +753,7 @@ function PreviewBlockingGrid({
     }
     dragRef.current.active = false;
     setPaintingMode2(false);
+    lastPaintedCell2.current = null;
   }
 
   function toggleFullDay(dayIdx: number) {
@@ -962,6 +995,7 @@ function PreviewBlockingGrid({
         className={`mt-4 select-none overflow-x-auto ${paintingMode2 ? "touch-none" : ""}`}
         onPointerUp={handlePointerUp}
         onPointerLeave={handlePointerUp}
+        onPointerMove={handlePointerMove2}
       >
         <div
           className="grid"
@@ -1105,6 +1139,7 @@ function PreviewBlockingGrid({
                 return (
                   <div
                     key={`${dayIdx}-${row}`}
+                    data-cell={`${dayIdx}-${row}`}
                     onPointerDown={(e) => {
                       e.preventDefault();
                       handlePointerDown(dayIdx, row, e);
