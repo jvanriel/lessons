@@ -87,6 +87,15 @@ export function QuickBook({ data, proSlug, hasPaymentMethod = true, allowBooking
     setInterval(data.interval);
   }, [data]);
 
+  // Listen for booking changes (from notifications) and refresh the page
+  useEffect(() => {
+    function handleBookingChanged() {
+      router.refresh();
+    }
+    window.addEventListener("booking-changed", handleBookingChanged);
+    return () => window.removeEventListener("booking-changed", handleBookingChanged);
+  }, [router]);
+
   const holdTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const animFrame = useRef<number | null>(null);
   const holdStart = useRef(0);

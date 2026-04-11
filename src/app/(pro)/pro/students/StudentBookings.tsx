@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useTransition, useRef } from "react";
+import { useState, useEffect, useTransition, useRef, useCallback } from "react";
 import { getStudentBookings, proCancelBooking } from "./actions";
 
 interface Booking {
@@ -86,13 +86,22 @@ export function StudentBookings({ proStudentId }: { proStudentId: number }) {
   const [isPending, startTransition] = useTransition();
   const [cancelTarget, setCancelTarget] = useState<Booking | null>(null);
 
-  useEffect(() => {
+  const fetchBookings = useCallback(() => {
     startTransition(async () => {
       const result = await getStudentBookings(proStudentId);
       setBookings(result);
       setLoaded(true);
     });
   }, [proStudentId, startTransition]);
+
+  useEffect(() => { fetchBookings(); }, [fetchBookings]);
+
+  // Refresh when a booking changes (via notification)
+  useEffect(() => {
+    function handleBookingChanged() { fetchBookings(); }
+    window.addEventListener("booking-changed", handleBookingChanged);
+    return () => window.removeEventListener("booking-changed", handleBookingChanged);
+  }, [fetchBookings]);
 
   function handleCancel() {
     if (!cancelTarget) return;

@@ -45,12 +45,19 @@ export default function NotificationBell({
     setToasts((prev) => prev.filter((t) => t.id !== id));
   }, []);
 
+  const prevCountRef = useRef(0);
   const fetchCount = useCallback(async () => {
     try {
       const res = await fetch("/api/notifications?countOnly=true");
       if (res.ok) {
         const data = await res.json();
-        setUnreadCount(data.unreadCount);
+        const newCount = data.unreadCount;
+        // If count increased, a new notification arrived — trigger refresh
+        if (newCount > prevCountRef.current && prevCountRef.current > 0) {
+          window.dispatchEvent(new CustomEvent("booking-changed"));
+        }
+        prevCountRef.current = newCount;
+        setUnreadCount(newCount);
       }
     } catch {}
   }, []);
@@ -98,6 +105,12 @@ export default function NotificationBell({
           if (data.type === "connected") return;
           setUnreadCount((c) => c + 1);
           fetchNotifications();
+
+          // Broadcast booking events so other components can refresh
+          const notifType = data.type ?? "";
+          if (notifType === "new_booking" || notifType === "booking_cancelled") {
+            window.dispatchEvent(new CustomEvent("booking-changed"));
+          }
 
           const priority = data.priority ?? "normal";
           if (priority === "high" || priority === "urgent") {

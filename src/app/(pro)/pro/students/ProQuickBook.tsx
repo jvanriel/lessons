@@ -48,6 +48,29 @@ export function ProQuickBook({ proStudentId, studentName, initialData, autoOpen 
   const [open, setOpen] = useState(!!initialData);
   const [interval, setInterval] = useState<string | null>(initialData?.interval ?? null);
 
+  // Listen for booking changes (from notifications) and refresh
+  useEffect(() => {
+    function handleBookingChanged() {
+      if (!data) return;
+      startTransition(async () => {
+        const result = await getProQuickBookData(proStudentId);
+        if (result.hasPreferences) {
+          setData(result);
+          setInterval(result.interval);
+          setSelectedDate(result.suggestedDate);
+          setSlots(
+            result.suggestedSlot
+              ? [result.suggestedSlot, ...result.alternativeSlots]
+              : result.alternativeSlots
+          );
+          setAllDates(null);
+        }
+      });
+    }
+    window.addEventListener("booking-changed", handleBookingChanged);
+    return () => window.removeEventListener("booking-changed", handleBookingChanged);
+  }, [data, proStudentId, startTransition]);
+
   // Auto-open: fetch data immediately on mount
   useEffect(() => {
     if (autoOpen && !data && !open) {
