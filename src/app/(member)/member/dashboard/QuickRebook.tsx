@@ -196,8 +196,13 @@ export function QuickBook({ data, proSlug, hasPaymentMethod = true, allowBooking
   return (
     <div className="mt-3 rounded-lg border border-green-100 bg-green-50/50 p-4">
       {/* Header */}
-      <div className="mb-3">
+      <div className="mb-3 flex items-baseline justify-between">
         <h3 className="text-sm font-medium text-green-900">Quick Book</h3>
+        {data.bookingNotice > 0 && (
+          <span className="text-[10px] text-green-400">
+            {data.bookingNotice}h notice
+          </span>
+        )}
       </div>
 
       {/* Toast */}

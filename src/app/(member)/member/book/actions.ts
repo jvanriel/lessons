@@ -535,6 +535,7 @@ export interface QuickBookData {
   locationName: string;
   duration: number;
   interval: string | null;
+  bookingNotice: number;
   suggestedDate: string;
   suggestedSlot: { startTime: string; endTime: string } | null;
   alternativeSlots: { startTime: string; endTime: string }[];
@@ -781,6 +782,7 @@ export async function getQuickBookData(
     locationName: loc.name,
     duration: rel.preferredDuration,
     interval: rel.preferredInterval,
+    bookingNotice: bookingNotice,
     suggestedDate: bestDate,
     suggestedSlot,
     alternativeSlots: bestSlots.filter(
