@@ -1,15 +1,18 @@
 import type { MetadataRoute } from "next";
 
+const isProduction = process.env.VERCEL_ENV === "production";
+
 export default function manifest(): MetadataRoute.Manifest {
   return {
-    name: "Golf Lessons",
-    short_name: "Golf Lessons",
+    name: isProduction ? "Golf Lessons" : "Golf Lessons (Preview)",
+    short_name: isProduction ? "Golf Lessons" : "GL Preview",
     description:
       "Book golf lessons with certified professionals. Manage your coaching, schedule, and progress.",
     start_url: "/",
+    id: isProduction ? "golflessons-prod" : "golflessons-preview",
     display: "standalone",
     background_color: "#faf7f0",
-    theme_color: "#091a12",
+    theme_color: isProduction ? "#091a12" : "#1a1209",
     icons: [
       {
         src: "/icon-192.png",
