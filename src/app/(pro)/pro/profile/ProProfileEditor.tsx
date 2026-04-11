@@ -219,7 +219,7 @@ export default function ProProfileEditor({
               aria-checked={bookingEnabled}
               onClick={() => setBookingEnabled(!bookingEnabled)}
               className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors ${
-                bookingEnabled ? "bg-green-600" : "bg-green-300"
+                bookingEnabled ? "bg-gold-600" : "bg-gray-300"
               }`}
             >
               <span
@@ -307,7 +307,7 @@ export default function ProProfileEditor({
                 setAllowBookingWithoutPayment(!allowBookingWithoutPayment)
               }
               className={`relative mt-0.5 inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors ${
-                allowBookingWithoutPayment ? "bg-green-600" : "bg-green-300"
+                allowBookingWithoutPayment ? "bg-gold-600" : "bg-gray-300"
               }`}
             >
               <span
