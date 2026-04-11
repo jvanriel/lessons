@@ -16,7 +16,20 @@ const DAYS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
 const GRID_START_HOUR = 7;
 const GRID_END_HOUR = 22;
 const ROWS = (GRID_END_HOUR - GRID_START_HOUR) * 2; // 30 half-hour rows
-const CELL_H = 22;
+const CELL_H_DESKTOP = 22;
+const CELL_H_MOBILE = 36;
+
+function useCellHeight() {
+  const [cellH, setCellH] = useState(CELL_H_DESKTOP);
+  useEffect(() => {
+    const mq = window.matchMedia("(max-width: 639px)");
+    setCellH(mq.matches ? CELL_H_MOBILE : CELL_H_DESKTOP);
+    function handler(e: MediaQueryListEvent) { setCellH(e.matches ? CELL_H_MOBILE : CELL_H_DESKTOP); }
+    mq.addEventListener("change", handler);
+    return () => mq.removeEventListener("change", handler);
+  }, []);
+  return cellH;
+}
 
 // Distinct colors for up to 6 locations
 const LOCATION_COLORS = [
@@ -125,6 +138,8 @@ export default function AvailabilityEditor({
   bookings,
   profileSettings,
 }: Props) {
+  const CELL_H = useCellHeight();
+
   // Build location -> color index map
   const locationColorMap = useMemo(() => {
     const map = new Map<number, number>();
@@ -201,6 +216,7 @@ function WeeklyTemplateGrid({
   grid: LocationGrid;
   onGridChange: (grid: LocationGrid) => void;
 }) {
+  const CELL_H = useCellHeight();
   const [dirtyLocations, setDirtyLocations] = useState<Set<number>>(new Set());
   const [saveStatus, setSaveStatus] = useState<"idle" | "saving" | "saved">("idle");
   const dragRef = useRef<{ active: boolean; adding: boolean; day: number }>({
@@ -531,6 +547,7 @@ function PreviewBlockingGrid({
   bookings: SerializedBooking[];
   profileSettings: SerializedProfileSettings;
 }) {
+  const CELL_H = useCellHeight();
   const [weekOffset, setWeekOffset] = useState(0);
   const [dirty, setDirty] = useState(false);
   const [saveStatus, setSaveStatus] = useState<"idle" | "saving" | "saved">("idle");
