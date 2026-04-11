@@ -114,7 +114,18 @@ export function BookingsView({
   bookings: Booking[];
   availability: AvailabilitySlot[];
 }) {
-  const [view, setView] = useState<"calendar" | "list">("calendar");
+  const [view, setView] = useState<"calendar" | "list">(() => {
+    if (typeof window !== "undefined") {
+      const stored = localStorage.getItem("bookings-view");
+      if (stored === "list") return "list";
+    }
+    return "calendar";
+  });
+
+  function switchView(v: "calendar" | "list") {
+    setView(v);
+    try { localStorage.setItem("bookings-view", v); } catch {}
+  }
 
   return (
     <div>
@@ -122,7 +133,7 @@ export function BookingsView({
       <div className="mb-4 flex items-center gap-1 rounded-lg border border-green-200 bg-white p-0.5 w-fit">
         <button
           type="button"
-          onClick={() => setView("calendar")}
+          onClick={() => switchView("calendar")}
           className={`flex items-center gap-1.5 rounded-md px-3 py-1.5 text-xs font-medium transition-colors ${
             view === "calendar"
               ? "bg-green-700 text-white"
@@ -136,7 +147,7 @@ export function BookingsView({
         </button>
         <button
           type="button"
-          onClick={() => setView("list")}
+          onClick={() => switchView("list")}
           className={`flex items-center gap-1.5 rounded-md px-3 py-1.5 text-xs font-medium transition-colors ${
             view === "list"
               ? "bg-green-700 text-white"
