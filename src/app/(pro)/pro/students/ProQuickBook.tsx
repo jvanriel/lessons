@@ -449,7 +449,18 @@ export function ProQuickBook({ proStudentId, studentName, initialData, autoOpen 
                     setInterval(newVal);
                     startTransition(async () => {
                       await proUpdateStudentInterval(data.proStudentId, newVal);
-                      router.refresh();
+                      // Re-fetch with new interval applied
+                      const result = await getProQuickBookData(proStudentId);
+                      if (result.hasPreferences) {
+                        setData(result);
+                        setSelectedDate(result.suggestedDate);
+                        setSlots(
+                          result.suggestedSlot
+                            ? [result.suggestedSlot, ...result.alternativeSlots]
+                            : result.alternativeSlots
+                        );
+                        setAllDates(null);
+                      }
                     });
                   }}
                   className={`rounded-full px-2 py-0.5 text-[10px] font-medium transition-colors ${
