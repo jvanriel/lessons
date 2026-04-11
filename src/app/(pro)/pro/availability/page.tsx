@@ -12,6 +12,7 @@ import { eq, and, gte, lte, asc } from "drizzle-orm";
 import { requireProProfile } from "@/lib/pro";
 import { redirect } from "next/navigation";
 import AvailabilityEditor from "./AvailabilityEditor";
+import { BookingRefreshListener } from "@/components/BookingRefreshListener";
 import type {
   SerializedAvailability,
   SerializedOverride,
@@ -180,6 +181,7 @@ export default async function AvailabilityPage() {
 
   return (
     <div className="mx-auto max-w-5xl px-6 py-12">
+      <BookingRefreshListener />
       <h1 className="mb-2 font-display text-3xl font-semibold text-green-900">
         Availability
       </h1>

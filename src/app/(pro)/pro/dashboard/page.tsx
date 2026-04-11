@@ -4,6 +4,7 @@ import { eq, and, gte, lte, sql } from "drizzle-orm";
 import { requireProProfile } from "@/lib/pro";
 import { redirect } from "next/navigation";
 import Link from "next/link";
+import { BookingRefreshListener } from "@/components/BookingRefreshListener";
 
 export const metadata = { title: "Pro Dashboard — Golf Lessons" };
 
@@ -41,6 +42,7 @@ export default async function ProDashboard() {
 
   return (
     <div className="mx-auto max-w-4xl px-6 py-12">
+      <BookingRefreshListener />
       <h1 className="font-display text-3xl font-semibold text-green-900">
         Pro Dashboard
       </h1>

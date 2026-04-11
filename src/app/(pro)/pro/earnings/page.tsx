@@ -3,6 +3,7 @@ import { redirect } from "next/navigation";
 import { db } from "@/lib/db";
 import { lessonBookings, users } from "@/lib/db/schema";
 import { eq, and, desc, sql, gte } from "drizzle-orm";
+import { BookingRefreshListener } from "@/components/BookingRefreshListener";
 
 export const metadata = { title: "Earnings — Golf Lessons" };
 
@@ -107,6 +108,7 @@ export default async function EarningsPage() {
 
   return (
     <div className="mx-auto max-w-4xl px-6 py-12">
+      <BookingRefreshListener />
       <h1 className="font-display text-3xl font-semibold text-green-900">
         Earnings
       </h1>

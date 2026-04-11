@@ -5,6 +5,7 @@ import { notFound } from "next/navigation";
 import { getSession } from "@/lib/auth";
 import { BookingWizard } from "./BookingWizard";
 import { getStripe } from "@/lib/stripe";
+import { BookingRefreshListener } from "@/components/BookingRefreshListener";
 
 export async function generateMetadata({
   params,
@@ -120,6 +121,7 @@ export default async function BookingPage({
 
   return (
     <div className="mx-auto max-w-3xl px-6 py-12">
+      <BookingRefreshListener />
       <BookingWizard
         pro={{
           id: pro.id,
