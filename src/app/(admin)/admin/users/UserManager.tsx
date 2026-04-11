@@ -362,7 +362,7 @@ function UserRowActions({
       return;
     startTransition(async () => {
       const result = await deleteUser(user.id);
-      if (result.error) alert(result.error);
+      if ("error" in result) alert(result.error);
     });
   }
 
@@ -451,7 +451,7 @@ function UserRowActions({
                   if (!confirm(`Permanently purge ${user.firstName} ${user.lastName}? This will remove all data and cannot be undone.`)) return;
                   startTransition(async () => {
                     const result = await purgeUser(user.id);
-                    if (result.error) alert(result.error);
+                    if ("error" in result) alert(result.error);
                   });
                 }}
                 className="block w-full px-4 py-2 text-left text-sm text-red-600 hover:bg-red-50"

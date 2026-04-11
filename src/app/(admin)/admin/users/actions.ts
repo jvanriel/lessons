@@ -116,12 +116,27 @@ export async function updateUser(
   return { success: true };
 }
 
+function isDummyAccount(email: string): boolean {
+  return email.startsWith("dummy") && email.endsWith("@golflessons.be");
+}
+
 export async function deleteUser(userId: number) {
   const session = await requireAdmin();
 
   // Prevent self-deletion
   if (session.userId === userId) {
     return { error: "You cannot delete your own account." };
+  }
+
+  // Dummy test accounts always get hard-deleted
+  const [userToDelete] = await db
+    .select({ email: users.email })
+    .from(users)
+    .where(eq(users.id, userId))
+    .limit(1);
+
+  if (userToDelete && isDummyAccount(userToDelete.email)) {
+    return purgeUserInternal(userId);
   }
 
   const now = new Date();
@@ -198,25 +213,18 @@ export async function deleteUser(userId: number) {
 }
 
 /**
- * Permanently remove a soft-deleted user and all their data.
- * Only works on users that have already been soft-deleted (deletedAt is set).
+ * Internal: permanently remove a user and all their data.
+ * Cancels future bookings, deletes pro profile, removes all records.
  */
-export async function purgeUser(userId: number) {
-  const session = await requireAdmin();
+async function purgeUserInternal(userId: number): Promise<{ success: boolean } | { error: string }> {
+  const now = new Date();
+  const today = now.toISOString().split("T")[0];
 
-  if (session.userId === userId) {
-    return { error: "You cannot purge your own account." };
-  }
-
-  // Verify user is actually soft-deleted
-  const [user] = await db
-    .select({ deletedAt: users.deletedAt })
-    .from(users)
-    .where(eq(users.id, userId))
-    .limit(1);
-
-  if (!user) return { error: "User not found." };
-  if (!user.deletedAt) return { error: "User must be deleted first before purging." };
+  // Cancel future bookings first (so slots are freed)
+  await db
+    .update(lessonBookings)
+    .set({ status: "cancelled", cancelledAt: now, cancellationReason: "Account purged", updatedAt: now })
+    .where(and(eq(lessonBookings.bookedById, userId), eq(lessonBookings.status, "confirmed"), gte(lessonBookings.date, today)));
 
   // Delete pro profile if exists (and cascade its children)
   const [proProfile] = await db
@@ -226,7 +234,13 @@ export async function purgeUser(userId: number) {
     .limit(1);
 
   if (proProfile) {
-    // Delete bookings referencing this pro (no cascade on FK)
+    // Cancel future bookings for this pro
+    await db
+      .update(lessonBookings)
+      .set({ status: "cancelled", cancelledAt: now, cancellationReason: "Pro account purged", updatedAt: now })
+      .where(and(eq(lessonBookings.proProfileId, proProfile.id), eq(lessonBookings.status, "confirmed"), gte(lessonBookings.date, today)));
+
+    // Delete all bookings referencing this pro (no cascade on FK)
     await db.delete(lessonBookings).where(eq(lessonBookings.proProfileId, proProfile.id));
     // Pro profile cascade-deletes: proLocations, proAvailability, proStudents, proPages, etc.
     await db.delete(proProfiles).where(eq(proProfiles.id, proProfile.id));
@@ -247,6 +261,30 @@ export async function purgeUser(userId: number) {
 
   revalidatePath("/admin/users");
   return { success: true };
+}
+
+/**
+ * Permanently remove a soft-deleted user and all their data.
+ * Only works on users that have already been soft-deleted (deletedAt is set).
+ */
+export async function purgeUser(userId: number) {
+  const session = await requireAdmin();
+
+  if (session.userId === userId) {
+    return { error: "You cannot purge your own account." };
+  }
+
+  // Verify user is actually soft-deleted
+  const [user] = await db
+    .select({ deletedAt: users.deletedAt })
+    .from(users)
+    .where(eq(users.id, userId))
+    .limit(1);
+
+  if (!user) return { error: "User not found." };
+  if (!user.deletedAt) return { error: "User must be deleted first before purging." };
+
+  return purgeUserInternal(userId);
 }
 
 function generatePassword(length = 12): string {

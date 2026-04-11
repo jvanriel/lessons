@@ -11,6 +11,8 @@ Use the following naming convention for test accounts in the Google Workspace:
 
 These are aliases of workspace accounts, so all emails arrive in the tester's own inbox. Each tester uses their own lastname to avoid conflicts.
 
+**Automatic cleanup:** Dummy accounts (`dummy*@golflessons.be`) are always **hard-deleted** when deleted via the admin panel — no soft-delete. This means the email is immediately available for re-registration, making test cycles fast and repeatable.
+
 **Pre-launch password:** `prolessons` (required on first visit for non-localhost)
 
 ---
