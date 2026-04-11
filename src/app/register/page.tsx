@@ -30,9 +30,9 @@ export default async function RegisterPage({ searchParams }: Props) {
     redirect("/pro/dashboard");
   }
 
-  // Admins/devs without pro role go to pro dashboard too (admin page is empty)
+  // Admins/devs go to member dashboard (they can navigate from there)
   if (session && (hasRole(session, "admin") || hasRole(session, "dev"))) {
-    redirect("/pro/dashboard");
+    redirect("/member/dashboard");
   }
 
   // Already completed onboarding → dashboard

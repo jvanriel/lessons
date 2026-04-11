@@ -84,8 +84,6 @@ export async function userLogin(
   const roles = parseRoles(user.roles);
   if (roles.includes("pro")) {
     redirect("/pro/dashboard");
-  } else if (roles.includes("admin") || roles.includes("dev")) {
-    redirect("/pro/dashboard");
   } else {
     redirect("/member/dashboard");
   }
