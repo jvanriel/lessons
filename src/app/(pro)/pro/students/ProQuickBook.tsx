@@ -1,8 +1,10 @@
 "use client";
 
 import { useState, useEffect, useRef, useCallback, useTransition } from "react";
+import { useRouter } from "next/navigation";
 import {
   proQuickBookForStudent,
+  proUpdateStudentInterval,
   getProQuickBookData,
   getProAllAvailableDates,
   fetchSlotsForDate,
@@ -38,9 +40,11 @@ function formatDatePillDate(dateStr: string) {
 }
 
 export function ProQuickBook({ proStudentId, studentName, initialData, autoOpen }: Props) {
+  const router = useRouter();
   const [isPending, startTransition] = useTransition();
   const [data, setData] = useState<ProQuickBookData | null>(initialData ?? null);
   const [open, setOpen] = useState(!!initialData);
+  const [interval, setInterval] = useState<string | null>(initialData?.interval ?? null);
 
   // Auto-open: fetch data immediately on mount
   useEffect(() => {
@@ -102,6 +106,7 @@ export function ProQuickBook({ proStudentId, studentName, initialData, autoOpen 
         return;
       }
       setData(result);
+      setInterval(result.interval);
       setSelectedDate(result.suggestedDate);
       setSlots(
         result.suggestedSlot
@@ -429,8 +434,36 @@ export function ProQuickBook({ proStudentId, studentName, initialData, autoOpen 
             </div>
           )}
 
-          {/* More options — load all available dates */}
-          {!allDates && (
+          {/* Next lesson interval + more options */}
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-1">
+              {([
+                { value: "weekly", label: "In a week" },
+                { value: "biweekly", label: "In 2 weeks" },
+                { value: "monthly", label: "In a month" },
+              ] as const).map((iv) => (
+                <button
+                  key={iv.value}
+                  onClick={() => {
+                    const newVal = interval === iv.value ? null : iv.value;
+                    setInterval(newVal);
+                    startTransition(async () => {
+                      await proUpdateStudentInterval(data.proStudentId, newVal);
+                      router.refresh();
+                    });
+                  }}
+                  className={`rounded-full px-2 py-0.5 text-[10px] font-medium transition-colors ${
+                    interval === iv.value
+                      ? "bg-green-700 text-white"
+                      : "bg-green-50 text-green-500 hover:text-green-700"
+                  }`}
+                >
+                  {iv.label}
+                </button>
+              ))}
+            </div>
+            {/* More options — load all available dates */}
+            {!allDates && (
             <button
               type="button"
               onClick={() => {
@@ -447,7 +480,8 @@ export function ProQuickBook({ proStudentId, studentName, initialData, autoOpen 
             >
               {isPending ? "Loading..." : "More dates"}
             </button>
-          )}
+            )}
+          </div>
 
           {/* All dates grid */}
           {allDates && (

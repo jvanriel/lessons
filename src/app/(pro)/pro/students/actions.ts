@@ -805,6 +805,38 @@ export async function getProQuickBookData(
 
 /**
  * Pro books a lesson on behalf of a student.
+ * Update the preferred interval for a student (called by the pro).
+ */
+export async function proUpdateStudentInterval(
+  proStudentId: number,
+  interval: string | null
+) {
+  const { profile } = await requireProProfile();
+  if (!profile) return { error: "No pro profile found." };
+
+  // Verify ownership
+  const [rel] = await db
+    .select({ id: proStudents.id })
+    .from(proStudents)
+    .where(
+      and(
+        eq(proStudents.id, proStudentId),
+        eq(proStudents.proProfileId, profile.id)
+      )
+    )
+    .limit(1);
+
+  if (!rel) return { error: "Student not found." };
+
+  await db
+    .update(proStudents)
+    .set({ preferredInterval: interval })
+    .where(eq(proStudents.id, proStudentId));
+
+  return { success: true };
+}
+
+/**
  * Uses the student's user details and saves as booked by the student.
  */
 export async function proQuickBookForStudent(data: {
