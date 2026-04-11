@@ -28,6 +28,18 @@ const outfit = Outfit({
 export const metadata: Metadata = {
   title: "Golf Lessons",
   description: "Book golf lessons with certified professionals",
+  appleWebApp: {
+    capable: true,
+    statusBarStyle: "black-translucent",
+    title: "Golf Lessons",
+  },
+  icons: {
+    icon: [
+      { url: "/favicon.png", sizes: "32x32", type: "image/png" },
+      { url: "/icon-192.png", sizes: "192x192", type: "image/png" },
+    ],
+    apple: "/apple-touch-icon.png",
+  },
 };
 
 export default async function RootLayout({
@@ -139,6 +151,9 @@ export default async function RootLayout({
 
   return (
     <html lang="en">
+      <head>
+        <meta name="theme-color" content="#091a12" />
+      </head>
       <body
         className={`${cormorant.variable} ${outfit.variable} font-sans antialiased`}
       >
@@ -156,6 +171,11 @@ export default async function RootLayout({
           )}
         </CmsProvider>
         <DeploymentChecker />
+        <script
+          dangerouslySetInnerHTML={{
+            __html: `if('serviceWorker' in navigator){navigator.serviceWorker.register('/sw.js')}`,
+          }}
+        />
       </body>
     </html>
   );
