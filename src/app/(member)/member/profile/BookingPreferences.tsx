@@ -9,7 +9,6 @@ interface ProPref {
   proStudentId: number;
   proName: string;
   preferredDuration: number | null;
-  preferredInterval: string | null;
   preferredDayOfWeek: number | null;
   preferredTime: string | null;
 }
@@ -25,12 +24,6 @@ const DAY_KEYS = [
 ];
 
 const DURATIONS = [30, 45, 60, 90, 120];
-
-const INTERVAL_KEYS: Record<string, string> = {
-  weekly: "onboarding.inAWeek",
-  biweekly: "onboarding.in2Weeks",
-  monthly: "onboarding.inAMonth",
-};
 
 // Generate time options in 30-min increments
 const TIMES: string[] = [];
@@ -75,7 +68,6 @@ function ProPreferenceRow({
   const [duration, setDuration] = useState(
     pro.preferredDuration !== null ? String(pro.preferredDuration) : ""
   );
-  const [interval, setIntervalState] = useState(pro.preferredInterval ?? "");
   const [day, setDay] = useState(
     pro.preferredDayOfWeek !== null ? String(pro.preferredDayOfWeek) : ""
   );
@@ -84,7 +76,6 @@ function ProPreferenceRow({
 
   function save(
     newDuration: string,
-    newInterval: string,
     newDay: string,
     newTime: string
   ) {
@@ -92,7 +83,7 @@ function ProPreferenceRow({
     startTransition(async () => {
       await updateMemberBookingPrefs(pro.proStudentId, {
         preferredDuration: newDuration !== "" ? Number(newDuration) : null,
-        preferredInterval: newInterval || null,
+        preferredInterval: null,
         preferredDayOfWeek: newDay !== "" ? Number(newDay) : null,
         preferredTime: newTime || null,
       });
@@ -117,7 +108,7 @@ function ProPreferenceRow({
             value={duration}
             onChange={(e) => {
               setDuration(e.target.value);
-              save(e.target.value, interval, day, time);
+              save(e.target.value, day, time);
             }}
             className={selectClass}
           >
@@ -131,33 +122,13 @@ function ProPreferenceRow({
         </div>
         <div>
           <label className="mb-1 block text-xs font-medium text-green-600">
-            {t("onboarding.nextLesson", locale)}
-          </label>
-          <select
-            value={interval}
-            onChange={(e) => {
-              setIntervalState(e.target.value);
-              save(duration, e.target.value, day, time);
-            }}
-            className={selectClass}
-          >
-            <option value="">{notSet}</option>
-            {Object.entries(INTERVAL_KEYS).map(([val, key]) => (
-              <option key={val} value={val}>
-                {t(key, locale)}
-              </option>
-            ))}
-          </select>
-        </div>
-        <div>
-          <label className="mb-1 block text-xs font-medium text-green-600">
             {t("onboarding.preferredDay", locale)}
           </label>
           <select
             value={day}
             onChange={(e) => {
               setDay(e.target.value);
-              save(duration, interval, e.target.value, time);
+              save(duration, e.target.value, time);
             }}
             className={selectClass}
           >
@@ -177,7 +148,7 @@ function ProPreferenceRow({
             value={time}
             onChange={(e) => {
               setTime(e.target.value);
-              save(duration, interval, day, e.target.value);
+              save(duration, day, e.target.value);
             }}
             className={selectClass}
           >

@@ -64,7 +64,6 @@ export default async function ProfilePage() {
     proStudentId: number;
     proName: string;
     preferredDuration: number | null;
-    preferredInterval: string | null;
     preferredDayOfWeek: number | null;
     preferredTime: string | null;
   }[] = [];
@@ -75,7 +74,6 @@ export default async function ProfilePage() {
         proStudentId: proStudents.id,
         proName: proProfiles.displayName,
         preferredDuration: proStudents.preferredDuration,
-        preferredInterval: proStudents.preferredInterval,
         preferredDayOfWeek: proStudents.preferredDayOfWeek,
         preferredTime: proStudents.preferredTime,
       })
