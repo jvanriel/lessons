@@ -897,6 +897,103 @@ export async function quickCreateBooking(data: {
   return { success: true, bookingId: booking.id };
 }
 
+// ─── Slot Explanation ────────────────────────────────
+
+export interface SlotExplanation {
+  date: string;
+  dayOfWeek: string;
+  templates: Array<{ startTime: string; endTime: string }>;
+  overrides: Array<{ type: string; startTime: string | null; endTime: string | null; reason: string | null }>;
+  existingBookings: Array<{ startTime: string; endTime: string; studentName: string }>;
+  bookingNoticeHours: number;
+  noticeFilteredBefore: string | null; // HH:MM cutoff time, null if no filtering
+  availableSlots: number;
+  duration: number;
+}
+
+/**
+ * Explain why specific slots are available (or not) for a given date.
+ * Used by the "press and hold on date" feature.
+ */
+export async function explainDateSlots(
+  proProfileId: number,
+  proLocationId: number,
+  date: string,
+  duration: number
+): Promise<SlotExplanation> {
+  await requireMember();
+
+  const [pro] = await db
+    .select({ bookingNotice: proProfiles.bookingNotice })
+    .from(proProfiles)
+    .where(eq(proProfiles.id, proProfileId))
+    .limit(1);
+
+  const bookingNotice = pro?.bookingNotice ?? 24;
+
+  const dayNames = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"];
+  const d = new Date(date + "T00:00:00");
+  const jsDay = d.getDay();
+  const isoDay = jsDay === 0 ? 6 : jsDay - 1;
+
+  // Templates for this day of week
+  const templates = await db
+    .select({ startTime: proAvailability.startTime, endTime: proAvailability.endTime, validFrom: proAvailability.validFrom, validUntil: proAvailability.validUntil })
+    .from(proAvailability)
+    .where(and(eq(proAvailability.proProfileId, proProfileId), eq(proAvailability.proLocationId, proLocationId), eq(proAvailability.dayOfWeek, isoDay)));
+
+  // Filter templates by validFrom/validUntil
+  const activeTemplates = templates.filter((t) => {
+    if (t.validFrom && date < t.validFrom) return false;
+    if (t.validUntil && date > t.validUntil) return false;
+    return true;
+  });
+
+  // Overrides for this date
+  const overrides = await db
+    .select({ type: proAvailabilityOverrides.type, startTime: proAvailabilityOverrides.startTime, endTime: proAvailabilityOverrides.endTime, reason: proAvailabilityOverrides.reason, proLocationId: proAvailabilityOverrides.proLocationId })
+    .from(proAvailabilityOverrides)
+    .where(and(eq(proAvailabilityOverrides.proProfileId, proProfileId), eq(proAvailabilityOverrides.date, date)));
+
+  const relevantOverrides = overrides.filter((o) => o.proLocationId === null || o.proLocationId === proLocationId);
+
+  // Existing bookings
+  const bookings = await db
+    .select({ startTime: lessonBookings.startTime, endTime: lessonBookings.endTime, firstName: users.firstName, lastName: users.lastName })
+    .from(lessonBookings)
+    .innerJoin(users, eq(lessonBookings.bookedById, users.id))
+    .where(and(eq(lessonBookings.proProfileId, proProfileId), eq(lessonBookings.proLocationId, proLocationId), eq(lessonBookings.date, date), eq(lessonBookings.status, "confirmed")));
+
+  // Compute notice cutoff in Brussels time
+  const now = new Date();
+  const thresholdMs = now.getTime() + bookingNotice * 60 * 60 * 1000;
+  const threshold = new Date(thresholdMs);
+  let noticeFilteredBefore: string | null = null;
+
+  const todayStr = now.toISOString().split("T")[0];
+  if (date <= todayStr || (date === todayStr)) {
+    // Only relevant for today or past dates
+    const { formatInTimeZone } = await import("date-fns-tz");
+    const cutoff = formatInTimeZone(threshold, "Europe/Brussels", "HH:mm");
+    noticeFilteredBefore = cutoff;
+  }
+
+  // Compute actual available slots
+  const slots = await getAvailableSlots(proProfileId, proLocationId, date, duration);
+
+  return {
+    date,
+    dayOfWeek: dayNames[isoDay],
+    templates: activeTemplates.map((t) => ({ startTime: t.startTime, endTime: t.endTime })),
+    overrides: relevantOverrides.map((o) => ({ type: o.type, startTime: o.startTime, endTime: o.endTime, reason: o.reason })),
+    existingBookings: bookings.map((b) => ({ startTime: b.startTime, endTime: b.endTime, studentName: `${b.firstName} ${b.lastName}` })),
+    bookingNoticeHours: bookingNotice,
+    noticeFilteredBefore,
+    availableSlots: slots.length,
+    duration,
+  };
+}
+
 // ─── Manual Preference Updates ───────────────────────
 
 /**

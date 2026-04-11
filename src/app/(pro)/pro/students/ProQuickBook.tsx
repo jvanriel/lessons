@@ -10,6 +10,8 @@ import {
   fetchSlotsForDate,
   type ProQuickBookData,
 } from "./actions";
+import { explainDateSlots, type SlotExplanation } from "@/app/(member)/member/book/actions";
+import { SlotExplanationDialog } from "@/components/SlotExplanationDialog";
 
 interface Props {
   proStudentId: number;
@@ -88,6 +90,8 @@ export function ProQuickBook({ proStudentId, studentName, initialData, autoOpen 
     endTime: string;
   } | null>(null);
   const [allDates, setAllDates] = useState<string[] | null>(null);
+  const [explanation, setExplanation] = useState<SlotExplanation | null>(null);
+  const dateHoldTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [calendarMonth, setCalendarMonth] = useState(() => new Date());
 
   const holdTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -339,8 +343,23 @@ export function ProQuickBook({ proStudentId, studentName, initialData, autoOpen 
               ].map((d) => (
                 <button
                   key={d}
-                  onClick={() => switchDate(d)}
-                  className={`shrink-0 rounded-lg px-2.5 py-1 text-center transition-colors ${
+                  onPointerDown={() => {
+                    dateHoldTimer.current = setTimeout(() => {
+                      dateHoldTimer.current = null;
+                      startTransition(async () => {
+                        const result = await explainDateSlots(data.proProfileId, data.locationId, d, data.duration);
+                        setExplanation(result);
+                      });
+                    }, 600);
+                  }}
+                  onPointerUp={() => {
+                    if (dateHoldTimer.current) { clearTimeout(dateHoldTimer.current); dateHoldTimer.current = null; switchDate(d); }
+                  }}
+                  onPointerLeave={() => {
+                    if (dateHoldTimer.current) { clearTimeout(dateHoldTimer.current); dateHoldTimer.current = null; }
+                  }}
+                  onContextMenu={(e) => e.preventDefault()}
+                  className={`shrink-0 rounded-lg px-2.5 py-1 text-center transition-colors select-none ${
                     selectedDate === d
                       ? "bg-gold-600 text-white"
                       : "bg-white text-green-700 hover:bg-green-100"
@@ -541,6 +560,11 @@ export function ProQuickBook({ proStudentId, studentName, initialData, autoOpen 
             );
           })()}
         </>
+      )}
+
+      {/* Slot explanation dialog */}
+      {explanation && (
+        <SlotExplanationDialog data={explanation} onClose={() => setExplanation(null)} />
       )}
     </div>
   );

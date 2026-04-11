@@ -7,8 +7,11 @@ import {
   quickCreateBooking,
   getAvailableSlots,
   updatePreferredInterval,
+  explainDateSlots,
   type QuickBookData,
+  type SlotExplanation,
 } from "../book/actions";
+import { SlotExplanationDialog } from "@/components/SlotExplanationDialog";
 
 interface Props {
   data: QuickBookData;
@@ -70,6 +73,8 @@ export function QuickBook({ data, proSlug, hasPaymentMethod = true, allowBooking
     endTime: string;
   } | null>(null);
   const [interval, setInterval] = useState(data.interval);
+  const [explanation, setExplanation] = useState<SlotExplanation | null>(null);
+  const dateHoldTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // Sync state when server data changes (e.g. after booking or cancellation)
   useEffect(() => {
@@ -245,8 +250,30 @@ export function QuickBook({ data, proSlug, hasPaymentMethod = true, allowBooking
               {[data.suggestedDate, ...data.alternativeDates.filter((d) => d !== data.suggestedDate)].map((d) => (
                 <button
                   key={d}
-                  onClick={() => switchDate(d)}
-                  className={`shrink-0 rounded-lg px-2.5 py-1 text-center transition-colors ${
+                  onPointerDown={() => {
+                    dateHoldTimer.current = setTimeout(() => {
+                      dateHoldTimer.current = null;
+                      startTransition(async () => {
+                        const result = await explainDateSlots(data.proProfileId, data.locationId, d, data.duration);
+                        setExplanation(result);
+                      });
+                    }, 600);
+                  }}
+                  onPointerUp={() => {
+                    if (dateHoldTimer.current) {
+                      clearTimeout(dateHoldTimer.current);
+                      dateHoldTimer.current = null;
+                      switchDate(d);
+                    }
+                  }}
+                  onPointerLeave={() => {
+                    if (dateHoldTimer.current) {
+                      clearTimeout(dateHoldTimer.current);
+                      dateHoldTimer.current = null;
+                    }
+                  }}
+                  onContextMenu={(e) => e.preventDefault()}
+                  className={`shrink-0 rounded-lg px-2.5 py-1 text-center transition-colors select-none ${
                     selectedDate === d
                       ? "bg-gold-600 text-white"
                       : "bg-green-50 text-green-700 hover:bg-green-100"
@@ -387,6 +414,11 @@ export function QuickBook({ data, proSlug, hasPaymentMethod = true, allowBooking
               More options
             </Link>
           </div>
+
+      {/* Slot explanation dialog */}
+      {explanation && (
+        <SlotExplanationDialog data={explanation} onClose={() => setExplanation(null)} />
+      )}
     </div>
   );
 }

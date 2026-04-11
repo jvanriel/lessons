@@ -593,6 +593,7 @@ function computeSuggestedDate(
 export interface ProQuickBookData {
   hasPreferences: true;
   proStudentId: number;
+  proProfileId: number;
   studentName: string;
   studentUserId: number;
   locationId: number;
@@ -794,6 +795,7 @@ export async function getProQuickBookData(
   return {
     hasPreferences: true,
     proStudentId: rel.id,
+    proProfileId: profile.id,
     studentName: `${rel.firstName} ${rel.lastName}`,
     studentUserId: rel.userId,
     locationId: rel.preferredLocationId,
