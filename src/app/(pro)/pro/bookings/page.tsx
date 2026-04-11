@@ -10,7 +10,7 @@ import { eq, asc } from "drizzle-orm";
 import { requireProProfile } from "@/lib/pro";
 import { redirect } from "next/navigation";
 import Link from "next/link";
-import { BookingsCalendar } from "./BookingsCalendar";
+import { BookingsView } from "./BookingsView";
 
 export const metadata = { title: "Bookings — Golf Lessons" };
 
@@ -77,9 +77,9 @@ export default async function ProBookingsPage() {
         </Link>
       </div>
 
-      {/* Calendar view */}
+      {/* Bookings view (calendar or list) */}
       <section className="mb-10">
-        <BookingsCalendar bookings={bookings} availability={availability} />
+        <BookingsView bookings={bookings} availability={availability} />
       </section>
 
       {/* Past & cancelled */}
