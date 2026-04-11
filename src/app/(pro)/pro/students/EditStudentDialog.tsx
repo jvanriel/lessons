@@ -36,12 +36,6 @@ const DURATIONS = [
   { value: 120, label: "2 hours" },
 ];
 
-const INTERVALS = [
-  { value: "weekly", label: "Weekly" },
-  { value: "biweekly", label: "Every 2 weeks" },
-  { value: "monthly", label: "Monthly" },
-];
-
 const TIMES: string[] = [];
 for (let h = 7; h <= 21; h++) {
   for (const m of ["00", "30"]) {
@@ -73,7 +67,7 @@ export function EditStudentDialog({
   const [duration, setDuration] = useState(
     student.preferredDuration !== null ? String(student.preferredDuration) : ""
   );
-  const [interval, setInterval] = useState(student.preferredInterval ?? "");
+  // interval is managed via Quick Book toggle, not this dialog
   const [day, setDay] = useState(
     student.preferredDayOfWeek !== null
       ? String(student.preferredDayOfWeek)
@@ -97,7 +91,7 @@ export function EditStudentDialog({
         email,
         phone,
         preferredDuration: duration !== "" ? Number(duration) : null,
-        preferredInterval: interval || null,
+        preferredInterval: student.preferredInterval, // preserve existing, managed via Quick Book
         preferredDayOfWeek: day !== "" ? Number(day) : null,
         preferredTime: time || null,
       });
@@ -233,23 +227,6 @@ export function EditStudentDialog({
                   {DURATIONS.map((d) => (
                     <option key={d.value} value={d.value}>
                       {d.label}
-                    </option>
-                  ))}
-                </select>
-              </div>
-              <div>
-                <label className="mb-1 block text-xs font-medium text-green-600">
-                  Frequency
-                </label>
-                <select
-                  value={interval}
-                  onChange={(e) => setInterval(e.target.value)}
-                  className={selectClass}
-                >
-                  <option value="">Not set</option>
-                  {INTERVALS.map((iv) => (
-                    <option key={iv.value} value={iv.value}>
-                      {iv.label}
                     </option>
                   ))}
                 </select>
