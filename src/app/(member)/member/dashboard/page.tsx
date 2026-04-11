@@ -14,6 +14,7 @@ import { t } from "@/lib/i18n/translations";
 import { redirect } from "next/navigation";
 import Link from "next/link";
 import { QRLoginButton } from "./QRLoginDialog";
+import { HelpButton } from "./HelpDialog";
 import { CancelBookingButton } from "./CancelBookingDialog";
 import { QuickBook } from "./QuickRebook";
 import {
@@ -126,7 +127,10 @@ export default async function MemberDashboard() {
           </h1>
           <p className="mt-2 text-green-700">{session.email}</p>
         </div>
-        <QRLoginButton />
+        <div className="flex items-center gap-2">
+          <HelpButton />
+          <QRLoginButton />
+        </div>
       </div>
 
       {/* My Pros */}

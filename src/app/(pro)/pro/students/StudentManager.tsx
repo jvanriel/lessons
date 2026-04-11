@@ -597,6 +597,38 @@ function HelpDialog({ onClose }: { onClose: () => void }) {
               time buttons on each student card — <strong>hold any time slot</strong> to
               instantly book a lesson for them.
             </p>
+            <p className="mt-2">
+              Use the <strong>In a week</strong> / <strong>In 2 weeks</strong> / <strong>In a month</strong> buttons
+              to quickly jump to a future date. As a pro, you bypass the booking notice
+              and can book any available slot, including today.
+            </p>
+          </div>
+
+          <div>
+            <h4 className="font-medium text-green-900">Understanding available slots</h4>
+            <p className="mt-1">
+              <strong>Press and hold a date</strong> (not a time slot) to see exactly why
+              specific times are available or unavailable. The dialog shows:
+            </p>
+            <ul className="mt-2 space-y-1 pl-4">
+              <li className="relative pl-3 before:absolute before:left-0 before:top-2 before:h-1.5 before:w-1.5 before:rounded-full before:bg-gold-500">
+                Your <strong>availability templates</strong> for that day of the week
+              </li>
+              <li className="relative pl-3 before:absolute before:left-0 before:top-2 before:h-1.5 before:w-1.5 before:rounded-full before:bg-gold-500">
+                Any <strong>schedule changes</strong> (blocks or extra availability)
+              </li>
+              <li className="relative pl-3 before:absolute before:left-0 before:top-2 before:h-1.5 before:w-1.5 before:rounded-full before:bg-gold-500">
+                <strong>Existing bookings</strong> that take up slots
+              </li>
+              <li className="relative pl-3 before:absolute before:left-0 before:top-2 before:h-1.5 before:w-1.5 before:rounded-full before:bg-gold-500">
+                The final count of <strong>available slots</strong>
+              </li>
+            </ul>
+            <p className="mt-2">
+              Switch to the <strong>Student view</strong> tab to see what the student sees,
+              including the booking notice filter. This helps explain why a student might
+              not be able to book a slot that you can.
+            </p>
           </div>
 
           <div>
