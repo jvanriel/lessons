@@ -45,15 +45,15 @@ export default function NotificationBell({
     setToasts((prev) => prev.filter((t) => t.id !== id));
   }, []);
 
-  const prevCountRef = useRef(0);
+  const prevCountRef = useRef(-1); // -1 = not yet initialized
   const fetchCount = useCallback(async () => {
     try {
       const res = await fetch("/api/notifications?countOnly=true");
       if (res.ok) {
         const data = await res.json();
         const newCount = data.unreadCount;
-        // If count increased, a new notification arrived — trigger refresh
-        if (newCount > prevCountRef.current && prevCountRef.current > 0) {
+        if (prevCountRef.current >= 0 && newCount > prevCountRef.current) {
+          // New notification arrived — trigger booking refresh immediately
           window.dispatchEvent(new CustomEvent("booking-changed"));
         }
         prevCountRef.current = newCount;
@@ -104,13 +104,14 @@ export default function NotificationBell({
           const data = JSON.parse(e.data);
           if (data.type === "connected") return;
           setUnreadCount((c) => c + 1);
-          fetchNotifications();
 
-          // Broadcast booking events so other components can refresh
+          // Broadcast booking events FIRST so components refresh immediately
           const notifType = data.type ?? "";
           if (notifType === "new_booking" || notifType === "booking_cancelled") {
             window.dispatchEvent(new CustomEvent("booking-changed"));
           }
+
+          fetchNotifications();
 
           const priority = data.priority ?? "normal";
           if (priority === "high" || priority === "urgent") {
