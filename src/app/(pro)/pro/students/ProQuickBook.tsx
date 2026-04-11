@@ -27,7 +27,12 @@ function formatShortDate(dateStr: string) {
   });
 }
 
-function formatDatePill(dateStr: string) {
+function formatDatePillDay(dateStr: string) {
+  const d = new Date(dateStr + "T00:00:00");
+  return d.toLocaleDateString("en-US", { weekday: "short" });
+}
+
+function formatDatePillDate(dateStr: string) {
   const d = new Date(dateStr + "T00:00:00");
   return d.toLocaleDateString("en-US", { month: "short", day: "numeric" });
 }
@@ -329,13 +334,14 @@ export function ProQuickBook({ proStudentId, studentName, initialData, autoOpen 
               <button
                 key={d}
                 onClick={() => switchDate(d)}
-                className={`shrink-0 rounded-full px-2.5 py-1 text-[11px] font-medium transition-colors ${
+                className={`shrink-0 rounded-lg px-2.5 py-1 text-center transition-colors ${
                   selectedDate === d
                     ? "bg-gold-600 text-white"
                     : "bg-white text-green-700 hover:bg-green-100"
                 }`}
               >
-                {formatDatePill(d)}
+                <div className="text-[10px] font-medium leading-tight">{formatDatePillDay(d)}</div>
+                <div className="text-[10px] leading-tight">{formatDatePillDate(d)}</div>
               </button>
             ))}
           </div>
@@ -425,13 +431,14 @@ export function ProQuickBook({ proStudentId, studentName, initialData, autoOpen 
                   <button
                     key={d}
                     onClick={() => switchDate(d)}
-                    className={`shrink-0 rounded-full px-2 py-0.5 text-[11px] font-medium transition-colors ${
+                    className={`shrink-0 rounded-lg px-2.5 py-1 text-center transition-colors ${
                       selectedDate === d
                         ? "bg-gold-600 text-white"
                         : "bg-white text-green-700 hover:bg-green-100"
                     }`}
                   >
-                    {formatDatePill(d)}
+                    <div className="text-[10px] font-medium leading-tight">{formatDatePillDay(d)}</div>
+                    <div className="text-[10px] leading-tight">{formatDatePillDate(d)}</div>
                   </button>
                 ))}
               </div>
