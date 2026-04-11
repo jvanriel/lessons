@@ -3,10 +3,10 @@ import { neon } from "@neondatabase/serverless";
 import { verifySessionToken, type UserRole } from "@/lib/auth";
 
 const ROLE_ROUTES: { prefix: string; roles: UserRole[] }[] = [
-  { prefix: "/member", roles: ["member"] },
+  { prefix: "/member", roles: ["member", "admin", "dev"] },
   { prefix: "/admin", roles: ["admin"] },
   { prefix: "/dev", roles: ["dev"] },
-  { prefix: "/pro/", roles: ["pro", "admin"] },
+  { prefix: "/pro/", roles: ["pro", "admin", "dev"] },
 ];
 
 const SITE_PASSWORD = "prolessons";

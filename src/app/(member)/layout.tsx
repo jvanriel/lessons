@@ -7,7 +7,7 @@ export default async function MemberLayout({
   children: React.ReactNode;
 }) {
   const session = await getSession();
-  if (!session || !hasRole(session, "member")) {
+  if (!session || !(hasRole(session, "member") || hasRole(session, "admin") || hasRole(session, "dev"))) {
     redirect("/login");
   }
   return <>{children}</>;
