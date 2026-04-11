@@ -376,12 +376,15 @@ export function ProQuickBook({ proStudentId, studentName, initialData, autoOpen 
           </div>
 
           {/* Time slots — hold to book */}
+          {isPending && (
+            <p className="py-1 text-xs text-green-500">Loading...</p>
+          )}
           {slots.length === 0 && !isPending && (
             <p className="py-1 text-xs text-green-400">
               No slots on this date.
             </p>
           )}
-          {slots.length > 0 && (
+          {slots.length > 0 && !isPending && (
             <div className="mb-2 flex flex-wrap gap-1">
               {slots.map((slot) => {
                 const isHolding =
