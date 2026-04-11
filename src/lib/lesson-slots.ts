@@ -151,13 +151,29 @@ export function computeAvailableSlots(
   }
 
   // 5. Filter by bookingNotice
+  // Slot times are in Europe/Brussels. Compare using Brussels local time
+  // so this works correctly on both localhost and Vercel (UTC).
   const currentTime = now ?? new Date();
-  const noticeThreshold = new Date(
-    currentTime.getTime() + bookingNoticeHours * 60 * 60 * 1000,
-  );
+  const thresholdMs = currentTime.getTime() + bookingNoticeHours * 60 * 60 * 1000;
+  const threshold = new Date(thresholdMs);
+
+  // Get threshold as Brussels HH:MM for same-day comparison
+  const thresholdBrussels = threshold.toLocaleString("en-GB", {
+    timeZone: "Europe/Brussels",
+    year: "numeric", month: "2-digit", day: "2-digit",
+    hour: "2-digit", minute: "2-digit", hour12: false,
+  });
+  // Format: "DD/MM/YYYY, HH:MM"
+  const [thresholdDatePart, thresholdTimePart] = thresholdBrussels.split(", ");
+  const [thDay, thMonth, thYear] = thresholdDatePart.split("/");
+  const thresholdDateStr = `${thYear}-${thMonth}-${thDay}`;
+  const thresholdTimeStr = thresholdTimePart; // "HH:MM"
+
   return slots.filter((s) => {
-    const slotStart = new Date(dateStr + "T" + s.startTime + ":00");
-    return slotStart > noticeThreshold;
+    if (dateStr > thresholdDateStr) return true;
+    if (dateStr < thresholdDateStr) return false;
+    // Same day: compare times
+    return s.startTime > thresholdTimeStr;
   });
 }
 
