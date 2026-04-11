@@ -556,38 +556,27 @@ function jsDayToIso(jsDay: number): number {
  * "In a month"  → next preferred day ≥ 28 days from today
  * No interval   → next preferred day from today (including today)
  */
+/**
+ * Pro-side: always start from today. No preferred-day snapping.
+ * The pro can book any day — the student's preferred day is irrelevant.
+ * Interval just pushes the start date forward.
+ */
 function computeSuggestedDate(
   interval: string | null,
-  preferredDayOfWeek: number,
+  _preferredDayOfWeek: number,
   _lastBookingDate: string | null
 ): string {
   const today = new Date();
   today.setHours(0, 0, 0, 0);
 
-  // No interval: start from today (show today if it's the preferred day)
-  if (!interval) {
-    const todayIso = jsDayToIso(today.getDay());
-    let diff = preferredDayOfWeek - todayIso;
-    if (diff < 0) diff += 7;
-    const next = new Date(today);
-    next.setDate(next.getDate() + diff);
-    return next.toISOString().split("T")[0];
-  }
-
-  // Minimum days ahead based on interval
-  let minDaysAhead = 7;
-  if (interval === "biweekly") minDaysAhead = 14;
+  let minDaysAhead = 0; // default: today
+  if (interval === "weekly") minDaysAhead = 7;
+  else if (interval === "biweekly") minDaysAhead = 14;
   else if (interval === "monthly") minDaysAhead = 28;
 
-  const earliest = new Date(today);
-  earliest.setDate(earliest.getDate() + minDaysAhead);
-
-  const earliestIso = jsDayToIso(earliest.getDay());
-  let diff = preferredDayOfWeek - earliestIso;
-  if (diff < 0) diff += 7;
-  earliest.setDate(earliest.getDate() + diff);
-
-  return earliest.toISOString().split("T")[0];
+  const start = new Date(today);
+  start.setDate(start.getDate() + minDaysAhead);
+  return start.toISOString().split("T")[0];
 }
 
 export interface ProQuickBookData {

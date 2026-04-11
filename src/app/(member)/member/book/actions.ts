@@ -909,6 +909,8 @@ export interface SlotExplanation {
   noticeFilteredBefore: string | null; // HH:MM cutoff time, null if no filtering
   availableSlots: number;
   duration: number;
+  /** The student's preferred day (e.g. "Saturday") — only shown on member side */
+  preferredDay?: string | null;
   /** Why earlier dates were skipped (only present for the first date) */
   skippedDays?: Array<{ date: string; dayOfWeek: string; reason: string }>;
 }
@@ -923,7 +925,8 @@ export async function explainDateSlots(
   date: string,
   duration: number,
   isFirstDate: boolean = false,
-  byPro: boolean = false
+  byPro: boolean = false,
+  preferredDayName: string | null = null
 ): Promise<SlotExplanation> {
   // Both members and pros can call this
   const session = await getSession();
@@ -1074,6 +1077,7 @@ export async function explainDateSlots(
     noticeFilteredBefore,
     availableSlots: slots.length,
     duration,
+    preferredDay: !byPro ? preferredDayName : null,
     skippedDays,
   };
 }
