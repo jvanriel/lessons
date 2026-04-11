@@ -922,9 +922,12 @@ export async function explainDateSlots(
   proLocationId: number,
   date: string,
   duration: number,
-  isFirstDate: boolean = false
+  isFirstDate: boolean = false,
+  byPro: boolean = false
 ): Promise<SlotExplanation> {
-  await requireMember();
+  // Both members and pros can call this
+  const session = await getSession();
+  if (!session) throw new Error("Not authenticated");
 
   const [pro] = await db
     .select({ bookingNotice: proProfiles.bookingNotice })
@@ -932,7 +935,8 @@ export async function explainDateSlots(
     .where(eq(proProfiles.id, proProfileId))
     .limit(1);
 
-  const bookingNotice = pro?.bookingNotice ?? 24;
+  // Pros bypass their own booking notice
+  const bookingNotice = byPro ? 0 : (pro?.bookingNotice ?? 24);
 
   const dayNames = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"];
   const d = new Date(date + "T00:00:00");
@@ -973,16 +977,42 @@ export async function explainDateSlots(
   const threshold = new Date(thresholdMs);
   let noticeFilteredBefore: string | null = null;
 
-  const todayStr = now.toISOString().split("T")[0];
-  if (date <= todayStr || (date === todayStr)) {
-    // Only relevant for today or past dates
-    const { formatInTimeZone } = await import("date-fns-tz");
-    const cutoff = formatInTimeZone(threshold, "Europe/Brussels", "HH:mm");
-    noticeFilteredBefore = cutoff;
+  if (!byPro && bookingNotice > 0) {
+    const todayStr = now.toISOString().split("T")[0];
+    if (date <= todayStr) {
+      const { formatInTimeZone } = await import("date-fns-tz");
+      const cutoff = formatInTimeZone(threshold, "Europe/Brussels", "HH:mm");
+      noticeFilteredBefore = cutoff;
+    }
   }
 
-  // Compute actual available slots
-  const slots = await getAvailableSlots(proProfileId, proLocationId, date, duration);
+  // Helper: compute slots with the correct notice for this context
+  async function getSlotsWithNotice(forDate: string) {
+    const tpls = await db
+      .select({ dayOfWeek: proAvailability.dayOfWeek, startTime: proAvailability.startTime, endTime: proAvailability.endTime, validFrom: proAvailability.validFrom, validUntil: proAvailability.validUntil })
+      .from(proAvailability)
+      .where(and(eq(proAvailability.proProfileId, proProfileId), eq(proAvailability.proLocationId, proLocationId)));
+    const ovrs = await db
+      .select({ type: proAvailabilityOverrides.type, startTime: proAvailabilityOverrides.startTime, endTime: proAvailabilityOverrides.endTime, proLocationId: proAvailabilityOverrides.proLocationId })
+      .from(proAvailabilityOverrides)
+      .where(and(eq(proAvailabilityOverrides.proProfileId, proProfileId), eq(proAvailabilityOverrides.date, forDate)));
+    const bkgs = await db
+      .select({ startTime: lessonBookings.startTime, endTime: lessonBookings.endTime })
+      .from(lessonBookings)
+      .where(and(eq(lessonBookings.proProfileId, proProfileId), eq(lessonBookings.proLocationId, proLocationId), eq(lessonBookings.date, forDate), eq(lessonBookings.status, "confirmed")));
+    const dateOvrs = ovrs.filter((o) => o.proLocationId === null || o.proLocationId === proLocationId);
+    return computeAvailableSlots(
+      forDate,
+      tpls as AvailabilityTemplate[],
+      dateOvrs as AvailabilityOverride[],
+      bkgs as ExistingBooking[],
+      bookingNotice, // 0 for pro, actual notice for student
+      duration,
+    );
+  }
+
+  // Compute actual available slots with correct notice
+  const slots = await getSlotsWithNotice(date);
 
   // Explain why earlier dates were skipped (only for the first date)
   let skippedDays: SlotExplanation["skippedDays"] | undefined;
@@ -1011,10 +1041,9 @@ export async function explainDateSlots(
         if (!templateDaySet.has(curIsoDay)) {
           skippedDays.push({ date: curDateStr, dayOfWeek: curDayName, reason: `No availability on ${curDayName}s` });
         } else {
-          // Has template — check if slots exist
-          const daySlots = await getAvailableSlots(proProfileId, proLocationId, curDateStr, duration);
+          // Has template — check if slots exist with correct notice
+          const daySlots = await getSlotsWithNotice(curDateStr);
           if (daySlots.length === 0) {
-            // Check why: overrides or notice?
             const dayOverrides = await db
               .select({ type: proAvailabilityOverrides.type })
               .from(proAvailabilityOverrides)
@@ -1023,11 +1052,12 @@ export async function explainDateSlots(
             const hasBlock = dayOverrides.some((o) => o.type === "blocked");
             if (hasBlock) {
               skippedDays.push({ date: curDateStr, dayOfWeek: curDayName, reason: "Blocked by the pro" });
+            } else if (bookingNotice > 0) {
+              skippedDays.push({ date: curDateStr, dayOfWeek: curDayName, reason: `All slots within ${bookingNotice}h booking notice` });
             } else {
-              skippedDays.push({ date: curDateStr, dayOfWeek: curDayName, reason: "All slots taken or within booking notice" });
+              skippedDays.push({ date: curDateStr, dayOfWeek: curDayName, reason: "All slots fully booked" });
             }
           }
-          // If slots exist on an earlier date, that's unexpected (shouldn't happen)
         }
         cursor.setDate(cursor.getDate() + 1);
       }

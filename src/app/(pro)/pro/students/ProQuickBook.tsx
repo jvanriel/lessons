@@ -347,7 +347,7 @@ export function ProQuickBook({ proStudentId, studentName, initialData, autoOpen 
                     dateHoldTimer.current = setTimeout(() => {
                       dateHoldTimer.current = null;
                       startTransition(async () => {
-                        const result = await explainDateSlots(data.proProfileId, data.locationId, d, data.duration, idx === 0);
+                        const result = await explainDateSlots(data.proProfileId, data.locationId, d, data.duration, idx === 0, true);
                         setExplanation(result);
                       });
                     }, 600);
