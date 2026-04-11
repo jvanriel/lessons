@@ -76,5 +76,17 @@ export async function userLogin(
   });
 
   const from = formData.get("from") as string | null;
-  redirect(from || "/member/dashboard");
+  if (from) {
+    redirect(from);
+  }
+
+  // Route to the appropriate dashboard based on role
+  const roles = parseRoles(user.roles);
+  if (roles.includes("admin") || roles.includes("dev")) {
+    redirect("/admin");
+  } else if (roles.includes("pro")) {
+    redirect("/pro/dashboard");
+  } else {
+    redirect("/member/dashboard");
+  }
 }

@@ -25,6 +25,16 @@ export default async function RegisterPage({ searchParams }: Props) {
   const preSelectedProId = pro ? parseInt(pro) : null;
   const session = await getSession();
 
+  // Pros go to pro dashboard — register/onboarding is for students only
+  if (session && hasRole(session, "pro")) {
+    redirect("/pro/dashboard");
+  }
+
+  // Admins/devs go to admin dashboard
+  if (session && (hasRole(session, "admin") || hasRole(session, "dev"))) {
+    redirect("/admin");
+  }
+
   // Already completed onboarding → dashboard
   if (session && hasRole(session, "member")) {
     const [user] = await db
