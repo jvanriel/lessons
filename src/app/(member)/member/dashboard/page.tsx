@@ -5,8 +5,9 @@ import {
   proLocations,
   proStudents,
   locations,
+  users,
 } from "@/lib/db/schema";
-import { eq, and, gte, asc } from "drizzle-orm";
+import { eq, and, gte, asc, isNull } from "drizzle-orm";
 import { getSession, hasRole } from "@/lib/auth";
 import { getLocale } from "@/lib/locale";
 import { t } from "@/lib/i18n/translations";
@@ -19,6 +20,7 @@ import {
   getQuickBookData,
   type QuickBookData,
 } from "../book/actions";
+import { getStripe } from "@/lib/stripe";
 
 export const metadata = { title: "Dashboard — Golf Lessons" };
 
@@ -59,6 +61,26 @@ export default async function MemberDashboard() {
     .orderBy(asc(lessonBookings.date), asc(lessonBookings.startTime))
     .limit(5);
 
+  // Check if student has a payment method
+  let hasPaymentMethod = false;
+  const [currentUser] = await db
+    .select({ stripeCustomerId: users.stripeCustomerId })
+    .from(users)
+    .where(eq(users.id, session.userId))
+    .limit(1);
+  if (currentUser?.stripeCustomerId) {
+    try {
+      const stripe = getStripe();
+      const methods = await stripe.paymentMethods.list({
+        customer: currentUser.stripeCustomerId,
+        limit: 1,
+      });
+      hasPaymentMethod = methods.data.length > 0;
+    } catch {
+      // Stripe error — treat as no payment method
+    }
+  }
+
   // Get my pros (via proStudents relationships) with booking preferences
   const myPros = await db
     .select({
@@ -69,6 +91,7 @@ export default async function MemberDashboard() {
       photoUrl: proProfiles.photoUrl,
       specialties: proProfiles.specialties,
       bookingEnabled: proProfiles.bookingEnabled,
+      allowBookingWithoutPayment: proProfiles.allowBookingWithoutPayment,
       hasPreferences: proStudents.preferredLocationId,
     })
     .from(proStudents)
@@ -76,7 +99,8 @@ export default async function MemberDashboard() {
     .where(
       and(
         eq(proStudents.userId, session.userId),
-        eq(proStudents.status, "active")
+        eq(proStudents.status, "active"),
+        isNull(proProfiles.deletedAt)
       )
     );
 
@@ -186,6 +210,8 @@ export default async function MemberDashboard() {
                   <QuickBook
                     data={quickBookMap[pro.proStudentId]}
                     proSlug={pro.slug}
+                    hasPaymentMethod={hasPaymentMethod}
+                    allowBookingWithoutPayment={pro.allowBookingWithoutPayment}
                   />
                 )}
               </div>

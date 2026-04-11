@@ -44,13 +44,15 @@ interface Props {
   locations: LocationInfo[];
   userDetails?: UserDetails | null;
   showAllSteps?: boolean;
+  allowBookingWithoutPayment?: boolean;
+  hasPaymentMethod?: boolean;
 }
 
 const STEPS = ["Location", "Duration", "Date", "Time", "Details", "Confirm"];
 
 // ─── Component ──────────────────────────────────────
 
-export function BookingWizard({ pro, locations, userDetails, showAllSteps }: Props) {
+export function BookingWizard({ pro, locations, userDetails, showAllSteps, allowBookingWithoutPayment, hasPaymentMethod }: Props) {
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
 
@@ -779,6 +781,24 @@ export function BookingWizard({ pro, locations, userDetails, showAllSteps }: Pro
                 </div>
               )}
             </div>
+            {/* Payment method messaging */}
+            {!hasPaymentMethod && !allowBookingWithoutPayment && (
+              <div className="mt-4 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+                A payment method is required to book with this pro.{" "}
+                <a href="/member/profile" className="font-medium underline hover:text-red-900">
+                  Add one in your profile
+                </a>
+              </div>
+            )}
+            {!hasPaymentMethod && allowBookingWithoutPayment && (
+              <div className="mt-4 rounded-lg border border-gold-200 bg-gold-50 px-4 py-3 text-sm text-gold-800">
+                No payment method on file.{" "}
+                <a href="/member/profile" className="font-medium underline hover:text-gold-900">
+                  Add one in your profile
+                </a>{" "}
+                to enable Quick Book for faster future bookings.
+              </div>
+            )}
             <div className="mt-6 flex items-center gap-3">
               <Button variant="ghost" onClick={goBack}>
                 Back
@@ -786,7 +806,7 @@ export function BookingWizard({ pro, locations, userDetails, showAllSteps }: Pro
               <Button
                 className="bg-gold-600 text-white hover:bg-gold-500"
                 onClick={handleConfirm}
-                disabled={isPending}
+                disabled={isPending || (!hasPaymentMethod && !allowBookingWithoutPayment)}
               >
                 {isPending ? "Booking..." : "Confirm booking"}
               </Button>

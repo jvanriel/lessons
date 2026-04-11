@@ -5,6 +5,7 @@ import {
   createUser,
   updateUser,
   deleteUser,
+  purgeUser,
   resetPassword,
   resetPasswordWithNotification,
   sendInvite,
@@ -29,6 +30,7 @@ interface User {
   roles: string | null;
   lastLoginAt: string | null;
   createdAt: string | null;
+  deletedAt: string | null;
   emails: UserEmail[];
 }
 
@@ -116,9 +118,14 @@ export default function UserManager({ users }: { users: User[] }) {
           </thead>
           <tbody className="divide-y divide-green-50">
             {filtered.map((user) => (
-              <tr key={user.id} className="hover:bg-green-50/50">
+              <tr key={user.id} className={`hover:bg-green-50/50 ${user.deletedAt ? "opacity-50" : ""}`}>
                 <td className="px-4 py-3 text-green-900">
                   {user.firstName} {user.lastName}
+                  {user.deletedAt && (
+                    <span className="ml-2 rounded bg-red-100 px-1.5 py-0.5 text-[10px] font-medium text-red-600">
+                      deleted
+                    </span>
+                  )}
                 </td>
                 <td className="px-4 py-3">
                   <span className="text-green-600">{user.email}</span>
@@ -437,12 +444,28 @@ function UserRowActions({
               Reset password
             </button>
             <div className="my-1 border-t border-green-100" />
-            <button
-              onClick={handleDelete}
-              className="block w-full px-4 py-2 text-left text-sm text-red-600 hover:bg-red-50"
-            >
-              Delete user
-            </button>
+            {user.deletedAt ? (
+              <button
+                onClick={() => {
+                  setMenuOpen(false);
+                  if (!confirm(`Permanently purge ${user.firstName} ${user.lastName}? This will remove all data and cannot be undone.`)) return;
+                  startTransition(async () => {
+                    const result = await purgeUser(user.id);
+                    if (result.error) alert(result.error);
+                  });
+                }}
+                className="block w-full px-4 py-2 text-left text-sm text-red-600 hover:bg-red-50"
+              >
+                Purge permanently
+              </button>
+            ) : (
+              <button
+                onClick={handleDelete}
+                className="block w-full px-4 py-2 text-left text-sm text-red-600 hover:bg-red-50"
+              >
+                Delete user
+              </button>
+            )}
           </div>
         )}
       </div>

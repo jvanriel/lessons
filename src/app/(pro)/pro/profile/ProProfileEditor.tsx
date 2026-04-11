@@ -15,6 +15,7 @@ interface ProfileData {
   bookingNotice: number;
   bookingHorizon: number;
   cancellationHours: number;
+  allowBookingWithoutPayment: boolean;
   published: boolean;
   slug: string;
 }
@@ -44,6 +45,7 @@ export default function ProProfileEditor({
   const [bookingNotice, setBookingNotice] = useState(profile.bookingNotice);
   const [bookingHorizon, setBookingHorizon] = useState(profile.bookingHorizon);
   const [cancellationHours, setCancellationHours] = useState(profile.cancellationHours);
+  const [allowBookingWithoutPayment, setAllowBookingWithoutPayment] = useState(profile.allowBookingWithoutPayment);
 
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -61,6 +63,7 @@ export default function ProProfileEditor({
       formData.set("bookingNotice", String(bookingNotice));
       formData.set("bookingHorizon", String(bookingHorizon));
       formData.set("cancellationHours", String(cancellationHours));
+      formData.set("allowBookingWithoutPayment", String(allowBookingWithoutPayment));
 
       const result = await updateProProfile(null, formData);
       if (result?.error) setError(result.error);
@@ -282,6 +285,39 @@ export default function ProProfileEditor({
                 How many hours before the lesson a student can cancel.
               </p>
             </div>
+          </div>
+
+          {/* Allow booking without payment */}
+          <div className="flex items-start gap-4 rounded-lg border border-green-100 bg-green-50/50 p-4">
+            <div className="flex-1">
+              <p className="text-sm font-medium text-green-800">
+                Allow booking without pre-payment
+              </p>
+              <p className="mt-1 text-xs text-green-500">
+                When enabled, students can book lessons without a saved payment
+                method. Useful if you accept cash or want to handle payments
+                separately.
+              </p>
+            </div>
+            <button
+              type="button"
+              role="switch"
+              aria-checked={allowBookingWithoutPayment}
+              onClick={() =>
+                setAllowBookingWithoutPayment(!allowBookingWithoutPayment)
+              }
+              className={`relative mt-0.5 inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors ${
+                allowBookingWithoutPayment ? "bg-green-600" : "bg-green-300"
+              }`}
+            >
+              <span
+                className={`pointer-events-none inline-block h-5 w-5 rounded-full bg-white shadow transition-transform ${
+                  allowBookingWithoutPayment
+                    ? "translate-x-5"
+                    : "translate-x-0"
+                }`}
+              />
+            </button>
           </div>
         </div>
 

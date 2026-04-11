@@ -6,6 +6,9 @@ import { getLocale } from "@/lib/locale";
 import { t } from "@/lib/i18n/translations";
 import ProfileForm, { ChangePasswordForm } from "./ProfileForm";
 import { BookingPreferences } from "./BookingPreferences";
+import { PaymentMethodSection } from "./PaymentMethodSection";
+import { GolfProfileSection } from "./GolfProfileSection";
+import { getStripe } from "@/lib/stripe";
 
 export const metadata = { title: "Profile — Golf Lessons" };
 
@@ -22,6 +25,38 @@ export default async function ProfilePage() {
 
   if (result.length === 0) return null;
   const user = result[0];
+
+  // Fetch payment method info for members
+  let paymentMethodInfo: {
+    hasPaymentMethod: boolean;
+    brand: string | null;
+    last4: string | null;
+    expMonth: number | null;
+    expYear: number | null;
+  } = { hasPaymentMethod: false, brand: null, last4: null, expMonth: null, expYear: null };
+
+  if (user.stripeCustomerId) {
+    try {
+      const stripe = getStripe();
+      const paymentMethods = await stripe.paymentMethods.list({
+        customer: user.stripeCustomerId,
+        type: "card",
+        limit: 1,
+      });
+      if (paymentMethods.data.length > 0) {
+        const pm = paymentMethods.data[0];
+        paymentMethodInfo = {
+          hasPaymentMethod: true,
+          brand: pm.card?.brand || null,
+          last4: pm.card?.last4 || null,
+          expMonth: pm.card?.exp_month || null,
+          expYear: pm.card?.exp_year || null,
+        };
+      }
+    } catch {
+      // Stripe error — show as no payment method
+    }
+  }
 
   // Fetch booking preferences per pro (for members)
   const isMember = hasRole(session, "member");
@@ -75,9 +110,25 @@ export default async function ProfilePage() {
         />
       </div>
 
+      <div className="mt-8 rounded-xl border border-green-200 bg-white p-8">
+        <GolfProfileSection
+          initialHandicap={user.handicap || ""}
+          initialGoals={(user.golfGoals as string[]) || []}
+          initialGoalsOther={user.golfGoalsOther || ""}
+          locale={locale}
+        />
+      </div>
+
+      <div className="mt-8 rounded-xl border border-green-200 bg-white p-8">
+        <PaymentMethodSection
+          paymentMethod={paymentMethodInfo}
+          locale={locale}
+        />
+      </div>
+
       {proPrefs.length > 0 && (
         <div className="mt-8 rounded-xl border border-green-200 bg-white p-8">
-          <BookingPreferences pros={proPrefs} />
+          <BookingPreferences pros={proPrefs} locale={locale} />
         </div>
       )}
 

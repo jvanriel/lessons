@@ -2,7 +2,7 @@
 
 import { db } from "@/lib/db";
 import { proProfiles, proStudents, locations, proLocations } from "@/lib/db/schema";
-import { eq, and } from "drizzle-orm";
+import { eq, and, isNull } from "drizzle-orm";
 import { getSession, hasRole } from "@/lib/auth";
 import { redirect } from "next/navigation";
 
@@ -22,7 +22,7 @@ export async function getPublishedPros() {
       bio: proProfiles.bio,
     })
     .from(proProfiles)
-    .where(eq(proProfiles.published, true));
+    .where(and(eq(proProfiles.published, true), isNull(proProfiles.deletedAt)));
 
   // Get locations for each pro
   const prosWithLocations = await Promise.all(

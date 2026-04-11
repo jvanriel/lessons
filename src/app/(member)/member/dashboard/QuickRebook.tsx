@@ -13,6 +13,8 @@ import {
 interface Props {
   data: QuickBookData;
   proSlug: string;
+  hasPaymentMethod?: boolean;
+  allowBookingWithoutPayment?: boolean;
 }
 
 const HOLD_MS = 600;
@@ -42,7 +44,8 @@ function formatDatePill(dateStr: string) {
   return d.toLocaleDateString("en-US", { month: "short", day: "numeric" });
 }
 
-export function QuickBook({ data, proSlug }: Props) {
+export function QuickBook({ data, proSlug, hasPaymentMethod = true, allowBookingWithoutPayment = false }: Props) {
+  const paymentBlocked = !hasPaymentMethod && !allowBookingWithoutPayment;
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
   const [selectedDate, setSelectedDate] = useState(data.suggestedDate);
@@ -165,6 +168,24 @@ export function QuickBook({ data, proSlug }: Props) {
       );
       setSlots(newSlots);
     });
+  }
+
+  // If payment is required and student has none, show a blocked state
+  if (paymentBlocked) {
+    return (
+      <div className="mt-3 rounded-lg border border-green-100 bg-green-50/50 p-4">
+        <h3 className="text-sm font-medium text-green-900">Quick Book</h3>
+        <p className="mt-2 text-xs text-green-600">
+          Add a payment method to enable Quick Book.
+        </p>
+        <a
+          href="/member/profile"
+          className="mt-2 inline-block text-xs font-medium text-gold-600 hover:text-gold-500"
+        >
+          Add payment method
+        </a>
+      </div>
+    );
   }
 
   return (

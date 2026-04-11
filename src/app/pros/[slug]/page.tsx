@@ -8,7 +8,7 @@ import {
   locations,
   proPages,
 } from "@/lib/db/schema";
-import { eq, and } from "drizzle-orm";
+import { eq, and, isNull } from "drizzle-orm";
 import { checkStudentRelationship } from "./actions";
 import JoinButton from "./JoinButton";
 
@@ -21,7 +21,7 @@ export async function generateMetadata({ params }: Props) {
   const [pro] = await db
     .select({ displayName: proProfiles.displayName, bio: proProfiles.bio })
     .from(proProfiles)
-    .where(and(eq(proProfiles.slug, slug), eq(proProfiles.published, true)))
+    .where(and(eq(proProfiles.slug, slug), eq(proProfiles.published, true), isNull(proProfiles.deletedAt)))
     .limit(1);
 
   if (!pro) return { title: "Pro not found" };
@@ -49,7 +49,7 @@ export default async function ProProfilePage({ params }: Props) {
     })
     .from(proProfiles)
     .innerJoin(users, eq(proProfiles.userId, users.id))
-    .where(and(eq(proProfiles.slug, slug), eq(proProfiles.published, true)))
+    .where(and(eq(proProfiles.slug, slug), eq(proProfiles.published, true), isNull(proProfiles.deletedAt)))
     .limit(1);
 
   if (!pro) notFound();

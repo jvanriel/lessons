@@ -368,6 +368,130 @@ export function buildWelcomeEmail(opts: {
   return emailLayout(body, undefined, opts.locale);
 }
 
+// ─── Onboarding Confirmation Email ──────────────────────
+
+const GOAL_LABELS: Record<string, Record<Locale, string>> = {
+  driving: { en: "Driving", nl: "Driving", fr: "Drive" },
+  short_game: { en: "Short Game", nl: "Korte spel", fr: "Petit jeu" },
+  putting: { en: "Putting", nl: "Putting", fr: "Putting" },
+  course_management: { en: "Course Management", nl: "Baanmanagement", fr: "Gestion du parcours" },
+  learn_basics: { en: "Learn the Basics", nl: "De basis leren", fr: "Apprendre les bases" },
+  fitness: { en: "Fitness & Flexibility", nl: "Fitness & flexibiliteit", fr: "Forme & souplesse" },
+  other: { en: "Other", nl: "Andere", fr: "Autre" },
+};
+
+const CONFIRMATION_STRINGS: Record<Locale, {
+  subject: string; greeting: string; intro: string;
+  profileSection: string; handicapLabel: string; goalsLabel: string; noHandicap: string;
+  prosSection: string; schedulingSection: string;
+  durationLabel: string; dayLabel: string; timeLabel: string; intervalLabel: string;
+  passwordSection: string; passwordNote: string;
+  profileHint: string; button: string;
+}> = {
+  en: {
+    subject: "Your Golf Lessons account is ready",
+    greeting: "Hi", intro: "Your account is set up and ready to go. Here's a summary of your choices:",
+    profileSection: "Golf Profile", handicapLabel: "Handicap", goalsLabel: "Goals", noHandicap: "Not set",
+    prosSection: "Your Pros", schedulingSection: "Lesson Preferences",
+    durationLabel: "Duration", dayLabel: "Day", timeLabel: "Time", intervalLabel: "Frequency",
+    passwordSection: "Your Password", passwordNote: "You used a generated password. Keep it safe or change it in your profile.",
+    profileHint: "You can update all your information anytime via your profile page.",
+    button: "Go to Dashboard",
+  },
+  nl: {
+    subject: "Je Golf Lessons account is klaar",
+    greeting: "Hallo", intro: "Je account is ingesteld en klaar voor gebruik. Hier is een overzicht van je keuzes:",
+    profileSection: "Golfprofiel", handicapLabel: "Handicap", goalsLabel: "Doelen", noHandicap: "Niet ingesteld",
+    prosSection: "Je pro's", schedulingSection: "Lesvoorkeuren",
+    durationLabel: "Duur", dayLabel: "Dag", timeLabel: "Tijd", intervalLabel: "Frequentie",
+    passwordSection: "Je wachtwoord", passwordNote: "Je hebt een gegenereerd wachtwoord gebruikt. Bewaar het goed of wijzig het via je profiel.",
+    profileHint: "Je kunt al je gegevens altijd bijwerken via je profielpagina.",
+    button: "Naar Dashboard",
+  },
+  fr: {
+    subject: "Votre compte Golf Lessons est prêt",
+    greeting: "Bonjour", intro: "Votre compte est configuré et prêt à l'emploi. Voici un résumé de vos choix :",
+    profileSection: "Profil Golf", handicapLabel: "Handicap", goalsLabel: "Objectifs", noHandicap: "Non défini",
+    prosSection: "Vos pros", schedulingSection: "Préférences de cours",
+    durationLabel: "Durée", dayLabel: "Jour", timeLabel: "Heure", intervalLabel: "Fréquence",
+    passwordSection: "Votre mot de passe", passwordNote: "Vous avez utilisé un mot de passe généré. Conservez-le ou modifiez-le dans votre profil.",
+    profileHint: "Vous pouvez modifier toutes vos informations à tout moment via votre page de profil.",
+    button: "Aller au tableau de bord",
+  },
+};
+
+export function buildOnboardingConfirmationEmail(opts: {
+  firstName: string;
+  email: string;
+  locale: Locale;
+  handicap: string | null;
+  goals: string[];
+  goalsOther: string | null;
+  pros: Array<{ name: string; duration?: number | null; day?: string | null; time?: string | null; interval?: string | null }>;
+  generatedPassword: string | null;
+}): string {
+  const s = CONFIRMATION_STRINGS[opts.locale] ?? CONFIRMATION_STRINGS.en;
+  const sectionStyle = `margin:24px 0 8px 0;font-family:Georgia,'Times New Roman',serif;font-size:16px;color:${COLORS.green950};font-weight:normal;`;
+  const rowStyle = `padding:6px 0;border-bottom:1px solid ${COLORS.green100};font-size:14px;`;
+
+  // Goals
+  const goalLabels = opts.goals
+    .map((g) => g === "other" && opts.goalsOther ? opts.goalsOther : (GOAL_LABELS[g]?.[opts.locale] ?? g))
+    .filter(Boolean);
+
+  // Pros & scheduling
+  let prosHtml = "";
+  for (const pro of opts.pros) {
+    prosHtml += `<div style="margin-bottom:12px;padding:12px;border:1px solid ${COLORS.green100};border-radius:6px;">`;
+    prosHtml += `<div style="font-weight:600;color:${COLORS.green950};margin-bottom:4px;">${pro.name}</div>`;
+    if (pro.duration) prosHtml += `<div style="font-size:13px;color:#555;">${s.durationLabel}: ${pro.duration} min</div>`;
+    if (pro.day) prosHtml += `<div style="font-size:13px;color:#555;">${s.dayLabel}: ${pro.day}</div>`;
+    if (pro.time) prosHtml += `<div style="font-size:13px;color:#555;">${s.timeLabel}: ${pro.time}</div>`;
+    if (pro.interval) prosHtml += `<div style="font-size:13px;color:#555;">${s.intervalLabel}: ${pro.interval}</div>`;
+    prosHtml += `</div>`;
+  }
+
+  let body = `
+    <h2 style="font-family:Georgia,'Times New Roman',serif;font-size:22px;color:${COLORS.green950};margin:0 0 16px 0;font-weight:normal;">
+      ${s.greeting} ${opts.firstName},
+    </h2>
+    <p style="margin:0 0 20px 0;">${s.intro}</p>
+
+    <h3 style="${sectionStyle}">${s.profileSection}</h3>
+    <div style="${rowStyle}"><strong>${s.handicapLabel}:</strong> ${opts.handicap ?? s.noHandicap}</div>
+    <div style="${rowStyle}"><strong>${s.goalsLabel}:</strong> ${goalLabels.length > 0 ? goalLabels.join(", ") : "—"}</div>
+  `;
+
+  if (opts.pros.length > 0) {
+    body += `<h3 style="${sectionStyle}">${s.prosSection}</h3>${prosHtml}`;
+  }
+
+  if (opts.generatedPassword) {
+    body += `
+      <h3 style="${sectionStyle}">${s.passwordSection}</h3>
+      <div style="padding:12px;background:${COLORS.cream};border:1px solid #e8e4db;border-radius:6px;font-family:monospace;font-size:15px;letter-spacing:0.5px;">
+        ${opts.generatedPassword}
+      </div>
+      <p style="margin:8px 0 0 0;font-size:13px;color:#555;">${s.passwordNote}</p>
+    `;
+  }
+
+  body += `
+    <p style="margin:24px 0 16px 0;color:#555;font-size:13px;">${s.profileHint}</p>
+    <p style="margin:0;">
+      <a href="${getBaseUrl()}/login?email=${encodeURIComponent(opts.email)}" style="display:inline-block;background:${COLORS.gold600};color:${COLORS.white};padding:12px 28px;border-radius:6px;text-decoration:none;font-weight:500;font-size:14px;">
+        ${s.button}
+      </a>
+    </p>
+  `;
+
+  return emailLayout(body, undefined, opts.locale);
+}
+
+export function getOnboardingConfirmationSubject(locale: Locale): string {
+  return (CONFIRMATION_STRINGS[locale] ?? CONFIRMATION_STRINGS.en).subject;
+}
+
 export function getWelcomeSubject(accountType: "student" | "pro", locale: Locale): string {
   const subjects: Record<string, Record<string, string>> = {
     en: { student: "Welcome to Golf Lessons!", pro: "Welcome to Golf Lessons — Registration received" },

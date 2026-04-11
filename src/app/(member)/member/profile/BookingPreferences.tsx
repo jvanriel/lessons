@@ -2,6 +2,8 @@
 
 import { useState, useTransition } from "react";
 import { updateMemberBookingPrefs } from "../book/actions";
+import { t } from "@/lib/i18n/translations";
+import type { Locale } from "@/lib/i18n";
 
 interface ProPref {
   proStudentId: number;
@@ -12,29 +14,25 @@ interface ProPref {
   preferredTime: string | null;
 }
 
-const DAYS = [
-  { value: 0, label: "Monday" },
-  { value: 1, label: "Tuesday" },
-  { value: 2, label: "Wednesday" },
-  { value: 3, label: "Thursday" },
-  { value: 4, label: "Friday" },
-  { value: 5, label: "Saturday" },
-  { value: 6, label: "Sunday" },
+const DAY_KEYS = [
+  "onboarding.day.mon",
+  "onboarding.day.tue",
+  "onboarding.day.wed",
+  "onboarding.day.thu",
+  "onboarding.day.fri",
+  "onboarding.day.sat",
+  "onboarding.day.sun",
 ];
 
-const DURATIONS = [
-  { value: 30, label: "30 minutes" },
-  { value: 45, label: "45 minutes" },
-  { value: 60, label: "1 hour" },
-  { value: 90, label: "1.5 hours" },
-  { value: 120, label: "2 hours" },
-];
+const DURATIONS = [30, 45, 60, 90, 120];
 
-const INTERVALS = [
-  { value: "weekly", label: "Weekly" },
-  { value: "biweekly", label: "Every 2 weeks" },
-  { value: "monthly", label: "Monthly" },
-];
+const INTERVAL_KEYS: Record<string, string> = {
+  weekly: "onboarding.weekly",
+  biweekly: "onboarding.biweekly",
+  monthly: "onboarding.monthly",
+  sporadic: "onboarding.sporadic",
+  once: "onboarding.once",
+};
 
 // Generate time options in 30-min increments
 const TIMES: string[] = [];
@@ -44,26 +42,37 @@ for (let h = 7; h <= 21; h++) {
   }
 }
 
-export function BookingPreferences({ pros }: { pros: ProPref[] }) {
+export function BookingPreferences({
+  pros,
+  locale,
+}: {
+  pros: ProPref[];
+  locale: Locale;
+}) {
   return (
     <div>
       <h2 className="font-display text-xl font-medium text-green-800">
-        Booking Preferences
+        {t("profile.bookingPreferences", locale)}
       </h2>
       <p className="mt-1 text-sm text-green-600">
-        Set your preferred schedule for each pro. This powers Quick Book on your
-        dashboard.
+        {t("profile.bookingPreferencesDesc", locale)}
       </p>
       <div className="mt-6 space-y-6">
         {pros.map((pro) => (
-          <ProPreferenceRow key={pro.proStudentId} pro={pro} />
+          <ProPreferenceRow key={pro.proStudentId} pro={pro} locale={locale} />
         ))}
       </div>
     </div>
   );
 }
 
-function ProPreferenceRow({ pro }: { pro: ProPref }) {
+function ProPreferenceRow({
+  pro,
+  locale,
+}: {
+  pro: ProPref;
+  locale: Locale;
+}) {
   const [isPending, startTransition] = useTransition();
   const [duration, setDuration] = useState(
     pro.preferredDuration !== null ? String(pro.preferredDuration) : ""
@@ -94,74 +103,90 @@ function ProPreferenceRow({ pro }: { pro: ProPref }) {
     });
   }
 
+  const notSet = t("profile.notSet", locale);
+  const selectClass =
+    "w-full rounded-md border border-green-200 bg-white px-2.5 py-1.5 text-sm text-green-900 outline-none focus:border-gold-400 focus:ring-1 focus:ring-gold-400/30";
+
   return (
     <div className="rounded-lg border border-green-100 p-4">
       <h3 className="text-sm font-medium text-green-900">{pro.proName}</h3>
       <div className="mt-3 grid gap-3 sm:grid-cols-2">
         <div>
           <label className="mb-1 block text-xs font-medium text-green-600">
-            Duration
+            {t("onboarding.duration", locale)}
           </label>
           <select
             value={duration}
-            onChange={(e) => { setDuration(e.target.value); save(e.target.value, interval, day, time); }}
-            className="w-full rounded-md border border-green-200 bg-white px-2.5 py-1.5 text-sm text-green-900 outline-none focus:border-gold-400 focus:ring-1 focus:ring-gold-400/30"
+            onChange={(e) => {
+              setDuration(e.target.value);
+              save(e.target.value, interval, day, time);
+            }}
+            className={selectClass}
           >
-            <option value="">Not set</option>
+            <option value="">{notSet}</option>
             {DURATIONS.map((d) => (
-              <option key={d.value} value={d.value}>
-                {d.label}
+              <option key={d} value={d}>
+                {d} min
               </option>
             ))}
           </select>
         </div>
         <div>
           <label className="mb-1 block text-xs font-medium text-green-600">
-            Frequency
+            {t("onboarding.howOften", locale)}
           </label>
           <select
             value={interval}
-            onChange={(e) => { setIntervalState(e.target.value); save(duration, e.target.value, day, time); }}
-            className="w-full rounded-md border border-green-200 bg-white px-2.5 py-1.5 text-sm text-green-900 outline-none focus:border-gold-400 focus:ring-1 focus:ring-gold-400/30"
+            onChange={(e) => {
+              setIntervalState(e.target.value);
+              save(duration, e.target.value, day, time);
+            }}
+            className={selectClass}
           >
-            <option value="">Not set</option>
-            {INTERVALS.map((iv) => (
-              <option key={iv.value} value={iv.value}>
-                {iv.label}
+            <option value="">{notSet}</option>
+            {Object.entries(INTERVAL_KEYS).map(([val, key]) => (
+              <option key={val} value={val}>
+                {t(key, locale)}
               </option>
             ))}
           </select>
         </div>
         <div>
           <label className="mb-1 block text-xs font-medium text-green-600">
-            Preferred day
+            {t("onboarding.preferredDay", locale)}
           </label>
           <select
             value={day}
-            onChange={(e) => { setDay(e.target.value); save(duration, interval, e.target.value, time); }}
-            className="w-full rounded-md border border-green-200 bg-white px-2.5 py-1.5 text-sm text-green-900 outline-none focus:border-gold-400 focus:ring-1 focus:ring-gold-400/30"
+            onChange={(e) => {
+              setDay(e.target.value);
+              save(duration, interval, e.target.value, time);
+            }}
+            className={selectClass}
           >
-            <option value="">Not set</option>
-            {DAYS.map((d) => (
-              <option key={d.value} value={d.value}>
-                {d.label}
+            <option value="">{notSet}</option>
+            {DAY_KEYS.map((key, idx) => (
+              <option key={idx} value={idx}>
+                {t(key, locale)}
               </option>
             ))}
           </select>
         </div>
         <div>
           <label className="mb-1 block text-xs font-medium text-green-600">
-            Preferred time
+            {t("onboarding.preferredTime", locale)}
           </label>
           <select
             value={time}
-            onChange={(e) => { setTime(e.target.value); save(duration, interval, day, e.target.value); }}
-            className="w-full rounded-md border border-green-200 bg-white px-2.5 py-1.5 text-sm text-green-900 outline-none focus:border-gold-400 focus:ring-1 focus:ring-gold-400/30"
+            onChange={(e) => {
+              setTime(e.target.value);
+              save(duration, interval, day, e.target.value);
+            }}
+            className={selectClass}
           >
-            <option value="">Not set</option>
-            {TIMES.map((t) => (
-              <option key={t} value={t}>
-                {t}
+            <option value="">{notSet}</option>
+            {TIMES.map((tm) => (
+              <option key={tm} value={tm}>
+                {tm}
               </option>
             ))}
           </select>
@@ -169,10 +194,14 @@ function ProPreferenceRow({ pro }: { pro: ProPref }) {
       </div>
       <div className="mt-2 h-4">
         {isPending && (
-          <span className="text-xs text-green-500">Saving...</span>
+          <span className="text-xs text-green-500">
+            {t("profile.saving", locale)}
+          </span>
         )}
         {saved && !isPending && (
-          <span className="text-xs text-green-600">Saved</span>
+          <span className="text-xs text-green-600">
+            {t("profile.saved", locale)}
+          </span>
         )}
       </div>
     </div>

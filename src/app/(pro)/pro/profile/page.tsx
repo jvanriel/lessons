@@ -38,6 +38,7 @@ export default async function ProProfilePage() {
             bookingNotice: profile.bookingNotice,
             bookingHorizon: profile.bookingHorizon,
             cancellationHours: profile.cancellationHours,
+            allowBookingWithoutPayment: profile.allowBookingWithoutPayment,
             published: profile.published,
             slug: profile.slug,
           }}

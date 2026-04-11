@@ -2,8 +2,8 @@
 
 import { revalidatePath } from "next/cache";
 import { db } from "@/lib/db";
-import { users, userEmails, proProfiles } from "@/lib/db/schema";
-import { eq, and } from "drizzle-orm";
+import { users, userEmails, proProfiles, lessonBookings, proStudents } from "@/lib/db/schema";
+import { eq, and, gte } from "drizzle-orm";
 import { getSession, hasRole, hashPassword } from "@/lib/auth";
 import { sendEmail } from "@/lib/mail";
 import { buildInviteEmail, buildPasswordResetEmail, getEmailStrings } from "@/lib/email-templates";
@@ -124,8 +124,126 @@ export async function deleteUser(userId: number) {
     return { error: "You cannot delete your own account." };
   }
 
+  const now = new Date();
+  const today = now.toISOString().split("T")[0];
+
+  // Cancel all future confirmed bookings (frees up slots)
+  await db
+    .update(lessonBookings)
+    .set({
+      status: "cancelled",
+      cancelledAt: now,
+      cancellationReason: "Account deleted",
+      updatedAt: now,
+    })
+    .where(
+      and(
+        eq(lessonBookings.bookedById, userId),
+        eq(lessonBookings.status, "confirmed"),
+        gte(lessonBookings.date, today)
+      )
+    );
+
+  // Deactivate all pro-student relationships
+  await db
+    .update(proStudents)
+    .set({ status: "inactive" })
+    .where(eq(proStudents.userId, userId));
+
+  // If user is a pro, also soft-delete their pro profile and cancel bookings made with them
+  const [proProfile] = await db
+    .select({ id: proProfiles.id })
+    .from(proProfiles)
+    .where(eq(proProfiles.userId, userId))
+    .limit(1);
+
+  if (proProfile) {
+    await db
+      .update(proProfiles)
+      .set({ deletedAt: now, published: false, updatedAt: now })
+      .where(eq(proProfiles.id, proProfile.id));
+
+    // Cancel future bookings for this pro
+    await db
+      .update(lessonBookings)
+      .set({
+        status: "cancelled",
+        cancelledAt: now,
+        cancellationReason: "Pro account deleted",
+        updatedAt: now,
+      })
+      .where(
+        and(
+          eq(lessonBookings.proProfileId, proProfile.id),
+          eq(lessonBookings.status, "confirmed"),
+          gte(lessonBookings.date, today)
+        )
+      );
+
+    // Deactivate all students of this pro
+    await db
+      .update(proStudents)
+      .set({ status: "inactive" })
+      .where(eq(proStudents.proProfileId, proProfile.id));
+  }
+
+  // Soft-delete the user
+  await db
+    .update(users)
+    .set({ deletedAt: now })
+    .where(eq(users.id, userId));
+
+  revalidatePath("/admin/users");
+  return { success: true };
+}
+
+/**
+ * Permanently remove a soft-deleted user and all their data.
+ * Only works on users that have already been soft-deleted (deletedAt is set).
+ */
+export async function purgeUser(userId: number) {
+  const session = await requireAdmin();
+
+  if (session.userId === userId) {
+    return { error: "You cannot purge your own account." };
+  }
+
+  // Verify user is actually soft-deleted
+  const [user] = await db
+    .select({ deletedAt: users.deletedAt })
+    .from(users)
+    .where(eq(users.id, userId))
+    .limit(1);
+
+  if (!user) return { error: "User not found." };
+  if (!user.deletedAt) return { error: "User must be deleted first before purging." };
+
+  // Delete pro profile if exists (and cascade its children)
+  const [proProfile] = await db
+    .select({ id: proProfiles.id })
+    .from(proProfiles)
+    .where(eq(proProfiles.userId, userId))
+    .limit(1);
+
+  if (proProfile) {
+    // Delete bookings referencing this pro (no cascade on FK)
+    await db.delete(lessonBookings).where(eq(lessonBookings.proProfileId, proProfile.id));
+    // Pro profile cascade-deletes: proLocations, proAvailability, proStudents, proPages, etc.
+    await db.delete(proProfiles).where(eq(proProfiles.id, proProfile.id));
+  }
+
+  // Delete bookings made by this user (no cascade on FK)
+  await db.delete(lessonBookings).where(eq(lessonBookings.bookedById, userId));
+
+  // Delete remaining pro-student relationships
+  await db.delete(proStudents).where(eq(proStudents.userId, userId));
+
+  // Delete notifications
+  const { notifications } = await import("@/lib/db/schema");
+  await db.delete(notifications).where(eq(notifications.targetUserId, userId));
+
+  // User cascade-deletes: userEmails, comments reactions (via authorId set null)
   await db.delete(users).where(eq(users.id, userId));
-  // user_emails cascade-deletes automatically
 
   revalidatePath("/admin/users");
   return { success: true };

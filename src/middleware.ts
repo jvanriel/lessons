@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { neon } from "@neondatabase/serverless";
 import { verifySessionToken, type UserRole } from "@/lib/auth";
 
 const ROLE_ROUTES: { prefix: string; roles: UserRole[] }[] = [
@@ -45,6 +46,28 @@ export async function middleware(request: NextRequest) {
       const loginUrl = new URL("/login", request.url);
       loginUrl.searchParams.set("from", pathname);
       return NextResponse.redirect(loginUrl);
+    }
+
+    // Onboarding guard for members: redirect to onboarding if not completed
+    if (
+      pathname.startsWith("/member") &&
+      !pathname.startsWith("/member/onboarding") &&
+      !pathname.startsWith("/register") &&
+      session.roles.includes("member") &&
+      !session.roles.includes("pro") &&
+      !session.roles.includes("admin")
+    ) {
+      const dbUrl =
+        process.env.POSTGRES_URL_PREVIEW || process.env.POSTGRES_URL;
+      if (dbUrl) {
+        const sql = neon(dbUrl);
+        const rows = await sql`SELECT onboarding_completed_at FROM users WHERE id = ${session.userId} LIMIT 1`;
+        if (rows.length > 0 && !rows[0].onboarding_completed_at) {
+          return NextResponse.redirect(
+            new URL("/register", request.url)
+          );
+        }
+      }
     }
 
     return NextResponse.next();

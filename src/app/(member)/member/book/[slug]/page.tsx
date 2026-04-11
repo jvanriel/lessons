@@ -1,9 +1,10 @@
 import { db } from "@/lib/db";
 import { proProfiles, proLocations, locations, users } from "@/lib/db/schema";
-import { eq, and } from "drizzle-orm";
+import { eq, and, isNull } from "drizzle-orm";
 import { notFound } from "next/navigation";
 import { getSession } from "@/lib/auth";
 import { BookingWizard } from "./BookingWizard";
+import { getStripe } from "@/lib/stripe";
 
 export async function generateMetadata({
   params,
@@ -14,7 +15,7 @@ export async function generateMetadata({
   const [pro] = await db
     .select({ displayName: proProfiles.displayName })
     .from(proProfiles)
-    .where(eq(proProfiles.slug, slug))
+    .where(and(eq(proProfiles.slug, slug), isNull(proProfiles.deletedAt)))
     .limit(1);
 
   return {
@@ -46,10 +47,11 @@ export default async function BookingPage({
       bookingEnabled: proProfiles.bookingEnabled,
       published: proProfiles.published,
       maxGroupSize: proProfiles.maxGroupSize,
+      allowBookingWithoutPayment: proProfiles.allowBookingWithoutPayment,
     })
     .from(proProfiles)
     .where(
-      and(eq(proProfiles.slug, slug), eq(proProfiles.published, true))
+      and(eq(proProfiles.slug, slug), eq(proProfiles.published, true), isNull(proProfiles.deletedAt))
     )
     .limit(1);
 
@@ -72,6 +74,28 @@ export default async function BookingPage({
       .where(eq(users.id, session.userId))
       .limit(1);
     if (u) userDetails = u;
+  }
+
+  // Check if student has a saved payment method
+  let hasPaymentMethod = false;
+  if (userDetails && session) {
+    const [u] = await db
+      .select({ stripeCustomerId: users.stripeCustomerId })
+      .from(users)
+      .where(eq(users.id, session.userId))
+      .limit(1);
+    if (u?.stripeCustomerId) {
+      try {
+        const stripe = getStripe();
+        const methods = await stripe.paymentMethods.list({
+          customer: u.stripeCustomerId,
+          limit: 1,
+        });
+        hasPaymentMethod = methods.data.length > 0;
+      } catch {
+        // Stripe error — treat as no payment method
+      }
+    }
   }
 
   // Load pro locations
@@ -110,6 +134,8 @@ export default async function BookingPage({
         locations={proLocs}
         userDetails={userDetails}
         showAllSteps={full === "1"}
+        allowBookingWithoutPayment={pro.allowBookingWithoutPayment}
+        hasPaymentMethod={hasPaymentMethod}
       />
     </div>
   );

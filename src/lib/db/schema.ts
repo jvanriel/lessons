@@ -23,7 +23,13 @@ export const users = pgTable("users", {
   emailOptOut: boolean("email_opt_out").default(false),
   emailVerifiedAt: timestamp("email_verified_at"),
   stripeCustomerId: varchar("stripe_customer_id", { length: 255 }),
+  // Golf profile (students)
+  handicap: numeric("handicap"),
+  golfGoals: jsonb("golf_goals").$type<string[]>(),
+  golfGoalsOther: varchar("golf_goals_other", { length: 500 }),
+  onboardingCompletedAt: timestamp("onboarding_completed_at"),
   lastLoginAt: timestamp("last_login_at"),
+  deletedAt: timestamp("deleted_at"),
   createdAt: timestamp("created_at").defaultNow(),
 });
 
@@ -116,6 +122,7 @@ export const proProfiles = pgTable("pro_profiles", {
   bookingHorizon: integer("booking_horizon").notNull().default(60),
   cancellationHours: integer("cancellation_hours").notNull().default(24),
   lateCancelRefundPercent: integer("late_cancel_refund_percent").notNull().default(0),
+  allowBookingWithoutPayment: boolean("allow_booking_without_payment").notNull().default(false),
   googleCalendarEmail: varchar("google_calendar_email", { length: 255 }),
   published: boolean("published").notNull().default(false),
   // Stripe subscription
@@ -128,6 +135,7 @@ export const proProfiles = pgTable("pro_profiles", {
   bankAccountHolder: varchar("bank_account_holder", { length: 255 }),
   bankIban: varchar("bank_iban", { length: 34 }),
   bankBic: varchar("bank_bic", { length: 11 }),
+  deletedAt: timestamp("deleted_at"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });
@@ -294,7 +302,7 @@ export const proStudents = pgTable("pro_students", {
   ),
   preferredDuration: integer("preferred_duration"),
   preferredDayOfWeek: integer("preferred_day_of_week"), // ISO: 0=Mon..6=Sun
-  preferredTime: varchar("preferred_time", { length: 5 }), // HH:MM
+  preferredTime: varchar("preferred_time", { length: 20 }), // HH:MM or morning/afternoon/evening
   preferredInterval: varchar("preferred_interval", { length: 20 }), // weekly, biweekly, monthly
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });

@@ -16,6 +16,7 @@ export default async function AdminUsersPage() {
         phone: users.phone,
         roles: users.roles,
         lastLoginAt: users.lastLoginAt,
+        deletedAt: users.deletedAt,
         createdAt: users.createdAt,
       })
       .from(users)
@@ -44,6 +45,7 @@ export default async function AdminUsersPage() {
   const serialized = allUsers.map((u) => ({
     ...u,
     lastLoginAt: u.lastLoginAt?.toISOString() ?? null,
+    deletedAt: u.deletedAt?.toISOString() ?? null,
     createdAt: u.createdAt?.toISOString() ?? null,
     emails: emailsByUser[u.id] ?? [],
   }));

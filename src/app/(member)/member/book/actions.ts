@@ -12,7 +12,7 @@ import {
   proStudents,
   users,
 } from "@/lib/db/schema";
-import { eq, and, gte, lte, desc } from "drizzle-orm";
+import { eq, and, gte, lte, desc, isNull } from "drizzle-orm";
 import { getSession, hasRole } from "@/lib/auth";
 import { createNotification } from "@/lib/notifications";
 import {
@@ -23,6 +23,7 @@ import {
 } from "@/lib/lesson-slots";
 import { redirect } from "next/navigation";
 import crypto from "node:crypto";
+import { getStripe } from "@/lib/stripe";
 
 function requireMember() {
   return getSession().then((session) => {
@@ -48,7 +49,7 @@ export async function getBookablePros() {
     })
     .from(proProfiles)
     .where(
-      and(eq(proProfiles.published, true), eq(proProfiles.bookingEnabled, true))
+      and(eq(proProfiles.published, true), eq(proProfiles.bookingEnabled, true), isNull(proProfiles.deletedAt))
     );
 
   return rows;
@@ -272,6 +273,56 @@ export async function getAvailableSlots(
   );
 }
 
+/**
+ * Check if a user has a saved payment method on their Stripe customer.
+ */
+async function userHasPaymentMethod(userId: number): Promise<boolean> {
+  const [user] = await db
+    .select({ stripeCustomerId: users.stripeCustomerId })
+    .from(users)
+    .where(eq(users.id, userId))
+    .limit(1);
+
+  if (!user?.stripeCustomerId) return false;
+
+  try {
+    const stripe = getStripe();
+    const methods = await stripe.paymentMethods.list({
+      customer: user.stripeCustomerId,
+      limit: 1,
+    });
+    return methods.data.length > 0;
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Check if the pro requires pre-payment and student has no payment method.
+ * Returns an error string if blocked, null if allowed.
+ */
+async function checkPaymentGate(
+  proProfileId: number,
+  userId: number
+): Promise<string | null> {
+  const [pro] = await db
+    .select({ allowBookingWithoutPayment: proProfiles.allowBookingWithoutPayment })
+    .from(proProfiles)
+    .where(eq(proProfiles.id, proProfileId))
+    .limit(1);
+
+  if (!pro) return "Pro not found.";
+
+  // If pro allows booking without payment, no gate needed
+  if (pro.allowBookingWithoutPayment) return null;
+
+  // Check if student has a payment method
+  const hasPayment = await userHasPaymentMethod(userId);
+  if (hasPayment) return null;
+
+  return "A payment method is required to book with this pro. Please add one in your profile.";
+}
+
 export async function createBooking(formData: FormData) {
   const session = await requireMember();
 
@@ -301,6 +352,10 @@ export async function createBooking(formData: FormData) {
   ) {
     return { error: "Please fill in all required fields." };
   }
+
+  // Payment gate: check if pro requires payment method
+  const paymentError = await checkPaymentGate(proProfileId, session.userId);
+  if (paymentError) return { error: paymentError };
 
   // Verify slot is still available
   const slots = await getAvailableSlots(proProfileId, proLocationId, date, duration);
@@ -760,6 +815,10 @@ export async function quickCreateBooking(data: {
     .limit(1);
 
   if (!user) return { error: "User not found." };
+
+  // Payment gate: check if pro requires payment method
+  const paymentError = await checkPaymentGate(data.proProfileId, session.userId);
+  if (paymentError) return { error: paymentError };
 
   // Verify slot is still available
   const slots = await getAvailableSlots(

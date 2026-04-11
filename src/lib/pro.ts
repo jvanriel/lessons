@@ -1,6 +1,6 @@
 import { db } from "@/lib/db";
 import { proProfiles } from "@/lib/db/schema";
-import { eq } from "drizzle-orm";
+import { eq, and, isNull } from "drizzle-orm";
 import { getSession, hasRole } from "@/lib/auth";
 import { redirect } from "next/navigation";
 
@@ -13,7 +13,7 @@ export async function requireProProfile() {
   const [profile] = await db
     .select()
     .from(proProfiles)
-    .where(eq(proProfiles.userId, session.userId))
+    .where(and(eq(proProfiles.userId, session.userId), isNull(proProfiles.deletedAt)))
     .limit(1);
 
   return { session, profile: profile ?? null };

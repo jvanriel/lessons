@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { db } from "@/lib/db";
 import { proProfiles, users, proLocations, locations } from "@/lib/db/schema";
-import { eq } from "drizzle-orm";
+import { eq, and, isNull } from "drizzle-orm";
 import { getLocale } from "@/lib/locale";
 import { t } from "@/lib/i18n/translations";
 
@@ -25,7 +25,7 @@ export default async function ProsPage() {
     })
     .from(proProfiles)
     .innerJoin(users, eq(proProfiles.userId, users.id))
-    .where(eq(proProfiles.published, true));
+    .where(and(eq(proProfiles.published, true), isNull(proProfiles.deletedAt)));
 
   // Fetch locations per pro
   const proLocationData = await db

@@ -2,7 +2,7 @@ import { notFound } from "next/navigation";
 import Link from "next/link";
 import { db } from "@/lib/db";
 import { proProfiles, proPages } from "@/lib/db/schema";
-import { eq, and } from "drizzle-orm";
+import { eq, and, isNull } from "drizzle-orm";
 import type { ProPageSection } from "@/lib/db/schema";
 
 interface Props {
@@ -15,7 +15,7 @@ export async function generateMetadata({ params }: Props) {
   const [pro] = await db
     .select({ id: proProfiles.id, displayName: proProfiles.displayName })
     .from(proProfiles)
-    .where(and(eq(proProfiles.slug, slug), eq(proProfiles.published, true)))
+    .where(and(eq(proProfiles.slug, slug), eq(proProfiles.published, true), isNull(proProfiles.deletedAt)))
     .limit(1);
 
   if (!pro) return { title: "Not found" };
@@ -51,7 +51,7 @@ export default async function ProFlyerPage({ params }: Props) {
       slug: proProfiles.slug,
     })
     .from(proProfiles)
-    .where(and(eq(proProfiles.slug, slug), eq(proProfiles.published, true)))
+    .where(and(eq(proProfiles.slug, slug), eq(proProfiles.published, true), isNull(proProfiles.deletedAt)))
     .limit(1);
 
   if (!pro) notFound();

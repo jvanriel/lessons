@@ -32,6 +32,7 @@ export async function updateProProfile(
   const bookingNotice = parseInt(formData.get("bookingNotice") as string) || 24;
   const bookingHorizon = parseInt(formData.get("bookingHorizon") as string) || 60;
   const cancellationHours = parseInt(formData.get("cancellationHours") as string) || 24;
+  const allowBookingWithoutPayment = formData.get("allowBookingWithoutPayment") === "true";
 
   let lessonDurations: number[] = [60];
   try {
@@ -56,6 +57,7 @@ export async function updateProProfile(
       bookingNotice,
       bookingHorizon,
       cancellationHours,
+      allowBookingWithoutPayment,
       updatedAt: new Date(),
     })
     .where(eq(proProfiles.id, profile.id));

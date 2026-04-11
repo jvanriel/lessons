@@ -3,7 +3,7 @@
 import { redirect } from "next/navigation";
 import { db } from "@/lib/db";
 import { users, userEmails, proProfiles } from "@/lib/db/schema";
-import { eq } from "drizzle-orm";
+import { eq, and, isNull } from "drizzle-orm";
 import { hashPassword, setSessionCookie } from "@/lib/auth";
 import { createNotification } from "@/lib/notifications";
 import { sendEmail } from "@/lib/mail";
@@ -38,7 +38,7 @@ export async function register(
   const [existing] = await db
     .select({ id: users.id, roles: users.roles })
     .from(users)
-    .where(eq(users.email, email))
+    .where(and(eq(users.email, email), isNull(users.deletedAt)))
     .limit(1);
 
   const hashed = await hashPassword(password);
@@ -134,8 +134,8 @@ export async function register(
     redirect("/pro/onboarding");
   }
 
-  const chooseProsUrl = proId
-    ? `/member/choose-pros?pro=${encodeURIComponent(proId)}`
-    : "/member/choose-pros";
-  redirect(chooseProsUrl);
+  const onboardingUrl = proId
+    ? `/member/onboarding?pro=${encodeURIComponent(proId)}`
+    : "/member/onboarding";
+  redirect(onboardingUrl);
 }
