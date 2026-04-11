@@ -1,6 +1,7 @@
 "use client";
 
-import { useState, useRef, useActionState } from "react";
+import { useState, useRef, useEffect, useActionState } from "react";
+import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { inviteStudent, getStudentBookings, proCancelBooking, type ProQuickBookData } from "./actions";
 import { ProQuickBook } from "./ProQuickBook";
@@ -77,6 +78,15 @@ export default function StudentManager({
   currentBooking: { date: string; startTime: string; endTime: string } | null;
   currentQuickBook: ProQuickBookData | null;
 }) {
+  const router = useRouter();
+
+  // Refresh page data when a booking changes
+  useEffect(() => {
+    function handleBookingChanged() { router.refresh(); }
+    window.addEventListener("booking-changed", handleBookingChanged);
+    return () => window.removeEventListener("booking-changed", handleBookingChanged);
+  }, [router]);
+
   const [showInviteForm, setShowInviteForm] = useState(false);
   const [inviteMode, setInviteMode] = useState<"invited" | "pro_added">(
     "invited"

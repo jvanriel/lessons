@@ -51,7 +51,6 @@ export function ProQuickBook({ proStudentId, studentName, initialData, autoOpen 
   // Listen for booking changes (from notifications) and refresh
   useEffect(() => {
     function handleBookingChanged() {
-      if (!data) return;
       startTransition(async () => {
         const result = await getProQuickBookData(proStudentId);
         if (result.hasPreferences) {
@@ -69,7 +68,7 @@ export function ProQuickBook({ proStudentId, studentName, initialData, autoOpen 
     }
     window.addEventListener("booking-changed", handleBookingChanged);
     return () => window.removeEventListener("booking-changed", handleBookingChanged);
-  }, [data, proStudentId, startTransition]);
+  }, [proStudentId, startTransition]);
 
   // Auto-open: fetch data immediately on mount
   useEffect(() => {

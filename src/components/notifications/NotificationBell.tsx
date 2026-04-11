@@ -105,11 +105,8 @@ export default function NotificationBell({
           if (data.type === "connected") return;
           setUnreadCount((c) => c + 1);
 
-          // Broadcast booking events FIRST so components refresh immediately
-          const notifType = data.type ?? "";
-          if (notifType === "new_booking" || notifType === "booking_cancelled") {
-            window.dispatchEvent(new CustomEvent("booking-changed"));
-          }
+          // Broadcast so components refresh immediately
+          window.dispatchEvent(new CustomEvent("booking-changed", { detail: data }));
 
           fetchNotifications();
 
