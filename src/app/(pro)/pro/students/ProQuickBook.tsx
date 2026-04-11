@@ -88,6 +88,7 @@ export function ProQuickBook({ proStudentId, studentName, initialData, autoOpen 
     endTime: string;
   } | null>(null);
   const [allDates, setAllDates] = useState<string[] | null>(null);
+  const [calendarMonth, setCalendarMonth] = useState(() => new Date());
 
   const holdTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const animFrame = useRef<number | null>(null);
@@ -492,30 +493,62 @@ export function ProQuickBook({ proStudentId, studentName, initialData, autoOpen 
             )}
           </div>
 
-          {/* All dates grid */}
-          {allDates && (
-            <div className="mt-2">
-              <p className="mb-1.5 text-[10px] font-medium uppercase tracking-wider text-green-400">
-                All available dates
-              </p>
-              <div className="flex flex-wrap gap-1">
-                {allDates.map((d) => (
-                  <button
-                    key={d}
-                    onClick={() => switchDate(d)}
-                    className={`shrink-0 rounded-lg px-2.5 py-1 text-center transition-colors ${
-                      selectedDate === d
-                        ? "bg-gold-600 text-white"
-                        : "bg-white text-green-700 hover:bg-green-100"
-                    }`}
-                  >
-                    <div className="text-[10px] font-medium leading-tight">{formatDatePillDay(d)}</div>
-                    <div className="text-[10px] leading-tight">{formatDatePillDate(d)}</div>
+          {/* Calendar view */}
+          {allDates && (() => {
+            const year = calendarMonth.getFullYear();
+            const month = calendarMonth.getMonth();
+            const firstDay = new Date(year, month, 1);
+            let startOffset = firstDay.getDay() - 1;
+            if (startOffset < 0) startOffset = 6;
+            const daysInMonth = new Date(year, month + 1, 0).getDate();
+            const cells: Array<{ date: string; day: number; available: boolean } | null> = [];
+            for (let i = 0; i < startOffset; i++) cells.push(null);
+            for (let d = 1; d <= daysInMonth; d++) {
+              const dateStr = `${year}-${String(month + 1).padStart(2, "0")}-${String(d).padStart(2, "0")}`;
+              cells.push({ date: dateStr, day: d, available: allDates.includes(dateStr) });
+            }
+            const monthLabel = calendarMonth.toLocaleDateString("en-US", { month: "long", year: "numeric" });
+
+            return (
+              <div className="mt-2">
+                {/* Month nav */}
+                <div className="mb-1 flex items-center justify-between">
+                  <button type="button" onClick={() => setCalendarMonth(new Date(year, month - 1, 1))} className="rounded p-0.5 text-green-400 hover:text-green-700">
+                    <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M15 19l-7-7 7-7" /></svg>
                   </button>
-                ))}
+                  <span className="text-xs font-medium text-green-800">{monthLabel}</span>
+                  <button type="button" onClick={() => setCalendarMonth(new Date(year, month + 1, 1))} className="rounded p-0.5 text-green-400 hover:text-green-700">
+                    <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" /></svg>
+                  </button>
+                </div>
+                {/* Day headers */}
+                <div className="mb-0.5 grid grid-cols-7 text-center text-[10px] font-medium text-green-400">
+                  {["M", "T", "W", "T", "F", "S", "S"].map((d, i) => <div key={i} className="py-0.5">{d}</div>)}
+                </div>
+                {/* Days grid */}
+                <div className="grid grid-cols-7 gap-0.5">
+                  {cells.map((cell, i) =>
+                    cell === null ? <div key={`e-${i}`} /> : (
+                      <button
+                        key={cell.date}
+                        disabled={!cell.available}
+                        onClick={() => switchDate(cell.date)}
+                        className={`rounded py-1 text-[11px] transition-all ${
+                          cell.available
+                            ? selectedDate === cell.date
+                              ? "bg-gold-500 font-semibold text-white"
+                              : "bg-green-50 font-medium text-green-800 hover:bg-gold-50"
+                            : "text-green-200 cursor-not-allowed"
+                        }`}
+                      >
+                        {cell.day}
+                      </button>
+                    )
+                  )}
+                </div>
               </div>
-            </div>
-          )}
+            );
+          })()}
         </>
       )}
     </div>
