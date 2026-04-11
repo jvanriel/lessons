@@ -255,7 +255,7 @@ export function QuickBook({ data, proSlug, hasPaymentMethod = true, allowBooking
                       dateHoldTimer.current = null;
                       startTransition(async () => {
                         const prefDay = new Date(data.suggestedDate + "T00:00:00").toLocaleDateString("en-US", { weekday: "long" });
-                        const result = await explainDateSlots(data.proProfileId, data.locationId, d, data.duration, idx === 0, false, prefDay);
+                        const result = await explainDateSlots(data.proProfileId, data.locationId, d, data.duration, idx === 0, false, prefDay, interval);
                         setExplanation(result);
                       });
                     }, 600);

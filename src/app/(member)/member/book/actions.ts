@@ -911,6 +911,8 @@ export interface SlotExplanation {
   duration: number;
   /** The student's preferred day (e.g. "Saturday") — only shown on member side */
   preferredDay?: string | null;
+  /** Active interval selection (e.g. "weekly", "biweekly", "monthly") */
+  interval?: string | null;
   /** Why earlier dates were skipped (only present for the first date) */
   skippedDays?: Array<{ date: string; dayOfWeek: string; reason: string }>;
 }
@@ -926,7 +928,8 @@ export async function explainDateSlots(
   duration: number,
   isFirstDate: boolean = false,
   byPro: boolean = false,
-  preferredDayName: string | null = null
+  preferredDayName: string | null = null,
+  activeInterval: string | null = null
 ): Promise<SlotExplanation> {
   // Both members and pros can call this
   const session = await getSession();
@@ -1078,6 +1081,7 @@ export async function explainDateSlots(
     availableSlots: slots.length,
     duration,
     preferredDay: !byPro ? preferredDayName : null,
+    interval: activeInterval,
     skippedDays,
   };
 }

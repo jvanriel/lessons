@@ -349,8 +349,8 @@ export function ProQuickBook({ proStudentId, studentName, initialData, autoOpen 
                       dateHoldTimer.current = null;
                       startTransition(async () => {
                         const [proView, studentView] = await Promise.all([
-                          explainDateSlots(data.proProfileId, data.locationId, d, data.duration, idx === 0, true),
-                          explainDateSlots(data.proProfileId, data.locationId, d, data.duration, idx === 0, false, null),
+                          explainDateSlots(data.proProfileId, data.locationId, d, data.duration, idx === 0, true, null, interval),
+                          explainDateSlots(data.proProfileId, data.locationId, d, data.duration, idx === 0, false, null, interval),
                         ]);
                         setExplanationPro(proView);
                         setExplanationStudent(studentView);

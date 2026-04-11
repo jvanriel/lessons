@@ -64,6 +64,20 @@ export function SlotExplanationDialog({
             </section>
           )}
 
+          {/* Interval note */}
+          {data.interval && (
+            <section>
+              <div className="flex items-center gap-2 rounded-lg bg-gold-50 px-3 py-2 text-xs text-gold-800">
+                <svg className="h-3.5 w-3.5 shrink-0 text-gold-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M3 8.689c0-.864.933-1.406 1.683-.977l7.108 4.061a1.125 1.125 0 0 1 0 1.954l-7.108 4.061A1.125 1.125 0 0 1 3 16.811V8.69ZM12.75 8.689c0-.864.933-1.406 1.683-.977l7.108 4.061a1.125 1.125 0 0 1 0 1.954l-7.108 4.061a1.125 1.125 0 0 1-1.683-.977V8.69Z" />
+                </svg>
+                <span>
+                  <strong>&quot;{data.interval === "weekly" ? "In a week" : data.interval === "biweekly" ? "In 2 weeks" : "In a month"}&quot;</strong> is selected — dates start at least {data.interval === "weekly" ? "7" : data.interval === "biweekly" ? "14" : "28"} days from today.
+                </span>
+              </div>
+            </section>
+          )}
+
           {/* Why this is the first available date */}
           {data.skippedDays && data.skippedDays.length > 0 && (
             <section>
@@ -303,6 +317,18 @@ export function TabbedExplanationDialog({
                 <path strokeLinecap="round" strokeLinejoin="round" d="M6.75 3v2.25M17.25 3v2.25M3 18.75V7.5a2.25 2.25 0 0 1 2.25-2.25h13.5A2.25 2.25 0 0 1 21 7.5v11.25m-18 0A2.25 2.25 0 0 0 5.25 21h13.5A2.25 2.25 0 0 0 21 18.75m-18 0v-7.5A2.25 2.25 0 0 1 5.25 9h13.5A2.25 2.25 0 0 1 21 11.25v7.5" />
               </svg>
               Student&apos;s preferred day: <strong>{studentData.preferredDay}</strong>
+            </div>
+          )}
+
+          {/* Interval note */}
+          {data.interval && (
+            <div className="flex items-center gap-2 rounded-lg bg-gold-50 px-3 py-2 text-xs text-gold-800">
+              <svg className="h-3.5 w-3.5 shrink-0 text-gold-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M3 8.689c0-.864.933-1.406 1.683-.977l7.108 4.061a1.125 1.125 0 0 1 0 1.954l-7.108 4.061A1.125 1.125 0 0 1 3 16.811V8.69ZM12.75 8.689c0-.864.933-1.406 1.683-.977l7.108 4.061a1.125 1.125 0 0 1 0 1.954l-7.108 4.061a1.125 1.125 0 0 1-1.683-.977V8.69Z" />
+              </svg>
+              <span>
+                <strong>&quot;{data.interval === "weekly" ? "In a week" : data.interval === "biweekly" ? "In 2 weeks" : "In a month"}&quot;</strong> is selected — dates start at least {data.interval === "weekly" ? "7" : data.interval === "biweekly" ? "14" : "28"} days from today.
+              </span>
             </div>
           )}
 
