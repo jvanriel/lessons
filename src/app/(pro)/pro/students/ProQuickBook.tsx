@@ -128,7 +128,7 @@ export function ProQuickBook({ proStudentId, studentName, initialData, autoOpen 
 
   const startHold = useCallback(
     (slot: { startTime: string; endTime: string }) => {
-      if (status === "booking" || status === "booked" || !data) return;
+      if (status === "booking" || !data) return;
       setHoldingSlot(slot.startTime);
       setStatus("holding");
       setError(null);
@@ -159,6 +159,13 @@ export function ProQuickBook({ proStudentId, studentName, initialData, autoOpen 
           } else {
             setStatus("booked");
             setBookedSlot(slot);
+            setHoldingSlot(null);
+            setHoldProgress(0);
+            // Reset after 3 seconds
+            setTimeout(() => {
+              setStatus("idle");
+              setBookedSlot(null);
+            }, 3000);
           }
         });
       }, HOLD_MS);
@@ -289,35 +296,18 @@ export function ProQuickBook({ proStudentId, studentName, initialData, autoOpen 
         </p>
       )}
 
-      {/* Booked */}
-      {status === "booked" && (
-        <div className="flex items-center gap-2 py-3">
-          <div className="flex h-8 w-8 items-center justify-center rounded-full bg-green-100">
-            <svg
-              className="h-4 w-4 text-green-600"
-              fill="none"
-              viewBox="0 0 24 24"
-              stroke="currentColor"
-              strokeWidth={2.5}
-            >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                d="M5 13l4 4L19 7"
-              />
-            </svg>
-          </div>
-          <div>
-            <p className="text-xs font-medium text-green-900">Booked!</p>
-            <p className="text-xs text-green-600">
-              {formatShortDate(selectedDate)} at {bookedSlot?.startTime}
-            </p>
-          </div>
+      {/* Booked toast */}
+      {status === "booked" && bookedSlot && (
+        <div className="mb-2 flex items-center gap-2 rounded-md bg-green-100 px-3 py-2 text-xs font-medium text-green-800 animate-in fade-in">
+          <svg className="h-4 w-4 shrink-0 text-green-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+            <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+          </svg>
+          Booked {formatShortDate(selectedDate)} at {bookedSlot.startTime}
         </div>
       )}
 
       {/* Quick book UI */}
-      {data && status !== "booked" && (
+      {data && (
         <>
           {/* Location + duration info */}
           <p className="mb-2 text-xs text-green-500">
