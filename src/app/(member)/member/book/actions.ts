@@ -542,47 +542,38 @@ export interface QuickBookData {
 }
 
 /**
- * Compute the next suggested date based on interval + last booking.
+ * Compute the next suggested date based on interval from TODAY,
+ * snapped to the preferred day of week.
+ *
+ * "In a week"   → next preferred day ≥ 7 days from today
+ * "In 2 weeks"  → next preferred day ≥ 14 days from today
+ * "In a month"  → next preferred day ≥ 28 days from today
+ * No interval   → next preferred day from tomorrow
  */
 function computeSuggestedDate(
   interval: string | null,
   preferredDayOfWeek: number,
-  lastBookingDate: string | null
+  _lastBookingDate: string | null
 ): string {
   const today = new Date();
   today.setHours(0, 0, 0, 0);
 
-  if (interval === "biweekly" && lastBookingDate) {
-    // 14 days from last booking, snapped to preferred day
-    const base = new Date(lastBookingDate + "T00:00:00");
-    base.setDate(base.getDate() + 14);
-    const baseIso = jsDayToIso(base.getDay());
-    let diff = preferredDayOfWeek - baseIso;
-    if (diff < 0) diff += 7;
-    base.setDate(base.getDate() + diff);
-    // Ensure it's in the future
-    if (base <= today) {
-      base.setDate(base.getDate() + 14);
-    }
-    return base.toISOString().split("T")[0];
-  }
+  // Minimum days ahead based on interval
+  let minDaysAhead = 1; // default: tomorrow
+  if (interval === "weekly") minDaysAhead = 7;
+  else if (interval === "biweekly") minDaysAhead = 14;
+  else if (interval === "monthly") minDaysAhead = 28;
 
-  if (interval === "monthly" && lastBookingDate) {
-    const last = new Date(lastBookingDate + "T00:00:00");
-    let candidate = new Date(last.getFullYear(), last.getMonth() + 1, last.getDate());
-    if (candidate <= today) {
-      candidate = new Date(candidate.getFullYear(), candidate.getMonth() + 1, candidate.getDate());
-    }
-    return candidate.toISOString().split("T")[0];
-  }
+  // Start from today + minDaysAhead, find next occurrence of preferred day
+  const earliest = new Date(today);
+  earliest.setDate(earliest.getDate() + minDaysAhead);
 
-  // Default / weekly: next occurrence of preferred day from today
-  const todayIso = jsDayToIso(today.getDay());
-  let daysAhead = preferredDayOfWeek - todayIso;
-  if (daysAhead <= 0) daysAhead += 7;
-  const next = new Date(today);
-  next.setDate(next.getDate() + daysAhead);
-  return next.toISOString().split("T")[0];
+  const earliestIso = jsDayToIso(earliest.getDay());
+  let diff = preferredDayOfWeek - earliestIso;
+  if (diff < 0) diff += 7;
+  earliest.setDate(earliest.getDate() + diff);
+
+  return earliest.toISOString().split("T")[0];
 }
 
 /**
