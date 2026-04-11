@@ -13,11 +13,12 @@ function QRScanButton({ locale }: { locale: Locale }) {
   const [scanning, setScanning] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const videoRef = useRef<HTMLVideoElement>(null);
+  const canvasRef = useRef<HTMLCanvasElement>(null);
   const streamRef = useRef<MediaStream | null>(null);
-  const animRef = useRef<number>(0);
+  const timerRef = useRef<ReturnType<typeof setInterval>>(0 as unknown as ReturnType<typeof setInterval>);
 
   const stopCamera = useCallback(() => {
-    if (animRef.current) cancelAnimationFrame(animRef.current);
+    if (timerRef.current) clearInterval(timerRef.current);
     streamRef.current?.getTracks().forEach((t) => t.stop());
     streamRef.current = null;
     setScanning(false);
@@ -33,35 +34,35 @@ function QRScanButton({ locale }: { locale: Locale }) {
       setScanning(true);
 
       // Wait for video element to mount
-      await new Promise((r) => setTimeout(r, 100));
+      await new Promise((r) => setTimeout(r, 200));
       if (videoRef.current) {
         videoRef.current.srcObject = stream;
         await videoRef.current.play();
       }
 
-      // Use BarcodeDetector if available
-      if ("BarcodeDetector" in window) {
-        const detector = new (window as unknown as { BarcodeDetector: new (opts: { formats: string[] }) => { detect: (src: HTMLVideoElement) => Promise<Array<{ rawValue: string }>> } }).BarcodeDetector({ formats: ["qr_code"] });
-        const scan = async () => {
-          if (!videoRef.current || !streamRef.current) return;
-          try {
-            const codes = await detector.detect(videoRef.current);
-            if (codes.length > 0) {
-              const url = codes[0].rawValue;
-              if (url.includes("/api/auth/qr-login")) {
-                stopCamera();
-                window.location.href = url;
-                return;
-              }
-            }
-          } catch {}
-          animRef.current = requestAnimationFrame(scan);
-        };
-        animRef.current = requestAnimationFrame(scan);
-      } else {
-        setError(t("auth.qrNotSupported", locale));
-        setTimeout(stopCamera, 3000);
-      }
+      // Import jsQR dynamically (works on all browsers including Safari iOS)
+      const jsQR = (await import("jsqr")).default;
+
+      // Scan every 250ms via canvas
+      timerRef.current = setInterval(() => {
+        const video = videoRef.current;
+        const canvas = canvasRef.current;
+        if (!video || !canvas || !streamRef.current || video.readyState < 2) return;
+
+        canvas.width = video.videoWidth;
+        canvas.height = video.videoHeight;
+        const ctx = canvas.getContext("2d");
+        if (!ctx) return;
+
+        ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+        const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+        const code = jsQR(imageData.data, imageData.width, imageData.height);
+
+        if (code && code.data.includes("/api/auth/qr-login")) {
+          stopCamera();
+          window.location.href = code.data;
+        }
+      }, 250);
     } catch {
       setError(t("auth.cameraError", locale));
     }
@@ -80,7 +81,9 @@ function QRScanButton({ locale }: { locale: Locale }) {
             className="w-full rounded-lg"
             playsInline
             muted
+            autoPlay
           />
+          <canvas ref={canvasRef} className="hidden" />
           <div className="absolute inset-0 border-2 border-gold-500/50 rounded-lg" />
           <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 h-48 w-48 border-2 border-gold-400 rounded-lg" />
         </div>

@@ -27,6 +27,7 @@
     "drizzle-orm": "^0.45.2",
     "googleapis": "^171.4.0",
     "jose": "^6.2.2",
+    "jsqr": "^1.4.0",
     "lucide-react": "^1.7.0",
     "next": "^16",
     "qrcode.react": "^4.2.0",
