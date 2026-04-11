@@ -340,14 +340,14 @@ export function ProQuickBook({ proStudentId, studentName, initialData, autoOpen 
                 ...data.alternativeDates.filter(
                   (d) => d !== data.suggestedDate
                 ),
-              ].map((d) => (
+              ].map((d, idx) => (
                 <button
                   key={d}
                   onPointerDown={() => {
                     dateHoldTimer.current = setTimeout(() => {
                       dateHoldTimer.current = null;
                       startTransition(async () => {
-                        const result = await explainDateSlots(data.proProfileId, data.locationId, d, data.duration);
+                        const result = await explainDateSlots(data.proProfileId, data.locationId, d, data.duration, idx === 0);
                         setExplanation(result);
                       });
                     }, 600);

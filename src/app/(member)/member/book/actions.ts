@@ -909,6 +909,8 @@ export interface SlotExplanation {
   noticeFilteredBefore: string | null; // HH:MM cutoff time, null if no filtering
   availableSlots: number;
   duration: number;
+  /** Why earlier dates were skipped (only present for the first date) */
+  skippedDays?: Array<{ date: string; dayOfWeek: string; reason: string }>;
 }
 
 /**
@@ -919,7 +921,8 @@ export async function explainDateSlots(
   proProfileId: number,
   proLocationId: number,
   date: string,
-  duration: number
+  duration: number,
+  isFirstDate: boolean = false
 ): Promise<SlotExplanation> {
   await requireMember();
 
@@ -981,6 +984,56 @@ export async function explainDateSlots(
   // Compute actual available slots
   const slots = await getAvailableSlots(proProfileId, proLocationId, date, duration);
 
+  // Explain why earlier dates were skipped (only for the first date)
+  let skippedDays: SlotExplanation["skippedDays"] | undefined;
+  if (isFirstDate) {
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const targetDate = new Date(date + "T00:00:00");
+
+    if (targetDate > today) {
+      skippedDays = [];
+
+      // Get all templates for this pro+location
+      const allTemplates = await db
+        .select({ dayOfWeek: proAvailability.dayOfWeek })
+        .from(proAvailability)
+        .where(and(eq(proAvailability.proProfileId, proProfileId), eq(proAvailability.proLocationId, proLocationId)));
+      const templateDaySet = new Set(allTemplates.map((t) => t.dayOfWeek));
+
+      const cursor = new Date(today);
+      while (cursor < targetDate && skippedDays.length < 14) {
+        const curDateStr = cursor.toISOString().split("T")[0];
+        const curJsDay = cursor.getDay();
+        const curIsoDay = curJsDay === 0 ? 6 : curJsDay - 1;
+        const curDayName = dayNames[curIsoDay];
+
+        if (!templateDaySet.has(curIsoDay)) {
+          skippedDays.push({ date: curDateStr, dayOfWeek: curDayName, reason: `No availability on ${curDayName}s` });
+        } else {
+          // Has template — check if slots exist
+          const daySlots = await getAvailableSlots(proProfileId, proLocationId, curDateStr, duration);
+          if (daySlots.length === 0) {
+            // Check why: overrides or notice?
+            const dayOverrides = await db
+              .select({ type: proAvailabilityOverrides.type })
+              .from(proAvailabilityOverrides)
+              .where(and(eq(proAvailabilityOverrides.proProfileId, proProfileId), eq(proAvailabilityOverrides.date, curDateStr)));
+
+            const hasBlock = dayOverrides.some((o) => o.type === "blocked");
+            if (hasBlock) {
+              skippedDays.push({ date: curDateStr, dayOfWeek: curDayName, reason: "Blocked by the pro" });
+            } else {
+              skippedDays.push({ date: curDateStr, dayOfWeek: curDayName, reason: "All slots taken or within booking notice" });
+            }
+          }
+          // If slots exist on an earlier date, that's unexpected (shouldn't happen)
+        }
+        cursor.setDate(cursor.getDate() + 1);
+      }
+    }
+  }
+
   return {
     date,
     dayOfWeek: dayNames[isoDay],
@@ -991,6 +1044,7 @@ export async function explainDateSlots(
     noticeFilteredBefore,
     availableSlots: slots.length,
     duration,
+    skippedDays,
   };
 }
 

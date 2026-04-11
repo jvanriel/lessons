@@ -247,14 +247,14 @@ export function QuickBook({ data, proSlug, hasPaymentMethod = true, allowBooking
               </svg>
             </button>
             <div className="flex flex-1 gap-1.5 overflow-hidden">
-              {[data.suggestedDate, ...data.alternativeDates.filter((d) => d !== data.suggestedDate)].map((d) => (
+              {[data.suggestedDate, ...data.alternativeDates.filter((d) => d !== data.suggestedDate)].map((d, idx) => (
                 <button
                   key={d}
                   onPointerDown={() => {
                     dateHoldTimer.current = setTimeout(() => {
                       dateHoldTimer.current = null;
                       startTransition(async () => {
-                        const result = await explainDateSlots(data.proProfileId, data.locationId, d, data.duration);
+                        const result = await explainDateSlots(data.proProfileId, data.locationId, d, data.duration, idx === 0);
                         setExplanation(result);
                       });
                     }, 600);
