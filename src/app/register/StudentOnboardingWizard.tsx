@@ -510,8 +510,6 @@ function ChooseProsStep({ pros, selected, onToggle }: { pros: Pro[]; selected: S
 
 const DAY_LABELS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
 const TIME_OPTIONS = [{ value: "morning", label: "Morning" }, { value: "afternoon", label: "Afternoon" }, { value: "evening", label: "Evening" }];
-const INTERVAL_OPTIONS = [{ value: "weekly", label: "Weekly" }, { value: "biweekly", label: "Every 2 weeks" }, { value: "monthly", label: "Monthly" }, { value: "sporadic", label: "Sporadic" }, { value: "once", label: "Once" }];
-
 function SchedulingStep({ prefs, onChange }: { prefs: SchedulingPref[]; onChange: (i: number, u: Partial<SchedulingPref>) => void }) {
   return (
     <div className="space-y-6">
@@ -540,14 +538,6 @@ function SchedulingStep({ prefs, onChange }: { prefs: SchedulingPref[]; onChange
             <div className="mt-1.5 flex flex-wrap gap-1.5">
               {TIME_OPTIONS.map((opt) => (
                 <button key={opt.value} type="button" onClick={() => onChange(i, { preferredTime: opt.value })} className={`rounded-md border px-3 py-1.5 text-xs font-medium transition-colors ${pref.preferredTime === opt.value ? "border-green-700 bg-green-700 text-white" : "border-green-200 bg-white text-green-700 hover:border-green-400"}`}>{opt.label}</button>
-              ))}
-            </div>
-          </div>
-          <div>
-            <label className="block text-xs font-medium text-green-700">How often?</label>
-            <div className="mt-1.5 flex flex-wrap gap-1.5">
-              {INTERVAL_OPTIONS.map((opt) => (
-                <button key={opt.value} type="button" onClick={() => onChange(i, { preferredInterval: opt.value })} className={`rounded-md border px-3 py-1.5 text-xs font-medium transition-colors ${pref.preferredInterval === opt.value ? "border-green-700 bg-green-700 text-white" : "border-green-200 bg-white text-green-700 hover:border-green-400"}`}>{opt.label}</button>
               ))}
             </div>
           </div>

@@ -27,11 +27,9 @@ const DAY_KEYS = [
 const DURATIONS = [30, 45, 60, 90, 120];
 
 const INTERVAL_KEYS: Record<string, string> = {
-  weekly: "onboarding.weekly",
-  biweekly: "onboarding.biweekly",
-  monthly: "onboarding.monthly",
-  sporadic: "onboarding.sporadic",
-  once: "onboarding.once",
+  weekly: "onboarding.inAWeek",
+  biweekly: "onboarding.in2Weeks",
+  monthly: "onboarding.inAMonth",
 };
 
 // Generate time options in 30-min increments
@@ -133,7 +131,7 @@ function ProPreferenceRow({
         </div>
         <div>
           <label className="mb-1 block text-xs font-medium text-green-600">
-            {t("onboarding.howOften", locale)}
+            {t("onboarding.nextLesson", locale)}
           </label>
           <select
             value={interval}

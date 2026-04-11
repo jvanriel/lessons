@@ -315,14 +315,18 @@ export function QuickBook({ data, proSlug, hasPaymentMethod = true, allowBooking
             </div>
           )}
 
-          {/* Interval + more options */}
+          {/* Next lesson timing + more options */}
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-1">
-              {(["weekly", "biweekly", "monthly"] as const).map((iv) => (
+              {([
+                { value: "weekly", label: "In a week" },
+                { value: "biweekly", label: "In 2 weeks" },
+                { value: "monthly", label: "In a month" },
+              ] as const).map((iv) => (
                 <button
-                  key={iv}
+                  key={iv.value}
                   onClick={() => {
-                    const newVal = interval === iv ? null : iv;
+                    const newVal = interval === iv.value ? null : iv.value;
                     setInterval(newVal);
                     startTransition(async () => {
                       await updatePreferredInterval(
@@ -333,12 +337,12 @@ export function QuickBook({ data, proSlug, hasPaymentMethod = true, allowBooking
                     });
                   }}
                   className={`rounded-full px-2 py-0.5 text-[10px] font-medium transition-colors ${
-                    interval === iv
+                    interval === iv.value
                       ? "bg-green-700 text-white"
                       : "bg-green-50 text-green-500 hover:text-green-700"
                   }`}
                 >
-                  {iv === "biweekly" ? "2-weekly" : iv}
+                  {iv.label}
                 </button>
               ))}
             </div>

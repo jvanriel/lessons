@@ -520,31 +520,6 @@ function SchedulingStep({
             </div>
           </div>
 
-          {/* Interval */}
-          <div>
-            <label className="block text-xs font-medium text-green-700">
-              How often?
-            </label>
-            <div className="mt-1.5 flex flex-wrap gap-1.5">
-              {INTERVAL_OPTIONS.map((opt) => (
-                <button
-                  key={opt.value}
-                  type="button"
-                  onClick={() =>
-                    onChange(i, { preferredInterval: opt.value })
-                  }
-                  className={`rounded-md border px-3 py-1.5 text-xs font-medium transition-colors ${
-                    pref.preferredInterval === opt.value
-                      ? "border-green-700 bg-green-700 text-white"
-                      : "border-green-200 bg-white text-green-700 hover:border-green-400"
-                  }`}
-                >
-                  {opt.label}
-                </button>
-              ))}
-            </div>
-          </div>
-
           {/* Location (if multiple) */}
           {pref.locations.length > 1 && (
             <div>
