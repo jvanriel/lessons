@@ -256,10 +256,7 @@ export default function AppSidebar({
         {visibleSections.map((section, si) => {
           const isClosed = closedSections.has(section.label);
           // Auto-expand if active page is inside this section
-          const hasActive = section.items.some(
-            (item) => pathname === item.href || pathname.startsWith(item.href + "/"),
-          );
-          const showItems = hasActive || !isClosed;
+          const showItems = !isClosed;
 
           return (
             <div key={section.label} className={si > 0 ? "mt-4" : ""}>
