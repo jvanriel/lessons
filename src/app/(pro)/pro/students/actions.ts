@@ -436,7 +436,7 @@ export async function getProAllAvailableDates(
       templateRows as AvailabilityTemplate[],
       dateOverrides as AvailabilityOverride[],
       dateBookings as ExistingBooking[],
-      proSettings.bookingNotice,
+      0, // Pro overrides their own booking notice
       duration,
       now
     );
@@ -521,7 +521,7 @@ async function fetchAvailableSlots(
     templates as AvailabilityTemplate[],
     dateOverrides as AvailabilityOverride[],
     bookings as ExistingBooking[],
-    pro.bookingNotice,
+    0, // Pro overrides their own booking notice
     duration
   );
 }
@@ -734,8 +734,6 @@ export async function getProQuickBookData(
         ),
     ]);
 
-  const bookingNotice = proSettings[0]?.bookingNotice ?? 0;
-
   function normalizeDate(d: string | Date): string {
     if (d instanceof Date) return d.toISOString().split("T")[0];
     if (d.includes("T")) return d.split("T")[0];
@@ -757,7 +755,7 @@ export async function getProQuickBookData(
       templateRows as AvailabilityTemplate[],
       dateOverrides as AvailabilityOverride[],
       dateBookings as ExistingBooking[],
-      bookingNotice,
+      0, // Pro overrides their own booking notice
       rel.preferredDuration!,
       now
     );
