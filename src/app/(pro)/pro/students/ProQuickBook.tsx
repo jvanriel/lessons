@@ -323,27 +323,56 @@ export function ProQuickBook({ proStudentId, studentName, initialData, autoOpen 
             )}
           </p>
 
-          {/* Date pills */}
-          <div className="mb-2 flex gap-1.5 overflow-x-auto">
-            {[
-              data.suggestedDate,
-              ...data.alternativeDates.filter(
-                (d) => d !== data.suggestedDate
-              ),
-            ].map((d) => (
-              <button
-                key={d}
-                onClick={() => switchDate(d)}
-                className={`shrink-0 rounded-lg px-2.5 py-1 text-center transition-colors ${
-                  selectedDate === d
-                    ? "bg-gold-600 text-white"
-                    : "bg-white text-green-700 hover:bg-green-100"
-                }`}
-              >
-                <div className="text-[10px] font-medium leading-tight">{formatDatePillDay(d)}</div>
-                <div className="text-[10px] leading-tight">{formatDatePillDate(d)}</div>
-              </button>
-            ))}
+          {/* Date pills with arrows */}
+          <div className="mb-2 flex items-center gap-1">
+            <button
+              type="button"
+              onClick={() => {
+                const allDates = [data.suggestedDate, ...data.alternativeDates.filter((d) => d !== data.suggestedDate)];
+                const idx = allDates.indexOf(selectedDate);
+                if (idx > 0) switchDate(allDates[idx - 1]);
+              }}
+              className="shrink-0 rounded p-0.5 text-green-400 hover:text-green-700 disabled:opacity-30"
+              disabled={selectedDate === data.suggestedDate}
+            >
+              <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M15 19l-7-7 7-7" />
+              </svg>
+            </button>
+            <div className="flex flex-1 gap-1.5 overflow-hidden">
+              {[
+                data.suggestedDate,
+                ...data.alternativeDates.filter(
+                  (d) => d !== data.suggestedDate
+                ),
+              ].map((d) => (
+                <button
+                  key={d}
+                  onClick={() => switchDate(d)}
+                  className={`shrink-0 rounded-lg px-2.5 py-1 text-center transition-colors ${
+                    selectedDate === d
+                      ? "bg-gold-600 text-white"
+                      : "bg-white text-green-700 hover:bg-green-100"
+                  }`}
+                >
+                  <div className="text-[10px] font-medium leading-tight">{formatDatePillDay(d)}</div>
+                  <div className="text-[10px] leading-tight">{formatDatePillDate(d)}</div>
+                </button>
+              ))}
+            </div>
+            <button
+              type="button"
+              onClick={() => {
+                const allDates = [data.suggestedDate, ...data.alternativeDates.filter((d) => d !== data.suggestedDate)];
+                const idx = allDates.indexOf(selectedDate);
+                if (idx < allDates.length - 1) switchDate(allDates[idx + 1]);
+              }}
+              className="shrink-0 rounded p-0.5 text-green-400 hover:text-green-700"
+            >
+              <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
+              </svg>
+            </button>
           </div>
 
           {/* Time slots — hold to book */}
