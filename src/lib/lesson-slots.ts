@@ -5,7 +5,15 @@
  * IMPORTANT: dayOfWeek uses Monday=0 (ISO) convention throughout,
  * matching the availability editor grid ["Mon","Tue","Wed","Thu","Fri","Sat","Sun"].
  * JavaScript's Date.getDay() uses Sunday=0 — callers must convert.
+ *
+ * All slot times are in Europe/Brussels timezone. The engine uses date-fns-tz
+ * to ensure correct behavior on both localhost (CEST/CET) and Vercel (UTC).
  */
+
+import { fromZonedTime } from "date-fns-tz";
+
+/** Our canonical timezone — all pro availability and bookings are in Brussels time */
+const TZ = "Europe/Brussels";
 
 // ─── Types ───────────────────────────────────────────
 
@@ -151,29 +159,18 @@ export function computeAvailableSlots(
   }
 
   // 5. Filter by bookingNotice
-  // Slot times are in Europe/Brussels. Compare using Brussels local time
-  // so this works correctly on both localhost and Vercel (UTC).
+  // All slot times are in Europe/Brussels. Use TZDate to correctly
+  // compare regardless of server timezone (UTC on Vercel, CEST locally).
   const currentTime = now ?? new Date();
   const thresholdMs = currentTime.getTime() + bookingNoticeHours * 60 * 60 * 1000;
-  const threshold = new Date(thresholdMs);
-
-  // Get threshold as Brussels HH:MM for same-day comparison
-  const thresholdBrussels = threshold.toLocaleString("en-GB", {
-    timeZone: "Europe/Brussels",
-    year: "numeric", month: "2-digit", day: "2-digit",
-    hour: "2-digit", minute: "2-digit", hour12: false,
-  });
-  // Format: "DD/MM/YYYY, HH:MM"
-  const [thresholdDatePart, thresholdTimePart] = thresholdBrussels.split(", ");
-  const [thDay, thMonth, thYear] = thresholdDatePart.split("/");
-  const thresholdDateStr = `${thYear}-${thMonth}-${thDay}`;
-  const thresholdTimeStr = thresholdTimePart; // "HH:MM"
 
   return slots.filter((s) => {
-    if (dateStr > thresholdDateStr) return true;
-    if (dateStr < thresholdDateStr) return false;
-    // Same day: compare times
-    return s.startTime > thresholdTimeStr;
+    // Parse slot start as Brussels local time → UTC milliseconds
+    const slotUtc = fromZonedTime(
+      `${dateStr}T${s.startTime}:00`,
+      TZ,
+    );
+    return slotUtc.getTime() > thresholdMs;
   });
 }
 
@@ -200,7 +197,7 @@ export function checkCancellationAllowed(
   status: string,
   now?: Date,
 ): CancellationCheck {
-  const start = new Date(`${lessonDate}T${lessonStart}:00`);
+  const start = fromZonedTime(`${lessonDate}T${lessonStart}:00`, TZ);
   const deadline = new Date(start.getTime() - cancellationHours * 60 * 60 * 1000);
   const current = now ?? new Date();
   return {
