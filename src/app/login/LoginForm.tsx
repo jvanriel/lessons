@@ -1,6 +1,6 @@
 "use client";
 
-import { useActionState } from "react";
+import { useActionState, useState, useRef, useEffect, useCallback } from "react";
 import { userLogin } from "./actions";
 import { useSearchParams } from "next/navigation";
 import Link from "next/link";
@@ -8,6 +8,107 @@ import { Suspense } from "react";
 import { t } from "@/lib/i18n/translations";
 import type { Locale } from "@/lib/i18n";
 import PasswordInput from "@/components/PasswordInput";
+
+function QRScanButton({ locale }: { locale: Locale }) {
+  const [scanning, setScanning] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const videoRef = useRef<HTMLVideoElement>(null);
+  const streamRef = useRef<MediaStream | null>(null);
+  const animRef = useRef<number>(0);
+
+  const stopCamera = useCallback(() => {
+    if (animRef.current) cancelAnimationFrame(animRef.current);
+    streamRef.current?.getTracks().forEach((t) => t.stop());
+    streamRef.current = null;
+    setScanning(false);
+  }, []);
+
+  const startScan = useCallback(async () => {
+    setError(null);
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({
+        video: { facingMode: "environment" },
+      });
+      streamRef.current = stream;
+      setScanning(true);
+
+      // Wait for video element to mount
+      await new Promise((r) => setTimeout(r, 100));
+      if (videoRef.current) {
+        videoRef.current.srcObject = stream;
+        await videoRef.current.play();
+      }
+
+      // Use BarcodeDetector if available
+      if ("BarcodeDetector" in window) {
+        const detector = new (window as unknown as { BarcodeDetector: new (opts: { formats: string[] }) => { detect: (src: HTMLVideoElement) => Promise<Array<{ rawValue: string }>> } }).BarcodeDetector({ formats: ["qr_code"] });
+        const scan = async () => {
+          if (!videoRef.current || !streamRef.current) return;
+          try {
+            const codes = await detector.detect(videoRef.current);
+            if (codes.length > 0) {
+              const url = codes[0].rawValue;
+              if (url.includes("/api/auth/qr-login")) {
+                stopCamera();
+                window.location.href = url;
+                return;
+              }
+            }
+          } catch {}
+          animRef.current = requestAnimationFrame(scan);
+        };
+        animRef.current = requestAnimationFrame(scan);
+      } else {
+        setError(t("auth.qrNotSupported", locale));
+        setTimeout(stopCamera, 3000);
+      }
+    } catch {
+      setError(t("auth.cameraError", locale));
+    }
+  }, [locale, stopCamera]);
+
+  useEffect(() => {
+    return () => { stopCamera(); };
+  }, [stopCamera]);
+
+  if (scanning) {
+    return (
+      <div className="mt-4">
+        <div className="relative overflow-hidden rounded-lg">
+          <video
+            ref={videoRef}
+            className="w-full rounded-lg"
+            playsInline
+            muted
+          />
+          <div className="absolute inset-0 border-2 border-gold-500/50 rounded-lg" />
+          <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 h-48 w-48 border-2 border-gold-400 rounded-lg" />
+        </div>
+        <button
+          onClick={stopCamera}
+          className="mt-3 w-full rounded-lg border border-green-700 px-4 py-2 text-sm text-green-100/60 hover:text-green-100"
+        >
+          {t("impersonate.cancel", locale)}
+        </button>
+      </div>
+    );
+  }
+
+  return (
+    <div className="mt-4">
+      {error && <p className="mb-2 text-xs text-red-400">{error}</p>}
+      <button
+        onClick={startScan}
+        className="flex w-full items-center justify-center gap-2 rounded-lg border border-green-700 px-4 py-2.5 text-sm font-medium text-green-100/70 transition-colors hover:border-gold-500 hover:text-gold-200"
+      >
+        <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+          <path strokeLinecap="round" strokeLinejoin="round" d="M3.75 4.5h4.5v4.5H3.75V4.5Zm0 10.5h4.5v4.5H3.75V15Zm10.5-10.5h4.5v4.5h-4.5V4.5Zm0 10.5h1.5m1.5 0h1.5m-4.5 3h4.5M15.75 15h1.5m-1.5 3h1.5m-7.5-6h7.5m-10.5 0h1.5m-1.5 3h1.5" />
+        </svg>
+        {t("auth.scanQR", locale)}
+      </button>
+    </div>
+  );
+}
 
 function LoginFormInner({ locale }: { locale: Locale }) {
   const searchParams = useSearchParams();
@@ -77,6 +178,11 @@ function LoginFormInner({ locale }: { locale: Locale }) {
             {pending ? t("auth.signingIn", locale) : t("auth.signIn", locale)}
           </button>
         </form>
+        {/* QR scan — mobile only */}
+        <div className="sm:hidden">
+          <QRScanButton locale={locale} />
+        </div>
+
         <p className="mt-4 text-center text-sm text-green-100/60">
           {t("auth.noAccount", locale)}{" "}
           <Link href="/register" className="text-gold-200 hover:text-gold-300">
