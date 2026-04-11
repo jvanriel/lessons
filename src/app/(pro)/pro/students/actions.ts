@@ -547,41 +547,47 @@ function jsDayToIso(jsDay: number): number {
   return jsDay === 0 ? 6 : jsDay - 1;
 }
 
+/**
+ * Compute the next suggested date based on interval from TODAY,
+ * snapped to the preferred day of week.
+ *
+ * "In a week"   → next preferred day ≥ 7 days from today
+ * "In 2 weeks"  → next preferred day ≥ 14 days from today
+ * "In a month"  → next preferred day ≥ 28 days from today
+ * No interval   → next preferred day from today (including today)
+ */
 function computeSuggestedDate(
   interval: string | null,
   preferredDayOfWeek: number,
-  lastBookingDate: string | null
+  _lastBookingDate: string | null
 ): string {
   const today = new Date();
   today.setHours(0, 0, 0, 0);
 
-  if (interval === "biweekly" && lastBookingDate) {
-    const base = new Date(lastBookingDate + "T00:00:00");
-    base.setDate(base.getDate() + 14);
-    const baseIso = jsDayToIso(base.getDay());
-    let diff = preferredDayOfWeek - baseIso;
+  // No interval: start from today (show today if it's the preferred day)
+  if (!interval) {
+    const todayIso = jsDayToIso(today.getDay());
+    let diff = preferredDayOfWeek - todayIso;
     if (diff < 0) diff += 7;
-    base.setDate(base.getDate() + diff);
-    if (base <= today) base.setDate(base.getDate() + 14);
-    return base.toISOString().split("T")[0];
+    const next = new Date(today);
+    next.setDate(next.getDate() + diff);
+    return next.toISOString().split("T")[0];
   }
 
-  if (interval === "monthly" && lastBookingDate) {
-    const last = new Date(lastBookingDate + "T00:00:00");
-    let candidate = new Date(last.getFullYear(), last.getMonth() + 1, last.getDate());
-    if (candidate <= today) {
-      candidate = new Date(candidate.getFullYear(), candidate.getMonth() + 1, candidate.getDate());
-    }
-    return candidate.toISOString().split("T")[0];
-  }
+  // Minimum days ahead based on interval
+  let minDaysAhead = 7;
+  if (interval === "biweekly") minDaysAhead = 14;
+  else if (interval === "monthly") minDaysAhead = 28;
 
-  // Default / weekly
-  const todayIso = jsDayToIso(today.getDay());
-  let daysAhead = preferredDayOfWeek - todayIso;
-  if (daysAhead <= 0) daysAhead += 7;
-  const next = new Date(today);
-  next.setDate(next.getDate() + daysAhead);
-  return next.toISOString().split("T")[0];
+  const earliest = new Date(today);
+  earliest.setDate(earliest.getDate() + minDaysAhead);
+
+  const earliestIso = jsDayToIso(earliest.getDay());
+  let diff = preferredDayOfWeek - earliestIso;
+  if (diff < 0) diff += 7;
+  earliest.setDate(earliest.getDate() + diff);
+
+  return earliest.toISOString().split("T")[0];
 }
 
 export interface ProQuickBookData {
