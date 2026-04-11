@@ -558,10 +558,20 @@ function computeSuggestedDate(
   const today = new Date();
   today.setHours(0, 0, 0, 0);
 
+  // No interval: start from today (show today's slots if available)
+  if (!interval) {
+    const todayIso = jsDayToIso(today.getDay());
+    let diff = preferredDayOfWeek - todayIso;
+    if (diff < 0) diff += 7;
+    // If preferred day is today, diff = 0 → show today
+    const next = new Date(today);
+    next.setDate(next.getDate() + diff);
+    return next.toISOString().split("T")[0];
+  }
+
   // Minimum days ahead based on interval
-  let minDaysAhead = 1; // default: tomorrow
-  if (interval === "weekly") minDaysAhead = 7;
-  else if (interval === "biweekly") minDaysAhead = 14;
+  let minDaysAhead = 7;
+  if (interval === "biweekly") minDaysAhead = 14;
   else if (interval === "monthly") minDaysAhead = 28;
 
   // Start from today + minDaysAhead, find next occurrence of preferred day
