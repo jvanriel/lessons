@@ -472,25 +472,26 @@ export function ProQuickBook({ proStudentId, studentName, initialData, autoOpen 
                 </button>
               ))}
             </div>
-            {/* More options — load all available dates */}
-            {!allDates && (
             <button
               type="button"
               onClick={() => {
-                startTransition(async () => {
-                  const dates = await getProAllAvailableDates(
-                    data.proStudentId,
-                    data.locationId,
-                    data.duration
-                  );
-                  setAllDates(dates);
-                });
+                if (allDates) {
+                  setAllDates(null);
+                } else {
+                  startTransition(async () => {
+                    const dates = await getProAllAvailableDates(
+                      data.proStudentId,
+                      data.locationId,
+                      data.duration
+                    );
+                    setAllDates(dates);
+                  });
+                }
               }}
               className="text-xs text-green-500 hover:text-green-700"
             >
-              {isPending ? "Loading..." : "More dates"}
+              {isPending ? "Loading..." : allDates ? "Fewer dates" : "More dates"}
             </button>
-            )}
           </div>
 
           {/* Calendar view */}
