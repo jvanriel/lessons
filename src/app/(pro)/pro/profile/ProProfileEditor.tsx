@@ -178,7 +178,7 @@ export default function ProProfileEditor({
                         if (next.length > 0) setLessonDurations(next);
                       }
                     }}
-                    className="h-4 w-4 rounded border-green-300 text-gold-600 focus:ring-gold-500"
+                    className="h-4 w-4 rounded border-green-300 accent-[#c4a035]"
                   />
                   {d} min
                 </label>
