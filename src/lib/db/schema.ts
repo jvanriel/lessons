@@ -148,6 +148,7 @@ export const locations = pgTable("locations", {
   country: varchar("country", { length: 100 }),
   lat: numeric("lat"),
   lng: numeric("lng"),
+  timezone: varchar("timezone", { length: 50 }).notNull().default("Europe/Brussels"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
 

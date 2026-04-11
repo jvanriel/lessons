@@ -12,8 +12,8 @@
 
 import { fromZonedTime } from "date-fns-tz";
 
-/** Our canonical timezone — all pro availability and bookings are in Brussels time */
-const TZ = "Europe/Brussels";
+/** Default timezone — used when no location timezone is specified */
+export const DEFAULT_TZ = "Europe/Brussels";
 
 // ─── Types ───────────────────────────────────────────
 
@@ -98,6 +98,7 @@ export function computeAvailableSlots(
   bookingNoticeHours: number,
   duration: number,
   now?: Date, // injectable for testing; defaults to new Date()
+  timezone: string = DEFAULT_TZ,
 ): AvailableSlot[] {
   const date = new Date(dateStr + "T00:00:00");
   const jsDay = date.getDay();
@@ -168,7 +169,7 @@ export function computeAvailableSlots(
     // Parse slot start as Brussels local time → UTC milliseconds
     const slotUtc = fromZonedTime(
       `${dateStr}T${s.startTime}:00`,
-      TZ,
+      timezone,
     );
     return slotUtc.getTime() > thresholdMs;
   });
@@ -196,8 +197,9 @@ export function checkCancellationAllowed(
   cancellationHours: number,
   status: string,
   now?: Date,
+  timezone: string = DEFAULT_TZ,
 ): CancellationCheck {
-  const start = fromZonedTime(`${lessonDate}T${lessonStart}:00`, TZ);
+  const start = fromZonedTime(`${lessonDate}T${lessonStart}:00`, timezone);
   const deadline = new Date(start.getTime() - cancellationHours * 60 * 60 * 1000);
   const current = now ?? new Date();
   return {
