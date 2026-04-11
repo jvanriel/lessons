@@ -337,6 +337,7 @@ export default function StudentManager({
               autoOpen
             />
           )}
+          <StudentBookings proStudentId={currentStudent.id} />
         </div>
       )}
 

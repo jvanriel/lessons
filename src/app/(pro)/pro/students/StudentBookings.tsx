@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useTransition } from "react";
+import { useState, useEffect, useTransition, useRef } from "react";
 import { getStudentBookings, proCancelBooking } from "./actions";
 
 interface Booking {
@@ -20,10 +20,71 @@ function formatDate(dateStr: string) {
   });
 }
 
+function CancelDialog({
+  booking,
+  onConfirm,
+  onClose,
+  pending,
+}: {
+  booking: Booking;
+  onConfirm: () => void;
+  onClose: () => void;
+  pending: boolean;
+}) {
+  const backdropRef = useRef<HTMLDivElement>(null);
+
+  return (
+    <div
+      ref={backdropRef}
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/50"
+      onClick={(e) => {
+        if (e.target === backdropRef.current) onClose();
+      }}
+    >
+      <div className="mx-4 w-full max-w-sm rounded-xl border border-green-200 bg-white p-6 shadow-2xl">
+        <h3 className="font-display text-lg font-semibold text-green-900">
+          Cancel booking?
+        </h3>
+        <div className="mt-4 rounded-lg border border-green-100 bg-green-50/50 p-4">
+          <p className="text-sm font-medium text-green-900">
+            {formatDate(booking.date)}
+          </p>
+          <p className="text-sm text-green-600">
+            {booking.startTime} - {booking.endTime}
+          </p>
+        </div>
+        <p className="mt-3 text-sm text-green-600">
+          This will free up the slot for other bookings. The student will be
+          notified.
+        </p>
+        <div className="mt-5 flex gap-3">
+          <button
+            type="button"
+            onClick={onClose}
+            disabled={pending}
+            className="flex-1 rounded-md border border-green-200 px-4 py-2 text-sm font-medium text-green-700 transition-colors hover:bg-green-50 disabled:opacity-50"
+          >
+            Keep
+          </button>
+          <button
+            type="button"
+            onClick={onConfirm}
+            disabled={pending}
+            className="flex-1 rounded-md bg-red-500 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-red-600 disabled:opacity-50"
+          >
+            {pending ? "Cancelling..." : "Cancel booking"}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export function StudentBookings({ proStudentId }: { proStudentId: number }) {
   const [bookings, setBookings] = useState<Booking[]>([]);
   const [loaded, setLoaded] = useState(false);
   const [isPending, startTransition] = useTransition();
+  const [cancelTarget, setCancelTarget] = useState<Booking | null>(null);
 
   useEffect(() => {
     startTransition(async () => {
@@ -33,15 +94,17 @@ export function StudentBookings({ proStudentId }: { proStudentId: number }) {
     });
   }, [proStudentId, startTransition]);
 
-  function handleCancel(bookingId: number) {
-    if (!confirm("Cancel this booking?")) return;
+  function handleCancel() {
+    if (!cancelTarget) return;
+    const id = cancelTarget.id;
     startTransition(async () => {
-      const result = await proCancelBooking(bookingId);
+      const result = await proCancelBooking(id);
       if ("error" in result) {
         alert(result.error);
       } else {
-        setBookings((prev) => prev.filter((b) => b.id !== bookingId));
+        setBookings((prev) => prev.filter((b) => b.id !== id));
       }
+      setCancelTarget(null);
     });
   }
 
@@ -67,7 +130,7 @@ export function StudentBookings({ proStudentId }: { proStudentId: number }) {
             </div>
             <button
               type="button"
-              onClick={() => handleCancel(b.id)}
+              onClick={() => setCancelTarget(b)}
               disabled={isPending}
               className="text-[10px] font-medium text-red-400 hover:text-red-600 disabled:opacity-50"
             >
@@ -76,6 +139,15 @@ export function StudentBookings({ proStudentId }: { proStudentId: number }) {
           </div>
         ))}
       </div>
+
+      {cancelTarget && (
+        <CancelDialog
+          booking={cancelTarget}
+          onConfirm={handleCancel}
+          onClose={() => setCancelTarget(null)}
+          pending={isPending}
+        />
+      )}
     </div>
   );
 }
