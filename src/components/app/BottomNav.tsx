@@ -66,7 +66,7 @@ export default function BottomNav({ roles }: BottomNavProps) {
   const tabs = roles.includes("pro") ? proTabs : memberTabs;
 
   return (
-    <nav className="flex h-14 shrink-0 items-center justify-around border-t border-green-200 bg-white md:hidden">
+    <nav className="fixed bottom-0 left-0 right-0 z-30 flex h-14 items-center justify-around border-t border-green-200 bg-white md:hidden">
       {tabs.map((tab) => {
         const active =
           pathname === tab.href || pathname.startsWith(tab.href + "/");
