@@ -11,6 +11,7 @@ import { requireProProfile } from "@/lib/pro";
 import { redirect } from "next/navigation";
 import Link from "next/link";
 import { BookingsView } from "./BookingsView";
+import { BookingRefreshListener } from "@/components/BookingRefreshListener";
 
 export const metadata = { title: "Bookings — Golf Lessons" };
 
@@ -65,6 +66,7 @@ export default async function ProBookingsPage() {
 
   return (
     <div className="mx-auto max-w-6xl px-6 py-12">
+      <BookingRefreshListener />
       <div className="mb-8 flex items-center justify-between">
         <h1 className="font-display text-3xl font-semibold text-green-900">
           Bookings

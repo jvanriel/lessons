@@ -10,6 +10,7 @@ import { getSession, hasRole } from "@/lib/auth";
 import { redirect } from "next/navigation";
 import Link from "next/link";
 import { CancelBookingButton } from "./CancelBookingButton";
+import { BookingRefreshListener } from "@/components/BookingRefreshListener";
 
 export const metadata = { title: "My Bookings — Golf Lessons" };
 
@@ -55,6 +56,7 @@ export default async function MemberBookingsPage() {
 
   return (
     <div className="mx-auto max-w-4xl px-6 py-12">
+      <BookingRefreshListener />
       <div className="mb-8 flex items-center justify-between">
         <h1 className="font-display text-3xl font-semibold text-green-900">
           My Bookings
