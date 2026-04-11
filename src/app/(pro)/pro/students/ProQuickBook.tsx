@@ -321,11 +321,6 @@ export function ProQuickBook({ proStudentId, studentName, initialData, autoOpen 
           {/* Location + duration info */}
           <p className="mb-2 text-xs text-green-500">
             {data.locationName} &middot; {data.duration} min
-            {data.interval && (
-              <span className="ml-1 rounded-full bg-green-100 px-1.5 py-0.5 text-[10px] text-green-600">
-                {data.interval}
-              </span>
-            )}
           </p>
 
           {/* Date pills with arrows */}
