@@ -2,9 +2,10 @@
 
 import { useState, useRef, useActionState } from "react";
 import Link from "next/link";
-import { inviteStudent, type ProQuickBookData } from "./actions";
+import { inviteStudent, getStudentBookings, proCancelBooking, type ProQuickBookData } from "./actions";
 import { ProQuickBook } from "./ProQuickBook";
 import { EditStudentDialog } from "./EditStudentDialog";
+import { StudentBookings } from "./StudentBookings";
 
 interface Student {
   id: number;
@@ -509,6 +510,11 @@ export default function StudentManager({
                         studentName={`${student.firstName} ${student.lastName}`}
                         autoOpen
                       />
+                    )}
+
+                    {/* Upcoming bookings */}
+                    {student.status === "active" && (
+                      <StudentBookings proStudentId={student.id} />
                     )}
                   </div>
                 )}

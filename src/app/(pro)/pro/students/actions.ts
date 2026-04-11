@@ -14,7 +14,7 @@ import {
   proAvailability,
   proAvailabilityOverrides,
 } from "@/lib/db/schema";
-import { eq, and, desc, gte, lte } from "drizzle-orm";
+import { eq, and, asc, desc, gte, lte } from "drizzle-orm";
 import { requireProProfile } from "@/lib/pro";
 import { hashPassword } from "@/lib/auth";
 import { sendEmail } from "@/lib/mail";
@@ -969,4 +969,85 @@ export async function proQuickBookForStudent(data: {
   revalidatePath("/pro/students");
   revalidatePath("/pro/bookings");
   return { success: true, bookingId: booking.id };
+}
+
+/**
+ * Get upcoming bookings for a specific student.
+ */
+export async function getStudentBookings(proStudentId: number) {
+  const { profile } = await requireProProfile();
+  if (!profile) return [];
+
+  const today = new Date().toISOString().split("T")[0];
+
+  // Get the student's userId from the proStudents relationship
+  const [rel] = await db
+    .select({ userId: proStudents.userId })
+    .from(proStudents)
+    .where(
+      and(
+        eq(proStudents.id, proStudentId),
+        eq(proStudents.proProfileId, profile.id)
+      )
+    )
+    .limit(1);
+
+  if (!rel) return [];
+
+  const bookings = await db
+    .select({
+      id: lessonBookings.id,
+      date: lessonBookings.date,
+      startTime: lessonBookings.startTime,
+      endTime: lessonBookings.endTime,
+      status: lessonBookings.status,
+    })
+    .from(lessonBookings)
+    .where(
+      and(
+        eq(lessonBookings.proProfileId, profile.id),
+        eq(lessonBookings.bookedById, rel.userId),
+        eq(lessonBookings.status, "confirmed"),
+        gte(lessonBookings.date, today)
+      )
+    )
+    .orderBy(asc(lessonBookings.date), asc(lessonBookings.startTime));
+
+  return bookings;
+}
+
+/**
+ * Cancel a booking (pro-initiated).
+ */
+export async function proCancelBooking(bookingId: number) {
+  const { profile } = await requireProProfile();
+  if (!profile) return { error: "No pro profile." };
+
+  const [booking] = await db
+    .select({ id: lessonBookings.id })
+    .from(lessonBookings)
+    .where(
+      and(
+        eq(lessonBookings.id, bookingId),
+        eq(lessonBookings.proProfileId, profile.id),
+        eq(lessonBookings.status, "confirmed")
+      )
+    )
+    .limit(1);
+
+  if (!booking) return { error: "Booking not found." };
+
+  await db
+    .update(lessonBookings)
+    .set({
+      status: "cancelled",
+      cancelledAt: new Date(),
+      cancellationReason: "Cancelled by pro",
+      updatedAt: new Date(),
+    })
+    .where(eq(lessonBookings.id, bookingId));
+
+  revalidatePath("/pro/students");
+  revalidatePath("/pro/bookings");
+  return { success: true };
 }
