@@ -1,4 +1,5 @@
-import { google } from "googleapis";
+import { gmail as gmailClient } from "@googleapis/gmail";
+import { JWT } from "google-auth-library";
 
 async function main() {
   const sendAs = process.env.GMAIL_SEND_AS || "noreply@golflessons.be";
@@ -12,14 +13,14 @@ async function main() {
     <p>Timestamp: ${new Date().toISOString()}</p>
   `;
 
-  const auth = new google.auth.JWT({
+  const auth = new JWT({
     email: process.env.GOOGLE_SERVICE_ACCOUNT_EMAIL,
     key: process.env.GOOGLE_SERVICE_ACCOUNT_PRIVATE_KEY?.replace(/\\n/g, "\n"),
     scopes: ["https://www.googleapis.com/auth/gmail.send"],
     subject: sendAs, // impersonate this user
   });
 
-  const gmail = google.gmail({ version: "v1", auth });
+  const gmail = gmailClient({ version: "v1", auth });
 
   // Build RFC 2822 message
   const message = [
@@ -53,14 +54,14 @@ async function main() {
   await new Promise((r) => setTimeout(r, 3000));
 
   // Read inbox as it.admin (which dummy.pro aliases to)
-  const readAuth = new google.auth.JWT({
+  const readAuth = new JWT({
     email: process.env.GOOGLE_SERVICE_ACCOUNT_EMAIL,
     key: process.env.GOOGLE_SERVICE_ACCOUNT_PRIVATE_KEY?.replace(/\\n/g, "\n"),
     scopes: ["https://www.googleapis.com/auth/gmail.readonly"],
     subject: "it.admin@golflessons.be",
   });
 
-  const readGmail = google.gmail({ version: "v1", auth: readAuth });
+  const readGmail = gmailClient({ version: "v1", auth: readAuth });
   const inbox = await readGmail.users.messages.list({
     userId: "me",
     maxResults: 3,

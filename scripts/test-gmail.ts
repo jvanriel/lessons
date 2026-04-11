@@ -1,16 +1,17 @@
-import { google } from "googleapis";
+import { gmail as gmailClient } from "@googleapis/gmail";
+import { JWT } from "google-auth-library";
 
 async function testGmail() {
   const email = "it.admin@golflessons.be";
 
-  const auth = new google.auth.JWT({
+  const auth = new JWT({
     email: process.env.GOOGLE_SERVICE_ACCOUNT_EMAIL,
     key: process.env.GOOGLE_SERVICE_ACCOUNT_PRIVATE_KEY?.replace(/\\n/g, "\n"),
     scopes: ["https://www.googleapis.com/auth/gmail.readonly"],
     subject: email,
   });
 
-  const gmail = google.gmail({ version: "v1", auth });
+  const gmail = gmailClient({ version: "v1", auth });
 
   console.log(`Reading inbox for ${email}...`);
 
