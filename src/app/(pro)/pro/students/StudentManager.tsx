@@ -411,11 +411,12 @@ export default function StudentManager({
                   onClick={() =>
                     setSelectedStudentId(isSelected ? null : student.id)
                   }
-                  className="flex w-full items-center justify-between p-4 text-left"
+                  className="w-full p-4 text-left"
                 >
-                  <div className="flex items-center gap-4">
+                  {/* Row 1: avatar + name + email */}
+                  <div className="flex items-center gap-3">
                     <div
-                      className={`flex h-10 w-10 items-center justify-center rounded-full text-sm font-medium ${
+                      className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-full text-sm font-medium ${
                         isSelected
                           ? "bg-gold-100 text-gold-700"
                           : "bg-green-100 text-green-600"
@@ -424,19 +425,16 @@ export default function StudentManager({
                       {student.firstName.charAt(0)}
                       {student.lastName.charAt(0)}
                     </div>
-                    <div>
+                    <div className="min-w-0 flex-1">
                       <p className="text-sm font-medium text-green-900">
                         {student.firstName} {student.lastName}
                       </p>
-                      <p className="text-xs text-green-500">{student.email}</p>
+                      <p className="truncate text-xs text-green-500">{student.email}</p>
                     </div>
                   </div>
-                  <div className="flex items-center gap-3">
-                    <div className="text-right">
-                      <div className="flex items-center gap-2">
-                        {statusBadge(student.status)}
-                      </div>
-                    </div>
+                  {/* Row 2: status + expand icon */}
+                  <div className="mt-2 flex items-center justify-between pl-[52px]">
+                    {statusBadge(student.status)}
                     <svg
                       className={`h-4 w-4 text-green-400 transition-transform ${
                         isSelected ? "rotate-180" : ""
