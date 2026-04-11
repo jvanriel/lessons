@@ -1021,7 +1021,12 @@ export async function proCancelBooking(bookingId: number) {
   if (!profile) return { error: "No pro profile." };
 
   const [booking] = await db
-    .select({ id: lessonBookings.id })
+    .select({
+      id: lessonBookings.id,
+      date: lessonBookings.date,
+      startTime: lessonBookings.startTime,
+      bookedById: lessonBookings.bookedById,
+    })
     .from(lessonBookings)
     .where(
       and(
@@ -1043,6 +1048,17 @@ export async function proCancelBooking(bookingId: number) {
       updatedAt: new Date(),
     })
     .where(eq(lessonBookings.id, bookingId));
+
+  // Notify the student
+  await createNotification({
+    type: "booking_cancelled",
+    priority: "high",
+    targetUserId: booking.bookedById,
+    title: "Lesson cancelled",
+    message: `${profile.displayName} cancelled your lesson on ${booking.date} at ${booking.startTime}.`,
+    actionUrl: "/member/bookings",
+    actionLabel: "View bookings",
+  }).catch(() => {});
 
   revalidatePath("/pro/students");
   revalidatePath("/pro/bookings");

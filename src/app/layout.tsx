@@ -68,10 +68,8 @@ export default async function RootLayout({
 
   if (isAppMode && session) {
     const locale = await getLocale();
-    const showNotifications =
-      hasRole(session, "admin") ||
-      hasRole(session, "pro") ||
-      hasRole(session, "dev");
+    // All authenticated users get notifications
+    const showNotifications = true;
 
     let sessionToken: string | undefined;
     if (showNotifications) {
