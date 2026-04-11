@@ -130,31 +130,34 @@ export function BookingsCalendar({ bookings, availability }: Props) {
 
   return (
     <div>
-      {/* Navigation */}
-      <div className="mb-4 flex flex-wrap items-center gap-3">
-        <Button variant="outline" size="sm" onClick={goToPrevWeek}>
-          <svg className="mr-1 h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-            <path strokeLinecap="round" strokeLinejoin="round" d="M15 19l-7-7 7-7" />
-          </svg>
-          Prev
-        </Button>
-        <Button variant="outline" size="sm" onClick={goToToday}>
-          Today
-        </Button>
-        <Button variant="outline" size="sm" onClick={goToNextWeek}>
-          Next
-          <svg className="ml-1 h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-            <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
-          </svg>
-        </Button>
-        <span className="text-sm font-medium text-green-800">{weekLabel}</span>
+      {/* Sticky navigation + day header */}
+      <div className="sticky top-0 z-20 bg-[#faf7f0] pb-2">
+        {/* Navigation */}
+        <div className="mb-2 flex flex-wrap items-center gap-3">
+          <Button variant="outline" size="sm" onClick={goToPrevWeek}>
+            <svg className="mr-1 h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M15 19l-7-7 7-7" />
+            </svg>
+            Prev
+          </Button>
+          <Button variant="outline" size="sm" onClick={goToToday}>
+            Today
+          </Button>
+          <Button variant="outline" size="sm" onClick={goToNextWeek}>
+            Next
+            <svg className="ml-1 h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
+            </svg>
+          </Button>
+          <span className="text-sm font-medium text-green-800">{weekLabel}</span>
+        </div>
       </div>
 
       {/* Calendar grid */}
       <div className="overflow-x-auto rounded-xl border border-green-200 bg-white">
         <div className="min-w-[720px]">
-          {/* Header */}
-          <div className="grid grid-cols-[60px_repeat(7,1fr)] border-b border-green-200">
+          {/* Day header — sticky within the scroll container */}
+          <div className="sticky top-0 z-10 grid grid-cols-[60px_repeat(7,1fr)] border-b border-green-200 bg-white">
             <div className="border-r border-green-100 px-2 py-2" />
             {weekDates.map((date, i) => {
               const dateStr = formatDate(date);
