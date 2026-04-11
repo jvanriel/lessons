@@ -39,9 +39,14 @@ function formatLongDate(dateStr: string) {
   });
 }
 
-function formatDatePill(dateStr: string) {
+function formatDatePillDay(dateStr: string) {
   const d = new Date(dateStr + "T00:00:00");
-  return d.toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric" });
+  return d.toLocaleDateString("en-US", { weekday: "short" });
+}
+
+function formatDatePillDate(dateStr: string) {
+  const d = new Date(dateStr + "T00:00:00");
+  return d.toLocaleDateString("en-US", { month: "short", day: "numeric" });
 }
 
 export function QuickBook({ data, proSlug, hasPaymentMethod = true, allowBookingWithoutPayment = false }: Props) {
@@ -216,18 +221,19 @@ export function QuickBook({ data, proSlug, hasPaymentMethod = true, allowBooking
       )}
 
       {/* Date pills */}
-          <div className="mb-3 flex gap-2 overflow-x-auto">
+          <div className="mb-3 flex gap-1.5 overflow-x-auto">
             {[data.suggestedDate, ...data.alternativeDates.filter((d) => d !== data.suggestedDate)].map((d) => (
               <button
                 key={d}
                 onClick={() => switchDate(d)}
-                className={`shrink-0 rounded-full px-3 py-1 text-xs font-medium transition-colors ${
+                className={`shrink-0 rounded-lg px-2.5 py-1 text-center transition-colors ${
                   selectedDate === d
                     ? "bg-gold-600 text-white"
                     : "bg-green-50 text-green-700 hover:bg-green-100"
                 }`}
               >
-                {formatDatePill(d)}
+                <div className="text-[10px] font-medium leading-tight">{formatDatePillDay(d)}</div>
+                <div className="text-[10px] leading-tight">{formatDatePillDate(d)}</div>
               </button>
             ))}
           </div>
