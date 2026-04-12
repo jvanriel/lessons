@@ -153,9 +153,23 @@ Access: student sees only their own page. Pro sees all their students' pages.
 
 ### 5.6 Notifications
 
-- Email: booking confirmations, reminders (24h before), cancellations, new content from pro
-- In-app: notification feed
+- **Email** — booking confirmations, reminders (24h before), cancellations, new content from pro
+- **In-app notification bell** — persistent history, always visible (system notifications disappear)
+- **In-app toast** — slide-in for high/urgent priority; also fired when the service worker forwards a Web Push to an active tab
+- **Web Push** — system notifications via service worker, `push_subscriptions` table, VAPID auth, `web-push` library. Subscribed users are routed to push only; non-subscribed users fall back to WebSocket + ntfy. All three channels flow through the single `createNotification` funnel.
+- **ntfy** — legacy fallback for non-subscribed users on high/urgent priority
 - SMS reminders — future phase
+
+### 5.7 PWA & Installation
+
+- **Manifest** via `src/app/manifest.ts` (standalone, maskable icons, environment-aware name)
+- **Service worker** (`public/sw.js`, v3) — online-first, handles `push` + `notificationclick`, `requireInteraction` + `vibrate` for prominence
+- **Install flow**:
+  - Inline script in root layout captures `beforeinstallprompt` early (before React hydrates)
+  - `InstallBanner` — mobile-only dismissible bottom banner (7-day cooldown)
+  - `InstallPwaSection` — profile page section with install button and live "Installed" detection
+  - `HelpDialog` — question-mark icon in top bar with iPhone/Android/QR login tabs, per-platform install + notification troubleshooting
+- iOS: Safari-only, instructions flow (Apple doesn't implement `beforeinstallprompt`)
 
 ---
 
@@ -169,10 +183,19 @@ Access: student sees only their own page. Pro sees all their students' pages.
 /(site)/[locale]/pros/[slug]          # Pro public profile
 /(site)/[locale]/pricing              # Pro subscription pricing
 
-/login                                # Auth
+/login                                # Auth (password + Google OAuth)
 /register                             # Auth (role selection: pro vs student)
 /register/pro                         # Pro registration → Stripe sub + Connect
 /register/student                     # Student registration
+
+/api/auth/google                      # Google OAuth start (CSRF state cookie)
+/api/auth/google/callback             # Google OAuth callback → session
+/api/auth/qr-login                    # QR login token callback (role-aware redirect)
+
+/api/push/subscribe                   # Web Push: store subscription
+/api/push/unsubscribe                 # Web Push: remove subscription
+/api/push/status                      # Web Push: current user's subscription state
+/api/push/test                        # Web Push: diagnostic send-to-self
 
 /(pro)/pro/                           # Pro dashboard
 /(pro)/pro/profiel                    # Edit profile

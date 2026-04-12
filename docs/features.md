@@ -17,10 +17,16 @@ Golf lesson booking platform at **golflessons.be**. Pros subscribe annually, con
 
 ### Login
 - Email + password with show/hide toggle
+- **Sign in with Google** (OAuth) as an alternative to password — matches the returned email against `users`/`user_emails`, no auto-registration
 - Accepts any registered email (primary or alias via `user_emails` table)
 - Pre-fills email from `?email=` query parameter (from invite/reset links)
 - Auto-activates pending pro-student relationships on login
 - Updates `lastLoginAt` timestamp
+
+### QR Login (desktop → mobile)
+- On member and pro dashboards, a "Phone" button shows a QR code containing a 5-minute JWT
+- Login page has a **Scan QR code to login** button (mobile only) using the camera + `jsqr`
+- Callback redirects based on role: pros → `/pro/dashboard`, admin/dev → `/admin`, members → `/member/dashboard`
 
 ### Password Management
 - **Forgot password**: enter email → receives branded reset link (1-hour JWT token)
@@ -179,11 +185,16 @@ Golf lesson booking platform at **golflessons.be**. Pros subscribe annually, con
 - Per-relationship coaching channel (contextType="coaching")
 - Uses existing `comments` system with `contextId = proStudents.id`
 - Chat bubbles: own messages right-aligned (dark green), others left (light green)
-- 5-second polling with incremental updates
+- Incremental polling with push-driven refresh
 - Date separators (Today, Yesterday, or date)
 - Reply-to with quoted preview
-- Quick emoji reactions (👍 ❤️ 😂 🎯 ✅)
+- **Chevron menu** inside bubble top-right → Reply / Download (attachments) / Delete (own)
+- **Grey smiley next to bubble** → opens quick reaction popup (👍 ❤️ 😂 🎯 ✅)
+- Reactions: anyone can toggle, counts per emoji, own reaction highlighted
+- **Emoji picker** in input field (100+ emojis grid)
 - Edit (15-minute window) and soft delete
+- Members can delete their own comments and add reactions (not restricted to pro/admin)
+- Input stays pinned above the BottomNav on mobile; 16px font to prevent iOS auto-zoom
 
 ### File Sharing
 - Paperclip button for file picker
@@ -199,6 +210,7 @@ Golf lesson booking platform at **golflessons.be**. Pros subscribe annually, con
 ### Pages
 - Pro view: `/pro/students/{id}` — coaching with a specific student
 - Student view: `/member/coaching/{id}` — coaching with their pro
+- Student chat list: `/member/coaching` — list of active pros (used by the BottomNav "Chat" tab)
 - Full-height layout with header showing partner info + back link
 
 ### `lastMessageAt` Tracking
@@ -210,22 +222,34 @@ Golf lesson booking platform at **golflessons.be**. Pros subscribe annually, con
 
 ### In-App Notifications
 - `notifications` table with type, priority, target user, title, message, action URL
-- Bell icon in header (admin/pro/dev only) with unread count badge
-- Dropdown with notification list, priority color borders, time-ago timestamps
-- Mark all read / Clear all actions
+- Bell icon in header (admin/pro/dev + member) with unread count badge — always visible as persistent history (system notifications disappear)
+- Dropdown is a centered modal on mobile, anchored dropdown on desktop
+- Mark all read / Clear all actions (panel auto-closes after clear)
 - Click to mark as read + navigate to action URL
 - 30-second polling fallback
-- WebSocket support ready (for Hetzner gateway)
+- WebSocket support via Hetzner gateway
 
 ### Toast Notifications
 - Slide-in from right for high/urgent priority
 - Auto-dismiss after 5 seconds
 - Two-tone chime sound via Web Audio API
+- Also fired when the service worker forwards a Web Push to an active tab
 
-### ntfy Push Notifications
+### Web Push Notifications (PWA)
+- `push_subscriptions` table stores per-device FCM/Apple push endpoints with VAPID keys
+- `/api/push/subscribe`, `/api/push/unsubscribe`, `/api/push/status`, `/api/push/test`
+- `src/lib/push.ts` `sendPush(userIds, payload)` helper using `web-push`
+- Service worker (`public/sw.js`, v3) handles `push` + `notificationclick`:
+  - Always calls `showNotification()` (OS suppresses in foreground automatically)
+  - Forwards to active clients via `postMessage` so the in-app toast still fires
+  - `requireInteraction: true`, `vibrate: [200, 100, 200]`, `renotify: true`
+- `createNotification` routes push-subscribed users to Web Push only (awaited, not fire-and-forget), non-subscribed users to WebSocket + ntfy fallback
+- Users enable via **Profile → Notifications → Enable notifications**, with a **Send test notification** button for diagnostics
+- iOS requires PWA installed to Home Screen before permission can be granted
+
+### ntfy Push Notifications (legacy fallback)
 - Sends to Hetzner server via `golf-alerts` topic
-- Triggered for high/urgent priority notifications
-- Pro registrations, task mentions, etc.
+- Only triggered for fallback users (no Web Push subscription) on high/urgent priority
 
 ### Notification Types
 - `user_registered` — new student or pro registration
@@ -368,14 +392,24 @@ Golf lesson booking platform at **golflessons.be**. Pros subscribe annually, con
 ## 14. Infrastructure
 
 ### Pre-Launch
-- Gold banner on all pages: "This site is in pre-launch"
-- Password gate on non-localhost domains (password: `prolessons`, 30-day cookie)
-- Deployment checker: polls `/api/version` every 60s, shows refresh banner on new deploy
+- Password gate on non-localhost domains (password: `prolessons`, 30-day cookie) — enforced in `src/middleware.ts`
+- Pre-launch banner was removed; the password gate alone keeps the site private
+- Deployment checker: polls `/api/version`, shows refresh banner on new deploy
+
+### PWA
+- Next.js manifest via `src/app/manifest.ts` (standalone, green/gold theme, maskable icons)
+- Service worker at `public/sw.js` (online-first, no-cache headers)
+- One-click install on Android/desktop Chrome via `beforeinstallprompt`:
+  - Captured early by an inline script in the root layout (before React hydrates) and stashed on `window.__deferredInstallPrompt`
+  - `InstallBanner` (mobile only, `md:hidden`) shows a dismissible bottom banner when installable (7-day cooldown)
+  - `InstallPwaSection` on profile pages with live install status (standalone check + localStorage flag + `getInstalledRelatedApps()`)
+  - `HelpDialog` has platform tabs (iPhone/Android/QR) with one-click install button on Android and Safari instructions for iOS
+- iOS: instructions-only flow (Apple doesn't implement `beforeinstallprompt`)
 
 ### Database
 - Neon Postgres (`neon-teal-flame`)
 - Drizzle ORM with `pnpm db:push` for schema sync
-- Tables: users, userEmails, cmsBlocks, notifications, proProfiles, locations, proLocations, proAvailability, proAvailabilityOverrides, lessonBookings, lessonParticipants, proPages, proStudents, proMailingContacts, proMailings, tasks, taskNotes, comments, commentReactions
+- Tables: users, userEmails, cmsBlocks, notifications, pushSubscriptions, proProfiles, locations, proLocations, proAvailability, proAvailabilityOverrides, lessonBookings, lessonParticipants, proPages, proStudents, proMailingContacts, proMailings, tasks, taskNotes, comments, commentReactions
 
 ### Storage
 - Vercel Blob (`lessons-blob`) for file uploads
@@ -401,13 +435,17 @@ Golf lesson booking platform at **golflessons.be**. Pros subscribe annually, con
 
 ---
 
-## 15. Planned (Not Yet Implemented)
+## 15. App Layout (Live)
 
-- **App mode layout**: left sidebar drawer (desktop) + bottom tab bar (mobile) for logged-in users
+- **AppLayout** (for logged-in users): top bar (Logo, Help, Language, Bell, User), left sidebar with collapsible role sections (persisted to localStorage, can collapse even when the active page is inside a section), bottom tab bar on mobile (Home, Bookings, Chat, Profile for members; Dashboard, Students, Bookings, Profile for pros)
+- **AppTopBar** right side: HelpDialog button, LanguageSwitcher (globe icon), NotificationBell, firstName + user menu
+- **HelpDialog** (question mark icon): iPhone/Android/QR login tabs with install + notification troubleshooting
+- Sidebar collapsed/expanded state persisted per-user in localStorage
+
+## 16. Planned (Not Yet Implemented)
+
 - **Contact page**: public contact form
-- **Stripe Connect**: payment processing for lesson fees
 - **ICS email attachments**: booking confirmation/cancellation calendar files
 - **Daily digest cron**: email summary of unread notifications
-- **Pro photo upload**: profile and coaching page photos
-- **Video hosting**: Vercel Blob for lesson videos
+- **Video hosting**: Vercel Blob for lesson videos (infrastructure ready, no UI yet)
 - **Google Calendar sync**: for pros with @golflessons.be emails

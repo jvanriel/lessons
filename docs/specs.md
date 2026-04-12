@@ -196,17 +196,22 @@ The registration is a unified 6-step wizard. All steps support back navigation �
 
 ### Flow: `/member/coaching/[id]` (student) or `/pro/students/[id]` (pro)
 
+Also: `/member/coaching` (list of active pros — used by the member BottomNav "Chat" tab).
+
 - WhatsApp-style messaging between student and pro
-- Messages poll every 5 seconds
+- Incremental polling with push-driven refresh
 - Date separators (Today, Yesterday, or date)
 - Sender's messages right-aligned, receiver's left-aligned
+- Input pinned above the BottomNav on mobile; 16px font prevents iOS auto-zoom on focus
 
 **Features:**
 - Send text messages
-- Emoji reactions (tap message): thumbs up, heart, laugh, target, checkmark
+- **Chevron menu** inside each bubble (top-right): Reply / Download (if attachment) / Delete (own messages)
+- **Grey smiley** button next to each bubble: opens quick reaction popup (👍 ❤️ 😂 🎯 ✅)
+- **Emoji picker** button in input field: 100+ emoji grid inserts into message
 - Reply to message (shows quoted original)
 - Edit message (within 15-minute window)
-- Delete message (soft-delete, shows "Message deleted")
+- Delete message (soft-delete, shows "Message deleted") — members can delete their own messages
 - File upload: drag-drop or click, max 10MB
   - Images: inline thumbnail (max 300px)
   - Videos: thumbnail with play icon
@@ -216,12 +221,16 @@ The registration is a unified 6-step wizard. All steps support back navigation �
 
 - [ ] Send message as student — verify appears for pro
 - [ ] Send message as pro — verify appears for student
-- [ ] Add emoji reaction — verify shown on message
+- [ ] Open chevron menu — verify Reply / Delete / Download (when file)
+- [ ] Tap smiley — verify quick reaction popup appears with 5 emojis
+- [ ] Tap an emoji — verify reaction added and toggle on second tap
+- [ ] Open emoji picker in input — verify grid and insert into message
 - [ ] Reply to a message — verify quoted text
 - [ ] Edit a message (within 15 min) — verify "edited" indicator
-- [ ] Delete a message — verify "Message deleted" placeholder
+- [ ] Delete own message as member — verify "Message deleted" placeholder (regression: members used to be blocked)
 - [ ] Upload image — verify inline preview
 - [ ] Upload document — verify file icon and download link
+- [ ] On mobile, focus input — verify no auto-zoom and input stays above BottomNav
 
 ---
 
@@ -482,3 +491,66 @@ Both linked from the footer. Terms specify disputes are resolved by the courts o
 - [ ] Access `/admin/users` as member — verify redirect to login
 - [ ] New member without onboarding — verify redirect to `/register`
 - [ ] Completed member accessing `/register` — verify redirect to dashboard
+
+---
+
+## 16. Google OAuth Login
+
+### Flow: `/login` → "Sign in with Google"
+
+- Button appears below the password form
+- Opens Google consent screen (scopes: `openid`, `email`, `profile`)
+- Callback at `/api/auth/google/callback` matches the verified email against `users` / `user_emails`
+- **No auto-registration**: if the email is not in the DB, redirects to login with `?error=google_no_account`
+- On success: creates a 7-day session cookie identical to password login, redirects by role (pro → `/pro/dashboard`, admin/dev → `/admin`, member → `/member/dashboard`)
+- Auto-sets `emailVerifiedAt` when Google has verified the email
+
+### Test scenarios
+
+- [ ] Sign in with a Google account whose email is in the DB — verify successful login + role-based redirect
+- [ ] Sign in with a Google account not in the DB — verify redirect back to login with error message
+- [ ] Sign in as a user who has a primary email AND an alias Google email — verify alias lookup works
+
+---
+
+## 17. Web Push Notifications
+
+### Flow: Profile → Notifications → Enable notifications
+
+- Requires PWA installed (standalone) on iOS; works in a regular Chrome tab on Android/desktop
+- Click **Enable notifications** → browser permission prompt → subscription stored in `push_subscriptions`
+- **Send test notification** button triggers `/api/push/test` → real push to the current user's device
+- `createNotification` sends Web Push (awaited) to subscribed users; falls back to WebSocket + ntfy for non-subscribed users
+- Service worker forwards pushes to focused tabs via `postMessage` (for in-app toast) AND calls `showNotification()` (OS suppresses in foreground automatically)
+
+### Test scenarios
+
+- [ ] Enable notifications as member — verify subscription row in DB
+- [ ] Send test notification — verify system notification appears
+- [ ] Create a booking as student — verify pro receives system notification in background
+- [ ] Cancel a booking — verify pro receives "{name} cancelled the lesson on …" message
+- [ ] Disable notifications → verify subscription removed from DB
+- [ ] On iOS, try enabling from Safari (not installed PWA) — verify the hint to install first
+
+---
+
+## 18. PWA Install
+
+### Android / desktop Chrome
+- Inline script in root layout captures `beforeinstallprompt` into `window.__deferredInstallPrompt`
+- **InstallBanner** (mobile only) shows a dismissible bottom banner with one-click install (7-day cooldown when dismissed)
+- **InstallPwaSection** on profile pages shows install button, "Installed" state, or platform-specific fallback text
+- **HelpDialog → Android tab** shows live Install button when available
+
+### iOS
+- No `beforeinstallprompt` support — users must use Safari → Share → Add to Home Screen
+- **HelpDialog → iPhone tab** shows step-by-step instructions with Share icon
+
+### Test scenarios
+
+- [ ] Open site on fresh Android Chrome — verify install banner appears at bottom
+- [ ] Tap Install on banner — verify native install prompt, app added to drawer
+- [ ] Dismiss banner — verify it doesn't reappear for 7 days
+- [ ] Open installed PWA — verify banner and InstallPwaSection show "Installed"
+- [ ] Open HelpDialog → iPhone tab — verify Safari instructions render
+- [ ] Open HelpDialog → QR login tab — verify desktop/phone steps

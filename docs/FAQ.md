@@ -150,7 +150,15 @@ Yes — when a pro books for a student (via the pro/students page), the booking 
 ## PWA & Installation
 
 ### Q: Can I install the app on my phone?
-Yes. On iPhone: open in Safari → Share → "Add to Home Screen". On Android: Chrome shows an install banner, or use Menu → "Add to Home Screen".
+Yes. On **Android / desktop Chrome**: we capture the `beforeinstallprompt` event and show:
+- A dismissible bottom banner on mobile ("Install Golf Lessons")
+- An **Install app** button in `Profile → Install app` section
+- A **one-click install button** inside the Help dialog (Android tab)
+
+On **iPhone**: open in Safari → Share → **Add to Home Screen**. Apple doesn't implement `beforeinstallprompt`, so there's no one-click install — step-by-step instructions are in the Help dialog (iPhone tab).
+
+### Q: How do I open the Help dialog?
+Tap the **question mark icon** in the top bar (to the left of the language switcher). It has three tabs: iPhone, Android, QR login — with install and notification troubleshooting for each platform.
 
 ### Q: Can I install both preview and production?
 Yes. Each environment has a unique manifest ID and name:
@@ -159,5 +167,59 @@ Yes. Each environment has a unique manifest ID and name:
 
 They install as separate apps with separate icons.
 
+### Q: How does the app detect it's installed?
+Three signals combined:
+1. `display-mode: standalone` / `navigator.standalone` — true when running from Home Screen
+2. `localStorage.pwa-installed` — set on the `appinstalled` event, persisted across tabs/sessions
+3. `getInstalledRelatedApps()` — Chrome API that detects the PWA even from a regular browser tab
+
 ### Q: How do updates work?
-The app is online-first — every visit fetches the latest code. A deployment checker polls every 60 seconds. If a new version is deployed while the app is open, a toast appears: "A new version is available" with a Refresh button.
+The app is online-first — every visit fetches the latest code. The service worker (`/sw.js`) is served with `Cache-Control: must-revalidate` so browsers pick up new versions fast. A deployment checker polls for new deploys and shows a toast: "A new version is available" with a Refresh button.
+
+---
+
+## System Notifications (Web Push)
+
+### Q: How do I enable system notifications?
+Install the app (see above), then go to **Profile → Notifications → Enable notifications**. Grant permission when prompted. Tap **Send test notification** to verify it works.
+
+### Q: Why don't I see notifications on iOS?
+iOS Web Push only works when the PWA is installed to Home Screen via Safari. If you're using Chrome as default browser and scan a QR code, links open in Chrome — and you won't be able to install the PWA from there. Open in Safari manually.
+
+### Q: I enabled notifications but don't see them on Android
+The push is probably being delivered but Android is suppressing the visual. Common causes:
+1. **Chrome site settings**: tap the lock icon → Permissions → Notifications → Allow
+2. **Chrome marked the site as spammy** (especially on preview URLs) — the bell icon in the address bar has a strikethrough. Override to Allow.
+3. **Do Not Disturb** is active
+4. **Battery saver / background restrictions** on Chrome
+5. Notification category is set to Silent in Android Settings → Apps → Chrome → Notifications
+
+The Help dialog (Android tab) has step-by-step troubleshooting.
+
+### Q: Why doesn't the installed PWA show up in Android's app list?
+Android treats PWAs as websites managed by the browser. All notification settings live under **Settings → Apps → Chrome → Notifications → Sites**, not as a separate app entry.
+
+### Q: What's the difference between the bell icon and system notifications?
+- **Bell icon** (top bar, always visible): persistent history of all notifications. System notifications disappear once dismissed, so the bell is the only place you can review past alerts.
+- **System notifications** (OS native popups): real-time alerts from Web Push, appear even when the app is closed or backgrounded.
+- **In-app toasts**: slide in from the top when the app is in foreground (driven by WebSocket or forwarded push).
+
+All three are fired from the same `createNotification` function — Web Push for subscribed users, WebSocket + ntfy for everyone else.
+
+### Q: Why can I get a test notification but not real booking notifications?
+This was a bug (fixed): `sendPush` was fire-and-forget, so Vercel serverless killed the promise before it finished. Now it's awaited. If you're still seeing this on an older deploy, update to the latest version.
+
+---
+
+## Login
+
+### Q: What login methods are available?
+1. **Email + password** — classic form on `/login`
+2. **Sign in with Google** — OAuth button below the password form (no auto-registration; the email must already exist in the DB)
+3. **QR code login** — on a desktop session, tap the **Phone** button in the dashboard header to show a QR code with a 5-minute token. On the phone, tap **Scan QR code to login** on the login page.
+
+### Q: Who can use Google OAuth?
+Anyone whose email is in the `users` or `user_emails` table. It's most useful for your team (Workspace users on `@golflessons.be`) — pros and students typically use password + email, since most don't have Google accounts.
+
+### Q: What happens with QR login on iOS + Chrome?
+If Chrome is your default browser on iOS, the QR code URL opens in Chrome. Login works, but Web Push and Home Screen install do NOT work in Chrome on iOS — only Safari. To install the PWA, open Safari manually.
