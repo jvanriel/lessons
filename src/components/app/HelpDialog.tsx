@@ -4,6 +4,11 @@ import { useState, useEffect } from "react";
 
 type Platform = "ios" | "android" | "unknown";
 
+interface BeforeInstallPromptEvent extends Event {
+  prompt: () => Promise<void>;
+  userChoice: Promise<{ outcome: "accepted" | "dismissed" }>;
+}
+
 function detectPlatform(): Platform {
   if (typeof navigator === "undefined") return "unknown";
   const ua = navigator.userAgent;
@@ -16,12 +21,43 @@ export default function HelpDialog() {
   const [open, setOpen] = useState(false);
   const [platform, setPlatform] = useState<Platform>("unknown");
   const [tab, setTab] = useState<"ios" | "android" | "qr">("ios");
+  const [installPrompt, setInstallPrompt] =
+    useState<BeforeInstallPromptEvent | null>(null);
+  const [installed, setInstalled] = useState(false);
 
   useEffect(() => {
     const p = detectPlatform();
     setPlatform(p);
     if (p === "android") setTab("android");
   }, []);
+
+  // Capture the browser's install prompt (Android Chrome/Edge, desktop Chrome)
+  useEffect(() => {
+    function handleBeforeInstall(e: Event) {
+      e.preventDefault();
+      setInstallPrompt(e as BeforeInstallPromptEvent);
+    }
+    function handleInstalled() {
+      setInstalled(true);
+      setInstallPrompt(null);
+    }
+    window.addEventListener("beforeinstallprompt", handleBeforeInstall);
+    window.addEventListener("appinstalled", handleInstalled);
+    return () => {
+      window.removeEventListener("beforeinstallprompt", handleBeforeInstall);
+      window.removeEventListener("appinstalled", handleInstalled);
+    };
+  }, []);
+
+  async function handleInstallClick() {
+    if (!installPrompt) return;
+    await installPrompt.prompt();
+    const { outcome } = await installPrompt.userChoice;
+    if (outcome === "accepted") {
+      setInstalled(true);
+    }
+    setInstallPrompt(null);
+  }
 
   useEffect(() => {
     if (!open) return;
@@ -126,7 +162,13 @@ export default function HelpDialog() {
             {/* Content */}
             <div className="max-h-[70vh] overflow-y-auto px-5 py-5 text-sm text-green-800">
               {tab === "ios" && <IOSInstructions />}
-              {tab === "android" && <AndroidInstructions />}
+              {tab === "android" && (
+                <AndroidInstructions
+                  canInstall={!!installPrompt}
+                  installed={installed}
+                  onInstall={handleInstallClick}
+                />
+              )}
               {tab === "qr" && <QRInstructions />}
               {tab !== "qr" && platform !== "unknown" && tab !== platform && (
                 <p className="mt-4 rounded-md bg-gold-50 px-3 py-2 text-xs text-gold-700">
@@ -236,24 +278,65 @@ function QRInstructions() {
   );
 }
 
-function AndroidInstructions() {
+function AndroidInstructions({
+  canInstall,
+  installed,
+  onInstall,
+}: {
+  canInstall: boolean;
+  installed: boolean;
+  onInstall: () => void;
+}) {
   return (
     <div className="space-y-5">
       <section>
         <h3 className="mb-2 font-semibold text-green-950">
           1. Install the app
         </h3>
-        <ol className="ml-5 list-decimal space-y-1.5 text-green-700">
-          <li>Open this website in <b>Chrome</b></li>
-          <li>
-            You should see an <b>Install</b> prompt at the bottom — tap it
-          </li>
-          <li>
-            Or: tap the <b>⋮</b> menu (top right) and choose{" "}
-            <b>Install app</b> or <b>Add to Home screen</b>
-          </li>
-          <li>Confirm the install</li>
-        </ol>
+
+        {installed ? (
+          <div className="rounded-md border border-green-300 bg-green-50 px-3 py-2.5 text-sm text-green-700">
+            ✓ Installed. Look for Golf Lessons in your app drawer or home
+            screen.
+          </div>
+        ) : canInstall ? (
+          <div className="space-y-2">
+            <button
+              onClick={onInstall}
+              className="flex w-full items-center justify-center gap-2 rounded-md bg-gold-600 px-4 py-2.5 text-sm font-medium text-white hover:bg-gold-500"
+            >
+              <svg
+                className="h-4 w-4"
+                fill="none"
+                viewBox="0 0 24 24"
+                stroke="currentColor"
+                strokeWidth={2}
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  d="M3 16.5v2.25A2.25 2.25 0 0 0 5.25 21h13.5A2.25 2.25 0 0 0 21 18.75V16.5M16.5 12 12 16.5m0 0L7.5 12m4.5 4.5V3"
+                />
+              </svg>
+              Install app
+            </button>
+            <p className="text-xs text-green-500">
+              Tap the button above to install in one step.
+            </p>
+          </div>
+        ) : (
+          <ol className="ml-5 list-decimal space-y-1.5 text-green-700">
+            <li>Open this website in <b>Chrome</b></li>
+            <li>
+              You should see an <b>Install</b> prompt at the bottom — tap it
+            </li>
+            <li>
+              Or: tap the <b>⋮</b> menu (top right) and choose{" "}
+              <b>Install app</b> or <b>Add to Home screen</b>
+            </li>
+            <li>Confirm the install</li>
+          </ol>
+        )}
       </section>
 
       <section>
