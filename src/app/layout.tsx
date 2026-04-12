@@ -175,7 +175,8 @@ export default async function RootLayout({
           dangerouslySetInnerHTML={{
             __html: `if('serviceWorker' in navigator){navigator.serviceWorker.register('/sw.js')}
 window.addEventListener('beforeinstallprompt',function(e){e.preventDefault();window.__deferredInstallPrompt=e;window.dispatchEvent(new Event('pwa-install-available'));});
-window.addEventListener('appinstalled',function(){window.__deferredInstallPrompt=null;window.dispatchEvent(new Event('pwa-installed'));});`,
+window.addEventListener('appinstalled',function(){window.__deferredInstallPrompt=null;try{localStorage.setItem('pwa-installed','true')}catch(e){}window.dispatchEvent(new Event('pwa-installed'));});
+try{if(window.matchMedia('(display-mode: standalone)').matches||navigator.standalone){localStorage.setItem('pwa-installed','true')}}catch(e){}`,
           }}
         />
       </body>
