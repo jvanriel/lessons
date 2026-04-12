@@ -409,7 +409,17 @@ Golf lesson booking platform at **golflessons.be**. Pros subscribe annually, con
 ### Database
 - Neon Postgres (`neon-teal-flame`)
 - Drizzle ORM with `pnpm db:push` for schema sync
-- Tables: users, userEmails, cmsBlocks, notifications, pushSubscriptions, proProfiles, locations, proLocations, proAvailability, proAvailabilityOverrides, lessonBookings, lessonParticipants, proPages, proStudents, proMailingContacts, proMailings, tasks, taskNotes, comments, commentReactions
+- Tables: users, userEmails, cmsBlocks, cmsBlockHistory, cmsPageVersions, pushSubscriptions, notifications, proProfiles, locations, proLocations, proAvailability, proAvailabilityOverrides, lessonBookings, lessonParticipants, proPages, proStudents, proMailingContacts, proMailings, tasks, taskNotes, comments, commentReactions, stripeEvents
+
+### Backup & Restore
+- **Format**: single JSON file containing all 23 tables, version-tagged, stored in Vercel Blob at `backups/YYYY/MM/TIMESTAMP.json`
+- **Core library**: `src/lib/backup.ts` — `createBackup`, `listBackups`, `restoreFromBackup`, `deleteBackup`
+- **API**: `/api/backup` (GET = cron, POST = UI), auth via `Bearer CRON_SECRET` OR dev session
+- **Daily cron**: `vercel.json` triggers `/api/backup` at 02:00 UTC and runs `cleanupOldNotifications` (90-day retention)
+- **Validation**: `/api/backup/validate?url=<blobUrl>` or `?latest=true` — compares backup row counts to live DB and reports mismatches
+- **Dev UI**: `/dev/backups` — create, view (JSON pretty-printed), download, restore (with confirmation), delete
+- **Test script**: `pnpm test:backup` (safe, backup + validate) or `pnpm test:backup --restore` (destructive round-trip, run on a Neon branch)
+- **Restore flow**: deletes tables in FK child→parent order, re-inserts in parent→child order with JSONB casts (`golf_goals`, `metadata`, `checklist`, `attachments`, `payload`, etc.), resets each `id_seq` to max
 
 ### Storage
 - Vercel Blob (`lessons-blob`) for file uploads

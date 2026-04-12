@@ -223,3 +223,41 @@ Anyone whose email is in the `users` or `user_emails` table. It's most useful fo
 
 ### Q: What happens with QR login on iOS + Chrome?
 If Chrome is your default browser on iOS, the QR code URL opens in Chrome. Login works, but Web Push and Home Screen install do NOT work in Chrome on iOS — only Safari. To install the PWA, open Safari manually.
+
+---
+
+## Backup & Restore
+
+### Q: How are backups made?
+A Vercel Cron hits `/api/backup` daily at 02:00 UTC. The endpoint calls `createBackup()` which dumps all 23 tables into a single JSON file and uploads it to Vercel Blob at `backups/YYYY/MM/TIMESTAMP.json`. Backups are public-blob URLs (unguessable, not auth-gated).
+
+Devs can also trigger a backup manually from `/dev/backups` → **Create backup**.
+
+### Q: How big is a backup?
+Small — on preview with ~400 rows it's about 160 KB. Even at 10× that size it's still a few MB. Vercel Blob has generous limits.
+
+### Q: How do I restore from a backup?
+Go to `/dev/backups`, pick a backup, click **Restore**, confirm. It deletes all tables in FK order and re-inserts from the JSON. The entire operation is inside one process (not atomic — if it fails halfway, the DB is in a partial state).
+
+### Q: Can I test that backup + restore actually work?
+
+Yes, two levels:
+
+**Safe test (no data changes)**: run `pnpm test:backup`. This creates a backup and compares row counts per table against the live DB. Output includes a table with ✓/✗ per table. Good for CI.
+
+**Destructive round-trip test**: run `pnpm test:backup --restore`. This creates a backup, then actually runs restore and compares the DB state before and after. **This modifies your database** — only run against a throwaway environment. The recommended way is to create a Neon branch of your preview database, point the script at it via `POSTGRES_URL_PREVIEW_NON_POOLING=<branch-url>`, and destroy the branch afterwards.
+
+You can also hit `/api/backup/validate?latest=true` or `?url=<blobUrl>` from the browser (as a dev) to get a JSON diff report for any backup without running a script.
+
+### Q: What's in a backup and what isn't?
+**Included**: all 23 tables (users, bookings, profiles, comments, notifications, CMS blocks, pro mailing lists, stripe events, etc.).
+
+**Not included**: Vercel Blob files (uploaded coaching attachments), Stripe customer/subscription data (lives in Stripe), Google Workspace email, auth secrets, env vars.
+
+So a full-disaster recovery would be: restore the DB from backup, then re-upload any missing blob files (or accept that they're gone, since URLs in the DB won't resolve to missing files).
+
+### Q: How long are backups kept?
+Forever, unless manually deleted from `/dev/backups`. Vercel Blob charges for storage but at backup sizes it's negligible. If needed we could add a retention policy later (e.g. keep daily for 30 days, weekly for 3 months, monthly forever).
+
+### Q: What is `CRON_SECRET`?
+A random token that Vercel Cron sends as `Authorization: Bearer <token>` when triggering `/api/backup`. It's set as an env var on preview and production. Without it, only logged-in dev users can trigger backups via POST.
