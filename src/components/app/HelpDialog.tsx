@@ -240,6 +240,35 @@ function IOSInstructions() {
           Requires iOS 16.4 or later.
         </p>
       </section>
+
+      <section>
+        <h3 className="mb-2 font-semibold text-green-950">
+          3. If notifications don&apos;t appear
+        </h3>
+        <p className="mb-1 font-medium text-green-800">Check the app&apos;s iOS notification settings:</p>
+        <ol className="ml-5 list-decimal space-y-1.5 text-green-700">
+          <li><b>iOS Settings</b> &rarr; <b>Notifications</b></li>
+          <li>Scroll to <b>Golf Lessons</b></li>
+          <li>Enable <b>Allow Notifications</b></li>
+          <li>Enable <b>Lock Screen</b>, <b>Notification Center</b>, and <b>Banners</b></li>
+          <li>Set <b>Banner Style</b> to <b>Persistent</b> for stickier alerts</li>
+          <li>Enable <b>Sounds</b> and <b>Badges</b></li>
+        </ol>
+        <p className="mt-3 mb-1 font-medium text-green-800">Other things to check:</p>
+        <ul className="ml-5 list-disc space-y-1.5 text-green-700">
+          <li><b>Focus / Do Not Disturb</b> — Control Centre &rarr; make sure no Focus is active</li>
+          <li><b>Low Power Mode</b> — can throttle background notifications. Settings &rarr; Battery</li>
+          <li><b>Scheduled Summary</b> — Settings &rarr; Notifications &rarr; if enabled, make sure Golf Lessons is set to <b>Deliver Immediately</b></li>
+        </ul>
+        <p className="mt-3 mb-1 font-medium text-green-800">Test your setup:</p>
+        <p className="text-green-700">
+          In the app, go to <b>Profile</b> &rarr; <b>Notifications</b> and tap
+          <b> Send test notification</b>. If nothing appears within a few
+          seconds, one of the settings above is blocking it. Remember: the
+          app must be installed from Safari to your Home Screen for
+          notifications to work at all on iOS.
+        </p>
+      </section>
     </div>
   );
 }
@@ -366,6 +395,42 @@ function AndroidInstructions({
         </ol>
         <p className="mt-2 text-xs text-green-500">
           Works in Chrome, Edge, Samsung Internet, and other Chromium browsers.
+        </p>
+      </section>
+
+      <section>
+        <h3 className="mb-2 font-semibold text-green-950">
+          3. If notifications don&apos;t appear
+        </h3>
+        <p className="mb-2 text-green-700">
+          Installed PWAs don&apos;t appear in Settings → Apps. All notification
+          settings live under Chrome.
+        </p>
+        <p className="mb-1 font-medium text-green-800">Allow notifications per site:</p>
+        <ol className="ml-5 list-decimal space-y-1.5 text-green-700">
+          <li>Open the app</li>
+          <li>Tap the <b>lock icon</b> in the address bar (or the <b>⋮</b> menu &rarr; <b>Site settings</b>)</li>
+          <li>Tap <b>Permissions</b> &rarr; <b>Notifications</b></li>
+          <li>Set to <b>Allow</b></li>
+        </ol>
+        <p className="mt-3 mb-1 font-medium text-green-800">Check Chrome&apos;s main notification settings:</p>
+        <ol className="ml-5 list-decimal space-y-1.5 text-green-700">
+          <li><b>Android Settings</b> &rarr; <b>Apps</b> &rarr; <b>Chrome</b> &rarr; <b>Notifications</b></li>
+          <li>Make sure notifications are on, and all categories are enabled</li>
+          <li>Scroll to <b>Sites</b> and check the Golf Lessons entry is not blocked or silenced</li>
+        </ol>
+        <p className="mt-3 mb-1 font-medium text-green-800">Other things that can block notifications:</p>
+        <ul className="ml-5 list-disc space-y-1.5 text-green-700">
+          <li><b>Do Not Disturb</b> — swipe down and check the DND toggle</li>
+          <li><b>Battery saver / background restrictions</b> — Android Settings &rarr; Apps &rarr; Chrome &rarr; Battery &rarr; <b>Unrestricted</b></li>
+          <li><b>Quiet notifications</b> — if Chrome has marked the site as spammy, the bell icon in the address bar will have a strikethrough. Tap it and set back to <b>Allow</b></li>
+          <li><b>Lock screen</b> — Settings &rarr; Notifications &rarr; Lock screen &rarr; allow notifications</li>
+        </ul>
+        <p className="mt-3 mb-1 font-medium text-green-800">Test your setup:</p>
+        <p className="text-green-700">
+          In the app, go to <b>Profile</b> &rarr; <b>Notifications</b> and tap
+          <b> Send test notification</b>. If you don&apos;t see anything
+          within a few seconds, one of the settings above is blocking it.
         </p>
       </section>
     </div>
