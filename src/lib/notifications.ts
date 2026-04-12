@@ -60,15 +60,19 @@ export async function createNotification(opts: {
   const pushUserSet = new Set(pushUserIds);
   const fallbackUserIds = targetUserIds.filter((id) => !pushUserSet.has(id));
 
-  // Web Push for subscribed users — the service worker decides whether to
-  // show a system notification or forward to an open tab.
+  // Web Push for subscribed users. MUST be awaited — on Vercel serverless,
+  // fire-and-forget promises get killed when the function returns.
   if (pushUserIds.length > 0) {
-    sendPush(pushUserIds, {
-      title: opts.title,
-      body: opts.message,
-      url: opts.actionUrl,
-      tag: opts.type,
-    }).catch((err) => console.error("sendPush failed:", err));
+    try {
+      await sendPush(pushUserIds, {
+        title: opts.title,
+        body: opts.message,
+        url: opts.actionUrl,
+        tag: opts.type,
+      });
+    } catch (err) {
+      console.error("sendPush failed:", err);
+    }
   }
 
   // For users without push: fall back to WebSocket + ntfy

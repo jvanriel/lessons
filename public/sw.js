@@ -2,7 +2,7 @@
 // Does not cache aggressively — the app is online-first.
 // Version bump forces browsers to pick up updated push handling.
 
-const CACHE_NAME = "golf-lessons-v2";
+const CACHE_NAME = "golf-lessons-v3";
 
 self.addEventListener("install", (event) => {
   self.skipWaiting();
@@ -43,6 +43,9 @@ self.addEventListener("push", (event) => {
     badge: "/icon-192.png",
     tag: data.tag,
     data: { url: data.url || "/" },
+    requireInteraction: true,
+    vibrate: [200, 100, 200],
+    renotify: true,
   };
 
   event.waitUntil(
