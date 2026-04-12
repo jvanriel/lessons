@@ -2,6 +2,7 @@ import webpush from "web-push";
 import { db } from "@/lib/db";
 import { pushSubscriptions } from "@/lib/db/schema";
 import { eq, inArray } from "drizzle-orm";
+import { logEvent } from "@/lib/events";
 
 let configured = false;
 
@@ -39,6 +40,9 @@ export async function sendPush(userIds: number[], payload: PushPayload) {
   if (subs.length === 0) return;
 
   const json = JSON.stringify(payload);
+  let sent = 0;
+  let failed = 0;
+  let pruned = 0;
 
   await Promise.all(
     subs.map(async (sub) => {
@@ -50,18 +54,35 @@ export async function sendPush(userIds: number[], payload: PushPayload) {
           },
           json
         );
+        sent++;
       } catch (err: unknown) {
         const code = (err as { statusCode?: number })?.statusCode;
         if (code === 404 || code === 410) {
           // Subscription is gone — remove it
+          pruned++;
           await db
             .delete(pushSubscriptions)
             .where(eq(pushSubscriptions.endpoint, sub.endpoint))
             .catch(() => {});
         } else {
+          failed++;
           console.error("Push send failed:", err);
         }
       }
     })
   );
+
+  await logEvent({
+    type: "push.sent",
+    level: failed > 0 ? "warn" : "info",
+    payload: {
+      tag: payload.tag,
+      title: payload.title,
+      recipients: userIds.length,
+      subscriptions: subs.length,
+      sent,
+      failed,
+      pruned,
+    },
+  });
 }

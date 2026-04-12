@@ -4,6 +4,7 @@ import { db } from "@/lib/db";
 import { notifications, users, pushSubscriptions } from "@/lib/db/schema";
 import { eq, and, desc, inArray, sql, lt } from "drizzle-orm";
 import { sendPush } from "@/lib/push";
+import { logEvent } from "@/lib/events";
 
 const GATEWAY_URL = process.env.GATEWAY_URL;
 const GATEWAY_API_KEY = process.env.GATEWAY_API_KEY;
@@ -49,6 +50,16 @@ export async function createNotification(opts: {
   }));
 
   await db.insert(notifications).values(rows);
+
+  await logEvent({
+    type: "notification.created",
+    payload: {
+      kind: opts.type,
+      priority: opts.priority ?? "normal",
+      targetCount: targetUserIds.length,
+      title: opts.title,
+    },
+  });
 
   // Determine which users have an active push subscription
   const subRows = await db

@@ -5,6 +5,7 @@ import { db } from "@/lib/db";
 import { users, userEmails, proStudents } from "@/lib/db/schema";
 import { eq, and } from "drizzle-orm";
 import { setSessionCookie, parseRoles } from "@/lib/auth";
+import { logEvent } from "@/lib/events";
 
 function getRedirectUri(requestUrl: string) {
   const url = new URL(requestUrl);
@@ -101,6 +102,11 @@ export async function GET(request: Request) {
 
   if (result.length === 0) {
     // No account found — redirect to login with message
+    await logEvent({
+      type: "auth.oauth.no_account",
+      level: "warn",
+      payload: { email: googleEmail },
+    });
     return NextResponse.redirect(
       new URL("/login?error=google_no_account", request.url)
     );
@@ -138,6 +144,12 @@ export async function GET(request: Request) {
     userId: user.id,
     email: user.email,
     roles: parseRoles(user.roles),
+  });
+
+  await logEvent({
+    type: "auth.login",
+    actorId: user.id,
+    payload: { method: "google" },
   });
 
   // Redirect based on `from` param or role

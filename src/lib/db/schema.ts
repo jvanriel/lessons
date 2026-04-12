@@ -9,6 +9,7 @@ import {
   jsonb,
   date,
   numeric,
+  index,
 } from "drizzle-orm/pg-core";
 
 export const users = pgTable("users", {
@@ -416,6 +417,34 @@ export const commentReactions = pgTable("comment_reactions", {
 });
 
 // ─── Stripe Events (Webhook Audit Trail) ──────────────
+
+// ─── Observability ─────────────────────────────────────
+
+export const events = pgTable(
+  "events",
+  {
+    id: serial("id").primaryKey(),
+    type: varchar("type", { length: 100 }).notNull(),
+    level: varchar("level", { length: 10 }).notNull().default("info"),
+    actorId: integer("actor_id").references(() => users.id, {
+      onDelete: "set null",
+    }),
+    targetId: integer("target_id"),
+    payload: jsonb("payload").$type<Record<string, unknown>>(),
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+  },
+  (table) => ({
+    typeCreatedAtIdx: index("events_type_created_at_idx").on(
+      table.type,
+      table.createdAt
+    ),
+    actorCreatedAtIdx: index("events_actor_created_at_idx").on(
+      table.actorId,
+      table.createdAt
+    ),
+    createdAtIdx: index("events_created_at_idx").on(table.createdAt),
+  })
+);
 
 export const stripeEvents = pgTable("stripe_events", {
   id: serial("id").primaryKey(),

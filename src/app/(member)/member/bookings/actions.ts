@@ -9,6 +9,7 @@ import {
 import { eq, and } from "drizzle-orm";
 import { getSession, hasRole } from "@/lib/auth";
 import { createNotification } from "@/lib/notifications";
+import { logEvent } from "@/lib/events";
 import { checkCancellationAllowed } from "@/lib/lesson-slots";
 import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
@@ -94,6 +95,18 @@ export async function cancelBooking(bookingId: number) {
     message: `${studentName} cancelled the lesson on ${booking.date} at ${booking.startTime}.`,
     actionUrl: "/pro/bookings",
     actionLabel: "View bookings",
+  });
+
+  await logEvent({
+    type: "booking.cancelled",
+    actorId: session.userId,
+    targetId: pro.userId,
+    payload: {
+      bookingId,
+      date: booking.date,
+      startTime: booking.startTime,
+      proId: booking.proProfileId,
+    },
   });
 
   revalidatePath("/member/bookings");

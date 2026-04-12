@@ -6,6 +6,7 @@ import { users, userEmails, proStudents } from "@/lib/db/schema";
 import { and } from "drizzle-orm";
 import { eq, or } from "drizzle-orm";
 import { verifyPassword, setSessionCookie, parseRoles } from "@/lib/auth";
+import { logEvent } from "@/lib/events";
 
 export async function userLogin(
   _prevState: { error: string } | null,
@@ -73,6 +74,12 @@ export async function userLogin(
     userId: user.id,
     email: user.email,
     roles: parseRoles(user.roles),
+  });
+
+  await logEvent({
+    type: "auth.login",
+    actorId: user.id,
+    payload: { method: "password" },
   });
 
   const from = formData.get("from") as string | null;

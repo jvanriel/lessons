@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { getSession, hasRole } from "@/lib/auth";
 import { createBackup } from "@/lib/backup";
 import { cleanupOldNotifications } from "@/lib/notifications";
+import { logEvent, purgeOldEvents } from "@/lib/events";
 
 async function runBackup(request: NextRequest) {
   // Auth: either CRON_SECRET bearer token (Vercel Cron) or dev session
@@ -28,13 +29,37 @@ async function runBackup(request: NextRequest) {
       console.error("Notification cleanup failed:", err);
     }
 
+    // Purge old events (90-day retention)
+    let eventsDeleted = 0;
+    try {
+      eventsDeleted = await purgeOldEvents(90);
+    } catch (err) {
+      console.error("Events purge failed:", err);
+    }
+
+    await logEvent({
+      type: "backup.created",
+      payload: {
+        pathname: meta.pathname,
+        size: meta.size,
+        notificationsDeleted,
+        eventsDeleted,
+      },
+    });
+
     return NextResponse.json({
       success: true,
       backup: meta,
       notificationsDeleted,
+      eventsDeleted,
     });
   } catch (error) {
     console.error("Backup failed:", error);
+    await logEvent({
+      type: "backup.failed",
+      level: "error",
+      payload: { error: String(error) },
+    });
     return NextResponse.json(
       { error: "Backup failed", details: String(error) },
       { status: 500 }
