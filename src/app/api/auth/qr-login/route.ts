@@ -47,7 +47,12 @@ export async function GET(request: NextRequest) {
       path: "/",
     });
 
-    return NextResponse.redirect(new URL("/member/dashboard", request.url));
+    const roles = Array.isArray(payload.roles) ? (payload.roles as string[]) : [];
+    let target = "/member/dashboard";
+    if (roles.includes("pro")) target = "/pro/dashboard";
+    else if (roles.includes("admin") || roles.includes("dev")) target = "/admin";
+
+    return NextResponse.redirect(new URL(target, request.url));
   } catch {
     return NextResponse.redirect(new URL("/login", request.url));
   }

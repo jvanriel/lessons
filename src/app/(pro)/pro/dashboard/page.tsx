@@ -5,6 +5,7 @@ import { requireProProfile } from "@/lib/pro";
 import { redirect } from "next/navigation";
 import Link from "next/link";
 import { BookingRefreshListener } from "@/components/BookingRefreshListener";
+import { QRLoginButton } from "@/app/(member)/member/dashboard/QRLoginDialog";
 
 export const metadata = { title: "Pro Dashboard — Golf Lessons" };
 
@@ -43,12 +44,17 @@ export default async function ProDashboard() {
   return (
     <div className="mx-auto max-w-4xl px-6 py-12">
       <BookingRefreshListener />
-      <h1 className="font-display text-3xl font-semibold text-green-900">
-        Pro Dashboard
-      </h1>
-      <p className="mt-2 text-green-700">
-        Manage your lessons, availability, and bookings.
-      </p>
+      <div className="flex items-start justify-between gap-4">
+        <div>
+          <h1 className="font-display text-3xl font-semibold text-green-900">
+            Pro Dashboard
+          </h1>
+          <p className="mt-2 text-green-700">
+            Manage your lessons, availability, and bookings.
+          </p>
+        </div>
+        <QRLoginButton />
+      </div>
 
       <div className="mt-8 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
         {/* Today's lessons */}
