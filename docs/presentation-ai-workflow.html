@@ -113,6 +113,87 @@
   </div>
 </div>
 
+<!-- Example: WhatsApp chat UI -->
+<div class="slide">
+  <h2>Iterating on UI</h2>
+  <p class="subtitle">Chat message actions, WhatsApp-style</p>
+  <div class="example">
+    <p class="human">"Array of emojis in the thread — what is that?"</p>
+    <p class="ai">&rarr; Explains: quick reactions on each message</p>
+    <p class="human">"Do it like WhatsApp: chevron inside bubble, grey smiley next to it"</p>
+    <p class="ai">&rarr; Restructures: chevron menu with Reply/Download/Delete, external smiley for reactions</p>
+    <p class="human">"I'm on iPhone — the input zooms in"</p>
+    <p class="ai">&rarr; Sets textarea to <code>text-base</code> (16px) — iOS doesn't zoom then</p>
+    <p class="human">"Input bar sits 1cm above the bottom nav"</p>
+    <p class="ai">&rarr; Fixes flex container height to match BottomNav exactly</p>
+  </div>
+  <p style="color: #888; font-size: 1.1rem; margin-top: 1.5rem;">Four rounds of real-device feedback, four production fixes.</p>
+</div>
+
+<!-- Example: borrowing patterns -->
+<div class="slide">
+  <h2>Borrowing patterns</h2>
+  <p class="subtitle">Copy a working solution from a sister project, adapt, improve</p>
+  <div class="example">
+    <p class="human">"Look at ../golf and build a similar backup/restore"</p>
+    <p class="ai">&rarr; Reads 5 files from the neighbouring project</p>
+    <p class="ai">&rarr; Maps the pattern: backup.ts + API route + dev UI + cron</p>
+    <p class="ai">&rarr; Lists 23 lessons tables, updates TABLE_DEFS in dependency order</p>
+    <p class="ai">&rarr; Fixes JSONB columns specific to this schema</p>
+    <p class="ai">&rarr; Adds a new bonus: <code>/api/backup/validate</code> row-count diff</p>
+    <p class="ai">&rarr; Writes a test script; round-trips 388 rows, zero mismatches</p>
+  </div>
+  <p style="color: #888; font-size: 1.1rem; margin-top: 1.5rem;">Not just translation — adaptation plus improvement.</p>
+</div>
+
+<!-- Example: nothing happens -->
+<div class="slide">
+  <h2>"Nothing happens"</h2>
+  <p class="subtitle">Debugging when there's no visible error</p>
+  <div class="example">
+    <p class="human">"I threw the test error but nothing happens"</p>
+    <p class="ai">&rarr; Queries Sentry API: issue IS captured</p>
+    <p class="ai">&rarr; Fetches Vercel runtime logs: webhook never called</p>
+    <p class="ai">&rarr; Checks <code>vercel env ls</code>: NEXT_PUBLIC_SENTRY_DSN not set</p>
+    <p class="ai">&rarr; Diagnosis: Marketplace env vars aren't injected at runtime</p>
+    <p class="ai">&rarr; Adds DSN as regular env var, triggers redeploy</p>
+    <p class="human">"Now it works"</p>
+  </div>
+  <p style="color: #888; font-size: 1.1rem; margin-top: 1.5rem;">Each symptom leads to the next question. Nothing skipped, nothing assumed.</p>
+</div>
+
+<!-- Example: can't you manage this? -->
+<div class="slide">
+  <h2>"Can't you manage this?"</h2>
+  <p class="subtitle">From clickable instructions to remote automation</p>
+  <div class="example">
+    <p class="human">"Here are the steps to configure Uptime Kuma..."</p>
+    <p class="human">"Can't you manage this?"</p>
+    <p class="ai">&rarr; SSH into Hetzner</p>
+    <p class="ai">&rarr; Reads Kuma source to find the Socket.IO event names</p>
+    <p class="ai">&rarr; Writes a Node script that logs in + creates monitors</p>
+    <p class="ai">&rarr; Runs it; schema error on missing <code>conditions</code> field</p>
+    <p class="ai">&rarr; Patches the script, reruns, 4 monitors green</p>
+    <p class="ai">&rarr; Cleans up the temp script</p>
+  </div>
+</div>
+
+<!-- Example: can you check the database? -->
+<div class="slide">
+  <h2>"Can you check the database?"</h2>
+  <p class="subtitle">Proactive diagnosis instead of back-and-forth</p>
+  <div class="example">
+    <p class="human">"It doesn't work on preview. Can you check the DB?"</p>
+    <p class="ai">&rarr; Queries Neon with the dummy pro user id</p>
+    <p class="ai">&rarr; Finds push subscription exists, notifications created</p>
+    <p class="ai">&rarr; Reads createNotification code: sendPush isn't awaited</p>
+    <p class="ai">&rarr; On Vercel, unawaited promises die when the function returns</p>
+    <p class="ai">&rarr; One-line fix: <code>await sendPush(...)</code></p>
+    <p class="human">"Now it works"</p>
+  </div>
+  <p style="color: #888; font-size: 1.1rem; margin-top: 1.5rem;">AI has the same access I have. No permissions to navigate manually.</p>
+</div>
+
 <!-- Slide 6: Debugging Together -->
 <div class="slide">
   <h2>Debugging together</h2>
@@ -418,6 +499,151 @@
     <p class="ai">&rarr; Done in 30 seconds</p>
   </div>
   <p style="color: #888; font-size: 1.1rem; margin-top: 1.5rem;">From bug report to production fix in under a minute.</p>
+</div>
+
+<!-- Dev Support section -->
+
+<!-- Slide: Beyond the product -->
+<div class="slide">
+  <h2>Beyond the product</h2>
+  <p class="subtitle">Building the app is half the work. The other half is everything around it.</p>
+  <ul>
+    <li>Backups & disaster recovery</li>
+    <li>Database + blob file browsers</li>
+    <li>Event logging & business metrics</li>
+    <li>Error tracking & alerting</li>
+    <li>Health checks & uptime monitoring</li>
+  </ul>
+  <p style="color: #888; font-size: 1.1rem; margin-top: 2rem;">All built in one day, in one conversation.</p>
+</div>
+
+<!-- Backup / Restore -->
+<div class="slide">
+  <h2>Backup &amp; Restore</h2>
+  <ul>
+    <li>Daily cron dumps the whole DB to Vercel Blob as versioned JSON</li>
+    <li><code style="color:#c4a035">/dev/backups</code> — view, download, restore, delete</li>
+    <li>Test script: <code style="color:#c4a035">pnpm test:backup</code> validates round-trip</li>
+    <li>90-day retention, automatic cleanup alongside notifications</li>
+  </ul>
+  <p style="color: #888; font-size: 1.1rem; margin-top: 1.5rem;">Never lose data. Restore any point in time.</p>
+</div>
+
+<!-- Database + Blob browsers -->
+<div class="slide">
+  <h2>Dev tools for live data</h2>
+  <div class="two-col">
+    <div>
+      <p style="color: #c4a035; font-size: 1rem; font-weight: 600; margin-bottom: 0.5rem; text-transform: uppercase; letter-spacing: 0.1em;">DATABASE</p>
+      <ul>
+        <li>Browse any table</li>
+        <li>Filter, sort, paginate</li>
+        <li>Edit rows in a dialog</li>
+        <li>Delete with confirmation</li>
+      </ul>
+    </div>
+    <div>
+      <p style="color: #c4a035; font-size: 1rem; font-weight: 600; margin-bottom: 0.5rem; text-transform: uppercase; letter-spacing: 0.1em;">BLOB STORE</p>
+      <ul>
+        <li>Drill into folders</li>
+        <li>Preview images, video, JSON</li>
+        <li>Download files</li>
+        <li>Delete with confirmation</li>
+      </ul>
+    </div>
+  </div>
+  <p style="color: #888; font-size: 1.1rem; margin-top: 1.5rem;">Built-in admin tools — no phpMyAdmin, no S3 browser, no SaaS.</p>
+</div>
+
+<!-- Event logging -->
+<div class="slide">
+  <h2>Event logging</h2>
+  <ul>
+    <li>Dedicated <code style="color:#c4a035">events</code> table with indexes for time-range queries</li>
+    <li><code style="color:#c4a035">logEvent()</code> helper — fire-and-forget, never breaks the caller</li>
+    <li>Instrumented: bookings, logins, pushes, OAuth, backups</li>
+    <li><code style="color:#c4a035">/dev/logs</code> — filter, search, color-coded levels, auto-refresh</li>
+    <li>Runs forever on Postgres — millions of events, sub-second queries</li>
+  </ul>
+</div>
+
+<!-- Three log tabs -->
+<div class="slide">
+  <h2>One page, three log views</h2>
+  <div class="example">
+    <p class="ai"><b>Events</b> &rarr; our app's business events (bookings, pushes, auth)</p>
+    <p class="ai"><b>Runtime</b> &rarr; Vercel function logs via Vercel REST API</p>
+    <p class="ai"><b>Sentry</b> &rarr; uncaught errors with stack traces &amp; breadcrumbs</p>
+  </div>
+  <p style="color: #888; font-size: 1.1rem; margin-top: 1.5rem;">Three systems, one tab switch. No context jumping.</p>
+</div>
+
+<!-- Sentry integration -->
+<div class="slide">
+  <h2>Error tracking with <span class="accent">Sentry</span></h2>
+  <ul>
+    <li>Installed via Vercel Marketplace — unified billing, SSO, one click</li>
+    <li>Captures every uncaught error (server + client + edge)</li>
+    <li>Stack traces with source maps, user attribution, breadcrumbs</li>
+    <li>Custom <code style="color:#c4a035">error.tsx</code> branded with our palette</li>
+    <li>Webhook &rarr; internal notifications &rarr; phone push via ntfy</li>
+  </ul>
+  <p style="color: #888; font-size: 1.1rem; margin-top: 1.5rem;">A bug in production pages me within seconds.</p>
+</div>
+
+<!-- Alert chain -->
+<div class="slide">
+  <h2>The alert chain</h2>
+  <div class="example" style="font-size: 1.2rem; line-height: 2.2;">
+    <p><span class="human">Error in production</span></p>
+    <p>&darr; captured by Sentry</p>
+    <p>&darr; Sentry fires <code>issue:created</code> webhook</p>
+    <p>&darr; <span class="ai">/api/sentry/webhook</span> verifies HMAC signature</p>
+    <p>&darr; <code>createNotification()</code> + direct <code>ntfy</code> push</p>
+    <p><span class="accent">&rarr; Phone vibrates within 5 seconds</span></p>
+  </div>
+</div>
+
+<!-- Health endpoint -->
+<div class="slide">
+  <h2>Health checks</h2>
+  <ul>
+    <li><code style="color:#c4a035">/api/health</code> — JSON endpoint checking DB, Stripe, Blob, env vars, Sentry</li>
+    <li>Returns 200 <code>"status":"ok"</code> or 503 <code>"status":"degraded"</code> with details</li>
+    <li><code style="color:#c4a035">/dev/health</code> — branded dashboard with per-check latency</li>
+    <li><code style="color:#c4a035">?deep=1</code> — expensive checks (Stripe/Blob) for manual/periodic use</li>
+  </ul>
+</div>
+
+<!-- Uptime Kuma -->
+<div class="slide">
+  <h2>External monitoring</h2>
+  <p class="subtitle">Self-hosted Uptime Kuma on our Hetzner node</p>
+  <ul>
+    <li>Polls <code>/api/health</code> every 60 seconds from outside Vercel</li>
+    <li>Catches what internal checks can't: DNS, TLS expiry, domain issues, Vercel itself</li>
+    <li>Four monitors: prod health, preview health, deep check, plain home</li>
+    <li>Same ntfy push channel &rarr; one notification path for everything</li>
+    <li>Zero recurring cost — runs alongside existing services on Telmio</li>
+  </ul>
+</div>
+
+<!-- Observability stack -->
+<div class="slide">
+  <h2>Full observability stack</h2>
+  <div class="two-col">
+    <ul>
+      <li><b>Events table</b> — business events</li>
+      <li><b>Vercel logs</b> — raw stdout/stderr</li>
+      <li><b>Sentry</b> — errors &amp; stack traces</li>
+    </ul>
+    <ul>
+      <li><b>Uptime Kuma</b> — external polling</li>
+      <li><b>ntfy</b> — phone push channel</li>
+      <li><b>/dev/*</b> — one dashboard</li>
+    </ul>
+  </div>
+  <p style="color: #888; font-size: 1.1rem; margin-top: 2rem;">Production-grade monitoring for a pre-launch product. All built in one afternoon.</p>
 </div>
 
 <!-- Slide 21: Key Takeaway -->
