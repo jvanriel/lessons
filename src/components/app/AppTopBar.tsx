@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 import Logo from "@/components/Logo";
 import LanguageSwitcher from "@/components/LanguageSwitcher";
 import NotificationBell from "@/components/notifications/NotificationBell";
+import HelpDialog from "@/components/app/HelpDialog";
 import type { Locale } from "@/lib/i18n";
 
 interface ImpersonableUser {
@@ -205,8 +206,9 @@ export default function AppTopBar({
         </Link>
       </div>
 
-      {/* Right: language, notifications, user */}
+      {/* Right: help, language, notifications, user */}
       <div className="flex items-center gap-3">
+        <HelpDialog />
         <LanguageSwitcher locale={locale as Locale} />
 
         {showNotifications && (

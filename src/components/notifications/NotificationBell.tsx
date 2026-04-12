@@ -39,6 +39,7 @@ export default function NotificationBell({
   const [loaded, setLoaded] = useState(false);
   const [wsConnected, setWsConnected] = useState(false);
   const [toasts, setToasts] = useState<ToastData[]>([]);
+  const [pushSubscribed, setPushSubscribed] = useState<boolean | null>(null);
   const ref = useRef<HTMLDivElement>(null);
 
   const dismissToast = useCallback((id: string) => {
@@ -73,6 +74,53 @@ export default function NotificationBell({
       }
     } catch {}
   }, []);
+
+  // Check push subscription status
+  useEffect(() => {
+    let disposed = false;
+    fetch("/api/push/status")
+      .then((r) => (r.ok ? r.json() : { subscribed: false }))
+      .then((d) => {
+        if (!disposed) setPushSubscribed(!!d.subscribed);
+      })
+      .catch(() => {
+        if (!disposed) setPushSubscribed(false);
+      });
+    return () => {
+      disposed = true;
+    };
+  }, []);
+
+  // Listen for push messages forwarded by the service worker when a tab is open
+  useEffect(() => {
+    if (typeof navigator === "undefined" || !("serviceWorker" in navigator))
+      return;
+
+    function handleMessage(e: MessageEvent) {
+      const data = e.data;
+      if (!data || data.type !== "push") return;
+
+      // Refresh the list/count and show a toast
+      fetchNotifications();
+      playNotificationChime();
+      setToasts((prev) => [
+        ...prev,
+        {
+          id: `${Date.now()}-${Math.random()}`,
+          title: data.title ?? "New notification",
+          message: data.body,
+          actionUrl: data.url,
+          priority: "normal",
+        },
+      ]);
+      window.dispatchEvent(new CustomEvent("booking-changed", { detail: data }));
+    }
+
+    navigator.serviceWorker.addEventListener("message", handleMessage);
+    return () => {
+      navigator.serviceWorker.removeEventListener("message", handleMessage);
+    };
+  }, [fetchNotifications]);
 
   // WebSocket connection with exponential backoff
   useEffect(() => {
@@ -215,7 +263,7 @@ export default function NotificationBell({
 
   return (
     <>
-      {/* Toast container */}
+      {/* Toast container — always rendered so push-forwarded toasts can appear */}
       {toasts.length > 0 && (
         <div className="pointer-events-none fixed right-4 top-4 z-50 flex flex-col gap-2">
           {toasts.map((t) => (
@@ -227,6 +275,9 @@ export default function NotificationBell({
           ))}
         </div>
       )}
+      {/* Hide the bell icon when Web Push is active — system notifications
+          and forwarded toasts cover the UX. Don't render until we know. */}
+      {pushSubscribed === false && (
       <div className="relative" ref={ref}>
         <button
           onClick={() => setOpen(!open)}
@@ -303,6 +354,7 @@ export default function NotificationBell({
           </div>
         )}
       </div>
+      )}
     </>
   );
 }

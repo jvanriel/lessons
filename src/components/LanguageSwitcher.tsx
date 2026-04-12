@@ -30,7 +30,7 @@ export default function LanguageSwitcher({ locale }: { locale: Locale }) {
     <div className="relative" ref={ref}>
       <button
         onClick={() => setOpen(!open)}
-        className="flex items-center gap-1 transition-colors duration-200 hover:text-gold-200"
+        className="flex items-center gap-1 text-green-100/60 transition-colors duration-200 hover:text-gold-200"
       >
         <svg
           className="h-4 w-4"

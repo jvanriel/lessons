@@ -1,7 +1,7 @@
 "use server";
 
 import { db } from "@/lib/db";
-import { notifications, users } from "@/lib/db/schema";
+import { notifications, users, pushSubscriptions } from "@/lib/db/schema";
 import { eq, and, desc, inArray, sql, lt } from "drizzle-orm";
 import { sendPush } from "@/lib/push";
 
@@ -50,51 +50,65 @@ export async function createNotification(opts: {
 
   await db.insert(notifications).values(rows);
 
-  // Web Push (fire-and-forget, failures are logged but don't block)
-  sendPush(targetUserIds, {
-    title: opts.title,
-    body: opts.message,
-    url: opts.actionUrl,
-    tag: opts.type,
-  }).catch((err) => console.error("sendPush failed:", err));
+  // Determine which users have an active push subscription
+  const subRows = await db
+    .selectDistinct({ userId: pushSubscriptions.userId })
+    .from(pushSubscriptions)
+    .where(inArray(pushSubscriptions.userId, targetUserIds));
 
-  // Push to WebSocket gateway (fire-and-forget)
-  if (GATEWAY_URL && GATEWAY_API_KEY) {
-    fetch(`${GATEWAY_URL}/push`, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${GATEWAY_API_KEY}`,
-      },
-      body: JSON.stringify({
-        type: opts.type,
-        title: opts.title,
-        message: opts.message,
-        actionUrl: opts.actionUrl,
-        userIds: targetUserIds,
-        priority: opts.priority ?? "normal",
-      }),
-    }).catch(() => {});
+  const pushUserIds = subRows.map((r) => r.userId);
+  const pushUserSet = new Set(pushUserIds);
+  const fallbackUserIds = targetUserIds.filter((id) => !pushUserSet.has(id));
+
+  // Web Push for subscribed users — the service worker decides whether to
+  // show a system notification or forward to an open tab.
+  if (pushUserIds.length > 0) {
+    sendPush(pushUserIds, {
+      title: opts.title,
+      body: opts.message,
+      url: opts.actionUrl,
+      tag: opts.type,
+    }).catch((err) => console.error("sendPush failed:", err));
   }
 
-  // ntfy mobile push for high/urgent priority
-  if (
-    NTFY_URL &&
-    NTFY_AUTH &&
-    (opts.priority === "high" || opts.priority === "urgent")
-  ) {
-    fetch(`${NTFY_URL}/${NTFY_TOPIC}`, {
-      method: "POST",
-      headers: {
-        Title: opts.title,
-        Priority: opts.priority === "urgent" ? "urgent" : "high",
-        Authorization: `Basic ${NTFY_AUTH}`,
-        ...(opts.actionUrl
-          ? { Actions: `view, Open, https://golflessons.be${opts.actionUrl}` }
-          : {}),
-      },
-      body: opts.message ?? opts.title,
-    }).catch(() => {});
+  // For users without push: fall back to WebSocket + ntfy
+  if (fallbackUserIds.length > 0) {
+    if (GATEWAY_URL && GATEWAY_API_KEY) {
+      fetch(`${GATEWAY_URL}/push`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${GATEWAY_API_KEY}`,
+        },
+        body: JSON.stringify({
+          type: opts.type,
+          title: opts.title,
+          message: opts.message,
+          actionUrl: opts.actionUrl,
+          userIds: fallbackUserIds,
+          priority: opts.priority ?? "normal",
+        }),
+      }).catch(() => {});
+    }
+
+    if (
+      NTFY_URL &&
+      NTFY_AUTH &&
+      (opts.priority === "high" || opts.priority === "urgent")
+    ) {
+      fetch(`${NTFY_URL}/${NTFY_TOPIC}`, {
+        method: "POST",
+        headers: {
+          Title: opts.title,
+          Priority: opts.priority === "urgent" ? "urgent" : "high",
+          Authorization: `Basic ${NTFY_AUTH}`,
+          ...(opts.actionUrl
+            ? { Actions: `view, Open, https://golflessons.be${opts.actionUrl}` }
+            : {}),
+        },
+        body: opts.message ?? opts.title,
+      }).catch(() => {});
+    }
   }
 }
 

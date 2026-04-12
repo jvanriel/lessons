@@ -44,7 +44,29 @@ self.addEventListener("push", (event) => {
     data: { url: data.url || "/" },
   };
 
-  event.waitUntil(self.registration.showNotification(title, options));
+  event.waitUntil(
+    self.clients
+      .matchAll({ type: "window", includeUncontrolled: true })
+      .then((clients) => {
+        // If a tab is open and visible, forward the data so the in-app
+        // toast can render it — skip the system notification to avoid
+        // duplicate alerts.
+        const focusedClient = clients.find(
+          (c) => c.visibilityState === "visible"
+        );
+        if (focusedClient) {
+          focusedClient.postMessage({
+            type: "push",
+            title,
+            body: options.body,
+            url: options.data.url,
+            tag: options.tag,
+          });
+          return;
+        }
+        return self.registration.showNotification(title, options);
+      })
+  );
 });
 
 self.addEventListener("notificationclick", (event) => {
