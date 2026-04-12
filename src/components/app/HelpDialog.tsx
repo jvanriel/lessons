@@ -31,21 +31,33 @@ export default function HelpDialog() {
     if (p === "android") setTab("android");
   }, []);
 
-  // Capture the browser's install prompt (Android Chrome/Edge, desktop Chrome)
+  // Capture the browser's install prompt (Android Chrome/Edge, desktop Chrome).
+  // An inline script in the root layout catches it early and stores it on
+  // window.__deferredInstallPrompt so we don't miss it between page load and
+  // React hydration.
   useEffect(() => {
-    function handleBeforeInstall(e: Event) {
-      e.preventDefault();
-      setInstallPrompt(e as BeforeInstallPromptEvent);
+    const w = window as unknown as {
+      __deferredInstallPrompt?: BeforeInstallPromptEvent | null;
+    };
+    if (w.__deferredInstallPrompt) {
+      setInstallPrompt(w.__deferredInstallPrompt);
+    }
+
+    function handleAvailable() {
+      const ev = (window as unknown as {
+        __deferredInstallPrompt?: BeforeInstallPromptEvent | null;
+      }).__deferredInstallPrompt;
+      if (ev) setInstallPrompt(ev);
     }
     function handleInstalled() {
       setInstalled(true);
       setInstallPrompt(null);
     }
-    window.addEventListener("beforeinstallprompt", handleBeforeInstall);
-    window.addEventListener("appinstalled", handleInstalled);
+    window.addEventListener("pwa-install-available", handleAvailable);
+    window.addEventListener("pwa-installed", handleInstalled);
     return () => {
-      window.removeEventListener("beforeinstallprompt", handleBeforeInstall);
-      window.removeEventListener("appinstalled", handleInstalled);
+      window.removeEventListener("pwa-install-available", handleAvailable);
+      window.removeEventListener("pwa-installed", handleInstalled);
     };
   }, []);
 
@@ -57,6 +69,7 @@ export default function HelpDialog() {
       setInstalled(true);
     }
     setInstallPrompt(null);
+    (window as unknown as { __deferredInstallPrompt?: null }).__deferredInstallPrompt = null;
   }
 
   useEffect(() => {

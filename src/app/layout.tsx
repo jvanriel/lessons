@@ -13,6 +13,7 @@ import { users } from "@/lib/db/schema";
 import { eq, ne } from "drizzle-orm";
 import { getLocale } from "@/lib/locale";
 import AppLayout from "@/components/app/AppLayout";
+import InstallBanner from "@/components/app/InstallBanner";
 
 const cormorant = Cormorant_Garamond({
   variable: "--font-display",
@@ -168,10 +169,13 @@ export default async function RootLayout({
             </>
           )}
         </CmsProvider>
+        <InstallBanner />
         <DeploymentChecker />
         <script
           dangerouslySetInnerHTML={{
-            __html: `if('serviceWorker' in navigator){navigator.serviceWorker.register('/sw.js')}`,
+            __html: `if('serviceWorker' in navigator){navigator.serviceWorker.register('/sw.js')}
+window.addEventListener('beforeinstallprompt',function(e){e.preventDefault();window.__deferredInstallPrompt=e;window.dispatchEvent(new Event('pwa-install-available'));});
+window.addEventListener('appinstalled',function(){window.__deferredInstallPrompt=null;window.dispatchEvent(new Event('pwa-installed'));});`,
           }}
         />
       </body>
