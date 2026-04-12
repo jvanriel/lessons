@@ -15,7 +15,7 @@ function detectPlatform(): Platform {
 export default function HelpDialog() {
   const [open, setOpen] = useState(false);
   const [platform, setPlatform] = useState<Platform>("unknown");
-  const [tab, setTab] = useState<"ios" | "android">("ios");
+  const [tab, setTab] = useState<"ios" | "android" | "qr">("ios");
 
   useEffect(() => {
     const p = detectPlatform();
@@ -93,17 +93,17 @@ export default function HelpDialog() {
             <div className="flex border-b border-green-100">
               <button
                 onClick={() => setTab("ios")}
-                className={`flex-1 py-2.5 text-sm font-medium transition-colors ${
+                className={`flex-1 py-2.5 text-xs font-medium transition-colors ${
                   tab === "ios"
                     ? "border-b-2 border-gold-500 text-green-950"
                     : "text-green-500 hover:text-green-700"
                 }`}
               >
-                iPhone / iPad
+                iPhone
               </button>
               <button
                 onClick={() => setTab("android")}
-                className={`flex-1 py-2.5 text-sm font-medium transition-colors ${
+                className={`flex-1 py-2.5 text-xs font-medium transition-colors ${
                   tab === "android"
                     ? "border-b-2 border-gold-500 text-green-950"
                     : "text-green-500 hover:text-green-700"
@@ -111,16 +111,24 @@ export default function HelpDialog() {
               >
                 Android
               </button>
+              <button
+                onClick={() => setTab("qr")}
+                className={`flex-1 py-2.5 text-xs font-medium transition-colors ${
+                  tab === "qr"
+                    ? "border-b-2 border-gold-500 text-green-950"
+                    : "text-green-500 hover:text-green-700"
+                }`}
+              >
+                QR login
+              </button>
             </div>
 
             {/* Content */}
             <div className="max-h-[70vh] overflow-y-auto px-5 py-5 text-sm text-green-800">
-              {tab === "ios" ? (
-                <IOSInstructions />
-              ) : (
-                <AndroidInstructions />
-              )}
-              {platform !== "unknown" && tab !== platform && (
+              {tab === "ios" && <IOSInstructions />}
+              {tab === "android" && <AndroidInstructions />}
+              {tab === "qr" && <QRInstructions />}
+              {tab !== "qr" && platform !== "unknown" && tab !== platform && (
                 <p className="mt-4 rounded-md bg-gold-50 px-3 py-2 text-xs text-gold-700">
                   Tip: you&apos;re on {platform === "ios" ? "iPhone/iPad" : "Android"} — switch to that tab above for matching instructions.
                 </p>
@@ -175,6 +183,53 @@ function IOSInstructions() {
         </ol>
         <p className="mt-2 text-xs text-green-500">
           Requires iOS 16.4 or later.
+        </p>
+      </section>
+    </div>
+  );
+}
+
+function QRInstructions() {
+  return (
+    <div className="space-y-5">
+      <p className="text-green-700">
+        If you&apos;re already signed in on a desktop browser, you can log in
+        on your phone without typing your password.
+      </p>
+
+      <section>
+        <h3 className="mb-2 font-semibold text-green-950">On your desktop</h3>
+        <ol className="ml-5 list-decimal space-y-1.5 text-green-700">
+          <li>
+            Go to your <b>Dashboard</b>
+          </li>
+          <li>
+            Tap the <b>Phone</b> button (top right)
+          </li>
+          <li>A QR code appears (valid for 5 minutes)</li>
+        </ol>
+      </section>
+
+      <section>
+        <h3 className="mb-2 font-semibold text-green-950">On your phone</h3>
+        <ol className="ml-5 list-decimal space-y-1.5 text-green-700">
+          <li>Open the login page on golflessons.be</li>
+          <li>
+            Tap <b>Scan QR code to login</b>
+          </li>
+          <li>Point your camera at the QR code on your desktop</li>
+          <li>You&apos;re signed in automatically</li>
+        </ol>
+      </section>
+
+      <section className="rounded-md bg-gold-50 px-3 py-2 text-xs text-gold-700">
+        <p className="font-semibold">iPhone tip</p>
+        <p className="mt-1">
+          If Chrome is your default browser on iOS, scanning the QR with the
+          iPhone camera app will open it in Chrome. Push notifications and
+          Home Screen install only work in <b>Safari</b>. To install the app,
+          open Safari first, go to the login page, and tap{" "}
+          <b>Scan QR code to login</b>.
         </p>
       </section>
     </div>
