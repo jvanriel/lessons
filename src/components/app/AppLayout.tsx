@@ -84,7 +84,7 @@ export default function AppLayout({
           collapsed={collapsed}
           onToggle={handleToggle}
         />
-        <main className="flex-1 overflow-y-auto bg-[#faf7f0] pb-16 md:pb-0">
+        <main className="flex-1 overflow-y-auto bg-[#faf7f0] pb-14 md:pb-0">
           {children}
         </main>
       </div>

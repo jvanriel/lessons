@@ -1013,7 +1013,7 @@ export default function Comments({
           onKeyDown={handleKeyDown}
           placeholder="Type a message..."
           rows={1}
-          className="max-h-24 min-h-[36px] flex-1 resize-none rounded-xl border border-green-200 bg-green-50/50 px-3 py-2 text-sm text-green-900 placeholder:text-green-400 focus:border-green-400 focus:outline-none focus:ring-1 focus:ring-green-400"
+          className="max-h-24 min-h-[36px] flex-1 resize-none rounded-xl border border-green-200 bg-green-50/50 px-3 py-2 text-base text-green-900 placeholder:text-green-400 focus:border-green-400 focus:outline-none focus:ring-1 focus:ring-green-400 md:text-sm"
         />
         <button
           type="button"

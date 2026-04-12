@@ -57,7 +57,7 @@ export default async function ProStudentChatPage({
   const studentName = `${record.studentFirstName} ${record.studentLastName}`;
 
   return (
-    <div className="flex h-full flex-col overflow-hidden pb-14 md:pb-0">
+    <div className="flex h-full flex-col overflow-hidden">
       {/* Header */}
       <div className="flex items-center gap-3 border-b border-green-100 bg-white px-4 py-3">
         <Link
