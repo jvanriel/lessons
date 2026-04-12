@@ -261,3 +261,54 @@ Forever, unless manually deleted from `/dev/backups`. Vercel Blob charges for st
 
 ### Q: What is `CRON_SECRET`?
 A random token that Vercel Cron sends as `Authorization: Bearer <token>` when triggering `/api/backup`. It's set as an env var on preview and production. Without it, only logged-in dev users can trigger backups via POST.
+
+---
+
+## Observability & Error Tracking
+
+### Q: Where do errors and events go?
+Three systems that serve different purposes:
+
+- **Sentry** (uncaught errors) — automatic capture of any thrown exception in server/client/edge code, with stack traces, user attribution, breadcrumbs, and grouping by fingerprint. Viewable at `/dev/sentry` or the full Sentry UI.
+- **Events table** (business events) — explicit `logEvent({...})` calls for things like booking cancellations, push delivery stats, auth successes. Viewable at `/dev/logs` → Events tab. 90-day retention.
+- **Vercel runtime logs** (raw `console.log`/`console.error`) — framework-level output. Viewable at `/dev/logs` → Runtime tab or the Vercel dashboard.
+
+### Q: How are errors delivered to me?
+The full chain for any new Sentry issue:
+
+1. Error thrown in the app → Sentry captures it via `onRequestError` hook (`src/instrumentation.ts`)
+2. Sentry groups by fingerprint; if it's a **new** issue, fires `issue:created` webhook
+3. Webhook hits `/api/sentry/webhook`, signature verified with `SENTRY_WEBHOOK_CLIENT_SECRET_{PREVIEW|PRODUCTION}`
+4. Handler calls `createNotification` (bell + Web Push + in-app toast to all dev users) AND a direct ntfy POST (guaranteed phone push)
+5. Also writes a row to the `events` table with type `sentry.issue.created`
+
+Result: a new production error pings your phone within seconds.
+
+### Q: How do I test the full alert chain?
+As a dev user, click **Throw test error** on `/dev/sentry` (or visit `/api/dev/throw` directly). This uses `Sentry.captureException` with a **unique fingerprint per call**, so every click creates a fresh issue and fires the webhook. You should get a phone notification within 10 seconds.
+
+### Q: Why didn't my existing error trigger another notification?
+Sentry's `issue:created` event only fires the **first time** a fingerprint is seen. Subsequent throws just increment the count on the existing issue. The test throw route forces a unique fingerprint, but real code errors will group naturally — if you want to test again, resolve the existing issue in `/dev/sentry` (or in the Sentry UI) first.
+
+### Q: Why did notifications mysteriously stop working?
+The most common cause: you added a new env var (or renamed one) and the currently-running deployment was built before the env var existed. Push an empty commit (`git commit --allow-empty`) or redeploy from the Vercel dashboard to pick up the change.
+
+### Q: Why isn't Sentry capturing my errors?
+Check:
+1. `NEXT_PUBLIC_SENTRY_DSN` is set as a regular Vercel env var (**not** just via the Marketplace integration — see gotcha below)
+2. `Sentry.init()` in `sentry.*.config.ts` has `enabled: !!process.env.NEXT_PUBLIC_SENTRY_DSN` — if DSN is missing, Sentry is silently disabled
+3. Deployment was built AFTER the env var was added
+4. The test throw route uses `Sentry.flush(2000)` to ensure the event is sent before the serverless function terminates
+
+### Q: What's the "Marketplace env var gotcha"?
+Vercel Marketplace integrations (Sentry, Neon, etc.) provision env vars in a separate bucket that doesn't show up in `vercel env ls` and may not be injected into your function runtime reliably. Fix: add the critical ones as regular env vars via `vercel env add`:
+
+- `NEXT_PUBLIC_SENTRY_DSN` — required for error capture
+- `SENTRY_AUTH_TOKEN` — required for source map upload at build time
+- `SENTRY_ORG`, `SENTRY_PROJECT` — required by our `/dev/sentry` code
+
+### Q: Why is there a dedicated `SENTRY_READ_TOKEN`?
+The Marketplace-provisioned `SENTRY_AUTH_TOKEN` only has scopes for project write (source map upload) and release management. To list issues, fetch latest events, and resolve issues via the API, we need a separate token with `event:admin` + `project:read` scopes. Create it at `https://sentry.io/settings/account/api/auth-tokens/`.
+
+### Q: Why `LOGS_VERCEL_TOKEN` instead of `VERCEL_API_TOKEN`?
+The `VERCEL_` prefix is reserved by Vercel for system-injected env vars (like `VERCEL_URL`, `VERCEL_ENV`). Custom env vars with that prefix may be silently stripped or overridden at runtime. `LOGS_VERCEL_TOKEN` avoids the conflict.

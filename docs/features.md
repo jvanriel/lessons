@@ -445,14 +445,71 @@ Golf lesson booking platform at **golflessons.be**. Pros subscribe annually, con
 
 ---
 
-## 15. App Layout (Live)
+## 15. Observability & Error Tracking
+
+### Event logging (`events` table)
+- `events` table with indexes on `(type, created_at)`, `(actor_id, created_at)`, and `(created_at)` for fast time-range queries
+- `src/lib/events.ts` → `logEvent({ type, level, actorId, targetId, payload })` — fire-and-forget, never throws
+- `purgeOldEvents(days)` runs nightly from the backup cron (90-day retention)
+- Instrumented points: `auth.login` (password + google), `auth.oauth.no_account`, `booking.cancelled`, `notification.created`, `push.sent` (with sent/failed/pruned counts), `backup.created`/`backup.failed`, `sentry.issue.created`
+
+### Sentry integration
+- Installed via **Vercel Marketplace** → Sentry, unified billing, auto SSO
+- `@sentry/nextjs` v10 with `withSentryConfig` in `next.config.ts`
+- `sentry.{server,edge,client}.config.ts` with release = git SHA, env = `VERCEL_ENV`, 10% trace sampling, `tunnelRoute: "/monitoring"` to bypass ad blockers
+- `src/instrumentation.ts` exports `captureRequestError` as `onRequestError` hook
+- `getSession()` calls `Sentry.setUser({ id, email })` → every error attributed to the logged-in user
+- `src/app/error.tsx` + `src/app/global-error.tsx` — branded error boundaries with "Try again" / "Go home" buttons that also call `Sentry.captureException`
+- `/api/dev/throw` — dev-only test endpoint, uses `Sentry.captureException` with a unique fingerprint per call so every hit creates a fresh issue (and fires `issue.created`)
+
+### Sentry → internal notifications webhook
+- Sentry **Internal Integration** per environment (preview/production) calls `/api/sentry/webhook`
+- Webhook verifies HMAC-SHA256 signature with `SENTRY_WEBHOOK_CLIENT_SECRET_{PREVIEW|PRODUCTION}`
+- On `issue:created` events:
+  1. `createNotification({ targetRoles: ["dev"], priority: "urgent"|"high" })` → bell + Web Push + toast
+  2. Direct ntfy POST (bypasses push-subscription gate — guarantees phone push)
+  3. `logEvent({ type: "sentry.issue.created" })` → events table
+- Free-tier friendly (uses Internal Integration webhooks, not paid Alert Rule webhooks)
+
+### Dev tooling (`/dev/*`)
+- **`/dev/logs`** — three log views in tabs:
+  - **Events** tab — filter by type/level/user, time range, full-text search across payload, auto-refresh, expandable rows with payload JSON, top-types summary, help dialog listing all event types
+  - **Runtime** tab — live Vercel runtime logs via the Vercel REST API (`v6/deployments`, `v3/deployments/{id}/events`), deployment dropdown, status code badges, expandable entries
+  - Uses `LOGS_VERCEL_TOKEN` (renamed from `VERCEL_API_TOKEN` to avoid the reserved `VERCEL_` env var prefix)
+- **`/dev/sentry`** — Sentry issues browser:
+  - Issue list with level badge, count, user count, first/last seen
+  - Summary cards (issues, events, errors)
+  - Filters (time range, status)
+  - **Throw test error** button + spinning refresh icon
+  - Issue detail dialog: user/env/release, tags strip (filtered to useful ones), request, stack trace (in-app frames only), breadcrumbs timeline (color-coded navigation/click/http/console), Resolve action
+  - Uses a dedicated `SENTRY_READ_TOKEN` with `event:admin` + `project:read` scopes (the Marketplace-provisioned `SENTRY_AUTH_TOKEN` only has source-map write scopes)
+- **`/dev/database`** — whitelisted table browser:
+  - Lists all public tables with row counts
+  - Filterable (any column, contains-search, parameterized), sortable headers, 50/page pagination
+  - Edit dialog with type-aware inputs (boolean, number, JSONB), PK + serial columns locked
+  - Delete with two-step confirmation (inside the edit dialog)
+  - All SQL via `information_schema`-validated identifiers and parameterized values
+- **`/dev/blob`** — Vercel Blob browser:
+  - Breadcrumb navigation, drill up/down via folder rows
+  - View (inline preview for images/video/JSON/text)
+  - Download, Delete with confirmation
+- **`/dev/backups`** — covered under §14 Backup & Restore
+
+### Env var gotcha
+- Vercel Marketplace integrations manage their provisioned env vars in a separate bucket that's **NOT visible via `vercel env ls`**. `NEXT_PUBLIC_SENTRY_DSN`, `SENTRY_AUTH_TOKEN`, `SENTRY_ORG`, `SENTRY_PROJECT` etc. must also be added as regular env vars for them to reach runtime code reliably
+- Env var names with the `VERCEL_` prefix are reserved by Vercel (we use `LOGS_VERCEL_TOKEN` instead of `VERCEL_API_TOKEN`)
+- `CRON_SECRET` required for the backup cron auth (also used by `/api/backup/validate`)
+
+---
+
+## 16. App Layout (Live)
 
 - **AppLayout** (for logged-in users): top bar (Logo, Help, Language, Bell, User), left sidebar with collapsible role sections (persisted to localStorage, can collapse even when the active page is inside a section), bottom tab bar on mobile (Home, Bookings, Chat, Profile for members; Dashboard, Students, Bookings, Profile for pros)
 - **AppTopBar** right side: HelpDialog button, LanguageSwitcher (globe icon), NotificationBell, firstName + user menu
 - **HelpDialog** (question mark icon): iPhone/Android/QR login tabs with install + notification troubleshooting
 - Sidebar collapsed/expanded state persisted per-user in localStorage
 
-## 16. Planned (Not Yet Implemented)
+## 17. Planned (Not Yet Implemented)
 
 - **Contact page**: public contact form
 - **ICS email attachments**: booking confirmation/cancellation calendar files
