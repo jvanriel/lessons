@@ -59,6 +59,20 @@ interface CommentsProps {
 
 const QUICK_REACTIONS = ["👍", "❤️", "😂", "🎯", "✅"];
 
+const EMOJI_PICKER: string[] = [
+  // Smileys
+  "😀","😃","😄","😁","😆","😅","😂","🤣","😊","😇","🙂","🙃","😉","😌","😍","🥰","😘","😗","😙","😚",
+  "😋","😛","😝","😜","🤪","🤨","🧐","🤓","😎","🥸","🤩","🥳","😏","😒","😞","😔","😟","😕","🙁","☹️",
+  // Gestures & people
+  "👍","👎","👌","✌️","🤞","🤟","🤘","🤙","👈","👉","👆","👇","☝️","👋","🤚","🖐️","✋","🖖","👏","🙌",
+  "🙏","💪","🫡","🤝","👀","🧠","🦵","🦶","👂","👃",
+  // Hearts & symbols
+  "❤️","🧡","💛","💚","💙","💜","🖤","🤍","🤎","💔","❣️","💕","💞","💓","💗","💖","💘","💝","💟","♥️",
+  "✨","⭐","🌟","💫","💥","🔥","💯","✅","❌","⚠️",
+  // Activities & sports
+  "⛳","🏌️","🏌️‍♂️","🏌️‍♀️","🏆","🥇","🥈","🥉","🎯","🎉","🎊","🎁","🎈","🏅","⚽","🏀","🏈","⚾","🎾","🏐",
+];
+
 // ─── Component ─────────────────────────────────────────
 
 export default function Comments({
@@ -81,6 +95,9 @@ export default function Comments({
   const [dragOver, setDragOver] = useState(false);
   const [lightboxUrl, setLightboxUrl] = useState<string | null>(null);
   const [videoUrl, setVideoUrl] = useState<string | null>(null);
+  const [reactionPickerId, setReactionPickerId] = useState<number | null>(null);
+  const [showEmojiPicker, setShowEmojiPicker] = useState(false);
+  const [menuOpenId, setMenuOpenId] = useState<number | null>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -544,9 +561,12 @@ export default function Comments({
                     </div>
                   )}
 
-                  {/* Bubble */}
+                  {/* Bubble + reaction trigger */}
                   <div
-                    className={`group relative rounded-2xl px-3 py-2 ${
+                    className={`flex items-start gap-1 ${isOwn ? "flex-row-reverse" : ""}`}
+                  >
+                  <div
+                    className={`group relative rounded-2xl px-3 py-2 ${!isDeleted ? "pr-8" : ""} ${
                       isDeleted
                         ? "bg-gray-100 italic text-gray-400"
                         : isOwn
@@ -643,56 +663,169 @@ export default function Comments({
                           {renderContentWithMentions(comment.content)}
                         </p>
 
-                        {/* Action buttons (visible on hover) */}
-                        <div
-                          className={`absolute top-0 ${isOwn ? "-left-20" : "-right-20"} hidden gap-0.5 group-hover:flex`}
-                        >
-                          <button
-                            onClick={() => {
-                              setReplyTo(comment);
-                              inputRef.current?.focus();
-                            }}
-                            className="rounded p-1 text-green-400 hover:bg-green-100 hover:text-green-600"
-                            title="Reply"
-                          >
-                            <svg
-                              className="h-3.5 w-3.5"
-                              fill="none"
-                              viewBox="0 0 24 24"
-                              stroke="currentColor"
-                              strokeWidth={2}
-                            >
-                              <path
-                                strokeLinecap="round"
-                                strokeLinejoin="round"
-                                d="M3 10h10a8 8 0 0 1 8 8v2M3 10l6 6m-6-6 6-6"
-                              />
-                            </svg>
-                          </button>
-                          {isOwn && (
+                        {/* Chevron menu — top right inside bubble */}
+                        <div className="absolute right-1 top-1">
+                          <div className="relative">
                             <button
-                              onClick={() => handleDelete(comment.id)}
-                              className="rounded p-1 text-green-400 hover:bg-red-50 hover:text-red-500"
-                              title="Delete"
+                              onClick={() =>
+                                setMenuOpenId(
+                                  menuOpenId === comment.id ? null : comment.id
+                                )
+                              }
+                              className={`rounded p-0.5 ${
+                                isOwn
+                                  ? "text-white/50 hover:bg-white/10 hover:text-white"
+                                  : "text-green-400 hover:bg-green-100 hover:text-green-700"
+                              }`}
+                              title="More"
                             >
                               <svg
-                                className="h-3.5 w-3.5"
+                                className="h-4 w-4"
                                 fill="none"
                                 viewBox="0 0 24 24"
                                 stroke="currentColor"
-                                strokeWidth={2}
+                                strokeWidth={2.5}
                               >
                                 <path
                                   strokeLinecap="round"
                                   strokeLinejoin="round"
-                                  d="m14.74 9-.346 9m-4.788 0L9.26 9m9.968-3.21c.342.052.682.107 1.022.166m-1.022-.165L18.16 19.673a2.25 2.25 0 0 1-2.244 2.077H8.084a2.25 2.25 0 0 1-2.244-2.077L4.772 5.79m14.456 0a48.108 48.108 0 0 0-3.478-.397m-12 .562c.34-.059.68-.114 1.022-.165m0 0a48.11 48.11 0 0 1 3.478-.397m7.5 0v-.916c0-1.18-.91-2.164-2.09-2.201a51.964 51.964 0 0 0-3.32 0c-1.18.037-2.09 1.022-2.09 2.201v.916m7.5 0a48.667 48.667 0 0 0-7.5 0"
+                                  d="m19.5 8.25-7.5 7.5-7.5-7.5"
                                 />
                               </svg>
                             </button>
-                          )}
+                            {menuOpenId === comment.id && (
+                              <div
+                                className={`absolute top-6 z-20 min-w-[140px] overflow-hidden rounded-lg border border-green-200 bg-white py-1 shadow-lg ${
+                                  isOwn ? "right-0" : "left-0"
+                                }`}
+                              >
+                                <button
+                                  onClick={() => {
+                                    setReplyTo(comment);
+                                    inputRef.current?.focus();
+                                    setMenuOpenId(null);
+                                  }}
+                                  className="flex w-full items-center gap-2 px-3 py-1.5 text-xs text-green-700 hover:bg-green-50"
+                                >
+                                  <svg
+                                    className="h-3.5 w-3.5"
+                                    fill="none"
+                                    viewBox="0 0 24 24"
+                                    stroke="currentColor"
+                                    strokeWidth={2}
+                                  >
+                                    <path
+                                      strokeLinecap="round"
+                                      strokeLinejoin="round"
+                                      d="M3 10h10a8 8 0 0 1 8 8v2M3 10l6 6m-6-6 6-6"
+                                    />
+                                  </svg>
+                                  Reply
+                                </button>
+                                {comment.attachments && comment.attachments.length > 0 && (
+                                  <a
+                                    href={comment.attachments[0].url}
+                                    download={comment.attachments[0].name}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    onClick={() => setMenuOpenId(null)}
+                                    className="flex w-full items-center gap-2 px-3 py-1.5 text-xs text-green-700 hover:bg-green-50"
+                                  >
+                                    <svg
+                                      className="h-3.5 w-3.5"
+                                      fill="none"
+                                      viewBox="0 0 24 24"
+                                      stroke="currentColor"
+                                      strokeWidth={2}
+                                    >
+                                      <path
+                                        strokeLinecap="round"
+                                        strokeLinejoin="round"
+                                        d="M3 16.5v2.25A2.25 2.25 0 0 0 5.25 21h13.5A2.25 2.25 0 0 0 21 18.75V16.5M16.5 12 12 16.5m0 0L7.5 12m4.5 4.5V3"
+                                      />
+                                    </svg>
+                                    Download
+                                  </a>
+                                )}
+                                {isOwn && (
+                                  <button
+                                    onClick={() => {
+                                      handleDelete(comment.id);
+                                      setMenuOpenId(null);
+                                    }}
+                                    className="flex w-full items-center gap-2 px-3 py-1.5 text-xs text-red-600 hover:bg-red-50"
+                                  >
+                                    <svg
+                                      className="h-3.5 w-3.5"
+                                      fill="none"
+                                      viewBox="0 0 24 24"
+                                      stroke="currentColor"
+                                      strokeWidth={2}
+                                    >
+                                      <path
+                                        strokeLinecap="round"
+                                        strokeLinejoin="round"
+                                        d="m14.74 9-.346 9m-4.788 0L9.26 9m9.968-3.21c.342.052.682.107 1.022.166m-1.022-.165L18.16 19.673a2.25 2.25 0 0 1-2.244 2.077H8.084a2.25 2.25 0 0 1-2.244-2.077L4.772 5.79m14.456 0a48.108 48.108 0 0 0-3.478-.397m-12 .562c.34-.059.68-.114 1.022-.165m0 0a48.11 48.11 0 0 1 3.478-.397m7.5 0v-.916c0-1.18-.91-2.164-2.09-2.201a51.964 51.964 0 0 0-3.32 0c-1.18.037-2.09 1.022-2.09 2.201v.916m7.5 0a48.667 48.667 0 0 0-7.5 0"
+                                      />
+                                    </svg>
+                                    Delete
+                                  </button>
+                                )}
+                              </div>
+                            )}
+                          </div>
                         </div>
                       </>
                     )}
+                  </div>
+                  {/* Grey smiley — opens quick reactions */}
+                  {!isDeleted && (
+                    <div className="relative self-center">
+                      <button
+                        onClick={() =>
+                          setReactionPickerId(
+                            reactionPickerId === comment.id ? null : comment.id
+                          )
+                        }
+                        className="flex h-7 w-7 items-center justify-center rounded-full text-gray-400 hover:bg-gray-100 hover:text-gray-600"
+                        title="React"
+                      >
+                        <svg
+                          className="h-4 w-4"
+                          fill="none"
+                          viewBox="0 0 24 24"
+                          stroke="currentColor"
+                          strokeWidth={2}
+                        >
+                          <path
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                            d="M15.182 15.182a4.5 4.5 0 0 1-6.364 0M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0ZM9.75 9.75c0 .414-.168.75-.375.75S9 10.164 9 9.75 9.168 9 9.375 9s.375.336.375.75Zm-.375 0h.008v.015h-.008V9.75Zm5.625 0c0 .414-.168.75-.375.75s-.375-.336-.375-.75.168-.75.375-.75.375.336.375.75Zm-.375 0h.008v.015h-.008V9.75Z"
+                          />
+                        </svg>
+                      </button>
+                      {reactionPickerId === comment.id && (
+                        <div
+                          className={`absolute bottom-9 z-20 flex gap-0.5 rounded-full border border-green-200 bg-white p-1 shadow-lg ${
+                            isOwn ? "right-0" : "left-0"
+                          }`}
+                        >
+                          {QUICK_REACTIONS.map((emoji) => (
+                            <button
+                              key={emoji}
+                              onClick={() => {
+                                handleReaction(comment.id, emoji);
+                                setReactionPickerId(null);
+                              }}
+                              className="rounded-full p-1 text-base transition-transform hover:scale-125 hover:bg-green-50"
+                            >
+                              {emoji}
+                            </button>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  )}
                   </div>
 
                   {/* Edited indicator + timestamp */}
@@ -733,36 +866,8 @@ export default function Comments({
                     </div>
                   )}
 
-                  {/* Quick reactions (on hover) */}
-                  {!isDeleted && (
-                    <div
-                      className={`mt-0.5 hidden gap-0.5 group-hover:flex ${isOwn ? "justify-end" : "justify-start"}`}
-                    >
-                      {/* Need to wrap the bubble in group for this to work -
-                          handled via the parent group class */}
-                    </div>
-                  )}
                 </div>
               </div>
-
-              {/* Quick reaction bar (below bubble, visible on hover via parent group) */}
-              {!isDeleted && (
-                <div
-                  className={`-mt-0.5 mb-1 flex gap-0.5 opacity-0 transition-opacity hover:opacity-100 ${
-                    isOwn ? "justify-end pr-2" : "justify-start pl-2"
-                  } [div:hover>&]:opacity-100`}
-                >
-                  {QUICK_REACTIONS.map((emoji) => (
-                    <button
-                      key={emoji}
-                      onClick={() => handleReaction(comment.id, emoji)}
-                      className="rounded-full p-0.5 text-xs hover:bg-green-100"
-                    >
-                      {emoji}
-                    </button>
-                  ))}
-                </div>
-              )}
             </div>
           );
         })}
@@ -844,7 +949,50 @@ export default function Comments({
       )}
 
       {/* Input area */}
-      <div className="flex items-end gap-2 border-t border-green-100 bg-white px-3 py-2">
+      <div className="relative flex items-end gap-2 border-t border-green-100 bg-white px-3 py-2">
+        {showEmojiPicker && (
+          <div className="absolute bottom-14 right-3 z-20 w-72 rounded-xl border border-green-200 bg-white p-2 shadow-lg">
+            <div className="mb-1.5 flex items-center justify-between px-1">
+              <span className="text-xs font-medium text-green-600">
+                Emoji
+              </span>
+              <button
+                type="button"
+                onClick={() => setShowEmojiPicker(false)}
+                className="rounded p-0.5 text-green-400 hover:bg-green-50 hover:text-green-600"
+              >
+                <svg
+                  className="h-3.5 w-3.5"
+                  fill="none"
+                  viewBox="0 0 24 24"
+                  stroke="currentColor"
+                  strokeWidth={2}
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    d="M6 18 18 6M6 6l12 12"
+                  />
+                </svg>
+              </button>
+            </div>
+            <div className="grid max-h-56 grid-cols-8 gap-0.5 overflow-y-auto">
+              {EMOJI_PICKER.map((emoji, i) => (
+                <button
+                  key={`${emoji}-${i}`}
+                  type="button"
+                  onClick={() => {
+                    setInput((prev) => prev + emoji);
+                    inputRef.current?.focus();
+                  }}
+                  className="rounded p-1 text-xl transition-colors hover:bg-green-50"
+                >
+                  {emoji}
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
         {onUpload && (
           <button
             type="button"
@@ -867,6 +1015,16 @@ export default function Comments({
           rows={1}
           className="max-h-24 min-h-[36px] flex-1 resize-none rounded-xl border border-green-200 bg-green-50/50 px-3 py-2 text-sm text-green-900 placeholder:text-green-400 focus:border-green-400 focus:outline-none focus:ring-1 focus:ring-green-400"
         />
+        <button
+          type="button"
+          onClick={() => setShowEmojiPicker((v) => !v)}
+          className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-green-400 transition-colors hover:bg-green-50 hover:text-green-600"
+          title="Emoji"
+        >
+          <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+            <path strokeLinecap="round" strokeLinejoin="round" d="M15.182 15.182a4.5 4.5 0 0 1-6.364 0M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0ZM9.75 9.75c0 .414-.168.75-.375.75S9 10.164 9 9.75 9.168 9 9.375 9s.375.336.375.75Zm-.375 0h.008v.015h-.008V9.75Zm5.625 0c0 .414-.168.75-.375.75s-.375-.336-.375-.75.168-.75.375-.75.375.336.375.75Zm-.375 0h.008v.015h-.008V9.75Z" />
+          </svg>
+        </button>
         <button
           onClick={handleSend}
           disabled={sending || !input.trim()}
