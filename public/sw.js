@@ -1,7 +1,8 @@
 // Minimal service worker for PWA installability.
 // Does not cache aggressively — the app is online-first.
+// Version bump forces browsers to pick up updated push handling.
 
-const CACHE_NAME = "golf-lessons-v1";
+const CACHE_NAME = "golf-lessons-v2";
 
 self.addEventListener("install", (event) => {
   self.skipWaiting();
@@ -48,21 +49,23 @@ self.addEventListener("push", (event) => {
     self.clients
       .matchAll({ type: "window", includeUncontrolled: true })
       .then((clients) => {
-        // If a tab is open and visible, forward the data so the in-app
-        // toast can render it — skip the system notification to avoid
-        // duplicate alerts.
-        const focusedClient = clients.find(
-          (c) => c.visibilityState === "visible"
+        // A client is "active" if it's visible AND focused. We forward
+        // the push to active clients so the in-app toast can render it.
+        // We ALSO show the system notification in all cases — the bell
+        // icon keeps history and a system notification ensures the user
+        // doesn't miss anything if they're scrolling another part of
+        // the app. The tag collapses duplicates.
+        const activeClient = clients.find(
+          (c) => c.visibilityState === "visible" && c.focused
         );
-        if (focusedClient) {
-          focusedClient.postMessage({
+        if (activeClient) {
+          activeClient.postMessage({
             type: "push",
             title,
             body: options.body,
             url: options.data.url,
             tag: options.tag,
           });
-          return;
         }
         return self.registration.showNotification(title, options);
       })

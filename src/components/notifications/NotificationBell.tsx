@@ -39,7 +39,6 @@ export default function NotificationBell({
   const [loaded, setLoaded] = useState(false);
   const [wsConnected, setWsConnected] = useState(false);
   const [toasts, setToasts] = useState<ToastData[]>([]);
-  const [pushSubscribed, setPushSubscribed] = useState<boolean | null>(null);
   const ref = useRef<HTMLDivElement>(null);
 
   const dismissToast = useCallback((id: string) => {
@@ -73,22 +72,6 @@ export default function NotificationBell({
         setLoaded(true);
       }
     } catch {}
-  }, []);
-
-  // Check push subscription status
-  useEffect(() => {
-    let disposed = false;
-    fetch("/api/push/status")
-      .then((r) => (r.ok ? r.json() : { subscribed: false }))
-      .then((d) => {
-        if (!disposed) setPushSubscribed(!!d.subscribed);
-      })
-      .catch(() => {
-        if (!disposed) setPushSubscribed(false);
-      });
-    return () => {
-      disposed = true;
-    };
   }, []);
 
   // Listen for push messages forwarded by the service worker when a tab is open
@@ -275,9 +258,6 @@ export default function NotificationBell({
           ))}
         </div>
       )}
-      {/* Hide the bell icon when Web Push is active — system notifications
-          and forwarded toasts cover the UX. Don't render until we know. */}
-      {pushSubscribed === false && (
       <div className="relative" ref={ref}>
         <button
           onClick={() => setOpen(!open)}
@@ -354,7 +334,6 @@ export default function NotificationBell({
           </div>
         )}
       </div>
-      )}
     </>
   );
 }
