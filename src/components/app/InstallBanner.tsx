@@ -95,7 +95,7 @@ export default function InstallBanner() {
   if (!visible || !prompt) return null;
 
   return (
-    <div className="fixed inset-x-0 bottom-0 z-40 border-t border-green-200 bg-white px-4 py-3 shadow-lg md:bottom-4 md:left-1/2 md:right-auto md:max-w-md md:-translate-x-1/2 md:rounded-xl md:border">
+    <div className="fixed inset-x-0 bottom-0 z-40 border-t border-green-200 bg-white px-4 py-3 shadow-lg md:hidden">
       <div className="flex items-center gap-3">
         <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-green-50">
           <svg
