@@ -500,6 +500,25 @@ Golf lesson booking platform at **golflessons.be**. Pros subscribe annually, con
 - Env var names with the `VERCEL_` prefix are reserved by Vercel (we use `LOGS_VERCEL_TOKEN` instead of `VERCEL_API_TOKEN`)
 - `CRON_SECRET` required for the backup cron auth (also used by `/api/backup/validate`)
 
+### Health endpoint + external uptime monitoring
+- **`/api/health`** — public JSON endpoint, no auth, never cached
+  - Always: Postgres `SELECT 1`, critical env var presence, Sentry config
+  - `?deep=1` adds: Stripe (`balance.retrieve`) + Vercel Blob (`list`)
+  - Returns HTTP 200 + `{"status":"ok", ...}` when healthy, 503 + `{"status":"degraded", ...}` with per-check `ok`/`ms`/`error`
+  - Response includes `deploy` (git SHA) and `env` (`VERCEL_ENV`)
+- **`/dev/health`** — branded UI with overall status card, per-check rows with latency, deep toggle, auto-refresh
+- **External monitor: Uptime Kuma on Hetzner Telmio**
+  - Installed at `/opt/uptime-kuma` (version 2.2.1), systemd service `uptime-kuma.service`, SQLite storage
+  - Listens on `127.0.0.1:3007`, proxied by Caddy at `uptime.silverswing.golf` and `uptime.golflessons.be` (same instance, two hostnames)
+  - Admin creds in `.env.local` as `KUMA_USERNAME` / `KUMA_PASSWORD`
+  - Configured monitors:
+    - `golflessons.be · health` — keyword check on `/api/health`, expects `"status":"ok"`, 60s interval
+    - `preview.golflessons.be · health` — same, 300s interval
+    - `golflessons.be · health deep` — `/api/health?deep=1`, 600s interval
+    - `golflessons.be · home` — plain home page, 60s interval
+  - Notification channel: `ntfy phone push` → `server.silverswing.golf` topic `golf-alerts`, priority 4, attached to all monitors
+  - External monitoring catches failure modes the internal health checks can't: DNS, TLS cert expiry, domain registration, Vercel itself being down
+
 ---
 
 ## 16. App Layout (Live)

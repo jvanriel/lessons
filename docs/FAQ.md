@@ -312,3 +312,45 @@ The Marketplace-provisioned `SENTRY_AUTH_TOKEN` only has scopes for project writ
 
 ### Q: Why `LOGS_VERCEL_TOKEN` instead of `VERCEL_API_TOKEN`?
 The `VERCEL_` prefix is reserved by Vercel for system-injected env vars (like `VERCEL_URL`, `VERCEL_ENV`). Custom env vars with that prefix may be silently stripped or overridden at runtime. `LOGS_VERCEL_TOKEN` avoids the conflict.
+
+---
+
+## Health monitoring & uptime
+
+### Q: How do we know when the site goes down?
+Two-layer monitoring:
+
+1. **External** — Uptime Kuma on Hetzner polls `/api/health` every 60s from outside Vercel. Catches DNS, TLS cert expiry, domain registration issues, and Vercel itself being down. On failure, fires a ntfy push to your phone.
+2. **Internal** — `/api/health` returns a JSON with per-dependency status (DB, Stripe, Blob, env, Sentry). Kuma reads the body and alerts on missing `"status":"ok"`. `/dev/health` shows the same data in a nice UI.
+
+Together: external says *when* something's broken, internal says *what's* broken.
+
+### Q: What does `/api/health` check?
+- **Always** (fast, cheap): Postgres `SELECT 1`, Sentry config, critical env vars present
+- **With `?deep=1`**: Stripe (`balance.retrieve`), Vercel Blob (`list`)
+
+Returns HTTP 200 with `"status":"ok"` when healthy, 503 with per-check errors when degraded. Publicly accessible, no auth — the monitor needs to read it from outside.
+
+### Q: Where is Uptime Kuma running?
+On the **Hetzner Telmio node** (77.42.77.191), already hosting ntfy and other Node services. Uptime Kuma 2.2.1 runs on `127.0.0.1:3007` via systemd, reverse-proxied by Caddy at both `https://uptime.silverswing.golf` and `https://uptime.golflessons.be` (same instance, two hostnames). SQLite storage at `/opt/uptime-kuma/data/kuma.db`.
+
+### Q: How do I log in to Uptime Kuma?
+Credentials are in `.env.local` as `KUMA_USERNAME` and `KUMA_PASSWORD`. Kuma has its own local auth, no SSO.
+
+### Q: What monitors are configured?
+- `golflessons.be · health` — keyword check on `/api/health`, expects `"status":"ok"`, 60s
+- `preview.golflessons.be · health` — same, 300s
+- `golflessons.be · health deep` — `/api/health?deep=1`, 600s (runs Stripe + Blob)
+- `golflessons.be · home` — plain HTTP check on the home page, 60s
+
+All four route alerts to the ntfy phone push channel.
+
+### Q: Why also monitor the plain home page?
+As a sanity check independent of our code. If `/api/health` breaks due to a bug in the health endpoint itself, the home page check still tells us whether the site responds at all. Redundancy is cheap.
+
+### Q: What's the difference between the `golf-alerts` ntfy channel for Sentry and for Kuma?
+Same channel, different kinds of alerts:
+- **Sentry → ntfy**: *something broke in the app and threw an error* (the error message, stack trace, affected user)
+- **Kuma → ntfy**: *the site is unreachable or a dependency is down* (latency, HTTP status, which monitor failed)
+
+Both land on your phone via the same topic, prefixed so you can tell them apart.
