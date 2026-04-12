@@ -138,12 +138,15 @@ export default function EnablePushButton() {
 
   if (status === "enabled") {
     return (
-      <button
-        onClick={disable}
-        className="rounded-md border border-green-300 bg-white px-4 py-2 text-sm font-medium text-green-700 hover:bg-green-50"
-      >
-        Notifications enabled · Turn off
-      </button>
+      <div className="space-y-2">
+        <button
+          onClick={disable}
+          className="rounded-md border border-green-300 bg-white px-4 py-2 text-sm font-medium text-green-700 hover:bg-green-50"
+        >
+          Notifications enabled · Turn off
+        </button>
+        <TestPushButton />
+      </div>
     );
   }
 
@@ -155,5 +158,52 @@ export default function EnablePushButton() {
     >
       {status === "pending" ? "Enabling..." : "Enable notifications"}
     </button>
+  );
+}
+
+function TestPushButton() {
+  const [state, setState] = useState<"idle" | "pending" | "ok" | "err">(
+    "idle"
+  );
+  const [message, setMessage] = useState<string>("");
+
+  async function handleTest() {
+    setState("pending");
+    setMessage("");
+    try {
+      const res = await fetch("/api/push/test", { method: "POST" });
+      const data = await res.json().catch(() => ({}));
+      if (res.ok) {
+        setState("ok");
+        setMessage(
+          `Sent to ${data.subscriptionCount ?? 0} device(s). Check for the notification.`
+        );
+      } else {
+        setState("err");
+        setMessage(data.error || `Failed (${res.status})`);
+      }
+    } catch (err) {
+      setState("err");
+      setMessage((err as Error).message || "Request failed");
+    }
+  }
+
+  return (
+    <div>
+      <button
+        onClick={handleTest}
+        disabled={state === "pending"}
+        className="rounded-md border border-green-300 bg-white px-4 py-2 text-sm font-medium text-green-700 hover:bg-green-50 disabled:opacity-50"
+      >
+        {state === "pending" ? "Sending..." : "Send test notification"}
+      </button>
+      {message && (
+        <p
+          className={`mt-2 text-xs ${state === "err" ? "text-red-600" : "text-green-600"}`}
+        >
+          {message}
+        </p>
+      )}
+    </div>
   );
 }

@@ -225,6 +225,7 @@ export default function NotificationBell({
     });
     setNotifications([]);
     setUnreadCount(0);
+    setTimeout(() => setOpen(false), 600);
   }
 
   async function handleClickNotification(n: Notification) {
