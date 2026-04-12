@@ -9,6 +9,7 @@ import { BookingPreferences } from "./BookingPreferences";
 import { PaymentMethodSection } from "./PaymentMethodSection";
 import { GolfProfileSection } from "./GolfProfileSection";
 import { getStripe } from "@/lib/stripe";
+import EnablePushButton from "@/components/notifications/EnablePushButton";
 
 export const metadata = { title: "Profile — Golf Lessons" };
 
@@ -129,6 +130,18 @@ export default async function ProfilePage() {
           <BookingPreferences pros={proPrefs} locale={locale} />
         </div>
       )}
+
+      <div className="mt-8 rounded-xl border border-green-200 bg-white p-8">
+        <h2 className="font-display text-xl font-semibold text-green-950">
+          Notifications
+        </h2>
+        <p className="mt-1 text-sm text-green-600">
+          Receive alerts for new messages and booking updates on this device.
+        </p>
+        <div className="mt-4">
+          <EnablePushButton />
+        </div>
+      </div>
 
       <div className="mt-8 rounded-xl border border-green-200 bg-white p-8">
         <ChangePasswordForm locale={locale} />

@@ -3,6 +3,7 @@
 import { db } from "@/lib/db";
 import { notifications, users } from "@/lib/db/schema";
 import { eq, and, desc, inArray, sql, lt } from "drizzle-orm";
+import { sendPush } from "@/lib/push";
 
 const GATEWAY_URL = process.env.GATEWAY_URL;
 const GATEWAY_API_KEY = process.env.GATEWAY_API_KEY;
@@ -48,6 +49,14 @@ export async function createNotification(opts: {
   }));
 
   await db.insert(notifications).values(rows);
+
+  // Web Push (fire-and-forget, failures are logged but don't block)
+  sendPush(targetUserIds, {
+    title: opts.title,
+    body: opts.message,
+    url: opts.actionUrl,
+    tag: opts.type,
+  }).catch((err) => console.error("sendPush failed:", err));
 
   // Push to WebSocket gateway (fire-and-forget)
   if (GATEWAY_URL && GATEWAY_API_KEY) {

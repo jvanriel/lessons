@@ -81,6 +81,19 @@ export const cmsPageVersions = pgTable("cms_page_versions", {
   message: varchar("message", { length: 500 }),
 });
 
+export const pushSubscriptions = pgTable("push_subscriptions", {
+  id: serial("id").primaryKey(),
+  userId: integer("user_id")
+    .references(() => users.id, { onDelete: "cascade" })
+    .notNull(),
+  endpoint: text("endpoint").notNull().unique(),
+  p256dh: text("p256dh").notNull(),
+  auth: text("auth").notNull(),
+  userAgent: varchar("user_agent", { length: 500 }),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  lastUsedAt: timestamp("last_used_at").defaultNow().notNull(),
+});
+
 export const notifications = pgTable("notifications", {
   id: serial("id").primaryKey(),
   type: varchar("type", { length: 50 }).notNull(),
