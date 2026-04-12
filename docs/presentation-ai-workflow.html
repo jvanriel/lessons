@@ -1,0 +1,471 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Building with AI — Our Way of Working</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    background: #0a0a0a;
+    color: #e5e5e5;
+    overflow: hidden;
+    height: 100vh;
+  }
+  .slide {
+    display: none;
+    flex-direction: column;
+    justify-content: center;
+    align-items: flex-start;
+    height: 100vh;
+    padding: 8vw 10vw;
+    animation: fadeIn 0.3s ease;
+  }
+  .slide.active { display: flex; }
+  @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+
+  h1 { font-size: 4rem; font-weight: 700; line-height: 1.1; margin-bottom: 1rem; color: #fff; }
+  h2 { font-size: 2.8rem; font-weight: 700; line-height: 1.2; margin-bottom: 1.5rem; color: #fff; }
+  .subtitle { font-size: 1.5rem; color: #888; margin-bottom: 2rem; }
+  .accent { color: #c4a035; }
+
+  ul { list-style: none; font-size: 1.4rem; line-height: 2.2; }
+  ul li::before { content: "—"; margin-right: 0.75rem; color: #c4a035; }
+
+  .quote { font-size: 1.8rem; font-style: italic; color: #ccc; border-left: 4px solid #c4a035; padding-left: 1.5rem; max-width: 700px; line-height: 1.6; }
+
+  .slide-number { position: fixed; bottom: 2rem; right: 3rem; font-size: 0.9rem; color: #555; }
+  .logo { position: fixed; bottom: 2rem; left: 3rem; font-size: 0.9rem; color: #555; }
+
+  .two-col { display: grid; grid-template-columns: 1fr 1fr; gap: 4rem; width: 100%; }
+  .two-col ul { font-size: 1.2rem; line-height: 2; }
+
+  .example { background: #1a1a1a; border-radius: 12px; padding: 2rem; font-family: 'SF Mono', 'Fira Code', monospace; font-size: 1.1rem; line-height: 1.8; color: #aaa; margin-top: 1.5rem; max-width: 800px; }
+  .example .human { color: #c4a035; }
+  .example .ai { color: #6ec87a; }
+
+  .big-number { font-size: 8rem; font-weight: 800; color: #c4a035; line-height: 1; margin-bottom: 0.5rem; }
+</style>
+</head>
+<body>
+
+<!-- Slide 1: Title -->
+<div class="slide active">
+  <h1>Building with <span class="accent">AI</span></h1>
+  <p class="subtitle">How we ship features through conversation</p>
+  <p style="color: #555; font-size: 1.1rem; margin-top: 3rem;">Jan Van Riel &middot; golflessons.be</p>
+</div>
+
+<!-- Slide 2: The Setup -->
+<div class="slide">
+  <h2>The Setup</h2>
+  <ul>
+    <li>Claude Code — AI pair programmer in the terminal</li>
+    <li>Full-stack access: code, git, deploy, browser</li>
+    <li>Conversational interface — no IDE plugins or forms</li>
+    <li>Same tools you already use: git, pnpm, vercel</li>
+  </ul>
+</div>
+
+<!-- Slide 3: How a Feature Gets Built -->
+<div class="slide">
+  <h2>How a feature gets built</h2>
+  <div class="example">
+    <p class="human">"I need Google OAuth login for our Workspace users"</p>
+    <p class="ai">&rarr; Discusses architecture options</p>
+    <p class="human">"Most pros don't have Workspace accounts"</p>
+    <p class="ai">&rarr; Adjusts: Google for team, password for everyone else</p>
+    <p class="human">"Yes, build it"</p>
+    <p class="ai">&rarr; API routes, UI, translations, env vars, deploy</p>
+    <p class="human">"Move the button below the form"</p>
+    <p class="ai">&rarr; Done</p>
+  </div>
+</div>
+
+<!-- Slide 4: The Human Drives -->
+<div class="slide">
+  <h2>The human <span class="accent">drives</span></h2>
+  <ul>
+    <li>You make the decisions — AI proposes options</li>
+    <li>Domain knowledge shapes the architecture</li>
+    <li>Nothing ships without explicit approval</li>
+    <li>Commit, push, merge — only when you say so</li>
+  </ul>
+</div>
+
+<!-- Slide 5: What Happens in One Session -->
+<div class="slide">
+  <h2>One conversation, full stack</h2>
+  <div class="two-col">
+    <ul>
+      <li>Database schema</li>
+      <li>API routes</li>
+      <li>UI components</li>
+      <li>Translations (3 languages)</li>
+    </ul>
+    <ul>
+      <li>Environment variables</li>
+      <li>Git workflow</li>
+      <li>Deployment</li>
+      <li>Bug fixes along the way</li>
+    </ul>
+  </div>
+</div>
+
+<!-- Slide 6: Debugging Together -->
+<div class="slide">
+  <h2>Debugging together</h2>
+  <div class="example">
+    <p class="human">"Page does not load"</p>
+    <p class="ai">&rarr; Checks server logs, finds compilation error</p>
+    <p class="human">"Error 400: redirect_uri=undefined"</p>
+    <p class="ai">&rarr; Identifies missing env var, fixes to derive from request URL</p>
+    <p class="human">"Works"</p>
+  </div>
+  <p style="color: #888; font-size: 1.2rem; margin-top: 2rem;">You report symptoms. AI diagnoses root causes.</p>
+</div>
+
+<!-- Slide 7: The Feedback Loop -->
+<div class="slide">
+  <h2>Tight <span class="accent">feedback</span> loops</h2>
+  <ul>
+    <li>Describe what you want in plain language</li>
+    <li>See it running in seconds</li>
+    <li>Give feedback: "that section won't collapse"</li>
+    <li>Fix ships immediately</li>
+  </ul>
+  <p style="color: #888; font-size: 1.2rem; margin-top: 2rem;">No tickets. No context switching. No waiting.</p>
+</div>
+
+<!-- Slide 8: What It's Good At -->
+<div class="slide">
+  <h2>Where it <span class="accent">shines</span></h2>
+  <ul>
+    <li>Boilerplate & wiring — routes, forms, CRUD</li>
+    <li>Cross-cutting changes — rename across 10 files</li>
+    <li>Research & decisions — "how should we handle shared auth?"</li>
+    <li>Deployment ops — env vars, git, CI</li>
+    <li>i18n — translations in 3 languages simultaneously</li>
+  </ul>
+</div>
+
+<!-- Slide 9: What Still Needs Humans -->
+<div class="slide">
+  <h2>What still needs <span class="accent">humans</span></h2>
+  <ul>
+    <li>Visual QA — does it actually look right?</li>
+    <li>Product decisions — what should we build?</li>
+    <li>Domain expertise — "pros don't have Google accounts"</li>
+    <li>User testing — real people, real devices</li>
+    <li>Taste — when "correct" isn't "good"</li>
+  </ul>
+</div>
+
+<!-- Slide 10: Our Workflow -->
+<div class="slide">
+  <h2>Our workflow</h2>
+  <ul>
+    <li>Work on <code style="color:#c4a035">preview</code> branch — always deployable</li>
+    <li>Test on Vercel preview URL</li>
+    <li>Merge to <code style="color:#c4a035">main</code> when validated</li>
+    <li>Production deploys automatically</li>
+    <li>AI remembers preferences across sessions</li>
+  </ul>
+</div>
+
+<!-- Slide 11: The Product -->
+<div class="slide">
+  <h2>The product: <span class="accent">golflessons.be</span></h2>
+  <p class="subtitle">Golf lesson booking platform for pros and students</p>
+  <ul>
+    <li>Pros subscribe, configure availability, receive payments</li>
+    <li>Students browse pros, book lessons, get coached</li>
+    <li>Sister site of silverswing.golf — shared identity layer</li>
+    <li>Three languages from day one: EN, NL, FR</li>
+  </ul>
+</div>
+
+<!-- Slide 12: Tech Stack Overview -->
+<div class="slide">
+  <h2>Tech stack</h2>
+  <div class="two-col">
+    <ul>
+      <li>Next.js 16</li>
+      <li>TypeScript</li>
+      <li>Tailwind CSS 4</li>
+      <li>shadcn/ui</li>
+      <li>Drizzle ORM</li>
+    </ul>
+    <ul>
+      <li>Neon PostgreSQL</li>
+      <li>Vercel</li>
+      <li>Stripe Connect</li>
+      <li>Vercel Blob</li>
+      <li>Vitest</li>
+    </ul>
+  </div>
+</div>
+
+<!-- Slide 13: What is Next.js -->
+<div class="slide">
+  <h2>Next.js <span class="accent">16</span></h2>
+  <p class="subtitle">Full-stack React framework by Vercel</p>
+  <ul>
+    <li>Server Components — HTML rendered on the server, zero JS shipped</li>
+    <li>App Router — file-based routing with layouts, loading states, error boundaries</li>
+    <li>Server Actions — form submissions that run server-side code directly</li>
+    <li>Turbopack — Rust-powered dev server, instant hot reload</li>
+    <li>API routes, middleware, streaming — one framework does it all</li>
+  </ul>
+</div>
+
+<!-- Slide 14: TypeScript -->
+<div class="slide">
+  <h2>TypeScript</h2>
+  <p class="subtitle">JavaScript with types — catches bugs before runtime</p>
+  <ul>
+    <li>Strict mode — no implicit any, null safety everywhere</li>
+    <li>Database schema generates TypeScript types (Drizzle)</li>
+    <li>API responses are type-checked end to end</li>
+    <li>Refactoring with confidence — rename and the compiler finds every reference</li>
+  </ul>
+</div>
+
+<!-- Slide 15: Tailwind + shadcn -->
+<div class="slide">
+  <h2>Tailwind CSS + <span class="accent">shadcn/ui</span></h2>
+  <p class="subtitle">Utility-first styling + accessible component library</p>
+  <ul>
+    <li>Tailwind — style directly in markup, no separate CSS files</li>
+    <li>Design tokens as CSS variables — one change updates everything</li>
+    <li>shadcn/ui — copy-paste components you own (not a dependency)</li>
+    <li>Built on Radix primitives — accessible, keyboard-navigable, composable</li>
+  </ul>
+</div>
+
+<!-- Slide 16: Drizzle + Neon -->
+<div class="slide">
+  <h2>Drizzle ORM + <span class="accent">Neon</span></h2>
+  <p class="subtitle">Type-safe database access + serverless PostgreSQL</p>
+  <ul>
+    <li>Drizzle — SQL-like syntax, full TypeScript inference, zero overhead</li>
+    <li>Schema-as-code — migrations generated from TypeScript definitions</li>
+    <li>Neon — PostgreSQL that scales to zero, branches like git</li>
+    <li>Serverless-friendly — HTTP connection pooling, no persistent connections needed</li>
+  </ul>
+</div>
+
+<!-- Slide 17: Vercel -->
+<div class="slide">
+  <h2>Vercel</h2>
+  <p class="subtitle">Deploy on push — preview every branch, ship to production on merge</p>
+  <ul>
+    <li>Git-integrated — every push gets its own URL</li>
+    <li>Edge network — fast globally, no infrastructure to manage</li>
+    <li>Fluid Compute — serverless functions that reuse instances</li>
+    <li>Blob storage, environment variables, domains — all managed</li>
+    <li>Zero config for Next.js — just push and it works</li>
+  </ul>
+</div>
+
+<!-- Slide 18: Stripe Connect -->
+<div class="slide">
+  <h2>Stripe <span class="accent">Connect</span></h2>
+  <p class="subtitle">Marketplace payments — students pay, pros receive</p>
+  <ul>
+    <li>Express accounts — pros onboard in minutes with hosted forms</li>
+    <li>Split payments — lesson fee goes to pro, platform takes 2.5%</li>
+    <li>Automatic SEPA payouts to pro's bank account</li>
+    <li>Webhooks handle the lifecycle — subscription, payment, payout events</li>
+    <li>Platform subscription (annual) + per-lesson commission model</li>
+  </ul>
+</div>
+
+
+<!-- Slide 13: Architecture Diagram -->
+<div class="slide">
+  <h2>Request flow</h2>
+  <div class="example" style="font-size: 1.3rem; line-height: 2.2; max-width: 900px;">
+    <p><span class="human">Browser</span> &rarr; Vercel Edge &rarr; <span class="ai">Middleware</span> (auth gate, role check)</p>
+    <p style="padding-left: 2rem;">&darr;</p>
+    <p style="padding-left: 2rem;"><span class="ai">Server Components</span> &rarr; Drizzle ORM &rarr; <span class="human">Neon Postgres</span></p>
+    <p style="padding-left: 2rem;">&darr;</p>
+    <p style="padding-left: 2rem;"><span class="ai">Server Actions</span> &rarr; Stripe / Gmail / Blob</p>
+  </div>
+  <p style="color: #888; font-size: 1.1rem; margin-top: 1.5rem;">No separate API server. Everything runs on Vercel Functions.</p>
+</div>
+
+<!-- Slide 14: Features — Pro Side -->
+<div class="slide">
+  <h2>Features: <span class="accent">Pro</span></h2>
+  <div class="two-col">
+    <ul>
+      <li>Availability editor (weekly templates)</li>
+      <li>Lesson types & pricing per location</li>
+      <li>Booking management</li>
+      <li>Earnings dashboard</li>
+      <li>Stripe Connect payouts</li>
+    </ul>
+    <ul>
+      <li>Student roster & coaching chat</li>
+      <li>Personal coaching pages per student</li>
+      <li>Tips, photos, videos, drills</li>
+      <li>Public profile & flyer pages</li>
+      <li>Email campaigns to contacts</li>
+    </ul>
+  </div>
+</div>
+
+<!-- Slide 15: Features — Student Side -->
+<div class="slide">
+  <h2>Features: <span class="accent">Student</span></h2>
+  <ul>
+    <li>Browse pro directory with profiles & reviews</li>
+    <li>Book lessons: pick pro, location, date, time slot, pay</li>
+    <li>WhatsApp-style coaching chat with your pro</li>
+    <li>Personal learning page — tips, videos, drill assignments</li>
+    <li>Booking history & payment overview</li>
+  </ul>
+</div>
+
+<!-- Slide 16: Features — Admin & Dev -->
+<div class="slide">
+  <h2>Features: <span class="accent">Admin & Dev</span></h2>
+  <div class="two-col">
+    <div>
+      <p style="color: #c4a035; font-size: 1rem; font-weight: 600; margin-bottom: 0.5rem; text-transform: uppercase; letter-spacing: 0.1em;">ADMIN</p>
+      <ul>
+        <li>User & pro management</li>
+        <li>CMS editor (per-locale content)</li>
+        <li>Payments dashboard & MRR</li>
+        <li>AI content generation panel</li>
+        <li>Impersonation (login as any user)</li>
+      </ul>
+    </div>
+    <div>
+      <p style="color: #c4a035; font-size: 1rem; font-weight: 600; margin-bottom: 0.5rem; text-transform: uppercase; letter-spacing: 0.1em;">DEV</p>
+      <ul>
+        <li>Database inspector</li>
+        <li>Blob storage browser</li>
+        <li>Log viewer</li>
+        <li>Seed scripts for test data</li>
+        <li>Schema diagnostics</li>
+      </ul>
+    </div>
+  </div>
+</div>
+
+<!-- Slide 17: UI/UX Design Language -->
+<div class="slide">
+  <h2>Design language</h2>
+  <div style="display: flex; gap: 1.5rem; margin-bottom: 2rem;">
+    <div style="width: 80px; height: 80px; border-radius: 12px; background: #091a12;"></div>
+    <div style="width: 80px; height: 80px; border-radius: 12px; background: #1a3d2a;"></div>
+    <div style="width: 80px; height: 80px; border-radius: 12px; background: #2d6b47;"></div>
+    <div style="width: 80px; height: 80px; border-radius: 12px; background: #c4a035;"></div>
+    <div style="width: 80px; height: 80px; border-radius: 12px; background: #faf7f0; border: 1px solid #333;"></div>
+  </div>
+  <ul>
+    <li>Luxury golf aesthetic — forest green + gold</li>
+    <li>Warm cream background, not cold white</li>
+    <li>Cormorant Garamond for headings, Outfit for body</li>
+    <li>shadcn/ui components with custom theme</li>
+  </ul>
+</div>
+
+<!-- Slide 18: UI/UX Patterns -->
+<div class="slide">
+  <h2>UI/UX <span class="accent">patterns</span></h2>
+  <div class="two-col">
+    <ul>
+      <li>Responsive sidebar + bottom nav</li>
+      <li>Role-based layouts (pro, member, admin)</li>
+      <li>Drag-and-drop kanban boards</li>
+      <li>Rich text editor (Tiptap)</li>
+    </ul>
+    <ul>
+      <li>WhatsApp-style coaching chat</li>
+      <li>Thread-based comments</li>
+      <li>Touch-optimized availability grid</li>
+      <li>QR code login for mobile</li>
+    </ul>
+  </div>
+</div>
+
+<!-- Slide 19: Testing -->
+<div class="slide">
+  <h2>Testing</h2>
+  <ul>
+    <li>Vitest — fast, TypeScript-native test runner</li>
+    <li>Integration tests against real Neon PostgreSQL</li>
+    <li>Lesson slot computation & booking conflict detection</li>
+    <li>Seed scripts for repeatable test environments</li>
+    <li>Manual QA on Vercel preview deployments</li>
+  </ul>
+  <p style="color: #888; font-size: 1.1rem; margin-top: 1.5rem;">Tests run against production infrastructure, not mocks.</p>
+</div>
+
+<!-- Slide 20: Testing with AI -->
+<div class="slide">
+  <h2>Testing <span class="accent">with AI</span></h2>
+  <div class="example">
+    <p class="human">"The sidebar won't collapse"</p>
+    <p class="ai">&rarr; Reads component, finds auto-expand overriding user toggle</p>
+    <p class="ai">&rarr; Removes hasActive override, preserves user intent</p>
+    <p class="ai">&rarr; 4 lines deleted, bug fixed</p>
+    <p class="human">"Commit, push, merge"</p>
+    <p class="ai">&rarr; Done in 30 seconds</p>
+  </div>
+  <p style="color: #888; font-size: 1.1rem; margin-top: 1.5rem;">From bug report to production fix in under a minute.</p>
+</div>
+
+<!-- Slide 21: Key Takeaway -->
+<div class="slide">
+  <div class="quote">
+    AI doesn't replace the developer.<br>
+    It removes the friction between<br>
+    deciding what to build and having it running.
+  </div>
+</div>
+
+<!-- Slide 22: End -->
+<div class="slide">
+  <h1>Questions<span class="accent">?</span></h1>
+  <p class="subtitle">golflessons.be &middot; silverswing.golf</p>
+</div>
+
+<div class="slide-number"></div>
+<div class="logo">golflessons.be</div>
+
+<script>
+  const slides = document.querySelectorAll('.slide');
+  const counter = document.querySelector('.slide-number');
+  let current = 0;
+
+  function show(n) {
+    slides[current].classList.remove('active');
+    current = (n + slides.length) % slides.length;
+    slides[current].classList.add('active');
+    counter.textContent = `${current + 1} / ${slides.length}`;
+  }
+
+  document.addEventListener('keydown', (e) => {
+    if (e.key === 'ArrowRight' || e.key === ' ' || e.key === 'Enter') { e.preventDefault(); show(current + 1); }
+    if (e.key === 'ArrowLeft' || e.key === 'Backspace') { e.preventDefault(); show(current - 1); }
+    if (e.key === 'Home') { e.preventDefault(); show(0); }
+    if (e.key === 'End') { e.preventDefault(); show(slides.length - 1); }
+  });
+
+  // Touch support
+  let touchStart = 0;
+  document.addEventListener('touchstart', (e) => { touchStart = e.touches[0].clientX; });
+  document.addEventListener('touchend', (e) => {
+    const diff = touchStart - e.changedTouches[0].clientX;
+    if (Math.abs(diff) > 50) { diff > 0 ? show(current + 1) : show(current - 1); }
+  });
+
+  show(0);
+</script>
+</body>
+</html>
