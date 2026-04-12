@@ -12,7 +12,8 @@ async function requireAuth() {
     !(
       hasRole(session, "admin") ||
       hasRole(session, "pro") ||
-      hasRole(session, "dev")
+      hasRole(session, "dev") ||
+      hasRole(session, "member")
     )
   ) {
     return null;
