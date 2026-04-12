@@ -4,7 +4,6 @@ import "./globals.css";
 import Header from "@/components/Header";
 import Footer from "@/components/Footer";
 import { CmsProvider } from "@/components/cms/CmsProvider";
-import PreLaunchBanner from "@/components/PreLaunchBanner";
 import DeploymentChecker from "@/components/DeploymentChecker";
 import { getSession, hasRole, getImpersonatorSession, parseRoles } from "@/lib/auth";
 import { cookies } from "next/headers";
@@ -162,7 +161,6 @@ export default async function RootLayout({
           ) : (
             /* Website mode — not logged in */
             <>
-              <PreLaunchBanner />
               <Header />
               <main className="min-h-screen">{children}</main>
               <Footer />
