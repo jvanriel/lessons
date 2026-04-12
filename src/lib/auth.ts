@@ -1,6 +1,7 @@
 import { SignJWT, jwtVerify } from "jose";
 import { hash, compare } from "bcryptjs";
 import { cookies } from "next/headers";
+import * as Sentry from "@sentry/nextjs";
 
 const SESSION_COOKIE = "user-session";
 const IMPERSONATOR_COOKIE = "impersonator-session";
@@ -71,7 +72,12 @@ export async function setSessionCookie(payload: SessionPayload) {
 export async function getSession(): Promise<SessionPayload | null> {
   const token = (await cookies()).get(SESSION_COOKIE)?.value;
   if (!token) return null;
-  return verifySessionToken(token);
+  const payload = await verifySessionToken(token);
+  if (payload) {
+    // Attach user context to Sentry so errors are attributed to this user
+    Sentry.setUser({ id: String(payload.userId), email: payload.email });
+  }
+  return payload;
 }
 
 export async function clearSessionCookie() {

@@ -12,12 +12,12 @@ async function requireDev() {
 }
 
 function getAuth() {
-  const token = process.env.VERCEL_API_TOKEN;
+  const token = process.env.LOGS_VERCEL_TOKEN;
   const projectId = process.env.VERCEL_PROJECT_ID;
   const teamId = process.env.VERCEL_TEAM_ID;
   if (!token || token === "PLACEHOLDER_REPLACE_ME") {
     throw new Error(
-      "VERCEL_API_TOKEN not configured. Create one at https://vercel.com/account/tokens"
+      "LOGS_VERCEL_TOKEN not configured. Create one at https://vercel.com/account/tokens"
     );
   }
   if (!projectId) {
