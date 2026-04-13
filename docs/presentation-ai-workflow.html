@@ -57,7 +57,19 @@
   <p style="color: #555; font-size: 1.1rem; margin-top: 3rem;">Jan Van Riel &middot; golflessons.be</p>
 </div>
 
-<!-- Slide 2: The Setup -->
+<!-- Slide 2: The Product -->
+<div class="slide">
+  <h2>The product: <span class="accent">golflessons.be</span></h2>
+  <p class="subtitle">Golf lesson booking platform for pros and students</p>
+  <ul>
+    <li>Pros subscribe, configure availability, receive payments</li>
+    <li>Students browse pros, book lessons, get coached</li>
+    <li>Sister site of silverswing.golf — shared identity layer</li>
+    <li>Three languages from day one: EN, NL, FR</li>
+  </ul>
+</div>
+
+<!-- Slide 3: The Setup -->
 <div class="slide">
   <h2>The Setup</h2>
   <ul>
@@ -255,36 +267,52 @@
   </ul>
 </div>
 
-<!-- Slide 11: The Product -->
-<div class="slide">
-  <h2>The product: <span class="accent">golflessons.be</span></h2>
-  <p class="subtitle">Golf lesson booking platform for pros and students</p>
-  <ul>
-    <li>Pros subscribe, configure availability, receive payments</li>
-    <li>Students browse pros, book lessons, get coached</li>
-    <li>Sister site of silverswing.golf — shared identity layer</li>
-    <li>Three languages from day one: EN, NL, FR</li>
-  </ul>
-</div>
-
 <!-- Slide 12: Tech Stack Overview -->
 <div class="slide">
   <h2>Tech stack</h2>
   <div class="two-col">
-    <ul>
-      <li>Next.js 16</li>
-      <li>TypeScript</li>
-      <li>Tailwind CSS 4</li>
-      <li>shadcn/ui</li>
-      <li>Drizzle ORM</li>
-    </ul>
-    <ul>
-      <li>Neon PostgreSQL</li>
-      <li>Vercel</li>
-      <li>Stripe Connect</li>
-      <li>Vercel Blob</li>
-      <li>Vitest</li>
-    </ul>
+    <div>
+      <p style="color: #c4a035; font-size: 0.9rem; font-weight: 600; margin-bottom: 0.4rem; text-transform: uppercase; letter-spacing: 0.1em;">APP</p>
+      <ul>
+        <li>Next.js 16 on React 19</li>
+        <li>TypeScript</li>
+        <li>Tailwind CSS 4</li>
+        <li>shadcn/ui</li>
+        <li>Drizzle ORM</li>
+        <li>Vitest</li>
+      </ul>
+    </div>
+    <div>
+      <p style="color: #c4a035; font-size: 0.9rem; font-weight: 600; margin-bottom: 0.4rem; text-transform: uppercase; letter-spacing: 0.1em;">PLATFORM</p>
+      <ul>
+        <li>Vercel</li>
+        <li>Neon PostgreSQL</li>
+        <li>Vercel Blob</li>
+        <li>Stripe Connect</li>
+        <li>Web Push (VAPID)</li>
+        <li>Google OAuth</li>
+      </ul>
+    </div>
+  </div>
+  <div class="two-col" style="margin-top: 1.5rem;">
+    <div>
+      <p style="color: #c4a035; font-size: 0.9rem; font-weight: 600; margin-bottom: 0.4rem; text-transform: uppercase; letter-spacing: 0.1em;">OBSERVABILITY</p>
+      <ul>
+        <li>Sentry (errors)</li>
+        <li>Uptime Kuma (uptime)</li>
+        <li>ntfy (phone push)</li>
+        <li>Events table (business)</li>
+      </ul>
+    </div>
+    <div>
+      <p style="color: #c4a035; font-size: 0.9rem; font-weight: 600; margin-bottom: 0.4rem; text-transform: uppercase; letter-spacing: 0.1em;">OPS</p>
+      <ul>
+        <li>Vercel Cron (daily backup)</li>
+        <li>Vercel Blob (backup store)</li>
+        <li>Hetzner VPS (Kuma + ntfy)</li>
+        <li>Caddy (reverse proxy)</li>
+      </ul>
+    </div>
   </div>
 </div>
 

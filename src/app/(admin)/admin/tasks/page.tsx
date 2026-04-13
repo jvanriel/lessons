@@ -46,7 +46,7 @@ export default async function AdminTasksPage() {
 
   return (
     <div className="mx-auto max-w-[96rem] px-6 py-8">
-      <h1 className="font-display text-2xl font-semibold text-green-900">
+      <h1 className="font-display text-xl font-semibold text-green-900">
         Tasks
       </h1>
       <p className="mt-1 text-xs text-green-600">
