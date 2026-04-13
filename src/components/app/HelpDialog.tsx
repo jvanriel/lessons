@@ -1,6 +1,8 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import type { Locale } from "@/lib/i18n";
+import { t } from "@/lib/i18n/translations";
 
 type Platform = "ios" | "android" | "unknown";
 
@@ -17,7 +19,7 @@ function detectPlatform(): Platform {
   return "unknown";
 }
 
-export default function HelpDialog() {
+export default function HelpDialog({ locale }: { locale: Locale }) {
   const [open, setOpen] = useState(false);
   const [platform, setPlatform] = useState<Platform>("unknown");
   const [tab, setTab] = useState<"ios" | "android" | "qr">("ios");
@@ -31,10 +33,6 @@ export default function HelpDialog() {
     if (p === "android") setTab("android");
   }, []);
 
-  // Capture the browser's install prompt (Android Chrome/Edge, desktop Chrome).
-  // An inline script in the root layout catches it early and stores it on
-  // window.__deferredInstallPrompt so we don't miss it between page load and
-  // React hydration.
   useEffect(() => {
     const w = window as unknown as {
       __deferredInstallPrompt?: BeforeInstallPromptEvent | null;
@@ -86,7 +84,7 @@ export default function HelpDialog() {
       <button
         onClick={() => setOpen(true)}
         className="flex items-center justify-center text-green-100/60 transition-colors hover:text-gold-200"
-        aria-label="Help"
+        aria-label={t("appHelp.button", locale)}
       >
         <svg
           className="h-[18px] w-[18px]"
@@ -115,12 +113,12 @@ export default function HelpDialog() {
             {/* Header */}
             <div className="flex items-center justify-between border-b border-green-100 px-5 py-4">
               <h2 className="font-display text-lg font-semibold text-green-950">
-                Install & Notifications
+                {t("appHelp.title", locale)}
               </h2>
               <button
                 onClick={() => setOpen(false)}
                 className="rounded p-1 text-green-400 hover:bg-green-50 hover:text-green-600"
-                aria-label="Close"
+                aria-label={t("appHelp.close", locale)}
               >
                 <svg
                   className="h-5 w-5"
@@ -148,7 +146,7 @@ export default function HelpDialog() {
                     : "text-green-500 hover:text-green-700"
                 }`}
               >
-                iPhone
+                {t("appHelp.tab.iphone", locale)}
               </button>
               <button
                 onClick={() => setTab("android")}
@@ -158,7 +156,7 @@ export default function HelpDialog() {
                     : "text-green-500 hover:text-green-700"
                 }`}
               >
-                Android
+                {t("appHelp.tab.android", locale)}
               </button>
               <button
                 onClick={() => setTab("qr")}
@@ -168,24 +166,30 @@ export default function HelpDialog() {
                     : "text-green-500 hover:text-green-700"
                 }`}
               >
-                QR login
+                {t("appHelp.tab.qr", locale)}
               </button>
             </div>
 
             {/* Content */}
             <div className="max-h-[70vh] overflow-y-auto px-5 py-5 text-sm text-green-800">
-              {tab === "ios" && <IOSInstructions />}
+              {tab === "ios" && <IOSInstructions locale={locale} />}
               {tab === "android" && (
                 <AndroidInstructions
                   canInstall={!!installPrompt}
                   installed={installed}
                   onInstall={handleInstallClick}
+                  locale={locale}
                 />
               )}
-              {tab === "qr" && <QRInstructions />}
+              {tab === "qr" && <QRInstructions locale={locale} />}
               {tab !== "qr" && platform !== "unknown" && tab !== platform && (
                 <p className="mt-4 rounded-md bg-gold-50 px-3 py-2 text-xs text-gold-700">
-                  Tip: you&apos;re on {platform === "ios" ? "iPhone/iPad" : "Android"} — switch to that tab above for matching instructions.
+                  {t("appHelp.tabTip", locale).replace(
+                    "{platform}",
+                    platform === "ios"
+                      ? t("appHelp.platform.iphone", locale)
+                      : t("appHelp.platform.android", locale)
+                  )}
                 </p>
               )}
             </div>
@@ -196,125 +200,101 @@ export default function HelpDialog() {
   );
 }
 
-function IOSInstructions() {
+function IOSInstructions({ locale }: { locale: Locale }) {
   return (
     <div className="space-y-5">
       <section>
         <h3 className="mb-2 font-semibold text-green-950">
-          1. Install the app
+          {t("appHelp.ios.install.h", locale)}
         </h3>
         <ol className="ml-5 list-decimal space-y-1.5 text-green-700">
-          <li>Open this website in <b>Safari</b> (not Chrome)</li>
-          <li>
-            Tap the <b>Share</b> button
-            <span className="ml-1 inline-flex items-center text-green-500">
-              (
-              <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
-                <path strokeLinecap="round" strokeLinejoin="round" d="M9 8.25H7.5a2.25 2.25 0 0 0-2.25 2.25v9a2.25 2.25 0 0 0 2.25 2.25h9a2.25 2.25 0 0 0 2.25-2.25v-9a2.25 2.25 0 0 0-2.25-2.25H15M9 12l3 3m0 0 3-3m-3 3V2.25" />
-              </svg>
-              )
-            </span>{" "}
-            at the bottom of the screen
-          </li>
-          <li>Scroll down and tap <b>Add to Home Screen</b></li>
-          <li>Tap <b>Add</b> in the top right</li>
+          <li>{t("appHelp.ios.install.step1", locale)}</li>
+          <li>{t("appHelp.ios.install.step2", locale)}</li>
+          <li>{t("appHelp.ios.install.step3", locale)}</li>
+          <li>{t("appHelp.ios.install.step4", locale)}</li>
         </ol>
       </section>
 
       <section>
         <h3 className="mb-2 font-semibold text-green-950">
-          2. Enable notifications
+          {t("appHelp.ios.notif.h", locale)}
         </h3>
         <ol className="ml-5 list-decimal space-y-1.5 text-green-700">
-          <li>
-            Open the app from your <b>Home Screen</b> (not Safari — this is
-            important)
-          </li>
-          <li>
-            Go to <b>Profile</b> &rarr; <b>Notifications</b>
-          </li>
-          <li>Tap <b>Enable notifications</b></li>
-          <li>Tap <b>Allow</b> when iOS asks for permission</li>
+          <li>{t("appHelp.ios.notif.step1", locale)}</li>
+          <li>{t("appHelp.ios.notif.step2", locale)}</li>
+          <li>{t("appHelp.ios.notif.step3", locale)}</li>
+          <li>{t("appHelp.ios.notif.step4", locale)}</li>
         </ol>
         <p className="mt-2 text-xs text-green-500">
-          Requires iOS 16.4 or later.
+          {t("appHelp.ios.notif.requires", locale)}
         </p>
       </section>
 
       <section>
         <h3 className="mb-2 font-semibold text-green-950">
-          3. If notifications don&apos;t appear
+          {t("appHelp.ios.fix.h", locale)}
         </h3>
-        <p className="mb-1 font-medium text-green-800">Check the app&apos;s iOS notification settings:</p>
+        <p className="mb-1 font-medium text-green-800">
+          {t("appHelp.ios.fix.intro", locale)}
+        </p>
         <ol className="ml-5 list-decimal space-y-1.5 text-green-700">
-          <li><b>iOS Settings</b> &rarr; <b>Notifications</b></li>
-          <li>Scroll to <b>Golf Lessons</b></li>
-          <li>Enable <b>Allow Notifications</b></li>
-          <li>Enable <b>Lock Screen</b>, <b>Notification Center</b>, and <b>Banners</b></li>
-          <li>Set <b>Banner Style</b> to <b>Persistent</b> for stickier alerts</li>
-          <li>Enable <b>Sounds</b> and <b>Badges</b></li>
+          <li>{t("appHelp.ios.fix.s1", locale)}</li>
+          <li>{t("appHelp.ios.fix.s2", locale)}</li>
+          <li>{t("appHelp.ios.fix.s3", locale)}</li>
+          <li>{t("appHelp.ios.fix.s4", locale)}</li>
+          <li>{t("appHelp.ios.fix.s5", locale)}</li>
+          <li>{t("appHelp.ios.fix.s6", locale)}</li>
         </ol>
-        <p className="mt-3 mb-1 font-medium text-green-800">Other things to check:</p>
+        <p className="mt-3 mb-1 font-medium text-green-800">
+          {t("appHelp.ios.fix.otherH", locale)}
+        </p>
         <ul className="ml-5 list-disc space-y-1.5 text-green-700">
-          <li><b>Focus / Do Not Disturb</b> — Control Centre &rarr; make sure no Focus is active</li>
-          <li><b>Low Power Mode</b> — can throttle background notifications. Settings &rarr; Battery</li>
-          <li><b>Scheduled Summary</b> — Settings &rarr; Notifications &rarr; if enabled, make sure Golf Lessons is set to <b>Deliver Immediately</b></li>
+          <li>{t("appHelp.ios.fix.other1", locale)}</li>
+          <li>{t("appHelp.ios.fix.other2", locale)}</li>
+          <li>{t("appHelp.ios.fix.other3", locale)}</li>
         </ul>
-        <p className="mt-3 mb-1 font-medium text-green-800">Test your setup:</p>
+        <p className="mt-3 mb-1 font-medium text-green-800">
+          {t("appHelp.ios.fix.testH", locale)}
+        </p>
         <p className="text-green-700">
-          In the app, go to <b>Profile</b> &rarr; <b>Notifications</b> and tap
-          <b> Send test notification</b>. If nothing appears within a few
-          seconds, one of the settings above is blocking it. Remember: the
-          app must be installed from Safari to your Home Screen for
-          notifications to work at all on iOS.
+          {t("appHelp.ios.fix.testBody", locale)}
         </p>
       </section>
     </div>
   );
 }
 
-function QRInstructions() {
+function QRInstructions({ locale }: { locale: Locale }) {
   return (
     <div className="space-y-5">
-      <p className="text-green-700">
-        If you&apos;re already signed in on a desktop browser, you can log in
-        on your phone without typing your password.
-      </p>
+      <p className="text-green-700">{t("appHelp.qr.intro", locale)}</p>
 
       <section>
-        <h3 className="mb-2 font-semibold text-green-950">On your desktop</h3>
+        <h3 className="mb-2 font-semibold text-green-950">
+          {t("appHelp.qr.desktopH", locale)}
+        </h3>
         <ol className="ml-5 list-decimal space-y-1.5 text-green-700">
-          <li>
-            Go to your <b>Dashboard</b>
-          </li>
-          <li>
-            Tap the <b>Phone</b> button (top right)
-          </li>
-          <li>A QR code appears (valid for 5 minutes)</li>
+          <li>{t("appHelp.qr.desktop1", locale)}</li>
+          <li>{t("appHelp.qr.desktop2", locale)}</li>
+          <li>{t("appHelp.qr.desktop3", locale)}</li>
         </ol>
       </section>
 
       <section>
-        <h3 className="mb-2 font-semibold text-green-950">On your phone</h3>
+        <h3 className="mb-2 font-semibold text-green-950">
+          {t("appHelp.qr.phoneH", locale)}
+        </h3>
         <ol className="ml-5 list-decimal space-y-1.5 text-green-700">
-          <li>Open the login page on golflessons.be</li>
-          <li>
-            Tap <b>Scan QR code to login</b>
-          </li>
-          <li>Point your camera at the QR code on your desktop</li>
-          <li>You&apos;re signed in automatically</li>
+          <li>{t("appHelp.qr.phone1", locale)}</li>
+          <li>{t("appHelp.qr.phone2", locale)}</li>
+          <li>{t("appHelp.qr.phone3", locale)}</li>
+          <li>{t("appHelp.qr.phone4", locale)}</li>
         </ol>
       </section>
 
       <section className="rounded-md bg-gold-50 px-3 py-2 text-xs text-gold-700">
-        <p className="font-semibold">iPhone tip</p>
-        <p className="mt-1">
-          If Chrome is your default browser on iOS, scanning the QR with the
-          iPhone camera app will open it in Chrome. Push notifications and
-          Home Screen install only work in <b>Safari</b>. To install the app,
-          open Safari first, go to the login page, and tap{" "}
-          <b>Scan QR code to login</b>.
-        </p>
+        <p className="font-semibold">{t("appHelp.qr.iphoneTipH", locale)}</p>
+        <p className="mt-1">{t("appHelp.qr.iphoneTipBody", locale)}</p>
       </section>
     </div>
   );
@@ -324,22 +304,23 @@ function AndroidInstructions({
   canInstall,
   installed,
   onInstall,
+  locale,
 }: {
   canInstall: boolean;
   installed: boolean;
   onInstall: () => void;
+  locale: Locale;
 }) {
   return (
     <div className="space-y-5">
       <section>
         <h3 className="mb-2 font-semibold text-green-950">
-          1. Install the app
+          {t("appHelp.android.install.h", locale)}
         </h3>
 
         {installed ? (
           <div className="rounded-md border border-green-300 bg-green-50 px-3 py-2.5 text-sm text-green-700">
-            ✓ Installed. Look for Golf Lessons in your app drawer or home
-            screen.
+            {t("appHelp.android.install.installed", locale)}
           </div>
         ) : canInstall ? (
           <div className="space-y-2">
@@ -360,77 +341,75 @@ function AndroidInstructions({
                   d="M3 16.5v2.25A2.25 2.25 0 0 0 5.25 21h13.5A2.25 2.25 0 0 0 21 18.75V16.5M16.5 12 12 16.5m0 0L7.5 12m4.5 4.5V3"
                 />
               </svg>
-              Install app
+              {t("appHelp.android.install.button", locale)}
             </button>
             <p className="text-xs text-green-500">
-              Tap the button above to install in one step.
+              {t("appHelp.android.install.oneStep", locale)}
             </p>
           </div>
         ) : (
           <ol className="ml-5 list-decimal space-y-1.5 text-green-700">
-            <li>Open this website in <b>Chrome</b></li>
-            <li>
-              You should see an <b>Install</b> prompt at the bottom — tap it
-            </li>
-            <li>
-              Or: tap the <b>⋮</b> menu (top right) and choose{" "}
-              <b>Install app</b> or <b>Add to Home screen</b>
-            </li>
-            <li>Confirm the install</li>
+            <li>{t("appHelp.android.install.step1", locale)}</li>
+            <li>{t("appHelp.android.install.step2", locale)}</li>
+            <li>{t("appHelp.android.install.step3", locale)}</li>
+            <li>{t("appHelp.android.install.step4", locale)}</li>
           </ol>
         )}
       </section>
 
       <section>
         <h3 className="mb-2 font-semibold text-green-950">
-          2. Enable notifications
+          {t("appHelp.android.notif.h", locale)}
         </h3>
         <ol className="ml-5 list-decimal space-y-1.5 text-green-700">
-          <li>Open the app from your Home Screen or app drawer</li>
-          <li>
-            Go to <b>Profile</b> &rarr; <b>Notifications</b>
-          </li>
-          <li>Tap <b>Enable notifications</b></li>
-          <li>Tap <b>Allow</b> when Android asks for permission</li>
+          <li>{t("appHelp.android.notif.step1", locale)}</li>
+          <li>{t("appHelp.android.notif.step2", locale)}</li>
+          <li>{t("appHelp.android.notif.step3", locale)}</li>
+          <li>{t("appHelp.android.notif.step4", locale)}</li>
         </ol>
         <p className="mt-2 text-xs text-green-500">
-          Works in Chrome, Edge, Samsung Internet, and other Chromium browsers.
+          {t("appHelp.android.notif.browsers", locale)}
         </p>
       </section>
 
       <section>
         <h3 className="mb-2 font-semibold text-green-950">
-          3. If notifications don&apos;t appear
+          {t("appHelp.android.fix.h", locale)}
         </h3>
         <p className="mb-2 text-green-700">
-          Installed PWAs don&apos;t appear in Settings → Apps. All notification
-          settings live under Chrome.
+          {t("appHelp.android.fix.intro", locale)}
         </p>
-        <p className="mb-1 font-medium text-green-800">Allow notifications per site:</p>
+        <p className="mb-1 font-medium text-green-800">
+          {t("appHelp.android.fix.perSiteH", locale)}
+        </p>
         <ol className="ml-5 list-decimal space-y-1.5 text-green-700">
-          <li>Open the app</li>
-          <li>Tap the <b>lock icon</b> in the address bar (or the <b>⋮</b> menu &rarr; <b>Site settings</b>)</li>
-          <li>Tap <b>Permissions</b> &rarr; <b>Notifications</b></li>
-          <li>Set to <b>Allow</b></li>
+          <li>{t("appHelp.android.fix.ps1", locale)}</li>
+          <li>{t("appHelp.android.fix.ps2", locale)}</li>
+          <li>{t("appHelp.android.fix.ps3", locale)}</li>
+          <li>{t("appHelp.android.fix.ps4", locale)}</li>
         </ol>
-        <p className="mt-3 mb-1 font-medium text-green-800">Check Chrome&apos;s main notification settings:</p>
+        <p className="mt-3 mb-1 font-medium text-green-800">
+          {t("appHelp.android.fix.chromeH", locale)}
+        </p>
         <ol className="ml-5 list-decimal space-y-1.5 text-green-700">
-          <li><b>Android Settings</b> &rarr; <b>Apps</b> &rarr; <b>Chrome</b> &rarr; <b>Notifications</b></li>
-          <li>Make sure notifications are on, and all categories are enabled</li>
-          <li>Scroll to <b>Sites</b> and check the Golf Lessons entry is not blocked or silenced</li>
+          <li>{t("appHelp.android.fix.c1", locale)}</li>
+          <li>{t("appHelp.android.fix.c2", locale)}</li>
+          <li>{t("appHelp.android.fix.c3", locale)}</li>
         </ol>
-        <p className="mt-3 mb-1 font-medium text-green-800">Other things that can block notifications:</p>
+        <p className="mt-3 mb-1 font-medium text-green-800">
+          {t("appHelp.android.fix.otherH", locale)}
+        </p>
         <ul className="ml-5 list-disc space-y-1.5 text-green-700">
-          <li><b>Do Not Disturb</b> — swipe down and check the DND toggle</li>
-          <li><b>Battery saver / background restrictions</b> — Android Settings &rarr; Apps &rarr; Chrome &rarr; Battery &rarr; <b>Unrestricted</b></li>
-          <li><b>Quiet notifications</b> — if Chrome has marked the site as spammy, the bell icon in the address bar will have a strikethrough. Tap it and set back to <b>Allow</b></li>
-          <li><b>Lock screen</b> — Settings &rarr; Notifications &rarr; Lock screen &rarr; allow notifications</li>
+          <li>{t("appHelp.android.fix.other1", locale)}</li>
+          <li>{t("appHelp.android.fix.other2", locale)}</li>
+          <li>{t("appHelp.android.fix.other3", locale)}</li>
+          <li>{t("appHelp.android.fix.other4", locale)}</li>
         </ul>
-        <p className="mt-3 mb-1 font-medium text-green-800">Test your setup:</p>
+        <p className="mt-3 mb-1 font-medium text-green-800">
+          {t("appHelp.android.fix.testH", locale)}
+        </p>
         <p className="text-green-700">
-          In the app, go to <b>Profile</b> &rarr; <b>Notifications</b> and tap
-          <b> Send test notification</b>. If you don&apos;t see anything
-          within a few seconds, one of the settings above is blocking it.
+          {t("appHelp.android.fix.testBody", locale)}
         </p>
       </section>
     </div>

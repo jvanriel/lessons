@@ -598,6 +598,7 @@ export function ProQuickBook({ proStudentId, studentName, initialData, autoOpen,
           proData={explanationPro}
           studentData={explanationStudent}
           onClose={() => { setExplanationPro(null); setExplanationStudent(null); }}
+          locale={locale}
         />
       )}
     </div>

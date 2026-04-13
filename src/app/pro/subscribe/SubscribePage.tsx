@@ -5,13 +5,17 @@ import { Button } from "@/components/ui/button";
 import { Elements, PaymentElement, useStripe, useElements } from "@stripe/react-stripe-js";
 import { getStripe } from "@/lib/stripe-client";
 import { useRouter } from "next/navigation";
-
-const MONTHLY_PRICE = 12.5;
-const ANNUAL_PRICE = 125;
-const ANNUAL_MONTHLY_EQUIVALENT = ANNUAL_PRICE / 12;
-const SAVINGS_PERCENT = Math.round(
-  ((MONTHLY_PRICE - ANNUAL_MONTHLY_EQUIVALENT) / MONTHLY_PRICE) * 100
-);
+import type { Locale } from "@/lib/i18n";
+import { t } from "@/lib/i18n/translations";
+import { formatDate } from "@/lib/format-date";
+import {
+  MONTHLY_PRICE,
+  ANNUAL_PRICE,
+  ANNUAL_MONTHLY_EQUIVALENT,
+  ANNUAL_SAVINGS_PERCENT,
+  ANNUAL_SAVINGS_EUROS,
+  formatPrice,
+} from "@/lib/pricing";
 
 // ─── Payment Form (inside Elements provider) ────────────
 
@@ -19,10 +23,12 @@ function PaymentForm({
   plan,
   onSuccess,
   onCancel,
+  locale,
 }: {
   plan: "monthly" | "annual";
   onSuccess: () => void;
   onCancel: () => void;
+  locale: Locale;
 }) {
   const stripe = useStripe();
   const elements = useElements();
@@ -46,14 +52,14 @@ function PaymentForm({
     });
 
     if (result.error) {
-      setError(result.error.message || "Payment setup failed");
+      setError(result.error.message || t("subscribe.paymentFailed", locale));
       setLoading(false);
       return;
     }
 
     const setupIntent = result.setupIntent;
     if (!setupIntent || setupIntent.status !== "succeeded") {
-      setError("Payment setup did not complete. Please try again.");
+      setError(t("subscribe.setupIncomplete", locale));
       setLoading(false);
       return;
     }
@@ -65,7 +71,7 @@ function PaymentForm({
         : setupIntent.payment_method?.id;
 
     if (!pmId) {
-      setError("Could not retrieve payment method. Please try again.");
+      setError(t("subscribe.noPaymentMethod", locale));
       setLoading(false);
       return;
     }
@@ -82,11 +88,11 @@ function PaymentForm({
       if (res.ok) {
         onSuccess();
       } else {
-        setError(data.error || "Failed to create subscription");
+        setError(data.error || t("subscribe.createFailed", locale));
         setLoading(false);
       }
     } catch {
-      setError("Failed to create subscription. Please try again.");
+      setError(t("subscribe.tryAgainGeneric", locale));
       setLoading(false);
     }
   }
@@ -115,19 +121,21 @@ function PaymentForm({
           disabled={loading}
           className="flex-1 border-green-200 text-green-700 hover:bg-green-50"
         >
-          Back
+          {t("subscribe.back", locale)}
         </Button>
         <Button
           type="submit"
           disabled={!stripe || loading}
           className="flex-1 bg-gold-600 text-white hover:bg-gold-500 rounded-md py-3 text-base font-medium"
         >
-          {loading ? "Setting up..." : "Start 14-day free trial"}
+          {loading
+            ? t("subscribe.settingUp", locale)
+            : t("subscribe.startTrial", locale)}
         </Button>
       </div>
 
       <p className="mt-4 text-center text-xs text-green-500">
-        Your payment method will be saved. You won&apos;t be charged during the 14-day trial.
+        {t("subscribe.savedNote", locale)}
       </p>
     </form>
   );
@@ -135,7 +143,7 @@ function PaymentForm({
 
 // ─── Main Subscribe Page ────────────────────────────────
 
-export default function SubscribePage() {
+export default function SubscribePage({ locale }: { locale: Locale }) {
   const router = useRouter();
   const [plan, setPlan] = useState<"monthly" | "annual">("annual");
   const [step, setStep] = useState<"plan" | "payment" | "success">("plan");
@@ -160,14 +168,14 @@ export default function SubscribePage() {
         setClientSecret(data.clientSecret);
         setStep("payment");
       } else {
-        setError(data.error || "Failed to initialize payment");
+        setError(data.error || t("subscribe.initFailed", locale));
       }
     } catch {
-      setError("Something went wrong. Please try again.");
+      setError(t("subscribe.genericError", locale));
     } finally {
       setLoading(false);
     }
-  }, [plan]);
+  }, [plan, locale]);
 
   if (step === "success") {
     return (
@@ -176,16 +184,16 @@ export default function SubscribePage() {
           <span className="text-3xl text-green-700">&#10003;</span>
         </div>
         <h1 className="font-display text-4xl font-semibold text-green-900">
-          Welcome aboard!
+          {t("subscribe.successTitle", locale)}
         </h1>
         <p className="mt-3 text-lg text-green-700">
-          Your 14-day free trial has started. Set up your profile and start accepting bookings.
+          {t("subscribe.successBody", locale)}
         </p>
         <Button
           onClick={() => router.push("/pro/dashboard")}
           className="mt-8 bg-gold-600 text-white hover:bg-gold-500 rounded-md px-8 py-3 text-base font-medium"
         >
-          Go to Dashboard
+          {t("subscribe.goToDashboard", locale)}
         </Button>
       </div>
     );
@@ -195,10 +203,10 @@ export default function SubscribePage() {
     <div className="mx-auto max-w-2xl px-6 py-16">
       <div className="text-center">
         <h1 className="font-display text-4xl font-semibold text-green-900">
-          Start Your Pro Subscription
+          {t("subscribe.title", locale)}
         </h1>
         <p className="mt-3 text-lg text-green-700">
-          14-day free trial. Cancel anytime. No charge until the trial ends.
+          {t("subscribe.subtitle", locale)}
         </p>
       </div>
 
@@ -211,11 +219,11 @@ export default function SubscribePage() {
       {/* Step indicator */}
       <div className="mt-8 flex items-center justify-center gap-3 text-sm">
         <span className={step === "plan" ? "font-semibold text-green-900" : "text-green-500"}>
-          1. Choose plan
+          {t("subscribe.step1", locale)}
         </span>
         <span className="text-green-300">&rarr;</span>
         <span className={step === "payment" ? "font-semibold text-green-900" : "text-green-500"}>
-          2. Payment details
+          {t("subscribe.step2", locale)}
         </span>
       </div>
 
@@ -232,7 +240,7 @@ export default function SubscribePage() {
                     : "text-green-700 hover:text-green-900"
                 }`}
               >
-                Monthly
+                {t("subscribe.plan.monthly", locale)}
               </button>
               <button
                 onClick={() => setPlan("annual")}
@@ -242,9 +250,12 @@ export default function SubscribePage() {
                     : "text-green-700 hover:text-green-900"
                 }`}
               >
-                Annual
+                {t("subscribe.plan.annual", locale)}
                 <span className="ml-2 rounded-full bg-gold-100 px-2 py-0.5 text-xs font-semibold text-gold-700">
-                  Save {SAVINGS_PERCENT}%
+                  {t("subscribe.plan.save", locale).replace(
+                    "{n}",
+                    String(ANNUAL_SAVINGS_PERCENT)
+                  )}
                 </span>
               </button>
             </div>
@@ -254,17 +265,20 @@ export default function SubscribePage() {
           <div className="mt-8 rounded-xl border border-green-200 bg-white p-8 text-center shadow-sm">
             <div className="flex items-baseline justify-center gap-1">
               <span className="font-display text-5xl font-bold text-green-900">
-                &euro;{plan === "monthly" ? "12.50" : "125"}
+                {formatPrice(plan === "monthly" ? MONTHLY_PRICE : ANNUAL_PRICE, locale)}
               </span>
               <span className="text-green-600">
-                /{plan === "monthly" ? "month" : "year"}
+                {plan === "monthly"
+                  ? t("subscribe.perMonth", locale)
+                  : t("subscribe.perYear", locale)}
               </span>
             </div>
 
             {plan === "annual" && (
               <p className="mt-2 text-sm text-green-600">
-                &euro;{ANNUAL_MONTHLY_EQUIVALENT.toFixed(2)}/month &mdash; save &euro;
-                {(MONTHLY_PRICE * 12 - ANNUAL_PRICE).toFixed(0)} per year
+                {t("subscribe.annualSavingsNote", locale)
+                  .replace("{monthly}", formatPrice(ANNUAL_MONTHLY_EQUIVALENT, locale))
+                  .replace("{total}", formatPrice(ANNUAL_SAVINGS_EUROS, locale))}
               </p>
             )}
 
@@ -272,23 +286,23 @@ export default function SubscribePage() {
               <ul className="space-y-3 text-left text-sm text-green-800">
                 <li className="flex items-start gap-3">
                   <span className="mt-0.5 text-gold-600">&#10003;</span>
-                  Public professional profile
+                  {t("subscribe.features.profile", locale)}
                 </li>
                 <li className="flex items-start gap-3">
                   <span className="mt-0.5 text-gold-600">&#10003;</span>
-                  Lesson booking &amp; availability management
+                  {t("subscribe.features.booking", locale)}
                 </li>
                 <li className="flex items-start gap-3">
                   <span className="mt-0.5 text-gold-600">&#10003;</span>
-                  Accept payments directly to your bank account
+                  {t("subscribe.features.payments", locale)}
                 </li>
                 <li className="flex items-start gap-3">
                   <span className="mt-0.5 text-gold-600">&#10003;</span>
-                  Personal coaching pages for each student
+                  {t("subscribe.features.coaching", locale)}
                 </li>
                 <li className="flex items-start gap-3">
                   <span className="mt-0.5 text-gold-600">&#10003;</span>
-                  Email notifications &amp; reminders
+                  {t("subscribe.features.email", locale)}
                 </li>
               </ul>
             </div>
@@ -298,11 +312,13 @@ export default function SubscribePage() {
               disabled={loading}
               className="mt-8 w-full bg-gold-600 text-white hover:bg-gold-500 rounded-md py-3 text-base font-medium"
             >
-              {loading ? "Loading..." : "Continue to payment"}
+              {loading
+                ? t("subscribe.loading", locale)
+                : t("subscribe.continue", locale)}
             </Button>
 
             <p className="mt-4 text-xs text-green-500">
-              No charge during the 14-day trial period.
+              {t("subscribe.noCharge", locale)}
             </p>
           </div>
         </>
@@ -312,18 +328,23 @@ export default function SubscribePage() {
         <div className="mt-8 rounded-xl border border-green-200 bg-white p-8 shadow-sm">
           <div className="mb-6 text-center">
             <p className="text-sm text-green-600">
-              {plan === "monthly" ? "Monthly" : "Annual"} plan &mdash;{" "}
-              <span className="font-semibold text-green-900">
-                &euro;{plan === "monthly" ? "12.50/month" : "125/year"}
-              </span>
+              {(plan === "monthly"
+                ? t("subscribe.planLabelMonthly", locale)
+                : t("subscribe.planLabelAnnual", locale)
+              ).replace(
+                "{price}",
+                formatPrice(plan === "monthly" ? MONTHLY_PRICE : ANNUAL_PRICE, locale)
+              )}
             </p>
             <p className="mt-1 text-xs text-green-500">
-              14-day free trial, then first charge on{" "}
-              {new Date(Date.now() + 14 * 86400000).toLocaleDateString("en-GB", {
-                day: "numeric",
-                month: "long",
-                year: "numeric",
-              })}
+              {t("subscribe.firstChargeOn", locale).replace(
+                "{date}",
+                formatDate(new Date(Date.now() + 14 * 86400000), locale, {
+                  day: "numeric",
+                  month: "long",
+                  year: "numeric",
+                })
+              )}
             </p>
           </div>
 
@@ -346,6 +367,7 @@ export default function SubscribePage() {
           >
             <PaymentForm
               plan={plan}
+              locale={locale}
               onSuccess={() => setStep("success")}
               onCancel={() => {
                 setStep("plan");

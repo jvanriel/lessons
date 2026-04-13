@@ -14,6 +14,7 @@ import {
 import { SlotExplanationDialog } from "@/components/SlotExplanationDialog";
 import { formatDate as formatDateLocale } from "@/lib/format-date";
 import type { Locale } from "@/lib/i18n";
+import { t } from "@/lib/i18n/translations";
 
 interface Props {
   data: QuickBookData;
@@ -24,8 +25,6 @@ interface Props {
 }
 
 const HOLD_MS = 600;
-
-const DAY_NAMES = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
 
 function makeDateFormatters(locale: Locale) {
   return {
@@ -51,7 +50,6 @@ function makeDateFormatters(locale: Locale) {
 export function QuickBook({ data, proSlug, hasPaymentMethod = true, allowBookingWithoutPayment = false, locale }: Props) {
   const fd = makeDateFormatters(locale);
   const formatShortDate = fd.short;
-  const formatLongDate = fd.long;
   const formatDatePillDay = fd.pillDay;
   const formatDatePillDate = fd.pillDate;
   const paymentBlocked = !hasPaymentMethod && !allowBookingWithoutPayment;
@@ -194,15 +192,15 @@ export function QuickBook({ data, proSlug, hasPaymentMethod = true, allowBooking
   if (paymentBlocked) {
     return (
       <div className="mt-3 rounded-lg border border-green-100 bg-green-50/50 p-4">
-        <h3 className="text-sm font-medium text-green-900">Quick Book</h3>
+        <h3 className="text-sm font-medium text-green-900">{t("memberQB.heading", locale)}</h3>
         <p className="mt-2 text-xs text-green-600">
-          Add a payment method to enable Quick Book.
+          {t("memberQB.blockedBody", locale)}
         </p>
         <a
           href="/member/profile"
           className="mt-2 inline-block text-xs font-medium text-gold-600 hover:text-gold-500"
         >
-          Add payment method
+          {t("memberQB.addPayment", locale)}
         </a>
       </div>
     );
@@ -212,10 +210,10 @@ export function QuickBook({ data, proSlug, hasPaymentMethod = true, allowBooking
     <div className="mt-3 rounded-lg border border-green-100 bg-green-50/50 p-4">
       {/* Header */}
       <div className="mb-3 flex items-baseline justify-between">
-        <h3 className="text-sm font-medium text-green-900">Quick Book</h3>
+        <h3 className="text-sm font-medium text-green-900">{t("memberQB.heading", locale)}</h3>
         {data.bookingNotice > 0 && (
           <span className="text-[10px] text-green-400">
-            {data.bookingNotice}h notice
+            {t("memberQB.noticeLabel", locale).replace("{n}", String(data.bookingNotice))}
           </span>
         )}
       </div>
@@ -236,7 +234,9 @@ export function QuickBook({ data, proSlug, hasPaymentMethod = true, allowBooking
               d="M5 13l4 4L19 7"
             />
           </svg>
-          Booked {formatShortDate(selectedDate)} at {bookedSlot.startTime}
+          {t("memberQB.bookedAt", locale)
+            .replace("{date}", formatShortDate(selectedDate))
+            .replace("{time}", bookedSlot.startTime)}
         </div>
       )}
 
@@ -332,11 +332,11 @@ export function QuickBook({ data, proSlug, hasPaymentMethod = true, allowBooking
                   d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"
                 />
               </svg>
-              Loading times...
+              {t("memberQB.loadingTimes", locale)}
             </div>
           ) : slots.length === 0 ? (
             <p className="py-2 text-xs text-green-500">
-              No slots available on this date.
+              {t("memberQB.noSlots", locale)}
             </p>
           ) : (
             <div className="mb-3 flex flex-wrap gap-1.5">
@@ -391,9 +391,9 @@ export function QuickBook({ data, proSlug, hasPaymentMethod = true, allowBooking
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-1">
               {([
-                { value: "weekly", label: "In a week" },
-                { value: "biweekly", label: "In 2 weeks" },
-                { value: "monthly", label: "In a month" },
+                { value: "weekly", label: t("memberQB.inAWeek", locale) },
+                { value: "biweekly", label: t("memberQB.inTwoWeeks", locale) },
+                { value: "monthly", label: t("memberQB.inAMonth", locale) },
               ] as const).map((iv) => (
                 <button
                   key={iv.value}
@@ -422,13 +422,17 @@ export function QuickBook({ data, proSlug, hasPaymentMethod = true, allowBooking
               href={`/member/book/${proSlug}?full=1`}
               className="text-xs text-green-500 hover:text-green-700"
             >
-              More options
+              {t("memberQB.moreOptions", locale)}
             </Link>
           </div>
 
       {/* Slot explanation dialog */}
       {explanation && (
-        <SlotExplanationDialog data={explanation} onClose={() => setExplanation(null)} />
+        <SlotExplanationDialog
+          data={explanation}
+          onClose={() => setExplanation(null)}
+          locale={locale}
+        />
       )}
     </div>
   );

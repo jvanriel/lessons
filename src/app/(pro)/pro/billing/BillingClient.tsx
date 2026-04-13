@@ -5,6 +5,11 @@ import { Button } from "@/components/ui/button";
 import type { Locale } from "@/lib/i18n";
 import { t } from "@/lib/i18n/translations";
 import { formatDate as formatDateLocale } from "@/lib/format-date";
+import {
+  MONTHLY_PRICE,
+  ANNUAL_PRICE,
+  formatPrice,
+} from "@/lib/pricing";
 
 interface BillingProps {
   subscriptionStatus: string;
@@ -197,8 +202,14 @@ export default function BillingClient({
 
   const priceLabel =
     subscriptionPlan === "annual"
-      ? t("proBilling.priceAnnual", locale)
-      : t("proBilling.priceMonthly", locale);
+      ? t("proBilling.priceAnnual", locale).replace(
+          "{price}",
+          formatPrice(ANNUAL_PRICE, locale)
+        )
+      : t("proBilling.priceMonthly", locale).replace(
+          "{price}",
+          formatPrice(MONTHLY_PRICE, locale)
+        );
 
   async function openPortal() {
     setPortalLoading(true);
@@ -235,9 +246,16 @@ export default function BillingClient({
               <StatusBadge status={subscriptionStatus} locale={locale} />
               {subscriptionPlan && (
                 <span className="text-sm text-green-600">
-                  {subscriptionPlan === "annual"
+                  {(subscriptionPlan === "annual"
                     ? t("proBilling.plan.annual", locale)
-                    : t("proBilling.plan.monthly", locale)}
+                    : t("proBilling.plan.monthly", locale)
+                  ).replace(
+                    "{price}",
+                    formatPrice(
+                      subscriptionPlan === "annual" ? ANNUAL_PRICE : MONTHLY_PRICE,
+                      locale
+                    )
+                  )}
                 </span>
               )}
             </div>

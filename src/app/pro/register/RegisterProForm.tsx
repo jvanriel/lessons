@@ -5,6 +5,7 @@ import Link from "next/link";
 import { registerPro } from "./actions";
 import { t } from "@/lib/i18n/translations";
 import type { Locale } from "@/lib/i18n";
+import { MONTHLY_PRICE, ANNUAL_PRICE, formatPrice } from "@/lib/pricing";
 
 export default function RegisterProForm({ locale }: { locale: Locale }) {
   const [state, formAction, pending] = useActionState(registerPro, null);
@@ -116,7 +117,9 @@ export default function RegisterProForm({ locale }: { locale: Locale }) {
           </button>
 
           <p className="text-center text-xs text-green-500">
-            {t("proReg.nextStep", locale)}
+            {t("proReg.nextStep", locale)
+              .replace("{monthly}", formatPrice(MONTHLY_PRICE, locale))
+              .replace("{annual}", formatPrice(ANNUAL_PRICE, locale))}
           </p>
         </form>
 

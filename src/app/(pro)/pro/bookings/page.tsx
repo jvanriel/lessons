@@ -13,6 +13,7 @@ import Link from "next/link";
 import { BookingsView } from "./BookingsView";
 import { BookingRefreshListener } from "@/components/BookingRefreshListener";
 import { getLocale } from "@/lib/locale";
+import { t } from "@/lib/i18n/translations";
 
 export const metadata = { title: "Bookings — Golf Lessons" };
 
@@ -72,13 +73,13 @@ export default async function ProBookingsPage() {
       <BookingRefreshListener />
       <div className="mb-8 flex items-center justify-between">
         <h1 className="font-display text-3xl font-semibold text-green-900">
-          Bookings
+          {t("proBookingsPage.title", locale)}
         </h1>
         <Link
           href="/pro/availability"
           className="rounded-md border border-green-200 bg-white px-4 py-2 text-sm font-medium text-green-800 transition-colors hover:border-green-300"
         >
-          Manage availability
+          {t("proBookingsPage.manageAvailability", locale)}
         </Link>
       </div>
 
@@ -92,7 +93,10 @@ export default async function ProBookingsPage() {
         <section>
           <details>
             <summary className="cursor-pointer font-display text-xl font-medium text-green-800">
-              Past &amp; cancelled ({past.length})
+              {t("proBookingsPage.pastCancelled", locale).replace(
+                "{n}",
+                String(past.length)
+              )}
             </summary>
             <div className="mt-4 space-y-2">
               {past.map((booking) => (
@@ -117,8 +121,8 @@ export default async function ProBookingsPage() {
                       }
                     >
                       {booking.status === "cancelled"
-                        ? "Cancelled"
-                        : "Completed"}
+                        ? t("proBookingsPage.status.cancelled", locale)
+                        : t("proBookingsPage.status.completed", locale)}
                     </span>
                   </div>
                 </div>

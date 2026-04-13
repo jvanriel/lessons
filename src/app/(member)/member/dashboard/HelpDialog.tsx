@@ -1,8 +1,10 @@
 "use client";
 
 import { useState, useRef } from "react";
+import type { Locale } from "@/lib/i18n";
+import { t } from "@/lib/i18n/translations";
 
-export function HelpButton() {
+export function HelpButton({ locale }: { locale: Locale }) {
   const [open, setOpen] = useState(false);
 
   return (
@@ -10,19 +12,19 @@ export function HelpButton() {
       <button
         onClick={() => setOpen(true)}
         className="rounded-md border border-green-200 p-1.5 text-green-500 transition-colors hover:bg-green-50 hover:text-green-700"
-        title="Help"
+        title={t("memberDash.help.button", locale)}
       >
         <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
           <path strokeLinecap="round" strokeLinejoin="round" d="M9.879 7.519c1.171-1.025 3.071-1.025 4.242 0 1.172 1.025 1.172 2.687 0 3.712-.203.179-.43.326-.67.442-.745.361-1.45.999-1.45 1.827m0 0v.75m0-3.375v.008" />
           <path strokeLinecap="round" strokeLinejoin="round" d="M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z" />
         </svg>
       </button>
-      {open && <MemberHelpDialog onClose={() => setOpen(false)} />}
+      {open && <MemberHelpDialog onClose={() => setOpen(false)} locale={locale} />}
     </>
   );
 }
 
-function MemberHelpDialog({ onClose }: { onClose: () => void }) {
+function MemberHelpDialog({ onClose, locale }: { onClose: () => void; locale: Locale }) {
   const backdropRef = useRef<HTMLDivElement>(null);
 
   return (
@@ -36,7 +38,7 @@ function MemberHelpDialog({ onClose }: { onClose: () => void }) {
       <div className="w-full max-w-lg rounded-xl border border-green-200 bg-white shadow-2xl">
         <div className="flex items-center justify-between border-b border-green-100 px-5 py-4">
           <h3 className="font-display text-lg font-semibold text-green-900">
-            Your Dashboard
+            {t("memberDash.help.title", locale)}
           </h3>
           <button
             onClick={onClose}
@@ -50,98 +52,78 @@ function MemberHelpDialog({ onClose }: { onClose: () => void }) {
 
         <div className="space-y-5 px-5 py-5 text-sm text-green-700 leading-relaxed">
           <div>
-            <h4 className="font-medium text-green-900">Your Pros</h4>
-            <p className="mt-1">
-              This section shows the golf professionals you&apos;re connected with.
-              From here you can:
-            </p>
+            <h4 className="font-medium text-green-900">{t("memberDash.help.yourProsH", locale)}</h4>
+            <p className="mt-1">{t("memberDash.help.yourProsIntro", locale)}</p>
             <ul className="mt-2 space-y-1 pl-4">
               <li className="relative pl-3 before:absolute before:left-0 before:top-2 before:h-1.5 before:w-1.5 before:rounded-full before:bg-gold-500">
-                <strong className="text-green-900">Chat</strong> — open a coaching conversation with your pro
+                <strong className="text-green-900">{t("memberDash.help.chatBullet.bold", locale)}</strong>
+                {t("memberDash.help.chatBullet.rest", locale)}
               </li>
               <li className="relative pl-3 before:absolute before:left-0 before:top-2 before:h-1.5 before:w-1.5 before:rounded-full before:bg-gold-500">
-                <strong className="text-green-900">Book a lesson</strong> — use the full booking wizard to pick a date and time
+                <strong className="text-green-900">{t("memberDash.help.bookBullet.bold", locale)}</strong>
+                {t("memberDash.help.bookBullet.rest", locale)}
               </li>
               <li className="relative pl-3 before:absolute before:left-0 before:top-2 before:h-1.5 before:w-1.5 before:rounded-full before:bg-gold-500">
-                <strong className="text-green-900">Manage</strong> — add or remove pros
+                <strong className="text-green-900">{t("memberDash.help.manageBullet.bold", locale)}</strong>
+                {t("memberDash.help.manageBullet.rest", locale)}
               </li>
             </ul>
           </div>
 
           <div>
-            <h4 className="font-medium text-green-900">Quick Book</h4>
-            <p className="mt-1">
-              After your first lesson, Quick Book appears on each pro card. It remembers
-              your preferred location, duration, day, and time — so you can rebook in
-              one tap.
-            </p>
+            <h4 className="font-medium text-green-900">{t("memberDash.help.quickBookH", locale)}</h4>
+            <p className="mt-1">{t("memberDash.help.quickBookP1", locale)}</p>
             <ul className="mt-2 space-y-1 pl-4">
               <li className="relative pl-3 before:absolute before:left-0 before:top-2 before:h-1.5 before:w-1.5 before:rounded-full before:bg-gold-500">
-                <strong className="text-green-900">Date pills</strong> — tap to switch between
-                suggested dates. Use the arrows to navigate.
+                <strong className="text-green-900">{t("memberDash.help.datePills.bold", locale)}</strong>
+                {t("memberDash.help.datePills.rest", locale)}
               </li>
               <li className="relative pl-3 before:absolute before:left-0 before:top-2 before:h-1.5 before:w-1.5 before:rounded-full before:bg-gold-500">
-                <strong className="text-green-900">Hold a time slot</strong> — press and hold for
-                half a second to instantly book that slot.
+                <strong className="text-green-900">{t("memberDash.help.hold.bold", locale)}</strong>
+                {t("memberDash.help.hold.rest", locale)}
               </li>
               <li className="relative pl-3 before:absolute before:left-0 before:top-2 before:h-1.5 before:w-1.5 before:rounded-full before:bg-gold-500">
-                <strong className="text-green-900">In a week / 2 weeks / month</strong> — jump
-                to a future date. These are suggestions, not recurring bookings.
+                <strong className="text-green-900">{t("memberDash.help.interval.bold", locale)}</strong>
+                {t("memberDash.help.interval.rest", locale)}
               </li>
             </ul>
           </div>
 
           <div>
-            <h4 className="font-medium text-green-900">Understanding available times</h4>
-            <p className="mt-1">
-              <strong>Press and hold a date</strong> (not a time slot) to see exactly why
-              specific times are available or unavailable. The dialog explains:
-            </p>
+            <h4 className="font-medium text-green-900">{t("memberDash.help.availH", locale)}</h4>
+            <p className="mt-1">{t("memberDash.help.availP1", locale)}</p>
             <ul className="mt-2 space-y-1 pl-4">
               <li className="relative pl-3 before:absolute before:left-0 before:top-2 before:h-1.5 before:w-1.5 before:rounded-full before:bg-gold-500">
-                Your <strong>preferred day</strong> and how it affects date suggestions
+                {t("memberDash.help.availBullet1", locale)}
               </li>
               <li className="relative pl-3 before:absolute before:left-0 before:top-2 before:h-1.5 before:w-1.5 before:rounded-full before:bg-gold-500">
-                The pro&apos;s <strong>availability</strong> for that day of the week
+                {t("memberDash.help.availBullet2", locale)}
               </li>
               <li className="relative pl-3 before:absolute before:left-0 before:top-2 before:h-1.5 before:w-1.5 before:rounded-full before:bg-gold-500">
-                Any <strong>schedule changes</strong> or blocks set by the pro
+                {t("memberDash.help.availBullet3", locale)}
               </li>
               <li className="relative pl-3 before:absolute before:left-0 before:top-2 before:h-1.5 before:w-1.5 before:rounded-full before:bg-gold-500">
-                <strong>Existing bookings</strong> from other students
+                {t("memberDash.help.availBullet4", locale)}
               </li>
               <li className="relative pl-3 before:absolute before:left-0 before:top-2 before:h-1.5 before:w-1.5 before:rounded-full before:bg-gold-500">
-                The <strong>booking notice</strong> period (e.g. 24h) — slots too close to now are unavailable
+                {t("memberDash.help.availBullet5", locale)}
               </li>
             </ul>
           </div>
 
           <div>
-            <h4 className="font-medium text-green-900">Booking notice</h4>
-            <p className="mt-1">
-              Each pro sets a minimum notice period (shown next to &quot;Quick Book&quot;, e.g.
-              &quot;24h notice&quot;). You cannot book a slot that starts within this window.
-              For example, with 24h notice, you can&apos;t book a lesson for tomorrow if
-              it&apos;s already past the same time today.
-            </p>
+            <h4 className="font-medium text-green-900">{t("memberDash.help.noticeH", locale)}</h4>
+            <p className="mt-1">{t("memberDash.help.noticeP1", locale)}</p>
           </div>
 
           <div>
-            <h4 className="font-medium text-green-900">Your upcoming lessons</h4>
-            <p className="mt-1">
-              Below your pros, you&apos;ll see a list of your upcoming confirmed lessons.
-              You can cancel a lesson by clicking the cancel button — make sure to check
-              the pro&apos;s cancellation policy first.
-            </p>
+            <h4 className="font-medium text-green-900">{t("memberDash.help.upcomingH", locale)}</h4>
+            <p className="mt-1">{t("memberDash.help.upcomingP1", locale)}</p>
           </div>
 
           <div>
-            <h4 className="font-medium text-green-900">Your profile</h4>
-            <p className="mt-1">
-              Tap the person icon in the top right to access your profile. From there
-              you can update your name, handicap, goals, payment method, booking
-              preferences, language, and password.
-            </p>
+            <h4 className="font-medium text-green-900">{t("memberDash.help.profileH", locale)}</h4>
+            <p className="mt-1">{t("memberDash.help.profileP1", locale)}</p>
           </div>
         </div>
       </div>

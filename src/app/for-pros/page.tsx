@@ -4,6 +4,12 @@ import { t } from "@/lib/i18n/translations";
 import { getCmsData } from "@/lib/cms";
 import CmsBlock from "@/components/cms/CmsBlock";
 import CmsPageInit from "@/components/cms/CmsPageInit";
+import {
+  MONTHLY_PRICE,
+  ANNUAL_PRICE,
+  ANNUAL_SAVINGS_EUROS,
+  formatPrice,
+} from "@/lib/pricing";
 
 export const metadata = {
   title: "For Pros — Golf Lessons",
@@ -93,7 +99,7 @@ export default async function ForProsPage() {
               </p>
               <div className="mt-3 flex items-baseline gap-1">
                 <span className="font-display text-5xl font-semibold text-green-900">
-                  &euro;12.50
+                  {formatPrice(MONTHLY_PRICE, locale)}
                 </span>
                 <span className="text-green-600">
                   {t("pros.pricing.perMonth", locale)}
@@ -112,14 +118,17 @@ export default async function ForProsPage() {
               </p>
               <div className="mt-3 flex items-baseline gap-1">
                 <span className="font-display text-5xl font-semibold text-green-900">
-                  &euro;125
+                  {formatPrice(ANNUAL_PRICE, locale)}
                 </span>
                 <span className="text-green-600">
                   {t("pros.pricing.perYear", locale)}
                 </span>
               </div>
               <p className="mt-4 text-sm font-medium text-gold-700">
-                {t("pros.pricing.savings", locale)}
+                {t("pros.pricing.savings", locale).replace(
+                  "{amount}",
+                  formatPrice(ANNUAL_SAVINGS_EUROS, locale)
+                )}
               </p>
             </div>
           </div>

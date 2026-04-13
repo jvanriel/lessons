@@ -130,7 +130,10 @@ export default async function ProProfilePage({ params }: Props) {
                 </span>
               )}
               <span className="rounded-full bg-green-100 px-3 py-1 text-xs text-green-700">
-                Max {pro.maxGroupSize} per group
+                {t("proBrowse.maxPerGroup", locale).replace(
+                  "{n}",
+                  String(pro.maxGroupSize)
+                )}
               </span>
             </div>
             <div className="mt-4 flex flex-wrap gap-3">
@@ -139,7 +142,7 @@ export default async function ProProfilePage({ params }: Props) {
                   href={`/member/book/${slug}`}
                   className="inline-block rounded-md bg-gold-600 px-5 py-2.5 text-sm font-medium text-white transition-colors hover:bg-gold-500"
                 >
-                  Book a Lesson
+                  {t("proBrowse.bookALesson", locale)}
                 </Link>
               )}
               <JoinButton
@@ -156,7 +159,7 @@ export default async function ProProfilePage({ params }: Props) {
         {pro.bio && (
           <div className="mt-10 rounded-xl border border-green-200 bg-white p-6">
             <h2 className="font-display text-xl font-medium text-green-800">
-              About
+              {t("proBrowse.about", locale)}
             </h2>
             <p className="mt-1 text-[11px] italic text-green-400">
               {t("pro.contentLanguageNotice", locale)}
@@ -171,7 +174,7 @@ export default async function ProProfilePage({ params }: Props) {
         {proLocs.length > 0 && (
           <div className="mt-6 rounded-xl border border-green-200 bg-white p-6">
             <h2 className="font-display text-xl font-medium text-green-800">
-              Locations
+              {t("proBrowse.locations", locale)}
             </h2>
             <div className="mt-4 space-y-3">
               {proLocs.map((loc, i) => (
@@ -206,7 +209,7 @@ export default async function ProProfilePage({ params }: Props) {
         {flyerPages.length > 0 && (
           <div className="mt-6 rounded-xl border border-green-200 bg-white p-6">
             <h2 className="font-display text-xl font-medium text-green-800">
-              News & Offers
+              {t("proBrowse.newsOffers", locale)}
             </h2>
             <div className="mt-4 space-y-2">
               {flyerPages.map((page) => (

@@ -2,23 +2,30 @@
 
 import { useRef, useState } from "react";
 import type { SlotExplanation } from "@/app/(member)/member/book/actions";
+import type { Locale } from "@/lib/i18n";
+import { t } from "@/lib/i18n/translations";
+import { formatDate as formatDateLocale } from "@/lib/format-date";
 
-function formatDate(dateStr: string) {
-  const d = new Date(dateStr + "T00:00:00");
-  return d.toLocaleDateString("en-US", {
-    weekday: "long",
-    month: "long",
-    day: "numeric",
-    year: "numeric",
-  });
+function intervalLabel(interval: string, locale: Locale): string {
+  if (interval === "weekly") return t("slotExpl.intervalLabel.weekly", locale);
+  if (interval === "biweekly") return t("slotExpl.intervalLabel.biweekly", locale);
+  return t("slotExpl.intervalLabel.monthly", locale);
+}
+
+function intervalDays(interval: string): string {
+  if (interval === "weekly") return "7";
+  if (interval === "biweekly") return "14";
+  return "28";
 }
 
 export function SlotExplanationDialog({
   data,
   onClose,
+  locale,
 }: {
   data: SlotExplanation;
   onClose: () => void;
+  locale: Locale;
 }) {
   const backdropRef = useRef<HTMLDivElement>(null);
 
@@ -37,7 +44,14 @@ export function SlotExplanationDialog({
             <h3 className="font-display text-lg font-semibold text-green-900">
               {data.dayOfWeek}
             </h3>
-            <p className="text-xs text-green-500">{formatDate(data.date)}</p>
+            <p className="text-xs text-green-500">
+              {formatDateLocale(data.date, locale, {
+                weekday: "long",
+                month: "long",
+                day: "numeric",
+                year: "numeric",
+              })}
+            </p>
           </div>
           <button
             onClick={onClose}
@@ -58,7 +72,10 @@ export function SlotExplanationDialog({
                   <path strokeLinecap="round" strokeLinejoin="round" d="M6.75 3v2.25M17.25 3v2.25M3 18.75V7.5a2.25 2.25 0 0 1 2.25-2.25h13.5A2.25 2.25 0 0 1 21 7.5v11.25m-18 0A2.25 2.25 0 0 0 5.25 21h13.5A2.25 2.25 0 0 0 21 18.75m-18 0v-7.5A2.25 2.25 0 0 1 5.25 9h13.5A2.25 2.25 0 0 1 21 11.25v7.5" />
                 </svg>
                 <span>
-                  Your preferred day is <strong>{data.preferredDay}</strong>. Quick Book suggests dates starting from the next {data.preferredDay}. You can change this in your profile under Booking Preferences.
+                  {t("slotExpl.preferredDayNote", locale).replace(
+                    /\{day\}/g,
+                    data.preferredDay
+                  )}
                 </span>
               </div>
             </section>
@@ -72,7 +89,9 @@ export function SlotExplanationDialog({
                   <path strokeLinecap="round" strokeLinejoin="round" d="M3 8.689c0-.864.933-1.406 1.683-.977l7.108 4.061a1.125 1.125 0 0 1 0 1.954l-7.108 4.061A1.125 1.125 0 0 1 3 16.811V8.69ZM12.75 8.689c0-.864.933-1.406 1.683-.977l7.108 4.061a1.125 1.125 0 0 1 0 1.954l-7.108 4.061a1.125 1.125 0 0 1-1.683-.977V8.69Z" />
                 </svg>
                 <span>
-                  <strong>&quot;{data.interval === "weekly" ? "In a week" : data.interval === "biweekly" ? "In 2 weeks" : "In a month"}&quot;</strong> is selected — dates start at least {data.interval === "weekly" ? "7" : data.interval === "biweekly" ? "14" : "28"} days from today.
+                  {t("slotExpl.intervalNote", locale)
+                    .replace("{label}", intervalLabel(data.interval, locale))
+                    .replace("{days}", intervalDays(data.interval))}
                 </span>
               </div>
             </section>
@@ -85,7 +104,7 @@ export function SlotExplanationDialog({
                 <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                   <path strokeLinecap="round" strokeLinejoin="round" d="m11.25 11.25.041-.02a.75.75 0 0 1 1.063.852l-.708 2.836a.75.75 0 0 0 1.063.853l.041-.021M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Zm-9-3.75h.008v.008H12V8.25Z" />
                 </svg>
-                Why this is the first available date
+                {t("slotExpl.firstDateH", locale)}
               </h4>
               <div className="mt-1.5 space-y-0.5">
                 {data.skippedDays.map((day) => (
@@ -102,20 +121,20 @@ export function SlotExplanationDialog({
           <section>
             <h4 className="flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wider text-green-700">
               <span className="flex h-4 w-4 items-center justify-center rounded-full bg-green-100 text-[10px]">1</span>
-              Availability
+              {t("slotExpl.availabilityH", locale)}
             </h4>
             {data.templates.length === 0 ? (
               <p className="mt-1.5 text-sm text-amber-600">
-                No availability template for {data.dayOfWeek}s at this location.
+                {t("slotExpl.noTemplate", locale).replace("{day}", data.dayOfWeek)}
               </p>
             ) : (
               <div className="mt-1.5 space-y-1">
-                {data.templates.map((t, i) => (
+                {data.templates.map((tpl, i) => (
                   <div key={i} className="flex items-center gap-2 rounded bg-green-50 px-3 py-1.5 text-sm text-green-800">
                     <svg className="h-3.5 w-3.5 text-green-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                       <path strokeLinecap="round" strokeLinejoin="round" d="M12 6v6h4.5m4.5 0a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z" />
                     </svg>
-                    {t.startTime} - {t.endTime}
+                    {tpl.startTime} - {tpl.endTime}
                   </div>
                 ))}
               </div>
@@ -127,7 +146,7 @@ export function SlotExplanationDialog({
             <section>
               <h4 className="flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wider text-green-700">
                 <span className="flex h-4 w-4 items-center justify-center rounded-full bg-green-100 text-[10px]">2</span>
-                Schedule changes
+                {t("slotExpl.scheduleChangesH", locale)}
               </h4>
               <div className="mt-1.5 space-y-1">
                 {data.overrides.map((o, i) => (
@@ -147,8 +166,12 @@ export function SlotExplanationDialog({
                       )}
                     </svg>
                     <span>
-                      {o.type === "blocked" ? "Blocked" : "Extra availability"}
-                      {o.startTime && o.endTime ? `: ${o.startTime} - ${o.endTime}` : " (full day)"}
+                      {o.type === "blocked"
+                        ? t("slotExpl.blocked", locale)
+                        : t("slotExpl.extraAvail", locale)}
+                      {o.startTime && o.endTime
+                        ? `: ${o.startTime} - ${o.endTime}`
+                        : ` ${t("slotExpl.fullDay", locale)}`}
                       {o.reason && <span className="ml-1 text-xs opacity-70">— {o.reason}</span>}
                     </span>
                   </div>
@@ -164,7 +187,7 @@ export function SlotExplanationDialog({
                 <span className="flex h-4 w-4 items-center justify-center rounded-full bg-green-100 text-[10px]">
                   {data.overrides.length > 0 ? "3" : "2"}
                 </span>
-                Already booked
+                {t("slotExpl.alreadyBookedH", locale)}
               </h4>
               <div className="mt-1.5 space-y-1">
                 {data.existingBookings.map((b, i) => (
@@ -187,11 +210,12 @@ export function SlotExplanationDialog({
                 <span className="flex h-4 w-4 items-center justify-center rounded-full bg-green-100 text-[10px]">
                   {1 + (data.overrides.length > 0 ? 1 : 0) + (data.existingBookings.length > 0 ? 1 : 0) + 1}
                 </span>
-                Booking notice
+                {t("slotExpl.bookingNoticeH", locale)}
               </h4>
               <p className="mt-1.5 text-sm text-green-600">
-                {data.bookingNoticeHours}h notice required — slots before{" "}
-                <span className="font-medium">{data.noticeFilteredBefore}</span> are not bookable.
+                {t("slotExpl.noticeMsg", locale)
+                  .replace("{n}", String(data.bookingNoticeHours))
+                  .replace("{time}", data.noticeFilteredBefore)}
               </p>
             </section>
           )}
@@ -200,7 +224,7 @@ export function SlotExplanationDialog({
           <section className="border-t border-green-100 pt-3">
             <div className="flex items-center justify-between">
               <span className="text-sm font-medium text-green-900">
-                Available {data.duration}-min slots
+                {t("slotExpl.availableSlots", locale).replace("{n}", String(data.duration))}
               </span>
               <span className={`rounded-full px-2.5 py-0.5 text-xs font-semibold ${
                 data.availableSlots > 0
@@ -219,7 +243,7 @@ export function SlotExplanationDialog({
             onClick={onClose}
             className="w-full rounded-md bg-green-800 py-2 text-sm font-medium text-white hover:bg-green-700"
           >
-            Got it
+            {t("slotExpl.gotIt", locale)}
           </button>
         </div>
       </div>
@@ -234,10 +258,12 @@ export function TabbedExplanationDialog({
   proData,
   studentData,
   onClose,
+  locale,
 }: {
   proData: SlotExplanation;
   studentData: SlotExplanation;
   onClose: () => void;
+  locale: Locale;
 }) {
   const backdropRef = useRef<HTMLDivElement>(null);
   const [tab, setTab] = useState<"pro" | "student">("pro");
@@ -258,7 +284,14 @@ export function TabbedExplanationDialog({
             <h3 className="font-display text-lg font-semibold text-green-900">
               {data.dayOfWeek}
             </h3>
-            <p className="text-xs text-green-500">{formatDate(data.date)}</p>
+            <p className="text-xs text-green-500">
+              {formatDateLocale(data.date, locale, {
+                weekday: "long",
+                month: "long",
+                day: "numeric",
+                year: "numeric",
+              })}
+            </p>
           </div>
           <button
             onClick={onClose}
@@ -280,7 +313,7 @@ export function TabbedExplanationDialog({
                 : "text-green-500 hover:text-green-700"
             }`}
           >
-            Your view (pro)
+            {t("slotExpl.tab.pro", locale)}
           </button>
           <button
             onClick={() => setTab("student")}
@@ -290,7 +323,7 @@ export function TabbedExplanationDialog({
                 : "text-green-500 hover:text-green-700"
             }`}
           >
-            Student view
+            {t("slotExpl.tab.student", locale)}
           </button>
         </div>
 
@@ -299,12 +332,19 @@ export function TabbedExplanationDialog({
           {/* Context note */}
           <div className="rounded-lg bg-green-50/50 px-3 py-2 text-[11px] text-green-600">
             {tab === "pro" ? (
-              "As a pro, you bypass the booking notice and can book any available slot."
+              t("slotExpl.tab.proNote", locale)
             ) : (
               <>
-                The student sees slots filtered by your <strong>{studentData.bookingNoticeHours}h booking notice</strong>.
+                {t("slotExpl.tab.studentNote", locale).replace(
+                  "{n}",
+                  String(studentData.bookingNoticeHours)
+                )}
                 {studentData.availableSlots !== proData.availableSlots && (
-                  <> They see <strong>{studentData.availableSlots}</strong> slots vs your <strong>{proData.availableSlots}</strong>.</>
+                  <>
+                    {t("slotExpl.tab.studentDiff", locale)
+                      .replace("{studentN}", String(studentData.availableSlots))
+                      .replace("{proN}", String(proData.availableSlots))}
+                  </>
                 )}
               </>
             )}
@@ -316,7 +356,10 @@ export function TabbedExplanationDialog({
               <svg className="h-3.5 w-3.5 shrink-0 text-green-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
                 <path strokeLinecap="round" strokeLinejoin="round" d="M6.75 3v2.25M17.25 3v2.25M3 18.75V7.5a2.25 2.25 0 0 1 2.25-2.25h13.5A2.25 2.25 0 0 1 21 7.5v11.25m-18 0A2.25 2.25 0 0 0 5.25 21h13.5A2.25 2.25 0 0 0 21 18.75m-18 0v-7.5A2.25 2.25 0 0 1 5.25 9h13.5A2.25 2.25 0 0 1 21 11.25v7.5" />
               </svg>
-              Student&apos;s preferred day: <strong>{studentData.preferredDay}</strong>
+              {t("slotExpl.tab.studentPreferredDay", locale).replace(
+                "{day}",
+                studentData.preferredDay
+              )}
             </div>
           )}
 
@@ -327,7 +370,9 @@ export function TabbedExplanationDialog({
                 <path strokeLinecap="round" strokeLinejoin="round" d="M3 8.689c0-.864.933-1.406 1.683-.977l7.108 4.061a1.125 1.125 0 0 1 0 1.954l-7.108 4.061A1.125 1.125 0 0 1 3 16.811V8.69ZM12.75 8.689c0-.864.933-1.406 1.683-.977l7.108 4.061a1.125 1.125 0 0 1 0 1.954l-7.108 4.061a1.125 1.125 0 0 1-1.683-.977V8.69Z" />
               </svg>
               <span>
-                <strong>&quot;{data.interval === "weekly" ? "In a week" : data.interval === "biweekly" ? "In 2 weeks" : "In a month"}&quot;</strong> is selected — dates start at least {data.interval === "weekly" ? "7" : data.interval === "biweekly" ? "14" : "28"} days from today.
+                {t("slotExpl.intervalNote", locale)
+                  .replace("{label}", intervalLabel(data.interval, locale))
+                  .replace("{days}", intervalDays(data.interval))}
               </span>
             </div>
           )}
@@ -339,7 +384,9 @@ export function TabbedExplanationDialog({
                 <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                   <path strokeLinecap="round" strokeLinejoin="round" d="m11.25 11.25.041-.02a.75.75 0 0 1 1.063.852l-.708 2.836a.75.75 0 0 0 1.063.853l.041-.021M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Zm-9-3.75h.008v.008H12V8.25Z" />
                 </svg>
-                {tab === "pro" ? "Why this is the first date" : "Why student sees this as first date"}
+                {tab === "pro"
+                  ? t("slotExpl.tab.firstDatePro", locale)
+                  : t("slotExpl.tab.firstDateStudent", locale)}
               </h4>
               <div className="mt-1.5 space-y-0.5">
                 {data.skippedDays.map((day) => (
@@ -354,17 +401,21 @@ export function TabbedExplanationDialog({
 
           {/* Availability */}
           <section>
-            <h4 className="text-xs font-semibold uppercase tracking-wider text-green-700">Availability</h4>
+            <h4 className="text-xs font-semibold uppercase tracking-wider text-green-700">
+              {t("slotExpl.availabilityH", locale)}
+            </h4>
             {data.templates.length === 0 ? (
-              <p className="mt-1.5 text-sm text-amber-600">No availability template for {data.dayOfWeek}s.</p>
+              <p className="mt-1.5 text-sm text-amber-600">
+                {t("slotExpl.tab.noTemplateShort", locale).replace("{day}", data.dayOfWeek)}
+              </p>
             ) : (
               <div className="mt-1.5 space-y-1">
-                {data.templates.map((t, i) => (
+                {data.templates.map((tpl, i) => (
                   <div key={i} className="flex items-center gap-2 rounded bg-green-50 px-3 py-1.5 text-sm text-green-800">
                     <svg className="h-3.5 w-3.5 text-green-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                       <path strokeLinecap="round" strokeLinejoin="round" d="M12 6v6h4.5m4.5 0a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z" />
                     </svg>
-                    {t.startTime} - {t.endTime}
+                    {tpl.startTime} - {tpl.endTime}
                   </div>
                 ))}
               </div>
@@ -374,12 +425,18 @@ export function TabbedExplanationDialog({
           {/* Overrides */}
           {data.overrides.length > 0 && (
             <section>
-              <h4 className="text-xs font-semibold uppercase tracking-wider text-green-700">Schedule changes</h4>
+              <h4 className="text-xs font-semibold uppercase tracking-wider text-green-700">
+                {t("slotExpl.scheduleChangesH", locale)}
+              </h4>
               <div className="mt-1.5 space-y-1">
                 {data.overrides.map((o, i) => (
                   <div key={i} className={`flex items-center gap-2 rounded px-3 py-1.5 text-sm ${o.type === "blocked" ? "bg-red-50 text-red-700" : "bg-blue-50 text-blue-700"}`}>
-                    {o.type === "blocked" ? "Blocked" : "Extra availability"}
-                    {o.startTime && o.endTime ? `: ${o.startTime} - ${o.endTime}` : " (full day)"}
+                    {o.type === "blocked"
+                      ? t("slotExpl.blocked", locale)
+                      : t("slotExpl.extraAvail", locale)}
+                    {o.startTime && o.endTime
+                      ? `: ${o.startTime} - ${o.endTime}`
+                      : ` ${t("slotExpl.fullDay", locale)}`}
                     {o.reason && <span className="text-xs opacity-70">— {o.reason}</span>}
                   </div>
                 ))}
@@ -390,7 +447,9 @@ export function TabbedExplanationDialog({
           {/* Existing bookings */}
           {data.existingBookings.length > 0 && (
             <section>
-              <h4 className="text-xs font-semibold uppercase tracking-wider text-green-700">Already booked</h4>
+              <h4 className="text-xs font-semibold uppercase tracking-wider text-green-700">
+                {t("slotExpl.alreadyBookedH", locale)}
+              </h4>
               <div className="mt-1.5 space-y-1">
                 {data.existingBookings.map((b, i) => (
                   <div key={i} className="flex items-center gap-2 rounded bg-amber-50 px-3 py-1.5 text-sm text-amber-800">
@@ -405,9 +464,13 @@ export function TabbedExplanationDialog({
           {/* Booking notice (student tab only) */}
           {tab === "student" && data.noticeFilteredBefore && (
             <section>
-              <h4 className="text-xs font-semibold uppercase tracking-wider text-green-700">Booking notice</h4>
+              <h4 className="text-xs font-semibold uppercase tracking-wider text-green-700">
+                {t("slotExpl.bookingNoticeH", locale)}
+              </h4>
               <p className="mt-1.5 text-sm text-green-600">
-                {data.bookingNoticeHours}h notice — slots before <span className="font-medium">{data.noticeFilteredBefore}</span> are not bookable.
+                {t("slotExpl.tab.noticeShort", locale)
+                  .replace("{n}", String(data.bookingNoticeHours))
+                  .replace("{time}", data.noticeFilteredBefore)}
               </p>
             </section>
           )}
@@ -416,7 +479,7 @@ export function TabbedExplanationDialog({
           <section className="border-t border-green-100 pt-3">
             <div className="flex items-center justify-between">
               <span className="text-sm font-medium text-green-900">
-                Available {data.duration}-min slots
+                {t("slotExpl.availableSlots", locale).replace("{n}", String(data.duration))}
               </span>
               <span className={`rounded-full px-2.5 py-0.5 text-xs font-semibold ${data.availableSlots > 0 ? "bg-green-100 text-green-700" : "bg-red-100 text-red-600"}`}>
                 {data.availableSlots}
@@ -431,7 +494,7 @@ export function TabbedExplanationDialog({
             onClick={onClose}
             className="w-full rounded-md bg-green-800 py-2 text-sm font-medium text-white hover:bg-green-700"
           >
-            Got it
+            {t("slotExpl.gotIt", locale)}
           </button>
         </div>
       </div>

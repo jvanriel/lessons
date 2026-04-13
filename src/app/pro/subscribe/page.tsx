@@ -1,6 +1,7 @@
 import { requireProProfile } from "@/lib/pro";
 import { redirect } from "next/navigation";
 import SubscribePage from "./SubscribePage";
+import { getLocale } from "@/lib/locale";
 
 export const metadata = { title: "Subscribe — Golf Lessons" };
 
@@ -16,5 +17,6 @@ export default async function Subscribe() {
     redirect("/pro/dashboard");
   }
 
-  return <SubscribePage />;
+  const locale = await getLocale();
+  return <SubscribePage locale={locale} />;
 }

@@ -208,7 +208,7 @@ export default function AppTopBar({
 
       {/* Right: help, language, notifications, user */}
       <div className="flex items-center gap-3">
-        <HelpDialog />
+        <HelpDialog locale={locale as Locale} />
         <LanguageSwitcher locale={locale as Locale} />
 
         {showNotifications && (

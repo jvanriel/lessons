@@ -8,6 +8,12 @@ import { useRouter } from "next/navigation";
 import type { Locale } from "@/lib/i18n";
 import { t } from "@/lib/i18n/translations";
 import { formatDate } from "@/lib/format-date";
+import {
+  MONTHLY_PRICE,
+  ANNUAL_PRICE,
+  ANNUAL_SAVINGS_PERCENT,
+  formatPrice,
+} from "@/lib/pricing";
 
 const STEP_KEYS = [
   "proOnb.step.profile",
@@ -526,9 +532,13 @@ function SubscriptionStep({ onSuccess, locale }: { onSuccess: () => void; locale
       <div className="space-y-4">
         <div className="text-center">
           <p className="text-sm text-green-600">
-            {plan === "annual"
+            {(plan === "annual"
               ? t("proOnb.sub.planAnnual", locale)
-              : t("proOnb.sub.planMonthly", locale)}
+              : t("proOnb.sub.planMonthly", locale)
+            ).replace(
+              "{price}",
+              formatPrice(plan === "annual" ? ANNUAL_PRICE : MONTHLY_PRICE, locale)
+            )}
           </p>
           <p className="mt-1 text-xs text-green-500">
             {t("proOnb.sub.firstChargeOn", locale).replace("{date}", firstChargeDate)}
@@ -578,7 +588,7 @@ function SubscriptionStep({ onSuccess, locale }: { onSuccess: () => void; locale
           }`}
         >
           <div className="font-display text-2xl font-bold text-green-900">
-            €12.50
+            {formatPrice(MONTHLY_PRICE, locale)}
           </div>
           <div className="text-sm text-green-600">{t("proOnb.sub.perMonth", locale)}</div>
         </button>
@@ -592,10 +602,13 @@ function SubscriptionStep({ onSuccess, locale }: { onSuccess: () => void; locale
         >
           <div className="flex items-baseline gap-2">
             <div className="font-display text-2xl font-bold text-green-900">
-              €125
+              {formatPrice(ANNUAL_PRICE, locale)}
             </div>
             <span className="rounded-full bg-gold-100 px-2 py-0.5 text-xs font-semibold text-gold-700">
-              {t("proOnb.sub.save17", locale)}
+              {t("proOnb.sub.savePercent", locale).replace(
+                "{n}",
+                String(ANNUAL_SAVINGS_PERCENT)
+              )}
             </span>
           </div>
           <div className="text-sm text-green-600">{t("proOnb.sub.perYear", locale)}</div>
