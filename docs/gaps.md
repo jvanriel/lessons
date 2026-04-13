@@ -72,10 +72,14 @@ The platform CMS (`cms_blocks`) has per-locale rows but is operated by the platf
 - Comment moderation tools (flagging + admin review).
 - Image optimization (`next/image` audit).
 - **Drop dead schema columns** `proProfiles.stripeConnectAccountId`, `stripeConnectOnboarded` — Connect is rejected, these never get populated. Migration is risk-free but no visible benefit pre-launch.
+- **Pro discovery / filtering on `/pros`** (Nadine task #24) — currently a flat list of every published pro. Acceptable while we launch with 2-3 pros, but won't scale past ~10. A proper implementation needs:
+  - Lat/lng on `pro_locations` (schema migration)
+  - Geocoding service (Nominatim free vs Google paid) to populate lat/lng on location create
+  - Filter UI on `/pros`: city dropdown + radius slider, ideally with sort-by-distance
+  - Decision deferred — will do a proper implementation soon, post-launch.
 - Nadine's deferred sub-issues from task #6:
   - Embedded `/pros` browser in onboarding instead of flat list.
-  - Region / radius filtering on `/pros`.
-  - Re-enabling email field after registration (requires verify-new-email flow).
+  - Re-enabling email field after registration (requires verify-new-email flow). **Note**: shipped as a typo-fix-only path in commit 66125d2 (task #23). A full email-change-after-verification flow is still post-launch.
 
 ## Open questions
 
