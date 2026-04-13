@@ -324,47 +324,115 @@ export function buildWelcomeEmail(opts: {
   accountType: "student" | "pro";
   locale: Locale;
 }): string {
-  const strings: Record<string, { subject: string; body: string; proNote: string; studentNote: string; button: string }> = {
+  const studentStrings: Record<Locale, { body: string; note: string; button: string; buttonPath: string }> = {
     en: {
-      subject: "Welcome to Golf Lessons!",
       body: "Thank you for signing up. Your account has been created successfully.",
-      proNote: "Our team will review your registration and set up your pro profile. You'll receive a notification once your account is activated as a golf professional.",
-      studentNote: "You can now browse our pros and book your first lesson.",
+      note: "You can now browse our pros and book your first lesson.",
       button: "Explore Golf Lessons",
+      buttonPath: "/pros",
     },
     nl: {
-      subject: "Welkom bij Golf Lessons!",
       body: "Bedankt voor je registratie. Je account is succesvol aangemaakt.",
-      proNote: "Ons team beoordeelt je registratie en stelt je pro-profiel in. Je ontvangt een melding zodra je account is geactiveerd als golfprofessional.",
-      studentNote: "Je kunt nu onze pro's bekijken en je eerste les boeken.",
+      note: "Je kunt nu onze pro's bekijken en je eerste les boeken.",
       button: "Ontdek Golf Lessons",
+      buttonPath: "/pros",
     },
     fr: {
-      subject: "Bienvenue sur Golf Lessons !",
       body: "Merci de vous être inscrit. Votre compte a été créé avec succès.",
-      proNote: "Notre équipe examinera votre inscription et configurera votre profil pro. Vous recevrez une notification une fois votre compte activé en tant que professionnel de golf.",
-      studentNote: "Vous pouvez maintenant parcourir nos pros et réserver votre premier cours.",
+      note: "Vous pouvez maintenant parcourir nos pros et réserver votre premier cours.",
       button: "Découvrir Golf Lessons",
+      buttonPath: "/pros",
     },
   };
 
-  const s = strings[opts.locale] ?? strings.en;
-  const greeting = (EMAIL_STRINGS[opts.locale] ?? EMAIL_STRINGS.en).inviteGreeting;
-  const note = opts.accountType === "pro" ? s.proNote : s.studentNote;
+  const proStrings: Record<Locale, {
+    intro: string;
+    stepsHeading: string;
+    step1: string;
+    step2: string;
+    step3: string;
+    step4: string;
+    closing: string;
+    button: string;
+    buttonPath: string;
+  }> = {
+    en: {
+      intro: "Welcome to Golf Lessons! Your pro account has been created and we're glad to have you on board. Here's what to do next:",
+      stepsHeading: "Get ready to take bookings",
+      step1: "Verify your email — we sent you a separate verification link.",
+      step2: "Complete your subscription on the payment page so students can discover you.",
+      step3: "Set up your profile, add your teaching locations, and paint your weekly availability.",
+      step4: "Publish your profile and start receiving bookings.",
+      closing: "Any questions along the way? Just reply to this email — we're here to help.",
+      button: "Continue setup",
+      buttonPath: "/pro/dashboard",
+    },
+    nl: {
+      intro: "Welkom bij Golf Lessons! Je pro-account is aangemaakt en we zijn blij je aan boord te hebben. Dit zijn de volgende stappen:",
+      stepsHeading: "Klaar om boekingen te ontvangen",
+      step1: "Bevestig je e-mailadres — we hebben je een aparte bevestigingslink gestuurd.",
+      step2: "Rond je abonnement af op de betaalpagina zodat leerlingen je kunnen vinden.",
+      step3: "Stel je profiel in, voeg je leslocaties toe en stel je wekelijkse beschikbaarheid in.",
+      step4: "Publiceer je profiel en begin met het ontvangen van boekingen.",
+      closing: "Vragen onderweg? Antwoord gewoon op deze e-mail — we helpen je graag verder.",
+      button: "Verder met instellen",
+      buttonPath: "/pro/dashboard",
+    },
+    fr: {
+      intro: "Bienvenue sur Golf Lessons ! Votre compte pro a été créé et nous sommes ravis de vous compter parmi nous. Voici les étapes suivantes :",
+      stepsHeading: "Prêt à recevoir des réservations",
+      step1: "Confirmez votre adresse e-mail — nous vous avons envoyé un lien de vérification séparé.",
+      step2: "Finalisez votre abonnement sur la page de paiement afin que les élèves puissent vous trouver.",
+      step3: "Configurez votre profil, ajoutez vos lieux de cours et renseignez vos disponibilités hebdomadaires.",
+      step4: "Publiez votre profil et commencez à recevoir des réservations.",
+      closing: "Des questions en cours de route ? Répondez simplement à cet e-mail — nous sommes là pour vous aider.",
+      button: "Poursuivre la configuration",
+      buttonPath: "/pro/dashboard",
+    },
+  };
 
+  const greeting = (EMAIL_STRINGS[opts.locale] ?? EMAIL_STRINGS.en).inviteGreeting;
+  const base = getBaseUrl();
+
+  if (opts.accountType === "pro") {
+    const s = proStrings[opts.locale] ?? proStrings.en;
+    const stepStyle = `padding:10px 0;border-bottom:1px solid ${COLORS.green100};font-size:14px;color:${COLORS.green900};`;
+    const numStyle = `display:inline-block;width:22px;height:22px;line-height:22px;text-align:center;background:${COLORS.gold600};color:${COLORS.white};border-radius:50%;font-size:12px;font-weight:600;margin-right:10px;`;
+    const body = `
+      <h2 style="font-family:Georgia,'Times New Roman',serif;font-size:22px;color:${COLORS.green950};margin:0 0 16px 0;font-weight:normal;">
+        ${greeting} ${opts.firstName},
+      </h2>
+      <p style="margin:0 0 24px 0;">${s.intro}</p>
+
+      <h3 style="font-family:Georgia,'Times New Roman',serif;font-size:16px;color:${COLORS.green950};margin:24px 0 8px 0;font-weight:normal;">${s.stepsHeading}</h3>
+      <div style="${stepStyle}"><span style="${numStyle}">1</span>${s.step1}</div>
+      <div style="${stepStyle}"><span style="${numStyle}">2</span>${s.step2}</div>
+      <div style="${stepStyle}"><span style="${numStyle}">3</span>${s.step3}</div>
+      <div style="${stepStyle}"><span style="${numStyle}">4</span>${s.step4}</div>
+
+      <p style="margin:24px 0 24px 0;">
+        <a href="${base}${s.buttonPath}" style="display:inline-block;background:${COLORS.gold600};color:${COLORS.white};padding:12px 28px;border-radius:6px;text-decoration:none;font-weight:500;font-size:14px;">
+          ${s.button}
+        </a>
+      </p>
+      <p style="margin:0;color:#555;font-size:13px;">${s.closing}</p>
+    `;
+    return emailLayout(body, undefined, opts.locale);
+  }
+
+  const s = studentStrings[opts.locale] ?? studentStrings.en;
   const body = `
     <h2 style="font-family:Georgia,'Times New Roman',serif;font-size:22px;color:${COLORS.green950};margin:0 0 16px 0;font-weight:normal;">
       ${greeting} ${opts.firstName},
     </h2>
     <p style="margin:0 0 16px 0;">${s.body}</p>
-    <p style="margin:0 0 24px 0;color:#555;">${note}</p>
+    <p style="margin:0 0 24px 0;color:#555;">${s.note}</p>
     <p style="margin:0 0 24px 0;">
-      <a href="${getBaseUrl()}" style="display:inline-block;background:${COLORS.gold600};color:${COLORS.white};padding:12px 28px;border-radius:6px;text-decoration:none;font-weight:500;font-size:14px;">
+      <a href="${base}${s.buttonPath}" style="display:inline-block;background:${COLORS.gold600};color:${COLORS.white};padding:12px 28px;border-radius:6px;text-decoration:none;font-weight:500;font-size:14px;">
         ${s.button}
       </a>
     </p>
   `;
-
   return emailLayout(body, undefined, opts.locale);
 }
 

@@ -9,7 +9,7 @@ import { sendEmail } from "@/lib/mail";
 import { resolveLocale, type Locale } from "@/lib/i18n";
 import { limitByIp, registerLimiter } from "@/lib/rate-limit";
 import { SignJWT } from "jose";
-import { emailLayout } from "@/lib/email-templates";
+import { buildWelcomeEmail, emailLayout, getWelcomeSubject } from "@/lib/email-templates";
 import { ensureProProfile, normalizeRoles } from "@/lib/pro";
 import { getLocale } from "@/lib/locale";
 import { t } from "@/lib/i18n/translations";
@@ -133,6 +133,18 @@ export async function registerPro(
       undefined,
       preferredLocale as Locale
     ),
+  }).catch(() => {});
+
+  // Welcome email — warm intro with next-step guide (verify → subscribe →
+  // set up profile/locations/availability → publish).
+  sendEmail({
+    to: email,
+    subject: getWelcomeSubject("pro", preferredLocale as Locale),
+    html: buildWelcomeEmail({
+      firstName,
+      accountType: "pro",
+      locale: preferredLocale as Locale,
+    }),
   }).catch(() => {});
 
   await setSessionCookie({
