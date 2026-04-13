@@ -128,6 +128,14 @@ const translations: Record<Locale, Record<string, string>> = {
     "pros.browse.subtitle": "Browse certified golf professionals and find the perfect coach for your game.",
     "pros.browse.empty": "No pros available yet. Check back soon.",
 
+    // Contact page
+    "contact.title": "Contact",
+    "contact.subtitle": "We'd love to hear from you. Reach out with any question about lessons, becoming a pro, or anything else.",
+    "contact.email.label": "Email us",
+    "contact.email.help": "We typically reply within one business day.",
+    "contact.pro.title": "Want to join as a pro?",
+    "contact.pro.body": "Send us a short note about your coaching background and we'll guide you through the onboarding.",
+
     // For Students page
     "students.badge": "Free to join",
     "students.hero.title": "Your Personal Golf Coach, Always Within Reach",
@@ -436,6 +444,20 @@ const translations: Record<Locale, Record<string, string>> = {
     "students.cta.title": "Klaar om Je Spel te Verbeteren?",
     "students.cta.desc": "Sluit je aan bij duizenden golfers die al leren met gecertificeerde professionals op ons platform. Aanmelden is gratis.",
     "students.cta.button": "Aan de Slag — Het is Gratis",
+
+    // Browse pros
+    "pros.browse.title": "Onze Pro's",
+    "pros.browse.subtitle": "Ontdek gecertificeerde golfprofessionals en vind de perfecte coach voor jouw spel.",
+    "pros.browse.empty": "Nog geen pro's beschikbaar. Kom binnenkort terug.",
+
+    // Contact page
+    "contact.title": "Contact",
+    "contact.subtitle": "We horen graag van je. Stel ons je vraag over lessen, pro worden, of iets anders.",
+    "contact.email.label": "Mail ons",
+    "contact.email.help": "We antwoorden meestal binnen één werkdag.",
+    "contact.pro.title": "Wil je je aansluiten als pro?",
+    "contact.pro.body": "Stuur ons een korte boodschap over je coachingachtergrond en we begeleiden je door de onboarding.",
+
     "pros.badge": "Voor professionals",
     "pros.hero.title": "Laat Je Coachingbedrijf Groeien",
     "pros.hero.subtitle": "Meer dan een boekingsplatform — een complete coaching toolkit. Beheer je agenda, deel content met leerlingen en bouw duurzame coachingrelaties.",
@@ -711,6 +733,20 @@ const translations: Record<Locale, Record<string, string>> = {
     "students.cta.title": "Prêt à Améliorer Votre Jeu ?",
     "students.cta.desc": "Rejoignez des milliers de golfeurs qui apprennent déjà avec des professionnels certifiés sur notre plateforme. L'inscription est gratuite.",
     "students.cta.button": "Commencer — C'est Gratuit",
+
+    // Browse pros
+    "pros.browse.title": "Nos Pros",
+    "pros.browse.subtitle": "Découvrez des golfeurs professionnels certifiés et trouvez le coach idéal pour votre jeu.",
+    "pros.browse.empty": "Aucun pro disponible pour le moment. Revenez bientôt.",
+
+    // Contact page
+    "contact.title": "Contact",
+    "contact.subtitle": "Nous serions ravis d'avoir de vos nouvelles. Posez-nous toutes vos questions sur les cours, le statut de pro, ou tout autre sujet.",
+    "contact.email.label": "Écrivez-nous",
+    "contact.email.help": "Nous répondons généralement sous un jour ouvrable.",
+    "contact.pro.title": "Vous souhaitez nous rejoindre en tant que pro ?",
+    "contact.pro.body": "Envoyez-nous un mot sur votre parcours de coach et nous vous guiderons pour l'inscription.",
+
     "pros.badge": "Pour les professionnels",
     "pros.hero.title": "Développez Votre Activité de Coaching",
     "pros.hero.subtitle": "Plus qu'une plateforme de réservation — une boîte à outils de coaching complète. Gérez votre agenda, partagez du contenu avec vos élèves et construisez des relations de coaching durables.",

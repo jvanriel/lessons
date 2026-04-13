@@ -1,11 +1,13 @@
 "use client";
 
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef, useEffect, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { LOCALE_LABELS, LOCALE_SHORT, type Locale } from "@/lib/i18n";
+import { setLocaleAction } from "@/lib/locale-actions";
 
 export default function LanguageSwitcher({ locale }: { locale: Locale }) {
   const [open, setOpen] = useState(false);
+  const [isPending, startTransition] = useTransition();
   const ref = useRef<HTMLDivElement>(null);
   const router = useRouter();
 
@@ -22,15 +24,19 @@ export default function LanguageSwitcher({ locale }: { locale: Locale }) {
 
   function handleChange(newLocale: Locale) {
     setOpen(false);
-    document.cookie = `locale=${newLocale};path=/;max-age=${365 * 24 * 60 * 60};samesite=lax`;
-    router.refresh();
+    if (newLocale === locale) return;
+    startTransition(async () => {
+      await setLocaleAction(newLocale);
+      router.refresh();
+    });
   }
 
   return (
     <div className="relative" ref={ref}>
       <button
         onClick={() => setOpen(!open)}
-        className="flex items-center gap-1 text-green-100/60 transition-colors duration-200 hover:text-gold-200"
+        disabled={isPending}
+        className="flex items-center gap-1 text-green-100/60 transition-colors duration-200 hover:text-gold-200 disabled:opacity-50"
       >
         <svg
           className="h-4 w-4"

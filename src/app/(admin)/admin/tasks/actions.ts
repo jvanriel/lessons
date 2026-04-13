@@ -35,7 +35,7 @@ async function requireTaskAccess(session: SessionPayload, taskId: number) {
   if (!hasAccess) throw new Error("No access to this task");
 }
 
-export type TaskColumn = "todo" | "in_progress" | "done";
+export type TaskColumn = "todo" | "in_progress" | "to_test" | "done";
 export type TaskPriority = "low" | "normal" | "high";
 
 export interface SerializedTask {

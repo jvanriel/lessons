@@ -16,6 +16,7 @@ import Comments from "@/components/comments/Comments";
 const COLUMNS: { id: TaskColumn; label: string; color: string }[] = [
   { id: "todo", label: "To Do", color: "border-blue-400" },
   { id: "in_progress", label: "In Progress", color: "border-amber-400" },
+  { id: "to_test", label: "To Test", color: "border-purple-400" },
   { id: "done", label: "Done", color: "border-green-400" },
 ];
 
