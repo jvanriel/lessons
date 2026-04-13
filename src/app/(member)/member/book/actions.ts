@@ -34,14 +34,21 @@ import {
 } from "@/lib/email-templates";
 import { resolveLocale, type Locale } from "@/lib/i18n";
 import { t } from "@/lib/i18n/translations";
+import { getLocale } from "@/lib/locale";
 
-async function getUserLocale(userId: number): Promise<Locale> {
-  const [u] = await db
-    .select({ preferredLocale: users.preferredLocale })
-    .from(users)
-    .where(eq(users.id, userId))
-    .limit(1);
-  return resolveLocale(u?.preferredLocale);
+/**
+ * Read the UI locale from the cookie (set by the language switcher), not
+ * from users.preferredLocale. The cookie reflects what the user is currently
+ * looking at; preferredLocale is what they chose at signup. Error messages
+ * shown in the UI must follow the cookie so that switching language in the
+ * header actually re-translates them.
+ *
+ * Note: outbound emails (booking confirmation, etc.) still use the recipient's
+ * preferredLocale because the recipient is not always the one looking at the
+ * screen.
+ */
+async function getUiLocale(): Promise<Locale> {
+  return getLocale();
 }
 
 function requireMember() {
@@ -370,11 +377,11 @@ export async function createBooking(formData: FormData) {
     !lastName ||
     !email
   ) {
-    const locale = await getUserLocale(session.userId);
+    const locale = await getUiLocale();
     return { error: t("bookErr.fillRequired", locale) };
   }
 
-  const locale = await getUserLocale(session.userId);
+  const locale = await getUiLocale();
 
   // Payment gate: check if pro requires payment method
   const paymentError = await checkPaymentGate(proProfileId, session.userId, locale);
@@ -927,7 +934,7 @@ export async function quickCreateBooking(data: {
     .where(eq(users.id, session.userId))
     .limit(1);
 
-  const locale = resolveLocale(user?.preferredLocale);
+  const locale = await getUiLocale();
   if (!user) return { error: t("bookErr.userNotFound", locale) };
 
   // Payment gate: check if pro requires payment method

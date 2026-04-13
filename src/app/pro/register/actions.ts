@@ -11,6 +11,8 @@ import { limitByIp, registerLimiter } from "@/lib/rate-limit";
 import { SignJWT } from "jose";
 import { emailLayout } from "@/lib/email-templates";
 import { ensureProProfile, normalizeRoles } from "@/lib/pro";
+import { getLocale } from "@/lib/locale";
+import { t } from "@/lib/i18n/translations";
 
 function getSecret() {
   return new TextEncoder().encode(
@@ -22,10 +24,15 @@ export async function registerPro(
   _prev: { error?: string } | null,
   formData: FormData
 ): Promise<{ error?: string }> {
+  const uiLocale = await getLocale();
+
   const limit = await limitByIp(registerLimiter);
   if (!limit.ok) {
     return {
-      error: `Too many registration attempts. Try again in ${limit.retryAfter}s.`,
+      error: t("authErr.tooManyAttempts", uiLocale).replace(
+        "{n}",
+        String(limit.retryAfter)
+      ),
     };
   }
 
@@ -37,13 +44,13 @@ export async function registerPro(
   const preferredLocaleRaw = (formData.get("preferredLocale") as string) || "";
 
   if (!firstName || !lastName || !email || !password) {
-    return { error: "All fields are required." };
+    return { error: t("authErr.allFieldsRequired", uiLocale) };
   }
   if (password.length < 8) {
-    return { error: "Password must be at least 8 characters." };
+    return { error: t("authErr.passwordTooShort", uiLocale) };
   }
   if (password !== confirm) {
-    return { error: "Passwords do not match." };
+    return { error: t("authErr.passwordsDontMatch", uiLocale) };
   }
 
   const [existing] = await db
@@ -53,9 +60,7 @@ export async function registerPro(
     .limit(1);
 
   if (existing) {
-    return {
-      error: "An account with this email already exists. Try logging in.",
-    };
+    return { error: t("authErr.emailExists", uiLocale) };
   }
 
   const hashed = await hashPassword(password);
