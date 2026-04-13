@@ -6,6 +6,8 @@ import {
   updateProLocation,
   removeProLocation,
 } from "./actions";
+import { t } from "@/lib/i18n/translations";
+import type { Locale } from "@/lib/i18n";
 
 interface ProLocation {
   proLocationId: number;
@@ -25,8 +27,10 @@ const inputClass =
 
 export default function LocationManager({
   locations,
+  locale,
 }: {
   locations: ProLocation[];
+  locale: Locale;
 }) {
   const [showAdd, setShowAdd] = useState(false);
   const [editingId, setEditingId] = useState<number | null>(null);
@@ -44,7 +48,8 @@ export default function LocationManager({
   const [, startTransition] = useTransition();
 
   function handleRemove(proLocationId: number, name: string) {
-    if (!confirm(`Remove ${name} from your locations?`)) return;
+    const msg = t("proLocations.removeConfirm", locale).replace("{name}", name);
+    if (!confirm(msg)) return;
     startTransition(() => {
       removeProLocation(proLocationId);
     });
@@ -55,7 +60,7 @@ export default function LocationManager({
       {/* Location list */}
       {locations.length === 0 ? (
         <div className="rounded-xl border border-green-200 bg-white p-8 text-center text-sm text-green-500">
-          No locations yet. Add your first teaching location below.
+          {t("proLocations.empty", locale)}
         </div>
       ) : (
         locations.map((loc) => (
@@ -70,6 +75,7 @@ export default function LocationManager({
             {editingId === loc.proLocationId ? (
               <EditLocationForm
                 location={loc}
+                locale={locale}
                 onClose={() => setEditingId(null)}
               />
             ) : (
@@ -79,7 +85,7 @@ export default function LocationManager({
                     <h3 className="font-medium text-green-900">{loc.name}</h3>
                     {!loc.active && (
                       <span className="rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-medium text-amber-700">
-                        Inactive
+                        {t("proLocations.inactive", locale)}
                       </span>
                     )}
                   </div>
@@ -128,39 +134,45 @@ export default function LocationManager({
       {/* Add location */}
       {showAdd ? (
         <div className="rounded-xl border border-gold-300 bg-white p-5">
-          <h3 className="mb-4 font-medium text-green-900">Add Location</h3>
+          <h3 className="mb-4 font-medium text-green-900">
+            {t("proLocations.addHeading", locale)}
+          </h3>
           <form action={createAction} className="space-y-3">
             <div className="grid gap-3 sm:grid-cols-2">
               <div>
                 <label className="block text-xs font-medium text-green-700">
-                  Name *
+                  {t("proLocations.name", locale)} *
                 </label>
                 <input
                   name="name"
                   required
-                  placeholder="e.g. Kempense Golf"
+                  placeholder={t("proLocations.namePlaceholder", locale)}
                   className={inputClass}
                 />
               </div>
               <div>
                 <label className="block text-xs font-medium text-green-700">
-                  City
+                  {t("proLocations.city", locale)}
                 </label>
-                <input name="city" placeholder="e.g. Mol" className={inputClass} />
+                <input
+                  name="city"
+                  placeholder={t("proLocations.cityPlaceholder", locale)}
+                  className={inputClass}
+                />
               </div>
               <div className="sm:col-span-2">
                 <label className="block text-xs font-medium text-green-700">
-                  Address
+                  {t("proLocations.address", locale)}
                 </label>
                 <input
                   name="address"
-                  placeholder="Street and number"
+                  placeholder={t("proLocations.addressPlaceholder", locale)}
                   className={inputClass}
                 />
               </div>
               <div>
                 <label className="block text-xs font-medium text-green-700">
-                  Country
+                  {t("proLocations.country", locale)}
                 </label>
                 <input
                   name="country"
@@ -170,17 +182,17 @@ export default function LocationManager({
               </div>
               <div>
                 <label className="block text-xs font-medium text-green-700">
-                  Price indication
+                  {t("proLocations.priceIndication", locale)}
                 </label>
                 <input
                   name="priceIndication"
-                  placeholder="e.g. €75/h"
+                  placeholder={t("proLocations.priceIndicationPlaceholder", locale)}
                   className={inputClass}
                 />
               </div>
               <div className="sm:col-span-2">
                 <label className="block text-xs font-medium text-green-700">
-                  Notes (internal)
+                  {t("proLocations.notesInternal", locale)}
                 </label>
                 <input name="notes" className={inputClass} />
               </div>
@@ -194,14 +206,16 @@ export default function LocationManager({
                 disabled={createPending}
                 className="rounded-lg bg-gold-600 px-4 py-2 text-sm font-medium text-white hover:bg-gold-500 disabled:opacity-50"
               >
-                {createPending ? "Adding..." : "Add Location"}
+                {createPending
+                  ? t("proLocations.adding", locale)
+                  : t("proLocations.add", locale)}
               </button>
               <button
                 type="button"
                 onClick={() => setShowAdd(false)}
                 className="rounded-lg border border-green-200 px-4 py-2 text-sm font-medium text-green-700 hover:bg-green-50"
               >
-                Cancel
+                {t("proLocations.cancel", locale)}
               </button>
             </div>
           </form>
@@ -214,7 +228,7 @@ export default function LocationManager({
           <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
             <path strokeLinecap="round" strokeLinejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
           </svg>
-          Add a teaching location
+          {t("proLocations.addCta", locale)}
         </button>
       )}
     </div>
@@ -223,9 +237,11 @@ export default function LocationManager({
 
 function EditLocationForm({
   location,
+  locale,
   onClose,
 }: {
   location: ProLocation;
+  locale: Locale;
   onClose: () => void;
 }) {
   const [state, action, pending] = useActionState(
@@ -263,13 +279,13 @@ function EditLocationForm({
               }`}
             />
           </button>
-          Active
+          {t("proLocations.active", locale)}
         </label>
       </div>
       <div className="grid gap-3 sm:grid-cols-2">
         <div>
           <label className="block text-xs font-medium text-green-700">
-            Price indication
+            {t("proLocations.priceIndication", locale)}
           </label>
           <input
             name="priceIndication"
@@ -279,7 +295,7 @@ function EditLocationForm({
         </div>
         <div>
           <label className="block text-xs font-medium text-green-700">
-            Notes
+            {t("proLocations.notes", locale)}
           </label>
           <input
             name="notes"
@@ -297,14 +313,16 @@ function EditLocationForm({
           disabled={pending}
           className="rounded-lg bg-green-700 px-4 py-2 text-sm font-medium text-white hover:bg-green-800 disabled:opacity-50"
         >
-          {pending ? "Saving..." : "Save"}
+          {pending
+            ? t("proLocations.saving", locale)
+            : t("proLocations.save", locale)}
         </button>
         <button
           type="button"
           onClick={onClose}
           className="rounded-lg border border-green-200 px-4 py-2 text-sm font-medium text-green-700 hover:bg-green-50"
         >
-          Cancel
+          {t("proLocations.cancel", locale)}
         </button>
       </div>
     </form>

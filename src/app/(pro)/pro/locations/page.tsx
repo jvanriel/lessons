@@ -22,7 +22,7 @@ export default async function ProLocationsPage() {
       <p className="mt-2 text-sm text-green-600">
         {t("proLocations.pageSubtitle", locale)}
       </p>
-      <LocationManager locations={myLocations} />
+      <LocationManager locations={myLocations} locale={locale} />
     </div>
   );
 }
