@@ -697,6 +697,7 @@ const BOOKING_STUDENT_STRINGS: Record<Locale, {
   duration: string;
   durationUnit: string;
   amount: string;
+  amountOnSite: string;
   cta: string;
   helper: string;
 }> = {
@@ -712,6 +713,7 @@ const BOOKING_STUDENT_STRINGS: Record<Locale, {
     duration: "Duration",
     durationUnit: "minutes",
     amount: "Amount charged",
+    amountOnSite: "Payable on site",
     cta: "View my bookings",
     helper: "Need to cancel or reschedule? Open the booking from your dashboard.",
   },
@@ -727,6 +729,7 @@ const BOOKING_STUDENT_STRINGS: Record<Locale, {
     duration: "Duur",
     durationUnit: "minuten",
     amount: "Bedrag",
+    amountOnSite: "Te betalen ter plaatse",
     cta: "Mijn boekingen bekijken",
     helper: "Annuleren of verplaatsen? Open de boeking vanuit je dashboard.",
   },
@@ -742,6 +745,7 @@ const BOOKING_STUDENT_STRINGS: Record<Locale, {
     duration: "Durée",
     durationUnit: "minutes",
     amount: "Montant facturé",
+    amountOnSite: "À payer sur place",
     cta: "Voir mes réservations",
     helper: "Annuler ou reprogrammer ? Ouvrez la réservation depuis votre tableau de bord.",
   },
@@ -784,6 +788,8 @@ export function buildStudentBookingConfirmationEmail(opts: {
   endTime: string;
   duration: number;
   priceCents?: number | null;
+  /** If true, the pro is cash-only — show "payable on site" instead of "amount charged". */
+  cashOnly?: boolean;
   locale: Locale;
 }): string {
   const s = BOOKING_STUDENT_STRINGS[opts.locale] ?? BOOKING_STUDENT_STRINGS.en;
@@ -799,7 +805,7 @@ export function buildStudentBookingConfirmationEmail(opts: {
       opts.locale === "en" ? "en-GB" : opts.locale === "nl" ? "nl-BE" : "fr-BE",
       { style: "currency", currency: "EUR", minimumFractionDigits: 2 }
     ).format(opts.priceCents / 100);
-    rows.push([s.amount, amount]);
+    rows.push([opts.cashOnly ? s.amountOnSite : s.amount, amount]);
   }
   const body = `
     <h2 style="font-family:Georgia,'Times New Roman',serif;font-size:22px;color:${COLORS.green950};margin:0 0 16px 0;font-weight:normal;">

@@ -411,24 +411,44 @@ export async function createBooking(formData: FormData) {
   const perLessonCents = (priceRow?.lessonPricing as Record<string, number> | null)?.[
     String(duration)
   ];
-  const priceCents =
+  const computedPriceCents =
     typeof perLessonCents === "number" && perLessonCents > 0
       ? perLessonCents * participantCount
       : null;
-  const platformFeeCents =
-    priceCents !== null ? calculatePlatformFee(priceCents) : null;
 
-  // If the pro requires payment and we couldn't compute a price, bail out.
-  // allowBookingWithoutPayment escapes this so free/manual bookings still work.
-  if (priceCents === null && !priceRow?.allowBookingWithoutPayment) {
+  // Cash-only pros: `allowBookingWithoutPayment=true` means the pro settles
+  // with the student offline (cash at the course, bank transfer, whatever).
+  // The platform never touches this money, so we record the amount on the
+  // booking row for the receipt but do NOT fire a PaymentIntent and do NOT
+  // count it in /pro/earnings revenue (which filters by paymentStatus='paid').
+  const cashOnly = priceRow?.allowBookingWithoutPayment === true;
+
+  // If the pro charges online but we couldn't compute a price, bail out.
+  if (computedPriceCents === null && !cashOnly) {
     return { error: t("bookErr.noPriceForDuration", locale) };
   }
+
+  const priceCents = computedPriceCents;
+  const platformFeeCents =
+    !cashOnly && priceCents !== null ? calculatePlatformFee(priceCents) : null;
 
   // NOTE: would ideally be wrapped in db.transaction() for atomicity, but
   // the @neondatabase/serverless HTTP driver does not support multi-statement
   // transactions. Revisit when we move to the WebSocket / pg driver.
   // See docs/gaps.md "data integrity" item.
   const manageToken = crypto.randomBytes(32).toString("hex");
+
+  // paymentStatus semantics:
+  //  - "manual"  → cash-only pro, platform never touches the money
+  //  - "pending" → online charge in flight, will flip to "paid" via the
+  //                PaymentIntent response or webhook reconciliation
+  //  - "paid"    → free / zero-price bookings (no price configured,
+  //                no cash-only flag — rare, backstop path)
+  const initialPaymentStatus = cashOnly
+    ? "manual"
+    : priceCents !== null
+      ? "pending"
+      : "paid";
 
   const [booking] = await db
     .insert(lessonBookings)
@@ -445,7 +465,7 @@ export async function createBooking(formData: FormData) {
       manageToken,
       priceCents,
       platformFeeCents,
-      paymentStatus: priceCents !== null ? "pending" : "paid",
+      paymentStatus: initialPaymentStatus,
     })
     .returning({ id: lessonBookings.id });
 
@@ -477,11 +497,13 @@ export async function createBooking(formData: FormData) {
     });
   }
 
-  // Charge the student's saved payment method off-session. The booking row
-  // already exists with paymentStatus="pending"; this flips it to "paid" on
-  // success (plus the webhook reconciles as belt-and-suspenders) or leaves
-  // it as "failed" so the student can retry from /member/bookings.
-  if (priceCents !== null) {
+  // Charge the student's saved payment method off-session. Skip entirely
+  // for cash-only pros — the booking row already reflects paymentStatus=
+  // "manual" and the platform never touches the money. The row otherwise
+  // starts as "pending" and this flips it to "paid" on success (plus the
+  // webhook reconciles as belt-and-suspenders) or leaves it as "failed"
+  // so the student can retry from /member/bookings.
+  if (!cashOnly && priceCents !== null) {
     try {
       // Look up the stripe customer + default payment method
       const [booker] = await db
@@ -654,6 +676,7 @@ export async function createBooking(formData: FormData) {
         endTime,
         duration,
         priceCents,
+        cashOnly,
         locale: studentLocale,
       }),
       attachments: [icsAttachment],

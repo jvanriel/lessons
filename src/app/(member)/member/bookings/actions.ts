@@ -180,11 +180,10 @@ export async function cancelBooking(bookingId: number) {
     };
   }
 
-  // Auto-refund if the booking was paid and we're within the cancellation
-  // window (check.canCancel === true above). Outside-window cancels fall
-  // through to the `canCancel` rejection earlier. Refund happens before we
-  // flip the booking to "cancelled" so a retry on partial failure can still
-  // see the paid row.
+  // Auto-refund if the booking was paid online and we're within the
+  // cancellation window. Skips entirely for cash-only pros
+  // (paymentStatus="manual") since the platform never touched that money —
+  // the pro refunds the student directly in whatever way they settled.
   let refundedCents: number | null = null;
   if (
     booking.paymentStatus === "paid" &&

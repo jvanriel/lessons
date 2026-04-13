@@ -7,26 +7,66 @@ Cross-reference for sprint planning and Nadine's testing feedback.
 
 ## 🔴 Go-live blockers
 
-### 1. V1 payment flow (Sprint B — the big one)
+### ~~1. V1 payment flow (Sprint B)~~ — **done** (follow-ups in 🟡)
 
-- PaymentIntent on platform Stripe account at booking confirmation (no `transfer_data`, no `application_fee_amount` — direct + SEPA model).
-- Booking wizard payment step — Stripe Checkout (simpler) vs Elements.
-- Webhook handlers: `payment_intent.succeeded` → mark booking `paymentStatus: paid`; `payment_intent.payment_failed` → mark `failed` + email student.
-- Idempotency on retries to avoid double-charging.
-- Refund flow: cancellations within window auto-refund; outside window no refund (document policy — needs decision).
-- Bancontact support (Belgian market) — already partially scaffolded in SetupIntent code.
-- Admin payouts view — aggregate paid bookings per pro, mark batches as paid out, execute SEPA transfer manually from platform account.
-- Commission decision (0% + higher subscription, or % cut).
+Shipped in commits `6e4ac54`, `07ad6e2`, `fd9bc90` on 2026-04-13. End-
+to-end flow:
 
-### 2. Pre-launch site password hardcoded
+1. **Pro side** — per-duration lesson prices live on
+   `pro_profiles.lesson_pricing` (jsonb `{ "30": 3500, "60": 6500 }`
+   in cents). Onboarding wizard + profile editor both render a per-
+   duration € input grid with pro-rated pre-fill on toggle and
+   cents↔EUR conversion at the form boundary. DB migration backfilled
+   5 preview pros + 3 prod pros with €50/h pro-rated defaults.
+2. **Student side** — booking wizard Confirm step shows the computed
+   Total in locale-aware currency (`formatPrice(cents/100, locale)`).
+   Confirm button is disabled if the pro hasn't priced the selected
+   duration, with a "pick another duration" message.
+3. **Charge** — `createBooking()` computes `priceCents = lessonPricing
+   [duration] * participantCount` plus `platformFeeCents` (from
+   `calculatePlatformFee`, now env-var driven via
+   `NEXT_PUBLIC_PLATFORM_FEE_PERCENT`, default 2.5%). Inserts the
+   booking row with `paymentStatus="pending"`, then fires
+   `stripe.paymentIntents.create` with `off_session: true`,
+   `confirm: true`, and `idempotencyKey: booking-{id}-v1`. On success
+   → `paymentStatus="paid"` + `paidAt`. On 3DS → `"requires_action"`
+   (retry UI still TBD). On failure → `"failed"` + Sentry capture,
+   booking row retained so the slot stays reserved.
+4. **Webhook reconciliation** — `payment_intent.succeeded` idempotently
+   flips to `paid`; `payment_intent.payment_failed` flips to `failed`
+   and fires `buildPaymentFailedEmail` to the student.
+5. **Refund on cancel** — `cancelBooking` checks `paymentStatus` +
+   cancellation window; if paid-and-inside-window, fires
+   `stripe.refunds.create` with `idempotencyKey: refund-{id}-v1`,
+   then flips to `paymentStatus="refunded"` + `refundedAt`. Outside-
+   window cancels were already blocked by the cancel-deadline guard
+   from the earlier locale-aware error work.
+6. **Confirmation email** — `buildStudentBookingConfirmationEmail`
+   now includes an "Amount charged" row formatted with
+   `Intl.NumberFormat` in the recipient's locale (en-GB / nl-BE /
+   fr-BE currency). Pro notification email unchanged — pros see
+   amounts in `/pro/earnings`.
+
+**Already in place from earlier sessions** (not touched this sprint):
+`MIN_LESSON_PRICE_CENTS`, Bancontact on the student SetupIntent,
+admin payouts view at `/admin/payouts` with CSV export aggregated
+per pro + IBAN, `/pro/earnings` revenue/fee display, `checkPaymentGate`
+payment-required guard during booking, `users.stripeCustomerId` on
+Stripe customer creation.
+
+**Commission decision**: stays 2.5% for now, driven by
+`NEXT_PUBLIC_PLATFORM_FEE_PERCENT` env var. Change the env var + redeploy
+to adjust without code.
+
+### 1. Pre-launch site password hardcoded
 
 - `src/middleware.ts:12` — `SITE_PASSWORD = "prolessons"`. Rotate or remove gate before public launch.
 
-### 3. DNS Belgium registrant fix
+### 2. DNS Belgium registrant fix
 
 - Deadline ~**2026-04-24** (10 days out). Vercel needs to handle. See memory `project_dns_belgium`.
 
-### 4. Pro-authored content + translations + CMS architecture review
+### 3. Pro-authored content + translations + CMS architecture review
 
 Pros author content in **multiple places** with no translation story:
 
@@ -51,6 +91,14 @@ The platform CMS (`cms_blocks`) has per-locale rows but is operated by the platf
 ## 🟡 Should-fix before launch
 
 - **`db.transaction()` wrapping in `createBooking()`** — multi-step inserts (booking + participant + relationship) can leave partial state on failure. **Blocked**: the current `drizzle-orm/neon-http` driver doesn't support multi-statement transactions. Move to `neon-serverless` (WebSocket) or `pg` first, then re-introduce. Initial attempt in commit `ea60e63` broke the booking flow (Nadine's task #12) and was reverted in `b95dc35`. The proper fix is a driver migration — see Open Questions #4.
+
+### Sprint B follow-ups (payment flow)
+
+- **Student "retry payment" UI on a failed booking.** When `createBooking` fires the PaymentIntent off-session and Stripe returns `requires_action` (3DS / SCA) or `failed`, the booking is marked `paymentStatus="requires_action"` or `"failed"` and retained. There's no student-facing UI to complete the 3DS flow or retry a declined card. Needs a small client component on `/member/bookings/[id]` that takes the PaymentIntent `client_secret` and runs `stripe.confirmCardPayment`. Lower priority since off-session usually succeeds on the first try, but the row will sit in limbo until the student interacts.
+- **Admin "mark as manually refunded" fallback.** `stripe.refunds.create` can fail (network hiccup, already-refunded, payment too old). Today that's surfaced as a console error in `cancelBooking` but the refund has to be reconciled manually in the Stripe dashboard. Add a button in `/admin/payouts` or `/admin/bookings` to set `paymentStatus="refunded"` + `refundedAt` on a booking after a manual Stripe-side refund.
+- ~~**Cash-only pros (`allowBookingWithoutPayment`)**~~ — **done**. Cash-only pros (with `allowBookingWithoutPayment=true`) now get `paymentStatus="manual"` on the booking row, the PaymentIntent is skipped entirely, no platform fee is recorded, and the confirmation email shows "Payable on site" instead of "Amount charged" (translated in EN/NL/FR). The refund-on-cancel path also skips these since `paymentStatus === "manual"` never matches the `"paid"` branch. `/pro/earnings` was already filtering by `paymentStatus = 'paid'`, so manual bookings correctly don't count toward the pro's platform-charged revenue.
+- **Smoke-test with a Stripe test card on preview** before merging Sprint B to main. Use a 4242 card on `/member/book/[slug]` with dummy student + dummy pro, then walk through: confirm → see Total → hit Confirm → watch Sentry + Stripe dashboard → check `/pro/earnings` after the webhook lands. Then cancel from `/member/bookings` within the window and verify the refund fires.
+- **Stripe webhook on production** needs the live-mode signing secret set (`STRIPE_WEBHOOK_SECRET`) and the endpoint registered in the Stripe dashboard pointing at `/api/webhooks/stripe` once Sprint B merges to main. Sandbox webhook secret is already in `.env.local` for preview.
 
 ## 🟢 Polish / post-launch
 
