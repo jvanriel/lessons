@@ -696,6 +696,7 @@ const BOOKING_STUDENT_STRINGS: Record<Locale, {
   time: string;
   duration: string;
   durationUnit: string;
+  amount: string;
   cta: string;
   helper: string;
 }> = {
@@ -710,6 +711,7 @@ const BOOKING_STUDENT_STRINGS: Record<Locale, {
     time: "Time",
     duration: "Duration",
     durationUnit: "minutes",
+    amount: "Amount charged",
     cta: "View my bookings",
     helper: "Need to cancel or reschedule? Open the booking from your dashboard.",
   },
@@ -724,6 +726,7 @@ const BOOKING_STUDENT_STRINGS: Record<Locale, {
     time: "Tijd",
     duration: "Duur",
     durationUnit: "minuten",
+    amount: "Bedrag",
     cta: "Mijn boekingen bekijken",
     helper: "Annuleren of verplaatsen? Open de boeking vanuit je dashboard.",
   },
@@ -738,6 +741,7 @@ const BOOKING_STUDENT_STRINGS: Record<Locale, {
     time: "Heure",
     duration: "Durée",
     durationUnit: "minutes",
+    amount: "Montant facturé",
     cta: "Voir mes réservations",
     helper: "Annuler ou reprogrammer ? Ouvrez la réservation depuis votre tableau de bord.",
   },
@@ -779,21 +783,30 @@ export function buildStudentBookingConfirmationEmail(opts: {
   startTime: string;
   endTime: string;
   duration: number;
+  priceCents?: number | null;
   locale: Locale;
 }): string {
   const s = BOOKING_STUDENT_STRINGS[opts.locale] ?? BOOKING_STUDENT_STRINGS.en;
+  const rows: Array<[string, string]> = [
+    [s.pro, opts.proName],
+    [s.location, opts.locationName],
+    [s.date, formatLessonDate(opts.date, opts.locale)],
+    [s.time, `${opts.startTime} – ${opts.endTime}`],
+    [s.duration, `${opts.duration} ${s.durationUnit}`],
+  ];
+  if (typeof opts.priceCents === "number" && opts.priceCents > 0) {
+    const amount = new Intl.NumberFormat(
+      opts.locale === "en" ? "en-GB" : opts.locale === "nl" ? "nl-BE" : "fr-BE",
+      { style: "currency", currency: "EUR", minimumFractionDigits: 2 }
+    ).format(opts.priceCents / 100);
+    rows.push([s.amount, amount]);
+  }
   const body = `
     <h2 style="font-family:Georgia,'Times New Roman',serif;font-size:22px;color:${COLORS.green950};margin:0 0 16px 0;font-weight:normal;">
       ${s.greeting} ${opts.firstName},
     </h2>
     <p style="margin:0 0 20px 0;">${s.body}</p>
-    ${detailsTable([
-      [s.pro, opts.proName],
-      [s.location, opts.locationName],
-      [s.date, formatLessonDate(opts.date, opts.locale)],
-      [s.time, `${opts.startTime} – ${opts.endTime}`],
-      [s.duration, `${opts.duration} ${s.durationUnit}`],
-    ])}
+    ${detailsTable(rows)}
     <p style="margin:0 0 24px 0;">
       <a href="${getBaseUrl()}/member/bookings" style="display:inline-block;background:${COLORS.gold600};color:${COLORS.white};padding:12px 28px;border-radius:6px;text-decoration:none;font-weight:500;font-size:14px;">
         ${s.cta}

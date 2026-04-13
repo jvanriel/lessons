@@ -24,7 +24,8 @@ import {
 } from "@/lib/lesson-slots";
 import { redirect } from "next/navigation";
 import crypto from "node:crypto";
-import { getStripe } from "@/lib/stripe";
+import { getStripe, calculatePlatformFee } from "@/lib/stripe";
+import * as Sentry from "@sentry/nextjs";
 import { sendEmail } from "@/lib/mail";
 import {
   buildStudentBookingConfirmationEmail,
@@ -397,6 +398,32 @@ export async function createBooking(formData: FormData) {
     return { error: t("bookErr.slotUnavailable", locale) };
   }
 
+  // Compute the lesson price from the pro's per-duration pricing table.
+  // Price is stored as EUR cents keyed by duration-in-minutes as a string.
+  const [priceRow] = await db
+    .select({
+      lessonPricing: proProfiles.lessonPricing,
+      allowBookingWithoutPayment: proProfiles.allowBookingWithoutPayment,
+    })
+    .from(proProfiles)
+    .where(eq(proProfiles.id, proProfileId))
+    .limit(1);
+  const perLessonCents = (priceRow?.lessonPricing as Record<string, number> | null)?.[
+    String(duration)
+  ];
+  const priceCents =
+    typeof perLessonCents === "number" && perLessonCents > 0
+      ? perLessonCents * participantCount
+      : null;
+  const platformFeeCents =
+    priceCents !== null ? calculatePlatformFee(priceCents) : null;
+
+  // If the pro requires payment and we couldn't compute a price, bail out.
+  // allowBookingWithoutPayment escapes this so free/manual bookings still work.
+  if (priceCents === null && !priceRow?.allowBookingWithoutPayment) {
+    return { error: t("bookErr.noPriceForDuration", locale) };
+  }
+
   // NOTE: would ideally be wrapped in db.transaction() for atomicity, but
   // the @neondatabase/serverless HTTP driver does not support multi-statement
   // transactions. Revisit when we move to the WebSocket / pg driver.
@@ -416,6 +443,9 @@ export async function createBooking(formData: FormData) {
       status: "confirmed",
       notes,
       manageToken,
+      priceCents,
+      platformFeeCents,
+      paymentStatus: priceCents !== null ? "pending" : "paid",
     })
     .returning({ id: lessonBookings.id });
 
@@ -445,6 +475,103 @@ export async function createBooking(formData: FormData) {
       source: "self",
       status: "active",
     });
+  }
+
+  // Charge the student's saved payment method off-session. The booking row
+  // already exists with paymentStatus="pending"; this flips it to "paid" on
+  // success (plus the webhook reconciles as belt-and-suspenders) or leaves
+  // it as "failed" so the student can retry from /member/bookings.
+  if (priceCents !== null) {
+    try {
+      // Look up the stripe customer + default payment method
+      const [booker] = await db
+        .select({ stripeCustomerId: users.stripeCustomerId })
+        .from(users)
+        .where(eq(users.id, session.userId))
+        .limit(1);
+      if (!booker?.stripeCustomerId) {
+        throw new Error("Student has no Stripe customer on file");
+      }
+      const stripe = getStripe();
+      const methods = await stripe.paymentMethods.list({
+        customer: booker.stripeCustomerId,
+        limit: 1,
+      });
+      const pm = methods.data[0];
+      if (!pm) {
+        throw new Error("Student has no saved payment method");
+      }
+
+      const intent = await stripe.paymentIntents.create(
+        {
+          amount: priceCents,
+          currency: "eur",
+          customer: booker.stripeCustomerId,
+          payment_method: pm.id,
+          off_session: true,
+          confirm: true,
+          description: `Lesson ${date} ${startTime}–${endTime}`,
+          metadata: {
+            bookingId: String(booking.id),
+            proProfileId: String(proProfileId),
+            userId: String(session.userId),
+          },
+        },
+        { idempotencyKey: `booking-${booking.id}-v1` }
+      );
+
+      if (intent.status === "succeeded") {
+        await db
+          .update(lessonBookings)
+          .set({
+            paymentStatus: "paid",
+            stripePaymentIntentId: intent.id,
+            paidAt: new Date(),
+            updatedAt: new Date(),
+          })
+          .where(eq(lessonBookings.id, booking.id));
+      } else if (intent.status === "requires_action") {
+        // 3D Secure / SCA — mark as requires-action; the UI can redirect
+        // the user to the client_secret flow to complete it. For v1 we
+        // leave the booking pending and tell the student to retry.
+        await db
+          .update(lessonBookings)
+          .set({
+            paymentStatus: "requires_action",
+            stripePaymentIntentId: intent.id,
+            updatedAt: new Date(),
+          })
+          .where(eq(lessonBookings.id, booking.id));
+      } else {
+        // Created but not yet confirmed — unusual but leave it pending.
+        await db
+          .update(lessonBookings)
+          .set({
+            stripePaymentIntentId: intent.id,
+            updatedAt: new Date(),
+          })
+          .where(eq(lessonBookings.id, booking.id));
+      }
+    } catch (err) {
+      // Card declined, network error, no PM on file, etc. Keep the booking
+      // row but flag it as failed so the student can retry + see the error.
+      const message =
+        err instanceof Error ? err.message : "Payment failed";
+      console.error("PaymentIntent failed for booking", booking.id, message);
+      Sentry.captureException(err, {
+        tags: { area: "booking-payment" },
+        extra: { bookingId: booking.id, priceCents, userId: session.userId },
+      });
+      await db
+        .update(lessonBookings)
+        .set({
+          paymentStatus: "failed",
+          updatedAt: new Date(),
+        })
+        .where(eq(lessonBookings.id, booking.id));
+      // Don't rollback the booking — user will see it in "failed" state
+      // and can retry from /member/bookings.
+    }
   }
 
   // Fetch the pro (with user details) for the notification + email
@@ -526,6 +653,7 @@ export async function createBooking(formData: FormData) {
         startTime,
         endTime,
         duration,
+        priceCents,
         locale: studentLocale,
       }),
       attachments: [icsAttachment],

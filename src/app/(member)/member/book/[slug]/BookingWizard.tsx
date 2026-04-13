@@ -12,6 +12,7 @@ import { cn } from "@/lib/utils";
 import { t } from "@/lib/i18n/translations";
 import type { Locale } from "@/lib/i18n";
 import { formatDate } from "@/lib/format-date";
+import { formatPrice } from "@/lib/pricing";
 
 // ─── Types ──────────────────────────────────────────
 
@@ -23,6 +24,8 @@ interface ProInfo {
   specialties: string | null;
   pricePerHour: string | null;
   lessonDurations: number[];
+  /** Real charged prices in EUR cents, keyed by duration-in-minutes string. */
+  lessonPricing: Record<string, number>;
   maxGroupSize: number;
 }
 
@@ -773,6 +776,30 @@ export function BookingWizard({ pro, locations, userDetails, showAllSteps, allow
                   {participantCount}
                 </span>
               </div>
+              {/* Price row: shows the real amount students will be charged. */}
+              {(() => {
+                const unitCents = selectedDuration
+                  ? pro.lessonPricing[String(selectedDuration)]
+                  : undefined;
+                if (!unitCents) {
+                  return (
+                    <div className="flex items-center gap-2 rounded-md bg-red-50 px-3 py-2 text-xs text-red-700">
+                      {t("book.summary.priceMissing", locale)}
+                    </div>
+                  );
+                }
+                const totalCents = unitCents * participantCount;
+                return (
+                  <div className="flex items-baseline justify-between border-b border-green-100 pb-3">
+                    <span className="text-sm text-green-600">
+                      {t("book.summary.total", locale)}
+                    </span>
+                    <span className="font-display text-lg font-semibold text-green-900">
+                      {formatPrice(totalCents / 100, locale)}
+                    </span>
+                  </div>
+                );
+              })()}
               <div className="flex justify-between">
                 <span className="text-sm text-green-600">{t("book.summary.bookedBy", locale)}</span>
                 <span className="text-sm font-medium text-green-900">
@@ -811,7 +838,12 @@ export function BookingWizard({ pro, locations, userDetails, showAllSteps, allow
               <Button
                 className="bg-gold-600 text-white hover:bg-gold-500"
                 onClick={handleConfirm}
-                disabled={isPending || (!hasPaymentMethod && !allowBookingWithoutPayment)}
+                disabled={
+                  isPending ||
+                  (!hasPaymentMethod && !allowBookingWithoutPayment) ||
+                  !selectedDuration ||
+                  !pro.lessonPricing[String(selectedDuration)]
+                }
               >
                 {isPending ? t("book.confirming", locale) : t("book.confirmBooking", locale)}
               </Button>

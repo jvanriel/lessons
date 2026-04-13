@@ -47,6 +47,7 @@ export default async function BookingPage({
       specialties: proProfiles.specialties,
       pricePerHour: proProfiles.pricePerHour,
       lessonDurations: proProfiles.lessonDurations,
+      lessonPricing: proProfiles.lessonPricing,
       bookingEnabled: proProfiles.bookingEnabled,
       published: proProfiles.published,
       maxGroupSize: proProfiles.maxGroupSize,
@@ -132,7 +133,9 @@ export default async function BookingPage({
           photoUrl: pro.photoUrl,
           specialties: pro.specialties,
           pricePerHour: pro.pricePerHour,
-          lessonDurations: pro.lessonDurations,
+          lessonDurations: pro.lessonDurations as number[],
+          lessonPricing:
+            (pro.lessonPricing as Record<string, number> | null) ?? {},
           maxGroupSize: pro.maxGroupSize,
         }}
         locations={proLocs}

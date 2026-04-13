@@ -16,6 +16,7 @@ import { checkCancellationAllowed, buildCancelIcs } from "@/lib/lesson-slots";
 import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import { sendEmail } from "@/lib/mail";
+import { getStripe } from "@/lib/stripe";
 import { resolveLocale, type Locale } from "@/lib/i18n";
 import { emailLayout } from "@/lib/email-templates";
 import { getLocale } from "@/lib/locale";
@@ -179,6 +180,45 @@ export async function cancelBooking(bookingId: number) {
     };
   }
 
+  // Auto-refund if the booking was paid and we're within the cancellation
+  // window (check.canCancel === true above). Outside-window cancels fall
+  // through to the `canCancel` rejection earlier. Refund happens before we
+  // flip the booking to "cancelled" so a retry on partial failure can still
+  // see the paid row.
+  let refundedCents: number | null = null;
+  if (
+    booking.paymentStatus === "paid" &&
+    booking.stripePaymentIntentId &&
+    booking.priceCents &&
+    booking.priceCents > 0
+  ) {
+    try {
+      const stripe = getStripe();
+      await stripe.refunds.create(
+        {
+          payment_intent: booking.stripePaymentIntentId,
+          metadata: {
+            bookingId: String(bookingId),
+            cancelledBy: "student",
+          },
+        },
+        { idempotencyKey: `refund-${bookingId}-v1` }
+      );
+      refundedCents = booking.priceCents;
+      await db
+        .update(lessonBookings)
+        .set({
+          paymentStatus: "refunded",
+          refundedAt: new Date(),
+        })
+        .where(eq(lessonBookings.id, bookingId));
+    } catch (err) {
+      console.error("Refund failed for booking", bookingId, err);
+      // Don't block the cancel — the booking still gets cancelled, refund
+      // will need manual reconciliation via admin.
+    }
+  }
+
   // Cancel the booking
   await db
     .update(lessonBookings)
@@ -189,6 +229,7 @@ export async function cancelBooking(bookingId: number) {
       updatedAt: new Date(),
     })
     .where(eq(lessonBookings.id, bookingId));
+  void refundedCents; // may be surfaced to the UI in a follow-up
 
   // Get student details for emails + notification
   const [student] = await db

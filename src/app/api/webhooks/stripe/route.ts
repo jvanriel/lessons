@@ -3,7 +3,7 @@ import { headers } from "next/headers";
 import Stripe from "stripe";
 import { getStripe } from "@/lib/stripe";
 import { db } from "@/lib/db";
-import { proProfiles, stripeEvents, users } from "@/lib/db/schema";
+import { proProfiles, stripeEvents, users, lessonBookings } from "@/lib/db/schema";
 import { eq } from "drizzle-orm";
 import { sendEmail } from "@/lib/mail";
 import {
@@ -83,6 +83,12 @@ export async function POST(request: NextRequest) {
         break;
       case "invoice.payment_failed":
         await handleInvoicePaymentFailed(event.data.object);
+        break;
+      case "payment_intent.succeeded":
+        await handlePaymentIntentSucceeded(event.data.object);
+        break;
+      case "payment_intent.payment_failed":
+        await handlePaymentIntentFailed(event.data.object);
         break;
       default:
         console.log(`Unhandled webhook event: ${event.type}`);
@@ -329,5 +335,98 @@ async function handleInvoicePaymentFailed(invoice: Stripe.Invoice) {
   }
 
   console.log(`Payment failed for pro ${profile.id}`);
+}
+
+// ─── Lesson PaymentIntent handlers (Sprint B) ───────────
+
+async function handlePaymentIntentSucceeded(intent: Stripe.PaymentIntent) {
+  const bookingIdRaw = (intent.metadata ?? {})["bookingId"];
+  if (!bookingIdRaw) {
+    // PaymentIntents for non-booking flows (if any) are ignored here.
+    return;
+  }
+  const bookingId = parseInt(bookingIdRaw, 10);
+  if (isNaN(bookingId)) return;
+
+  // Idempotent: only flip to "paid" if we haven't already.
+  const [booking] = await db
+    .select({
+      id: lessonBookings.id,
+      paymentStatus: lessonBookings.paymentStatus,
+    })
+    .from(lessonBookings)
+    .where(eq(lessonBookings.id, bookingId))
+    .limit(1);
+  if (!booking) {
+    console.warn(`payment_intent.succeeded for unknown booking ${bookingId}`);
+    return;
+  }
+  if (booking.paymentStatus === "paid") return;
+
+  await db
+    .update(lessonBookings)
+    .set({
+      paymentStatus: "paid",
+      stripePaymentIntentId: intent.id,
+      paidAt: new Date(),
+      updatedAt: new Date(),
+    })
+    .where(eq(lessonBookings.id, bookingId));
+
+  console.log(`Booking ${bookingId} marked paid (PI ${intent.id})`);
+}
+
+async function handlePaymentIntentFailed(intent: Stripe.PaymentIntent) {
+  const bookingIdRaw = (intent.metadata ?? {})["bookingId"];
+  if (!bookingIdRaw) return;
+  const bookingId = parseInt(bookingIdRaw, 10);
+  if (isNaN(bookingId)) return;
+
+  const [booking] = await db
+    .select({
+      id: lessonBookings.id,
+      paymentStatus: lessonBookings.paymentStatus,
+      bookedById: lessonBookings.bookedById,
+      date: lessonBookings.date,
+      startTime: lessonBookings.startTime,
+    })
+    .from(lessonBookings)
+    .where(eq(lessonBookings.id, bookingId))
+    .limit(1);
+  if (!booking) return;
+  if (booking.paymentStatus === "paid") return; // already succeeded somehow
+
+  await db
+    .update(lessonBookings)
+    .set({
+      paymentStatus: "failed",
+      stripePaymentIntentId: intent.id,
+      updatedAt: new Date(),
+    })
+    .where(eq(lessonBookings.id, bookingId));
+
+  // Nudge the student — fire-and-forget.
+  const [student] = await db
+    .select({
+      firstName: users.firstName,
+      email: users.email,
+      preferredLocale: users.preferredLocale,
+    })
+    .from(users)
+    .where(eq(users.id, booking.bookedById))
+    .limit(1);
+  if (student) {
+    const locale = resolveLocale(student.preferredLocale);
+    sendEmail({
+      to: student.email,
+      subject: getPaymentFailedSubject(locale),
+      html: buildPaymentFailedEmail({
+        firstName: student.firstName,
+        locale,
+      }),
+    }).catch(() => {});
+  }
+
+  console.log(`Booking ${bookingId} payment failed (PI ${intent.id})`);
 }
 
