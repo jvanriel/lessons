@@ -831,13 +831,23 @@ export default function StudentOnboardingWizard({
 
   async function handleMaybeLater() {
     if (!isAuthenticated) {
-      router.push("/");
+      // Hard navigation guarantees we exit even if React Router state is stale.
+      window.location.assign("/");
       return;
     }
     // Authenticated: mark onboarding complete so middleware doesn't redirect
     // them back to the wizard. They can fill in details later from /member/profile.
-    await saveStep("complete", { generatedPassword: null });
-    router.push("/member/dashboard");
+    const result = await saveStep("complete", { generatedPassword: null });
+    if (!result) {
+      // saveStep already set an error; bail so the user sees it instead of
+      // bouncing through a redirect that may loop back via middleware.
+      return;
+    }
+    // Hard navigation: router.push relies on React Router state which can
+    // be stale, and the middleware re-checks onboarding_completed_at on
+    // arrival. A full navigation guarantees a fresh server request that
+    // sees the just-committed DB row.
+    window.location.assign("/member/dashboard");
   }
 
   return (

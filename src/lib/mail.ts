@@ -1,5 +1,7 @@
 import { gmail } from "@googleapis/gmail";
 import { JWT } from "google-auth-library";
+import * as Sentry from "@sentry/nextjs";
+import { logEvent } from "@/lib/events";
 
 const SEND_AS = process.env.GMAIL_SEND_AS || "noreply@golflessons.be";
 
@@ -51,10 +53,28 @@ export async function sendEmail({
       requestBody: { raw: encoded },
     });
 
+    logEvent({
+      type: "email.sent",
+      level: "info",
+      payload: { to, subject, messageId: res.data.id ?? null },
+    }).catch(() => {});
+
     return { messageId: res.data.id ?? undefined };
   } catch (err: unknown) {
     const message = err instanceof Error ? err.message : "Failed to send email";
     console.error("sendEmail error:", message);
+    // Loud failure: write to events table AND capture in Sentry. Callers
+    // can still .catch() to keep the request non-blocking, but the failure
+    // is now visible in /dev/logs and /dev/sentry instead of vanishing.
+    logEvent({
+      type: "email.failed",
+      level: "error",
+      payload: { to, subject, error: message },
+    }).catch(() => {});
+    Sentry.captureException(err, {
+      tags: { area: "email" },
+      extra: { to, subject },
+    });
     return { error: message };
   }
 }
