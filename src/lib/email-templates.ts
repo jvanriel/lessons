@@ -5,7 +5,7 @@
  * Georgia serves as the serif fallback for Cormorant Garamond.
  */
 
-import type { Locale } from "@/lib/i18n";
+import { DEFAULT_LOCALE, type Locale } from "@/lib/i18n";
 
 function getBaseUrl(): string {
   if (process.env.NEXT_PUBLIC_APP_URL) return process.env.NEXT_PUBLIC_APP_URL;
@@ -132,7 +132,7 @@ function diamondDivider(color = COLORS.muted) {
 /** Branded email footer. */
 export function emailFooter(
   unsubscribeUrl?: string,
-  locale: Locale = "en"
+  locale: Locale = DEFAULT_LOCALE
 ) {
   const strings = EMAIL_STRINGS[locale] ?? EMAIL_STRINGS.en;
   const unsubscribeRow = unsubscribeUrl
@@ -178,7 +178,7 @@ export function emailFooter(
 export function emailLayout(
   body: string,
   unsubscribeUrl?: string,
-  locale: Locale = "en"
+  locale: Locale = DEFAULT_LOCALE
 ) {
   return `<!DOCTYPE html>
 <html lang="${locale}">

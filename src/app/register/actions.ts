@@ -8,7 +8,7 @@ import { hashPassword, setSessionCookie } from "@/lib/auth";
 import { createNotification } from "@/lib/notifications";
 import { sendEmail } from "@/lib/mail";
 import { buildWelcomeEmail, getWelcomeSubject } from "@/lib/email-templates";
-import { resolveLocale } from "@/lib/i18n";
+import { getLocale } from "@/lib/locale";
 
 export async function register(
   _prevState: { error: string } | null,
@@ -95,9 +95,14 @@ export async function register(
     metadata: { userId, email, accountType },
   }).catch(() => {});
 
-  // Send welcome email
-  const locale = resolveLocale("en"); // new users default to en
+  // Send welcome email in the user's current UI language (from cookie)
+  const locale = await getLocale();
   const acctType = accountType === "pro" ? "pro" : "student";
+  // Persist so future emails (cron reminders, webhooks) use the same locale
+  await db
+    .update(users)
+    .set({ preferredLocale: locale })
+    .where(eq(users.id, userId));
   sendEmail({
     to: email,
     subject: getWelcomeSubject(acctType, locale),

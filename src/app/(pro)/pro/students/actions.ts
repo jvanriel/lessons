@@ -19,6 +19,7 @@ import { requireProProfile } from "@/lib/pro";
 import { hashPassword } from "@/lib/auth";
 import { sendEmail } from "@/lib/mail";
 import { buildInviteEmail, getEmailStrings } from "@/lib/email-templates";
+import { getLocale } from "@/lib/locale";
 import { resolveLocale } from "@/lib/i18n";
 import { createNotification } from "@/lib/notifications";
 import {
@@ -158,9 +159,11 @@ export async function inviteStudent(
     status: source === "pro_added" ? "active" : (tempPassword ? "pending" : "active"),
   });
 
-  // Send invite email if new user was created
+  // Send invite email if new user was created. Use the inviting pro's
+  // locale (from their session cookie) since the student account is fresh
+  // and has no preferredLocale yet.
   if (tempPassword) {
-    const locale = resolveLocale("en");
+    const locale = await getLocale();
     const strings = getEmailStrings(locale);
 
     const html = buildInviteEmail({
@@ -278,6 +281,7 @@ export async function resetStudentPassword(proStudentId: number) {
       userId: proStudents.userId,
       firstName: users.firstName,
       email: users.email,
+      preferredLocale: users.preferredLocale,
     })
     .from(proStudents)
     .innerJoin(users, eq(proStudents.userId, users.id))
@@ -299,8 +303,8 @@ export async function resetStudentPassword(proStudentId: number) {
     .set({ password: hashed })
     .where(eq(users.id, rel.userId));
 
-  // Send email with new password
-  const locale = resolveLocale("en");
+  // Send email in the student's preferred language
+  const locale = resolveLocale(rel.preferredLocale);
   const strings = getEmailStrings(locale);
   const html = buildInviteEmail({
     firstName: rel.firstName,
@@ -312,7 +316,7 @@ export async function resetStudentPassword(proStudentId: number) {
 
   sendEmail({
     to: rel.email,
-    subject: "Your password has been reset — Golf Lessons",
+    subject: strings.resetSubject,
     html,
   }).catch(() => {});
 
