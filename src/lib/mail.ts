@@ -6,6 +6,23 @@ import { logEvent } from "@/lib/events";
 const SEND_AS = process.env.GMAIL_SEND_AS || "noreply@golflessons.be";
 
 /**
+ * Strip surrounding double/single quotes and trim whitespace. Used for
+ * env vars that might be stored with the quotes included (a common
+ * Vercel paste mistake).
+ */
+function stripQuotesAndTrim(raw: string | undefined): string {
+  if (!raw) return "";
+  let v = raw.trim();
+  if (
+    (v.startsWith('"') && v.endsWith('"')) ||
+    (v.startsWith("'") && v.endsWith("'"))
+  ) {
+    v = v.slice(1, -1).trim();
+  }
+  return v;
+}
+
+/**
  * Normalize a PEM private key from an env var. Tolerates the three common
  * paste mistakes:
  *  - Surrounding double or single quotes ("...key..." → ...key...)
@@ -18,26 +35,17 @@ const SEND_AS = process.env.GMAIL_SEND_AS || "noreply@golflessons.be";
  * during her registration test (Sentry SENTRY-ORANGE-ZEBRA-7/8).
  */
 function normalizePrivateKey(raw: string | undefined): string {
-  if (!raw) return "";
-  let key = raw.trim();
-  if (
-    (key.startsWith('"') && key.endsWith('"')) ||
-    (key.startsWith("'") && key.endsWith("'"))
-  ) {
-    key = key.slice(1, -1).trim();
-  }
   // Convert literal \n escape sequences to actual newlines. Real newlines
   // pass through this regex unchanged.
-  key = key.replace(/\\n/g, "\n");
-  return key;
+  return stripQuotesAndTrim(raw).replace(/\\n/g, "\n");
 }
 
 function getGmailClient() {
   const auth = new JWT({
-    email: process.env.GOOGLE_SERVICE_ACCOUNT_EMAIL,
+    email: stripQuotesAndTrim(process.env.GOOGLE_SERVICE_ACCOUNT_EMAIL),
     key: normalizePrivateKey(process.env.GOOGLE_SERVICE_ACCOUNT_PRIVATE_KEY),
     scopes: ["https://www.googleapis.com/auth/gmail.send"],
-    subject: SEND_AS,
+    subject: stripQuotesAndTrim(SEND_AS),
   });
   return gmail({ version: "v1", auth });
 }
