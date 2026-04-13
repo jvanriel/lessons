@@ -9,6 +9,9 @@ import {
   createBooking,
 } from "../actions";
 import { cn } from "@/lib/utils";
+import { t } from "@/lib/i18n/translations";
+import type { Locale } from "@/lib/i18n";
+import { formatDate } from "@/lib/format-date";
 
 // ─── Types ──────────────────────────────────────────
 
@@ -46,13 +49,31 @@ interface Props {
   showAllSteps?: boolean;
   allowBookingWithoutPayment?: boolean;
   hasPaymentMethod?: boolean;
+  locale: Locale;
 }
 
-const STEPS = ["Location", "Duration", "Date", "Time", "Details", "Confirm"];
+const STEP_KEYS = [
+  "book.step.location",
+  "book.step.duration",
+  "book.step.date",
+  "book.step.time",
+  "book.step.details",
+  "book.step.confirm",
+] as const;
+
+const DAY_KEYS = [
+  "book.day.mon",
+  "book.day.tue",
+  "book.day.wed",
+  "book.day.thu",
+  "book.day.fri",
+  "book.day.sat",
+  "book.day.sun",
+] as const;
 
 // ─── Component ──────────────────────────────────────
 
-export function BookingWizard({ pro, locations, userDetails, showAllSteps, allowBookingWithoutPayment, hasPaymentMethod }: Props) {
+export function BookingWizard({ pro, locations, userDetails, showAllSteps, allowBookingWithoutPayment, hasPaymentMethod, locale }: Props) {
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
 
@@ -209,7 +230,7 @@ export function BookingWizard({ pro, locations, userDetails, showAllSteps, allow
 
   function goToConfirm() {
     if (!firstName.trim() || !lastName.trim() || !email.trim()) {
-      setError("Please fill in your name and email.");
+      setError(t("book.errorFillDetails", locale));
       return;
     }
     setError(null);
@@ -277,7 +298,7 @@ export function BookingWizard({ pro, locations, userDetails, showAllSteps, allow
   }
 
   function formatMonthYear(d: Date) {
-    return d.toLocaleDateString("en-US", { month: "long", year: "numeric" });
+    return formatDate(d, locale, { month: "long", year: "numeric" });
   }
 
   function prevMonth() {
@@ -307,7 +328,7 @@ export function BookingWizard({ pro, locations, userDetails, showAllSteps, allow
         )}
         <div>
           <h1 className="font-display text-2xl font-semibold text-green-900">
-            Book a lesson with {pro.displayName}
+            {t("book.title", locale)} {pro.displayName}
           </h1>
           {pro.specialties && (
             <p className="text-sm text-green-600">{pro.specialties}</p>
@@ -317,8 +338,8 @@ export function BookingWizard({ pro, locations, userDetails, showAllSteps, allow
 
       {/* Stepper */}
       <div className="mb-8 flex items-center gap-1">
-        {STEPS.map((label, i) => (
-          <div key={label} className="flex items-center gap-1">
+        {STEP_KEYS.map((key, i) => (
+          <div key={key} className="flex items-center gap-1">
             <div
               className={cn(
                 "flex h-7 w-7 items-center justify-center rounded-full text-xs font-medium",
@@ -353,9 +374,9 @@ export function BookingWizard({ pro, locations, userDetails, showAllSteps, allow
                 i <= step ? "text-green-800" : "text-green-400"
               )}
             >
-              {label}
+              {t(key, locale)}
             </span>
-            {i < STEPS.length - 1 && (
+            {i < STEP_KEYS.length - 1 && (
               <div
                 className={cn(
                   "mx-1 h-px w-4 sm:w-6",
@@ -380,7 +401,7 @@ export function BookingWizard({ pro, locations, userDetails, showAllSteps, allow
         {step === 0 && (
           <div>
             <h2 className="mb-4 font-display text-xl font-medium text-green-800">
-              Choose a location
+              {t("book.chooseLocation", locale)}
             </h2>
             <div className="grid gap-3 sm:grid-cols-2">
               {locations.map((loc) => (
@@ -408,7 +429,7 @@ export function BookingWizard({ pro, locations, userDetails, showAllSteps, allow
             </div>
             {locations.length === 0 && (
               <p className="text-sm text-green-500">
-                No locations available for this pro.
+                {t("book.noLocations", locale)}
               </p>
             )}
           </div>
@@ -418,7 +439,7 @@ export function BookingWizard({ pro, locations, userDetails, showAllSteps, allow
         {step === 1 && (
           <div>
             <h2 className="mb-4 font-display text-xl font-medium text-green-800">
-              Choose lesson duration
+              {t("book.chooseDuration", locale)}
             </h2>
             <div className="grid gap-3 sm:grid-cols-3">
               {pro.lessonDurations.map((d) => (
@@ -430,13 +451,13 @@ export function BookingWizard({ pro, locations, userDetails, showAllSteps, allow
                   <div className="text-2xl font-semibold text-green-900">
                     {d}
                   </div>
-                  <div className="text-sm text-green-600">minutes</div>
+                  <div className="text-sm text-green-600">{t("book.minutes", locale)}</div>
                 </button>
               ))}
             </div>
             <div className="mt-6">
               <Button variant="ghost" onClick={goBack}>
-                Back
+                {t("book.back", locale)}
               </Button>
             </div>
           </div>
@@ -446,7 +467,7 @@ export function BookingWizard({ pro, locations, userDetails, showAllSteps, allow
         {step === 2 && (
           <div>
             <h2 className="mb-4 font-display text-xl font-medium text-green-800">
-              Pick a date
+              {t("book.pickDate", locale)}
             </h2>
             {loadingDates ? (
               <div className="flex items-center gap-2 text-sm text-green-600">
@@ -469,7 +490,7 @@ export function BookingWizard({ pro, locations, userDetails, showAllSteps, allow
                     d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"
                   />
                 </svg>
-                Loading available dates...
+                {t("book.loadingDates", locale)}
               </div>
             ) : (
               <div>
@@ -499,13 +520,11 @@ export function BookingWizard({ pro, locations, userDetails, showAllSteps, allow
                 </div>
                 {/* Day headers */}
                 <div className="mb-1 grid grid-cols-7 text-center text-xs font-medium text-green-500">
-                  {["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"].map(
-                    (d) => (
-                      <div key={d} className="py-1">
-                        {d}
-                      </div>
-                    )
-                  )}
+                  {DAY_KEYS.map((dk) => (
+                    <div key={dk} className="py-1">
+                      {t(dk, locale)}
+                    </div>
+                  ))}
                 </div>
                 {/* Days grid */}
                 <div className="grid grid-cols-7 gap-1">
@@ -533,14 +552,14 @@ export function BookingWizard({ pro, locations, userDetails, showAllSteps, allow
                 </div>
                 {availableDates.length === 0 && (
                   <p className="mt-4 text-sm text-green-500">
-                    No dates available in the booking horizon.
+                    {t("book.noDates", locale)}
                   </p>
                 )}
               </div>
             )}
             <div className="mt-6">
               <Button variant="ghost" onClick={goBack}>
-                Back
+                {t("book.back", locale)}
               </Button>
             </div>
           </div>
@@ -550,15 +569,10 @@ export function BookingWizard({ pro, locations, userDetails, showAllSteps, allow
         {step === 3 && (
           <div>
             <h2 className="mb-4 font-display text-xl font-medium text-green-800">
-              Choose a time
+              {t("book.chooseTime", locale)}
             </h2>
             <p className="mb-4 text-sm text-green-600">
-              {new Date(selectedDate + "T00:00:00").toLocaleDateString("en-US", {
-                weekday: "long",
-                day: "numeric",
-                month: "long",
-                year: "numeric",
-              })}
+              {selectedDate && formatDate(selectedDate, locale)}
             </p>
             {loadingSlots ? (
               <div className="flex items-center gap-2 text-sm text-green-600">
@@ -581,7 +595,7 @@ export function BookingWizard({ pro, locations, userDetails, showAllSteps, allow
                     d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"
                   />
                 </svg>
-                Loading time slots...
+                {t("book.loadingSlots", locale)}
               </div>
             ) : (
               <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
@@ -604,12 +618,12 @@ export function BookingWizard({ pro, locations, userDetails, showAllSteps, allow
             )}
             {!loadingSlots && availableSlots.length === 0 && (
               <p className="text-sm text-green-500">
-                No time slots available for this date.
+                {t("book.noSlots", locale)}
               </p>
             )}
             <div className="mt-6">
               <Button variant="ghost" onClick={goBack}>
-                Back
+                {t("book.back", locale)}
               </Button>
             </div>
           </div>
@@ -619,13 +633,13 @@ export function BookingWizard({ pro, locations, userDetails, showAllSteps, allow
         {step === 4 && (
           <div>
             <h2 className="mb-4 font-display text-xl font-medium text-green-800">
-              Your details
+              {t("book.yourDetails", locale)}
             </h2>
             <div className="space-y-4">
               <div className="grid gap-4 sm:grid-cols-2">
                 <div>
                   <label className="mb-1 block text-sm font-medium text-green-700">
-                    First name *
+                    {t("book.firstName", locale)} *
                   </label>
                   <input
                     type="text"
@@ -636,7 +650,7 @@ export function BookingWizard({ pro, locations, userDetails, showAllSteps, allow
                 </div>
                 <div>
                   <label className="mb-1 block text-sm font-medium text-green-700">
-                    Last name *
+                    {t("book.lastName", locale)} *
                   </label>
                   <input
                     type="text"
@@ -648,7 +662,7 @@ export function BookingWizard({ pro, locations, userDetails, showAllSteps, allow
               </div>
               <div>
                 <label className="mb-1 block text-sm font-medium text-green-700">
-                  Email *
+                  {t("book.email", locale)} *
                 </label>
                 <input
                   type="email"
@@ -659,7 +673,7 @@ export function BookingWizard({ pro, locations, userDetails, showAllSteps, allow
               </div>
               <div>
                 <label className="mb-1 block text-sm font-medium text-green-700">
-                  Phone
+                  {t("book.phone", locale)}
                 </label>
                 <input
                   type="tel"
@@ -670,7 +684,7 @@ export function BookingWizard({ pro, locations, userDetails, showAllSteps, allow
               </div>
               <div>
                 <label className="mb-1 block text-sm font-medium text-green-700">
-                  Number of participants
+                  {t("book.participants", locale)}
                 </label>
                 <select
                   value={participantCount}
@@ -682,7 +696,7 @@ export function BookingWizard({ pro, locations, userDetails, showAllSteps, allow
                   {Array.from({ length: pro.maxGroupSize }, (_, i) => i + 1).map(
                     (n) => (
                       <option key={n} value={n}>
-                        {n} {n === 1 ? "participant" : "participants"}
+                        {n} {n === 1 ? t("book.participant", locale) : t("book.participantsPlural", locale)}
                       </option>
                     )
                   )}
@@ -690,26 +704,26 @@ export function BookingWizard({ pro, locations, userDetails, showAllSteps, allow
               </div>
               <div>
                 <label className="mb-1 block text-sm font-medium text-green-700">
-                  Notes (optional)
+                  {t("book.notes", locale)}
                 </label>
                 <textarea
                   value={notes}
                   onChange={(e) => setNotes(e.target.value)}
                   rows={3}
                   className="w-full rounded-lg border border-green-200 bg-white px-3 py-2 text-sm text-green-900 outline-none focus:border-gold-400 focus:ring-2 focus:ring-gold-400/30"
-                  placeholder="Any specific requests or information for the pro..."
+                  placeholder={t("book.notesPlaceholder", locale)}
                 />
               </div>
             </div>
             <div className="mt-6 flex items-center gap-3">
               <Button variant="ghost" onClick={goBack}>
-                Back
+                {t("book.back", locale)}
               </Button>
               <Button
                 className="bg-gold-600 text-white hover:bg-gold-500"
                 onClick={goToConfirm}
               >
-                Review booking
+                {t("book.reviewBooking", locale)}
               </Button>
             </div>
           </div>
@@ -719,64 +733,55 @@ export function BookingWizard({ pro, locations, userDetails, showAllSteps, allow
         {step === 5 && (
           <div>
             <h2 className="mb-4 font-display text-xl font-medium text-green-800">
-              Confirm your booking
+              {t("book.confirmTitle", locale)}
             </h2>
             <div className="space-y-3 rounded-xl border border-green-200 bg-white p-5">
               <div className="flex justify-between border-b border-green-100 pb-3">
-                <span className="text-sm text-green-600">Pro</span>
+                <span className="text-sm text-green-600">{t("book.summary.pro", locale)}</span>
                 <span className="text-sm font-medium text-green-900">
                   {pro.displayName}
                 </span>
               </div>
               <div className="flex justify-between border-b border-green-100 pb-3">
-                <span className="text-sm text-green-600">Location</span>
+                <span className="text-sm text-green-600">{t("book.summary.location", locale)}</span>
                 <span className="text-sm font-medium text-green-900">
                   {selectedLocation?.name}
                   {selectedLocation?.city && `, ${selectedLocation.city}`}
                 </span>
               </div>
               <div className="flex justify-between border-b border-green-100 pb-3">
-                <span className="text-sm text-green-600">Date</span>
+                <span className="text-sm text-green-600">{t("book.summary.date", locale)}</span>
                 <span className="text-sm font-medium text-green-900">
-                  {selectedDate &&
-                    new Date(selectedDate + "T00:00:00").toLocaleDateString(
-                      "en-US",
-                      {
-                        weekday: "long",
-                        day: "numeric",
-                        month: "long",
-                        year: "numeric",
-                      }
-                    )}
+                  {selectedDate && formatDate(selectedDate, locale)}
                 </span>
               </div>
               <div className="flex justify-between border-b border-green-100 pb-3">
-                <span className="text-sm text-green-600">Time</span>
+                <span className="text-sm text-green-600">{t("book.summary.time", locale)}</span>
                 <span className="text-sm font-medium text-green-900">
                   {selectedSlot?.startTime} - {selectedSlot?.endTime}
                 </span>
               </div>
               <div className="flex justify-between border-b border-green-100 pb-3">
-                <span className="text-sm text-green-600">Duration</span>
+                <span className="text-sm text-green-600">{t("book.summary.duration", locale)}</span>
                 <span className="text-sm font-medium text-green-900">
-                  {selectedDuration} minutes
+                  {selectedDuration} {t("book.minutes", locale)}
                 </span>
               </div>
               <div className="flex justify-between border-b border-green-100 pb-3">
-                <span className="text-sm text-green-600">Participants</span>
+                <span className="text-sm text-green-600">{t("book.summary.participants", locale)}</span>
                 <span className="text-sm font-medium text-green-900">
                   {participantCount}
                 </span>
               </div>
               <div className="flex justify-between">
-                <span className="text-sm text-green-600">Booked by</span>
+                <span className="text-sm text-green-600">{t("book.summary.bookedBy", locale)}</span>
                 <span className="text-sm font-medium text-green-900">
                   {firstName} {lastName} ({email})
                 </span>
               </div>
               {notes && (
                 <div className="border-t border-green-100 pt-3">
-                  <span className="text-sm text-green-600">Notes</span>
+                  <span className="text-sm text-green-600">{t("book.summary.notes", locale)}</span>
                   <p className="mt-1 text-sm text-green-800">{notes}</p>
                 </div>
               )}
@@ -784,31 +789,31 @@ export function BookingWizard({ pro, locations, userDetails, showAllSteps, allow
             {/* Payment method messaging */}
             {!hasPaymentMethod && !allowBookingWithoutPayment && (
               <div className="mt-4 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
-                A payment method is required to book with this pro.{" "}
+                {t("book.paymentRequired", locale)}{" "}
                 <a href="/member/profile" className="font-medium underline hover:text-red-900">
-                  Add one in your profile
+                  {t("book.addInProfile", locale)}
                 </a>
               </div>
             )}
             {!hasPaymentMethod && allowBookingWithoutPayment && (
               <div className="mt-4 rounded-lg border border-gold-200 bg-gold-50 px-4 py-3 text-sm text-gold-800">
-                No payment method on file.{" "}
+                {t("book.paymentOptional", locale)}{" "}
                 <a href="/member/profile" className="font-medium underline hover:text-gold-900">
-                  Add one in your profile
+                  {t("book.addInProfile", locale)}
                 </a>{" "}
-                to enable Quick Book for faster future bookings.
+                {t("book.enableQuickBookHint", locale)}
               </div>
             )}
             <div className="mt-6 flex items-center gap-3">
               <Button variant="ghost" onClick={goBack}>
-                Back
+                {t("book.back", locale)}
               </Button>
               <Button
                 className="bg-gold-600 text-white hover:bg-gold-500"
                 onClick={handleConfirm}
                 disabled={isPending || (!hasPaymentMethod && !allowBookingWithoutPayment)}
               >
-                {isPending ? "Booking..." : "Confirm booking"}
+                {isPending ? t("book.confirming", locale) : t("book.confirmBooking", locale)}
               </Button>
             </div>
           </div>

@@ -422,6 +422,21 @@ function TaskDetailPanel({
               contextId={task.id}
               userId={currentUserId}
               mentionUsers={adminUsers}
+              onUpload={async (file: File) => {
+                const formData = new FormData();
+                formData.append("file", file);
+                formData.append("taskId", String(task.id));
+                const res = await fetch("/api/admin/tasks/upload", {
+                  method: "POST",
+                  body: formData,
+                });
+                if (!res.ok) {
+                  const err = await res.json().catch(() => ({ error: "Upload failed" }));
+                  console.error("Task upload error:", err.error);
+                  return null;
+                }
+                return res.json();
+              }}
             />
           )}
           {activeTab === "share" && (

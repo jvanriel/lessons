@@ -6,6 +6,7 @@ import { getSession } from "@/lib/auth";
 import { BookingWizard } from "./BookingWizard";
 import { getStripe } from "@/lib/stripe";
 import { BookingRefreshListener } from "@/components/BookingRefreshListener";
+import { getLocale } from "@/lib/locale";
 
 export async function generateMetadata({
   params,
@@ -35,6 +36,7 @@ export default async function BookingPage({
 }) {
   const { slug } = await params;
   const { full } = await searchParams;
+  const locale = await getLocale();
 
   const [pro] = await db
     .select({
@@ -137,6 +139,7 @@ export default async function BookingPage({
         userDetails={userDetails}
         showAllSteps={full === "1"}
         allowBookingWithoutPayment={pro.allowBookingWithoutPayment}
+        locale={locale}
         hasPaymentMethod={hasPaymentMethod}
       />
     </div>
