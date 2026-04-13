@@ -8,6 +8,7 @@ import { getLocale } from "@/lib/locale";
 import { formatDate as formatDateHelper } from "@/lib/format-date";
 import type { Locale } from "@/lib/i18n";
 import { t } from "@/lib/i18n/translations";
+import { PLATFORM_FEE_PERCENT } from "@/lib/stripe";
 
 export const metadata = { title: "Earnings — Golf Lessons" };
 
@@ -160,7 +161,7 @@ export default async function EarningsPage() {
             {t("proEarnings.platformFee", locale)}
           </p>
           <p className="mt-2 font-display text-2xl font-bold text-green-900">
-            2.5%
+            {PLATFORM_FEE_PERCENT}%
           </p>
           <p className="mt-1 text-xs text-green-600">
             {t("proEarnings.platformFeeNote", locale)}

@@ -2,6 +2,7 @@
 
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
+import { PLATFORM_FEE_PERCENT } from "@/lib/stripe";
 
 interface Payout {
   proProfileId: number;
@@ -123,7 +124,7 @@ export default function PayoutsClient({
         </div>
         <div className="rounded-xl border border-green-200 bg-white p-5">
           <p className="text-xs font-medium uppercase text-green-500">
-            Platform fees (2.5%)
+            Platform fees ({PLATFORM_FEE_PERCENT}%)
           </p>
           <p className="mt-1 font-display text-2xl font-bold text-gold-700">
             {formatCents(totalFees)}

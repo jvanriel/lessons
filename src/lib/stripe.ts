@@ -35,8 +35,20 @@ export function requireStripePrice(plan: "monthly" | "annual"): string {
   return val;
 }
 
-// Platform commission: 2.5% of lesson price
-export const PLATFORM_FEE_PERCENT = 2.5;
+/**
+ * Platform commission percentage, sourced from NEXT_PUBLIC_PLATFORM_FEE_PERCENT
+ * so marketing/billing can change the fee without a code deploy. Defaults to
+ * 2.5%. Values outside [0, 100] fall back to the default.
+ */
+function readCommissionPercent(): number {
+  const raw = process.env.NEXT_PUBLIC_PLATFORM_FEE_PERCENT;
+  if (!raw) return 2.5;
+  const n = Number(raw);
+  if (!Number.isFinite(n) || n < 0 || n > 100) return 2.5;
+  return n;
+}
+
+export const PLATFORM_FEE_PERCENT = readCommissionPercent();
 
 // Minimum lesson price in cents (€50)
 export const MIN_LESSON_PRICE_CENTS = 5000;
