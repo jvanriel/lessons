@@ -13,6 +13,7 @@ import { eq, ne } from "drizzle-orm";
 import { getLocale } from "@/lib/locale";
 import AppLayout from "@/components/app/AppLayout";
 import InstallBanner from "@/components/app/InstallBanner";
+import Script from "next/script";
 
 const cormorant = Cormorant_Garamond({
   variable: "--font-display",
@@ -169,14 +170,12 @@ export default async function RootLayout({
         </CmsProvider>
         <InstallBanner />
         <DeploymentChecker />
-        <script
-          dangerouslySetInnerHTML={{
-            __html: `if('serviceWorker' in navigator){navigator.serviceWorker.register('/sw.js')}
+        <Script id="pwa-bootstrap" strategy="afterInteractive">
+          {`if('serviceWorker' in navigator){navigator.serviceWorker.register('/sw.js')}
 window.addEventListener('beforeinstallprompt',function(e){e.preventDefault();window.__deferredInstallPrompt=e;window.dispatchEvent(new Event('pwa-install-available'));});
 window.addEventListener('appinstalled',function(){window.__deferredInstallPrompt=null;try{localStorage.setItem('pwa-installed','true')}catch(e){}window.dispatchEvent(new Event('pwa-installed'));});
-try{if(window.matchMedia('(display-mode: standalone)').matches||navigator.standalone){localStorage.setItem('pwa-installed','true')}}catch(e){}`,
-          }}
-        />
+try{if(window.matchMedia('(display-mode: standalone)').matches||navigator.standalone){localStorage.setItem('pwa-installed','true')}}catch(e){}`}
+        </Script>
       </body>
     </html>
   );
