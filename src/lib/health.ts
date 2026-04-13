@@ -56,13 +56,27 @@ async function checkStripe(): Promise<HealthCheck> {
       throw new Error("STRIPE_SECRET_KEY not set");
     if (!process.env.STRIPE_WEBHOOK_SECRET)
       throw new Error("STRIPE_WEBHOOK_SECRET not set");
-    if (!process.env.STRIPE_PRICE_MONTHLY)
-      throw new Error("STRIPE_PRICE_MONTHLY not set");
-    if (!process.env.STRIPE_PRICE_ANNUAL)
-      throw new Error("STRIPE_PRICE_ANNUAL not set");
+    const monthlyId = process.env.STRIPE_PRICE_MONTHLY;
+    const annualId = process.env.STRIPE_PRICE_ANNUAL;
+    if (!monthlyId) throw new Error("STRIPE_PRICE_MONTHLY not set");
+    if (!annualId) throw new Error("STRIPE_PRICE_ANNUAL not set");
+
     const stripe = getStripe();
-    // Cheap Stripe call — retrieves platform balance (no args required)
+
+    // Smoke-test: retrieve platform balance (verifies the secret key works).
     await stripe.balance.retrieve();
+
+    // Verify both configured price IDs actually exist in the Stripe account.
+    // This catches the SENTRY-ORANGE-ZEBRA-A class of bug where env vars hold
+    // stale price IDs after a Stripe price migration.
+    const [monthly, annual] = await Promise.all([
+      stripe.prices.retrieve(monthlyId),
+      stripe.prices.retrieve(annualId),
+    ]);
+    if (!monthly.active)
+      throw new Error(`STRIPE_PRICE_MONTHLY (${monthlyId}) is not active`);
+    if (!annual.active)
+      throw new Error(`STRIPE_PRICE_ANNUAL (${annualId}) is not active`);
   });
 }
 

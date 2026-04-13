@@ -14,9 +14,14 @@ import {
 } from "@/lib/email-templates";
 import { resolveLocale } from "@/lib/i18n";
 
-// Stripe v22 types — use plain objects for webhook data
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-type StripeObject = any;
+// Stripe v22's Subscription type moved `current_period_end` / `trial_end`
+// onto items in newer API versions. Our account is still on the pre-move
+// version so these fields exist at the top level. This helper type patches
+// them back on for strict typing without reaching for `any`.
+type SubscriptionWithPeriod = Stripe.Subscription & {
+  current_period_end: number;
+  trial_end: number | null;
+};
 
 export async function POST(request: NextRequest) {
   const body = await request.text();
@@ -60,22 +65,24 @@ export async function POST(request: NextRequest) {
   try {
     switch (event.type) {
       case "checkout.session.completed":
-        await handleCheckoutCompleted(event.data.object as StripeObject);
+        await handleCheckoutCompleted(event.data.object);
         break;
       case "customer.subscription.updated":
-        await handleSubscriptionUpdated(event.data.object as StripeObject);
+        await handleSubscriptionUpdated(
+          event.data.object as SubscriptionWithPeriod
+        );
         break;
       case "customer.subscription.deleted":
-        await handleSubscriptionDeleted(event.data.object as StripeObject);
+        await handleSubscriptionDeleted(event.data.object);
         break;
       case "customer.subscription.trial_will_end":
-        await handleTrialWillEnd(event.data.object as StripeObject);
+        await handleTrialWillEnd(event.data.object as SubscriptionWithPeriod);
         break;
       case "invoice.paid":
-        await handleInvoicePaid(event.data.object as StripeObject);
+        await handleInvoicePaid(event.data.object);
         break;
       case "invoice.payment_failed":
-        await handleInvoicePaymentFailed(event.data.object as StripeObject);
+        await handleInvoicePaymentFailed(event.data.object);
         break;
       default:
         console.log(`Unhandled webhook event: ${event.type}`);
@@ -134,11 +141,11 @@ async function recordEvent(event: Stripe.Event, bookingId?: number) {
 
 // ─── Event Handlers ─────────────────────────────────────
 
-async function handleCheckoutCompleted(session: StripeObject) {
+async function handleCheckoutCompleted(session: Stripe.Checkout.Session) {
   if (session.mode !== "subscription") return;
 
   const profile = await findProfileByMetadata(
-    session.metadata as Record<string, string>
+    (session.metadata ?? {}) as Record<string, string>
   );
   if (!profile) {
     console.error("No pro profile found for checkout session:", session.id);
@@ -146,12 +153,11 @@ async function handleCheckoutCompleted(session: StripeObject) {
   }
 
   const stripe = getStripe();
-  const subResponse = await stripe.subscriptions.retrieve(
+  const sub = (await stripe.subscriptions.retrieve(
     session.subscription as string
-  );
-  const sub = subResponse as unknown as StripeObject;
+  )) as unknown as SubscriptionWithPeriod;
 
-  const plan = (session.metadata as Record<string, string>)?.plan || "monthly";
+  const plan = (session.metadata as Record<string, string> | null)?.plan || "monthly";
 
   await db
     .update(proProfiles)
@@ -174,12 +180,12 @@ async function handleCheckoutCompleted(session: StripeObject) {
   );
 }
 
-async function handleSubscriptionUpdated(subscription: StripeObject) {
+async function handleSubscriptionUpdated(subscription: SubscriptionWithPeriod) {
   const profile = await findProfileBySubscription(subscription.id);
   if (!profile) return;
 
   // Map Stripe status to our status
-  let status = subscription.status as string;
+  let status: string = subscription.status;
   if (status === "incomplete" || status === "incomplete_expired") {
     status = "none";
   }
@@ -203,7 +209,7 @@ async function handleSubscriptionUpdated(subscription: StripeObject) {
   );
 }
 
-async function handleSubscriptionDeleted(subscription: StripeObject) {
+async function handleSubscriptionDeleted(subscription: Stripe.Subscription) {
   const profile = await findProfileBySubscription(subscription.id);
   if (!profile) return;
 
@@ -218,7 +224,7 @@ async function handleSubscriptionDeleted(subscription: StripeObject) {
   console.log(`Subscription cancelled for pro ${profile.id}`);
 }
 
-async function handleTrialWillEnd(subscription: StripeObject) {
+async function handleTrialWillEnd(subscription: SubscriptionWithPeriod) {
   const profile = await findProfileBySubscription(subscription.id);
   if (!profile) return;
 
@@ -253,20 +259,22 @@ async function handleTrialWillEnd(subscription: StripeObject) {
   );
 }
 
-async function handleInvoicePaid(invoice: StripeObject) {
-  if (!invoice.subscription) return;
+async function handleInvoicePaid(invoice: Stripe.Invoice) {
+  // `subscription` lives under `parent.subscription_details.subscription` in
+  // recent API versions; on our version it's still a top-level field. Cast
+  // through unknown to keep TS honest while supporting both shapes.
+  const subscriptionId = (invoice as unknown as { subscription?: string })
+    .subscription;
+  if (!subscriptionId) return;
 
-  const profile = await findProfileBySubscription(
-    invoice.subscription as string
-  );
+  const profile = await findProfileBySubscription(subscriptionId);
   if (!profile) return;
 
   // Retrieve fresh subscription to update period_end
   const stripe = getStripe();
-  const subResponse = await stripe.subscriptions.retrieve(
-    invoice.subscription as string
-  );
-  const sub = subResponse as unknown as StripeObject;
+  const sub = (await stripe.subscriptions.retrieve(
+    subscriptionId
+  )) as unknown as SubscriptionWithPeriod;
 
   await db
     .update(proProfiles)
@@ -283,12 +291,12 @@ async function handleInvoicePaid(invoice: StripeObject) {
   console.log(`Invoice paid for pro ${profile.id}`);
 }
 
-async function handleInvoicePaymentFailed(invoice: StripeObject) {
-  if (!invoice.subscription) return;
+async function handleInvoicePaymentFailed(invoice: Stripe.Invoice) {
+  const subscriptionId = (invoice as unknown as { subscription?: string })
+    .subscription;
+  if (!subscriptionId) return;
 
-  const profile = await findProfileBySubscription(
-    invoice.subscription as string
-  );
+  const profile = await findProfileBySubscription(subscriptionId);
   if (!profile) return;
 
   await db
