@@ -64,6 +64,18 @@ The platform CMS (`cms_blocks`) has per-locale rows but is operated by the platf
 - **Locale-aware date formatting sweep** — `formatDate(locale)` helper exists and is wired into `/member/bookings`, `/member/dashboard`, the booking wizard, `/pro/bookings` (BookingsView + BookingsCalendar), `/pro/students/StudentBookings`, `/pro/earnings`, `/member/dashboard/CancelBookingDialog`, and `/member/dashboard/QuickRebook`. ~20 other files still call `toLocaleDateString("en-US", ...)` directly. Remaining: admin-side (UserManager, ContentPanel, payouts), pro-side (`AvailabilityEditor`, `EditStudentDialog`, `ProQuickBook`), various smaller dialogs.
 - ~~**Pro-side editor component translations**~~ — **done**. `LocationManager`, `AvailabilityEditor`, `StudentManager` (incl. HelpDialog), `EditStudentDialog`, and `ProQuickBook` all i18n-wired in EN/NL/FR.
 - ~~**Welcome-as-pro email**~~ — **done**. `buildWelcomeEmail` rewritten with a 4-step pro onboarding guide (verify → subscribe → profile/locations/availability → publish) and wired into `/pro/register` alongside the verify email.
+- **Remaining member/pro i18n gaps (audit 2026-04-13)** — ~100 untranslated strings across ~20 files in member/* and pro/*. admin/* and dev/* are intentionally EN-only. Biggest offenders, roughly in priority order:
+  1. **App shell** — `src/components/app/BottomNav.tsx` (6 tab labels) and `src/components/app/AppSidebar.tsx` (~15 section + link labels). Highest visibility — every logged-in user sees these.
+  2. **`/pro/billing` (`BillingClient.tsx`)** — biggest single file, ~40 strings: status badges, IBAN form, subscription card, trial/past-due messages, bank account card, invoices card. Also hardcodes `toLocaleDateString("en-GB")`.
+  3. **`/pro/earnings/page.tsx`** — heading, summary stats ("This month", "All time", "Platform fee"), table headers (Student/Date/Amount/Fee/Net/Status), empty state.
+  4. **`/pro/bookings/BookingsCalendar.tsx`** — Prev/Today/Next buttons + expanded booking detail labels (Time, Location, Email, Phone, Participants, Status).
+  5. **`/pro/pages/ProPagesList.tsx`** — CRUD chrome: "New Page", "Publish/Unpublish", "Draft/Published", "Delete", empty state.
+  6. **`/pro/tasks/page.tsx`** — heading + subtitle chrome (Kanban board itself already i18n).
+  7. **`/pro/mailings/MailingManager.tsx`** — "Contacts" heading, "Sync students" button.
+  8. **`/member/bookings/page.tsx`** — "My Bookings", "Upcoming lessons", empty state, "Past & cancelled", Cancelled/Completed badges.
+  9. **`/member/coaching/page.tsx`** — heading + empty state.
+  10. **`/pro/onboarding/OnboardingWizard.tsx`** — step names, form labels, placeholders, location card headings. New pros hit this once on their first run — worth doing before launch.
+  11. **`src/components/comments/Comments.tsx`** — default empty state fallback.
 
 ## 🟢 Polish / post-launch
 

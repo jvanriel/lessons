@@ -4,6 +4,7 @@ import { useState, useEffect, type ReactNode } from "react";
 import AppTopBar from "./AppTopBar";
 import AppSidebar from "./AppSidebar";
 import BottomNav from "./BottomNav";
+import type { Locale } from "@/lib/i18n";
 
 interface ImpersonableUser {
   id: number;
@@ -81,12 +82,13 @@ export default function AppLayout({
           roles={roles}
           collapsed={collapsed}
           onToggle={handleToggle}
+          locale={locale as Locale}
         />
         <main className="flex-1 overflow-y-auto bg-[#faf7f0] pb-14 md:pb-0">
           {children}
         </main>
       </div>
-      <BottomNav roles={roles} />
+      <BottomNav roles={roles} locale={locale as Locale} />
     </div>
   );
 }
