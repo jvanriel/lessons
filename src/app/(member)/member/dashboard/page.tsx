@@ -10,6 +10,7 @@ import {
 import { eq, and, gte, asc, isNull } from "drizzle-orm";
 import { getSession, hasRole } from "@/lib/auth";
 import { getLocale } from "@/lib/locale";
+import { formatDate } from "@/lib/format-date";
 import { t } from "@/lib/i18n/translations";
 import { redirect } from "next/navigation";
 import Link from "next/link";
@@ -131,7 +132,7 @@ export default async function MemberDashboard() {
         </div>
         <div className="flex items-center gap-2">
           <HelpButton />
-          <QRLoginButton />
+          <QRLoginButton label={t("dashboard.openOnPhone", locale)} />
         </div>
       </div>
 
@@ -255,9 +256,7 @@ export default async function MemberDashboard() {
               >
                 <div>
                   <div className="text-sm font-medium text-green-900">
-                    {new Date(
-                      booking.date + "T00:00:00"
-                    ).toLocaleDateString("en-US", {
+                    {formatDate(booking.date, locale, {
                       weekday: "short",
                       day: "numeric",
                       month: "short",

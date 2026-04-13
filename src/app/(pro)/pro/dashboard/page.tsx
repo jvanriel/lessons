@@ -6,12 +6,16 @@ import { redirect } from "next/navigation";
 import Link from "next/link";
 import { BookingRefreshListener } from "@/components/BookingRefreshListener";
 import { QRLoginButton } from "@/app/(member)/member/dashboard/QRLoginDialog";
+import { getLocale } from "@/lib/locale";
+import { t } from "@/lib/i18n/translations";
 
 export const metadata = { title: "Pro Dashboard — Golf Lessons" };
 
 export default async function ProDashboard() {
   const { profile } = await requireProProfile();
   if (!profile) redirect("/login");
+
+  const locale = await getLocale();
 
   const today = new Date().toISOString().split("T")[0];
 
@@ -53,7 +57,7 @@ export default async function ProDashboard() {
             Manage your lessons, availability, and bookings.
           </p>
         </div>
-        <QRLoginButton />
+        <QRLoginButton label={t("dashboard.openOnPhone", locale)} />
       </div>
 
       <div className="mt-8 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">

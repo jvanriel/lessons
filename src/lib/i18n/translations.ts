@@ -115,6 +115,7 @@ const translations: Record<Locale, Record<string, string>> = {
 
     // Member dashboard
     "member.welcome": "Welcome back",
+    "dashboard.openOnPhone": "Open on phone",
     "member.yourLessons": "Your Lessons",
     "member.noLessons": "No upcoming lessons. Browse our pros to book your first lesson.",
 
@@ -410,6 +411,7 @@ const translations: Record<Locale, Record<string, string>> = {
 
     // Member dashboard
     "member.welcome": "Welkom terug",
+    "dashboard.openOnPhone": "Open op telefoon",
     "member.yourLessons": "Jouw Lessen",
     "member.noLessons": "Geen aankomende lessen. Blader door onze pro's om je eerste les te boeken.",
 
@@ -700,6 +702,7 @@ const translations: Record<Locale, Record<string, string>> = {
 
     // Member dashboard
     "member.welcome": "Bienvenue",
+    "dashboard.openOnPhone": "Ouvrir sur téléphone",
     "member.yourLessons": "Vos Cours",
     "member.noLessons": "Aucun cours à venir. Parcourez nos pros pour réserver votre premier cours.",
 

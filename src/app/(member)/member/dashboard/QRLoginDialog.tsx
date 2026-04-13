@@ -4,7 +4,7 @@ import { useState, useTransition, useEffect, useRef } from "react";
 import { QRCodeSVG } from "qrcode.react";
 import { generateQRToken } from "./actions";
 
-export function QRLoginButton() {
+export function QRLoginButton({ label }: { label: string }) {
   const [open, setOpen] = useState(false);
 
   return (
@@ -13,7 +13,7 @@ export function QRLoginButton() {
       <button
         onClick={() => setOpen(true)}
         className="hidden sm:flex items-center gap-1.5 rounded-md border border-green-200 px-3 py-1.5 text-xs font-medium text-green-700 transition-colors hover:bg-green-50"
-        title="Open on your phone"
+        title={label}
       >
         <svg
           className="h-4 w-4"
@@ -25,23 +25,10 @@ export function QRLoginButton() {
           <path
             strokeLinecap="round"
             strokeLinejoin="round"
-            d="M3.75 4.875c0-.621.504-1.125 1.125-1.125h3.026a2.999 2.999 0 0 1 2.11.879l.737.737a3.005 3.005 0 0 0 2.122.879H19.5a1.125 1.125 0 0 1 0 2.25H3.75V4.875ZM3.75 4.875v14.25c0 .621.504 1.125 1.125 1.125h14.25c.621 0 1.125-.504 1.125-1.125V7.875"
+            d="M10.5 1.5H8.25A2.25 2.25 0 0 0 6 3.75v16.5a2.25 2.25 0 0 0 2.25 2.25h7.5A2.25 2.25 0 0 0 18 20.25V3.75a2.25 2.25 0 0 0-2.25-2.25H13.5m-3 0V3h3V1.5m-3 0h3m-3 18.75h3"
           />
         </svg>
-        <svg
-          className="h-4 w-4"
-          fill="none"
-          viewBox="0 0 24 24"
-          stroke="currentColor"
-          strokeWidth={1.5}
-        >
-          <path
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            d="M3.75 4.5h4.5v4.5H3.75V4.5Zm0 10.5h4.5v4.5H3.75V15Zm10.5-10.5h4.5v4.5h-4.5V4.5Zm0 10.5h1.5m1.5 0h1.5m-4.5 3h4.5M15.75 15h1.5m-1.5 3h1.5m-7.5-6h7.5m-10.5 0h1.5m-1.5 3h1.5"
-          />
-        </svg>
-        Phone
+        {label}
       </button>
 
       {open && <QRLoginDialog onClose={() => setOpen(false)} />}
