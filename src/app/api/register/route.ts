@@ -8,6 +8,7 @@ import { createNotification } from "@/lib/notifications";
 import { sendEmail } from "@/lib/mail";
 import { buildWelcomeEmail, getWelcomeSubject, emailLayout } from "@/lib/email-templates";
 import { resolveLocale } from "@/lib/i18n";
+import { limitByIp, registerLimiter } from "@/lib/rate-limit";
 
 function getSecret() {
   return new TextEncoder().encode(
@@ -16,6 +17,14 @@ function getSecret() {
 }
 
 export async function POST(request: Request) {
+  const limit = await limitByIp(registerLimiter);
+  if (!limit.ok) {
+    return NextResponse.json(
+      { error: `Too many registration attempts. Try again in ${limit.retryAfter}s.` },
+      { status: 429, headers: { "Retry-After": String(limit.retryAfter) } }
+    );
+  }
+
   const formData = await request.formData();
 
   const firstName = (formData.get("firstName") as string)?.trim();

@@ -6,6 +6,7 @@ import { users } from "@/lib/db/schema";
 import { eq } from "drizzle-orm";
 import { jwtVerify } from "jose";
 import { hashPassword, setSessionCookie, parseRoles } from "@/lib/auth";
+import { limitByIp, resetPasswordLimiter } from "@/lib/rate-limit";
 
 function getSecret() {
   return new TextEncoder().encode(
@@ -17,6 +18,11 @@ export async function resetPasswordWithToken(
   _prev: { error?: string } | null,
   formData: FormData
 ): Promise<{ error?: string }> {
+  const limit = await limitByIp(resetPasswordLimiter);
+  if (!limit.ok) {
+    return { error: `Too many attempts. Try again in ${limit.retryAfter}s.` };
+  }
+
   const token = formData.get("token") as string;
   const password = formData.get("password") as string;
   const confirm = formData.get("confirmPassword") as string;

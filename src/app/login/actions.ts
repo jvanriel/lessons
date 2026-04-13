@@ -7,11 +7,17 @@ import { and } from "drizzle-orm";
 import { eq, or } from "drizzle-orm";
 import { verifyPassword, setSessionCookie, parseRoles } from "@/lib/auth";
 import { logEvent } from "@/lib/events";
+import { limitByIp, loginLimiter } from "@/lib/rate-limit";
 
 export async function userLogin(
   _prevState: { error: string } | null,
   formData: FormData
 ) {
+  const limit = await limitByIp(loginLimiter);
+  if (!limit.ok) {
+    return { error: `Too many login attempts. Try again in ${limit.retryAfter}s.` };
+  }
+
   const email = (formData.get("email") as string).trim().toLowerCase();
   const password = formData.get("password") as string;
 

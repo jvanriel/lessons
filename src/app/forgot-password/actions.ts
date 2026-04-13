@@ -7,6 +7,7 @@ import { SignJWT } from "jose";
 import { sendEmail } from "@/lib/mail";
 import { emailLayout, getEmailStrings } from "@/lib/email-templates";
 import { resolveLocale, type Locale } from "@/lib/i18n";
+import { limitByKey, forgotPasswordLimiter, getClientIp } from "@/lib/rate-limit";
 
 function getSecret() {
   return new TextEncoder().encode(
@@ -20,6 +21,14 @@ export async function requestPasswordReset(
 ): Promise<{ error?: string; success?: boolean }> {
   const email = (formData.get("email") as string).trim().toLowerCase();
   if (!email) return { error: "Email is required." };
+
+  // Rate limit by IP+email so an attacker can't enumerate addresses or spam
+  // a single victim's inbox.
+  const ip = await getClientIp();
+  const limit = await limitByKey(forgotPasswordLimiter, `${ip}:${email}`);
+  if (!limit.ok) {
+    return { error: `Too many requests. Try again in ${limit.retryAfter}s.` };
+  }
 
   // Look up user by primary email or alias
   let userId: number | null = null;
