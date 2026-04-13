@@ -8,6 +8,8 @@ import { ProQuickBook } from "./ProQuickBook";
 import { EditStudentDialog } from "./EditStudentDialog";
 import { StudentBookings } from "./StudentBookings";
 import type { Locale } from "@/lib/i18n";
+import { t } from "@/lib/i18n/translations";
+import { formatDate } from "@/lib/format-date";
 
 interface Student {
   id: number;
@@ -26,37 +28,24 @@ interface Student {
   preferredInterval: string | null;
 }
 
-function sourceLabel(source: string) {
-  switch (source) {
-    case "self":
-      return "Self-registered";
-    case "invited":
-      return "Invited";
-    case "pro_added":
-      return "Added by pro";
-    default:
-      return source;
-  }
-}
-
-function statusBadge(status: string) {
+function statusBadge(status: string, locale: Locale) {
   switch (status) {
     case "active":
       return (
         <span className="rounded-full bg-green-100 px-2 py-0.5 text-xs font-medium text-green-700">
-          Active
+          {t("proStudents.status.active", locale)}
         </span>
       );
     case "pending":
       return (
         <span className="rounded-full bg-yellow-100 px-2 py-0.5 text-xs font-medium text-yellow-700">
-          Pending
+          {t("proStudents.status.pending", locale)}
         </span>
       );
     case "inactive":
       return (
         <span className="rounded-full bg-gray-100 px-2 py-0.5 text-xs font-medium text-gray-500">
-          Inactive
+          {t("proStudents.status.inactive", locale)}
         </span>
       );
     default:
@@ -134,13 +123,13 @@ export default function StudentManager({
         <div>
           <div className="flex items-center gap-2">
             <h1 className="font-display text-3xl font-semibold text-green-900">
-              Students
+              {t("proStudents.title", locale)}
             </h1>
             <button
               type="button"
               onClick={() => setShowHelp(true)}
               className="rounded-full p-1 text-green-400 transition-colors hover:bg-green-50 hover:text-green-600"
-              title="Help"
+              title={t("proStudents.help", locale)}
             >
               <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
                 <path strokeLinecap="round" strokeLinejoin="round" d="M9.879 7.519c1.171-1.025 3.071-1.025 4.242 0 1.172 1.025 1.172 2.687 0 3.712-.203.179-.43.326-.67.442-.745.361-1.45.999-1.45 1.827m0 0v.5m0 2h.008v.008H12v-.008Z" />
@@ -149,7 +138,12 @@ export default function StudentManager({
             </button>
           </div>
           <p className="mt-1 text-sm text-green-600">
-            {activeCounts.active} active student{activeCounts.active !== 1 ? "s" : ""}
+            {t(
+              activeCounts.active === 1
+                ? "proStudents.activeCount"
+                : "proStudents.activeCountPlural",
+              locale
+            ).replace("{n}", String(activeCounts.active))}
           </p>
         </div>
         <div className="flex gap-2">
@@ -162,8 +156,8 @@ export default function StudentManager({
             }}
             className="rounded-md bg-gold-600 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-gold-500"
           >
-            <span className="sm:hidden">Invite</span>
-            <span className="hidden sm:inline">Invite student</span>
+            <span className="sm:hidden">{t("proStudents.inviteShort", locale)}</span>
+            <span className="hidden sm:inline">{t("proStudents.invite", locale)}</span>
           </button>
           <button
             type="button"
@@ -174,8 +168,8 @@ export default function StudentManager({
             }}
             className="rounded-md border border-green-300 bg-white px-4 py-2 text-sm font-medium text-green-700 transition-colors hover:bg-green-50"
           >
-            <span className="sm:hidden">Add</span>
-            <span className="hidden sm:inline">Add student</span>
+            <span className="sm:hidden">{t("proStudents.addShort", locale)}</span>
+            <span className="hidden sm:inline">{t("proStudents.add", locale)}</span>
           </button>
         </div>
       </div>
@@ -185,20 +179,22 @@ export default function StudentManager({
         <div className="mt-6 rounded-xl border border-green-200 bg-white p-6">
           <div className="flex items-center justify-between mb-4">
             <h2 className="font-display text-lg font-medium text-green-800">
-              {inviteMode === "invited" ? "Invite a student" : "Add a student"}
+              {inviteMode === "invited"
+                ? t("proStudents.inviteHeading", locale)
+                : t("proStudents.addHeading", locale)}
             </h2>
             <button
               type="button"
               onClick={() => setShowInviteForm(false)}
               className="text-sm text-green-400 hover:text-green-600"
             >
-              Cancel
+              {t("proStudents.cancel", locale)}
             </button>
           </div>
 
           {inviteMode === "invited" && (
             <p className="mb-4 text-sm text-green-600">
-              An email invitation with login credentials will be sent to the student.
+              {t("proStudents.inviteBlurb", locale)}
             </p>
           )}
 
@@ -207,7 +203,7 @@ export default function StudentManager({
             <div className="grid gap-3 sm:grid-cols-2">
               <div>
                 <label className="text-sm font-medium text-green-700">
-                  First name
+                  {t("proStudents.firstName", locale)}
                 </label>
                 <input
                   name="firstName"
@@ -217,7 +213,7 @@ export default function StudentManager({
               </div>
               <div>
                 <label className="text-sm font-medium text-green-700">
-                  Last name
+                  {t("proStudents.lastName", locale)}
                 </label>
                 <input
                   name="lastName"
@@ -228,7 +224,7 @@ export default function StudentManager({
             </div>
             <div>
               <label className="text-sm font-medium text-green-700">
-                Email
+                {t("proStudents.email", locale)}
               </label>
               <input
                 name="email"
@@ -239,7 +235,7 @@ export default function StudentManager({
             </div>
             <div>
               <label className="text-sm font-medium text-green-700">
-                Password
+                {t("proStudents.password", locale)}
               </label>
               <div className="mt-1 flex gap-2">
                 <input
@@ -262,7 +258,7 @@ export default function StudentManager({
                   }}
                   className="shrink-0 rounded-lg border border-green-200 px-3 py-2 text-xs font-medium text-green-700 transition-colors hover:bg-green-50"
                 >
-                  Generate
+                  {t("proStudents.generate", locale)}
                 </button>
               </div>
             </div>
@@ -272,10 +268,13 @@ export default function StudentManager({
             )}
             {inviteState?.success && (
               <p className="text-sm text-green-600">
-                Student {inviteMode === "invited" ? "invited" : "added"} successfully!
+                {inviteMode === "invited"
+                  ? t("proStudents.successInvited", locale)
+                  : t("proStudents.successAdded", locale)}
                 {inviteState.password && (
                   <span className="block mt-1 text-xs text-green-500">
-                    Temporary password: <code className="bg-green-50 px-1 py-0.5 rounded">{inviteState.password}</code>
+                    {t("proStudents.tempPassword", locale)}{" "}
+                    <code className="bg-green-50 px-1 py-0.5 rounded">{inviteState.password}</code>
                   </span>
                 )}
               </p>
@@ -287,10 +286,10 @@ export default function StudentManager({
               className="rounded-md bg-gold-600 px-5 py-2 text-sm font-medium text-white transition-colors hover:bg-gold-500 disabled:opacity-50"
             >
               {invitePending
-                ? "Processing..."
+                ? t("proStudents.processing", locale)
                 : inviteMode === "invited"
-                  ? "Send invitation"
-                  : "Add student"}
+                  ? t("proStudents.sendInvitation", locale)
+                  : t("proStudents.addSubmit", locale)}
             </button>
           </form>
         </div>
@@ -310,10 +309,11 @@ export default function StudentManager({
                   {currentStudent.firstName} {currentStudent.lastName}
                 </p>
                 <p className="text-xs text-green-500">
-                  {new Date(currentBooking.date + "T00:00:00").toLocaleDateString(
-                    "en-US",
-                    { weekday: "short", month: "short", day: "numeric" }
-                  )}
+                  {formatDate(currentBooking.date, locale, {
+                    weekday: "short",
+                    month: "short",
+                    day: "numeric",
+                  })}
                 </p>
                 <p className="text-xs text-green-400">
                   {currentBooking.startTime} - {currentBooking.endTime}
@@ -329,7 +329,7 @@ export default function StudentManager({
               <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                 <path strokeLinecap="round" strokeLinejoin="round" d="M8.625 12a.375.375 0 1 1-.75 0 .375.375 0 0 1 .75 0Zm0 0H8.25m4.125 0a.375.375 0 1 1-.75 0 .375.375 0 0 1 .75 0Zm0 0H12m4.125 0a.375.375 0 1 1-.75 0 .375.375 0 0 1 .75 0Zm0 0h-.375M21 12c0 4.556-4.03 8.25-9 8.25a9.764 9.764 0 0 1-2.555-.337A5.972 5.972 0 0 1 5.41 20.97a5.969 5.969 0 0 1-.474-.065 4.48 4.48 0 0 0 .978-2.025c.09-.457-.133-.901-.467-1.226C3.93 16.178 3 14.189 3 12c0-4.556 4.03-8.25 9-8.25s9 3.694 9 8.25Z" />
               </svg>
-              Chat
+              {t("proStudents.chat", locale)}
             </Link>
             <button
               type="button"
@@ -339,7 +339,7 @@ export default function StudentManager({
               <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                 <path strokeLinecap="round" strokeLinejoin="round" d="m16.862 4.487 1.687-1.688a1.875 1.875 0 1 1 2.652 2.652L10.582 16.07a4.5 4.5 0 0 1-1.897 1.13L6 18l.8-2.685a4.5 4.5 0 0 1 1.13-1.897l8.932-8.931Zm0 0L19.5 7.125M18 14v4.75A2.25 2.25 0 0 1 15.75 21H5.25A2.25 2.25 0 0 1 3 18.75V8.25A2.25 2.25 0 0 1 5.25 6H10" />
               </svg>
-              Edit
+              {t("proStudents.edit", locale)}
             </button>
           </div>
           {currentQuickBook && (
@@ -374,7 +374,7 @@ export default function StudentManager({
             type="text"
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            placeholder="Search students..."
+            placeholder={t("proStudents.searchPlaceholder", locale)}
             className="w-full rounded-lg border border-green-200 bg-white py-2 pl-9 pr-3 text-sm text-green-900 outline-none focus:border-gold-400 focus:ring-1 focus:ring-gold-400/30"
           />
         </div>
@@ -393,7 +393,7 @@ export default function StudentManager({
                 : "text-green-500 hover:text-green-700"
             }`}
           >
-            {f.charAt(0).toUpperCase() + f.slice(1)} ({activeCounts[f]})
+            {t(`proStudents.filter.${f}` as const, locale)} ({activeCounts[f]})
           </button>
         ))}
       </div>
@@ -409,14 +409,16 @@ export default function StudentManager({
                 </svg>
               </div>
               <h3 className="font-display text-lg font-medium text-green-900">
-                No students yet
+                {t("proStudents.empty.title", locale)}
               </h3>
               <p className="mx-auto mt-2 max-w-sm text-sm text-green-600">
-                Invite a student by email or add one manually to start building your roster.
+                {t("proStudents.empty.desc", locale)}
               </p>
             </>
           ) : (
-            <p className="text-sm text-green-500">No {filter} students.</p>
+            <p className="text-sm text-green-500">
+              {t("proStudents.empty.filtered", locale)}
+            </p>
           )}
         </div>
       ) : (
@@ -461,7 +463,7 @@ export default function StudentManager({
                   </div>
                   {/* Row 2: status + expand icon */}
                   <div className="mt-2 flex items-center justify-between pl-[52px]">
-                    {statusBadge(student.status)}
+                    {statusBadge(student.status, locale)}
                     <svg
                       className={`h-4 w-4 text-green-400 transition-transform ${
                         isSelected ? "rotate-180" : ""
@@ -502,7 +504,7 @@ export default function StudentManager({
                             d="M8.625 12a.375.375 0 1 1-.75 0 .375.375 0 0 1 .75 0Zm0 0H8.25m4.125 0a.375.375 0 1 1-.75 0 .375.375 0 0 1 .75 0Zm0 0H12m4.125 0a.375.375 0 1 1-.75 0 .375.375 0 0 1 .75 0Zm0 0h-.375M21 12c0 4.556-4.03 8.25-9 8.25a9.764 9.764 0 0 1-2.555-.337A5.972 5.972 0 0 1 5.41 20.97a5.969 5.969 0 0 1-.474-.065 4.48 4.48 0 0 0 .978-2.025c.09-.457-.133-.901-.467-1.226C3.93 16.178 3 14.189 3 12c0-4.556 4.03-8.25 9-8.25s9 3.694 9 8.25Z"
                           />
                         </svg>
-                        Chat
+                        {t("proStudents.chat", locale)}
                       </Link>
                       <button
                         type="button"
@@ -525,7 +527,7 @@ export default function StudentManager({
                             d="m16.862 4.487 1.687-1.688a1.875 1.875 0 1 1 2.652 2.652L10.582 16.07a4.5 4.5 0 0 1-1.897 1.13L6 18l.8-2.685a4.5 4.5 0 0 1 1.13-1.897l8.932-8.931Zm0 0L19.5 7.125M18 14v4.75A2.25 2.25 0 0 1 15.75 21H5.25A2.25 2.25 0 0 1 3 18.75V8.25A2.25 2.25 0 0 1 5.25 6H10"
                           />
                         </svg>
-                        Edit
+                        {t("proStudents.edit", locale)}
                       </button>
                     </div>
 
@@ -560,13 +562,13 @@ export default function StudentManager({
 
       {/* Help dialog */}
       {showHelp && (
-        <HelpDialog onClose={() => setShowHelp(false)} />
+        <HelpDialog onClose={() => setShowHelp(false)} locale={locale} />
       )}
     </div>
   );
 }
 
-function HelpDialog({ onClose }: { onClose: () => void }) {
+function HelpDialog({ onClose, locale }: { onClose: () => void; locale: Locale }) {
   const backdropRef = useRef<HTMLDivElement>(null);
   return (
     <div
@@ -579,7 +581,7 @@ function HelpDialog({ onClose }: { onClose: () => void }) {
       <div className="w-full max-w-lg rounded-xl border border-green-200 bg-white shadow-2xl">
         <div className="flex items-center justify-between border-b border-green-100 px-5 py-4">
           <h3 className="font-display text-lg font-semibold text-green-900">
-            Managing your students
+            {t("proStudents.helpDialog.title", locale)}
           </h3>
           <button
             onClick={onClose}
@@ -592,110 +594,139 @@ function HelpDialog({ onClose }: { onClose: () => void }) {
         </div>
         <div className="space-y-5 px-5 py-5 text-sm text-green-700 leading-relaxed">
           <div>
-            <h4 className="font-medium text-green-900">Adding students</h4>
+            <h4 className="font-medium text-green-900">
+              {t("proStudents.helpDialog.addingHeading", locale)}
+            </h4>
             <p className="mt-1">
-              There are two ways to add a student:
+              {t("proStudents.helpDialog.addingIntro", locale)}
             </p>
             <ul className="mt-2 space-y-2 pl-4">
               <li className="relative pl-3 before:absolute before:left-0 before:top-2 before:h-1.5 before:w-1.5 before:rounded-full before:bg-gold-500">
-                <strong className="text-green-900">Invite</strong> — sends an email
-                with login credentials. The student&apos;s status is &quot;pending&quot; until
-                they log in for the first time.
+                <strong className="text-green-900">
+                  {t("proStudents.helpDialog.inviteBulletBold", locale)}
+                </strong>
+                {t("proStudents.helpDialog.inviteBulletRest", locale)}
               </li>
               <li className="relative pl-3 before:absolute before:left-0 before:top-2 before:h-1.5 before:w-1.5 before:rounded-full before:bg-gold-500">
-                <strong className="text-green-900">Add</strong> — creates the student
-                account immediately as &quot;active&quot;. Use this when you&apos;re setting up
-                the account in person, e.g. during a lesson.
+                <strong className="text-green-900">
+                  {t("proStudents.helpDialog.addBulletBold", locale)}
+                </strong>
+                {t("proStudents.helpDialog.addBulletRest", locale)}
               </li>
             </ul>
             <p className="mt-2">
-              Both require a password. Click <strong>Generate</strong> to create a
-              secure random password, or type one manually.
+              {t("proStudents.helpDialog.passwordHint", locale)}
             </p>
           </div>
 
           <div>
-            <h4 className="font-medium text-green-900">Quick Book</h4>
+            <h4 className="font-medium text-green-900">
+              {t("proStudents.helpDialog.quickBookHeading", locale)}
+            </h4>
             <p className="mt-1">
-              Once a student has booked at least one lesson, the system remembers
-              their preferred location, duration, day, and time. You&apos;ll see date and
-              time buttons on each student card — <strong>hold any time slot</strong> to
-              instantly book a lesson for them.
+              {t("proStudents.helpDialog.quickBookP1", locale)}
             </p>
             <p className="mt-2">
-              Use the <strong>In a week</strong> / <strong>In 2 weeks</strong> / <strong>In a month</strong> buttons
-              to quickly jump to a future date. As a pro, you bypass the booking notice
-              and can book any available slot, including today.
+              {t("proStudents.helpDialog.quickBookP2", locale)}
             </p>
           </div>
 
           <div>
-            <h4 className="font-medium text-green-900">Understanding available slots</h4>
+            <h4 className="font-medium text-green-900">
+              {t("proStudents.helpDialog.slotsHeading", locale)}
+            </h4>
             <p className="mt-1">
-              <strong>Press and hold a date</strong> (not a time slot) to see exactly why
-              specific times are available or unavailable. The dialog shows:
+              {t("proStudents.helpDialog.slotsP1", locale)}
             </p>
             <ul className="mt-2 space-y-1 pl-4">
               <li className="relative pl-3 before:absolute before:left-0 before:top-2 before:h-1.5 before:w-1.5 before:rounded-full before:bg-gold-500">
-                Your <strong>availability templates</strong> for that day of the week
+                {t("proStudents.helpDialog.slotsBullet1", locale)}
               </li>
               <li className="relative pl-3 before:absolute before:left-0 before:top-2 before:h-1.5 before:w-1.5 before:rounded-full before:bg-gold-500">
-                Any <strong>schedule changes</strong> (blocks or extra availability)
+                {t("proStudents.helpDialog.slotsBullet2", locale)}
               </li>
               <li className="relative pl-3 before:absolute before:left-0 before:top-2 before:h-1.5 before:w-1.5 before:rounded-full before:bg-gold-500">
-                <strong>Existing bookings</strong> that take up slots
+                {t("proStudents.helpDialog.slotsBullet3", locale)}
               </li>
               <li className="relative pl-3 before:absolute before:left-0 before:top-2 before:h-1.5 before:w-1.5 before:rounded-full before:bg-gold-500">
-                The final count of <strong>available slots</strong>
+                {t("proStudents.helpDialog.slotsBullet4", locale)}
               </li>
             </ul>
             <p className="mt-2">
-              Switch to the <strong>Student view</strong> tab to see what the student sees,
-              including the booking notice filter. This helps explain why a student might
-              not be able to book a slot that you can.
+              {t("proStudents.helpDialog.slotsP2", locale)}
             </p>
           </div>
 
           <div>
-            <h4 className="font-medium text-green-900">Edit &amp; manage</h4>
+            <h4 className="font-medium text-green-900">
+              {t("proStudents.helpDialog.editHeading", locale)}
+            </h4>
             <p className="mt-1">
-              Click the <strong>Edit</strong> button on a student card to update their
-              name, email, phone, and booking preferences. From the same dialog you
-              can also reset their password or remove them.
+              {t("proStudents.helpDialog.editP1", locale)}
             </p>
           </div>
 
           <div>
-            <h4 className="font-medium text-green-900">Invite vs. Reset password</h4>
+            <h4 className="font-medium text-green-900">
+              {t("proStudents.helpDialog.inviteResetHeading", locale)}
+            </h4>
             <div className="mt-2 rounded-lg border border-green-100 overflow-hidden">
               <table className="w-full text-left text-xs">
                 <thead>
                   <tr className="bg-green-50 text-green-800">
                     <th className="px-3 py-2 font-medium"></th>
-                    <th className="px-3 py-2 font-medium">Invite / Add</th>
-                    <th className="px-3 py-2 font-medium">Reset password</th>
+                    <th className="px-3 py-2 font-medium">
+                      {t("proStudents.helpDialog.tableColInvite", locale)}
+                    </th>
+                    <th className="px-3 py-2 font-medium">
+                      {t("proStudents.helpDialog.tableColReset", locale)}
+                    </th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-green-100">
                   <tr>
-                    <td className="px-3 py-2 font-medium text-green-800">When to use</td>
-                    <td className="px-3 py-2">Someone <strong>new</strong> who has never used Golf Lessons before</td>
-                    <td className="px-3 py-2">An <strong>existing</strong> student who can&apos;t log in anymore</td>
+                    <td className="px-3 py-2 font-medium text-green-800">
+                      {t("proStudents.helpDialog.tableRowWhen", locale)}
+                    </td>
+                    <td className="px-3 py-2">
+                      {t("proStudents.helpDialog.tableRowWhenInvite", locale)}
+                    </td>
+                    <td className="px-3 py-2">
+                      {t("proStudents.helpDialog.tableRowWhenReset", locale)}
+                    </td>
                   </tr>
                   <tr>
-                    <td className="px-3 py-2 font-medium text-green-800">What it does</td>
-                    <td className="px-3 py-2"><strong>Creates a new account</strong>, connects them to you, and sends a welcome email with login instructions</td>
-                    <td className="px-3 py-2"><strong>Changes the password</strong> on their existing account and emails them the new one</td>
+                    <td className="px-3 py-2 font-medium text-green-800">
+                      {t("proStudents.helpDialog.tableRowWhat", locale)}
+                    </td>
+                    <td className="px-3 py-2">
+                      {t("proStudents.helpDialog.tableRowWhatInvite", locale)}
+                    </td>
+                    <td className="px-3 py-2">
+                      {t("proStudents.helpDialog.tableRowWhatReset", locale)}
+                    </td>
                   </tr>
                   <tr>
-                    <td className="px-3 py-2 font-medium text-green-800">Their data</td>
-                    <td className="px-3 py-2">Fresh account — no bookings or history</td>
-                    <td className="px-3 py-2">Everything stays: bookings, preferences, chat history</td>
+                    <td className="px-3 py-2 font-medium text-green-800">
+                      {t("proStudents.helpDialog.tableRowData", locale)}
+                    </td>
+                    <td className="px-3 py-2">
+                      {t("proStudents.helpDialog.tableRowDataInvite", locale)}
+                    </td>
+                    <td className="px-3 py-2">
+                      {t("proStudents.helpDialog.tableRowDataReset", locale)}
+                    </td>
                   </tr>
                   <tr>
-                    <td className="px-3 py-2 font-medium text-green-800">Where</td>
-                    <td className="px-3 py-2"><strong>Invite</strong> / <strong>Add</strong> buttons at the top of this page</td>
-                    <td className="px-3 py-2"><strong>Edit</strong> button on the student card → Account section</td>
+                    <td className="px-3 py-2 font-medium text-green-800">
+                      {t("proStudents.helpDialog.tableRowWhere", locale)}
+                    </td>
+                    <td className="px-3 py-2">
+                      {t("proStudents.helpDialog.tableRowWhereInvite", locale)}
+                    </td>
+                    <td className="px-3 py-2">
+                      {t("proStudents.helpDialog.tableRowWhereReset", locale)}
+                    </td>
                   </tr>
                 </tbody>
               </table>
@@ -703,18 +734,18 @@ function HelpDialog({ onClose }: { onClose: () => void }) {
           </div>
 
           <div>
-            <h4 className="font-medium text-green-900">Student status</h4>
+            <h4 className="font-medium text-green-900">
+              {t("proStudents.helpDialog.statusHeading", locale)}
+            </h4>
             <ul className="mt-1 space-y-1 pl-4">
               <li className="relative pl-3 before:absolute before:left-0 before:top-2 before:h-1.5 before:w-1.5 before:rounded-full before:bg-green-500">
-                <strong className="text-green-900">Active</strong> — can book lessons and chat with you.
+                {t("proStudents.helpDialog.statusActive", locale)}
               </li>
               <li className="relative pl-3 before:absolute before:left-0 before:top-2 before:h-1.5 before:w-1.5 before:rounded-full before:bg-yellow-500">
-                <strong className="text-green-900">Pending</strong> — invited but hasn&apos;t logged in yet.
-                Becomes active on first login.
+                {t("proStudents.helpDialog.statusPending", locale)}
               </li>
               <li className="relative pl-3 before:absolute before:left-0 before:top-2 before:h-1.5 before:w-1.5 before:rounded-full before:bg-gray-400">
-                <strong className="text-green-900">Inactive</strong> — removed. They
-                can be re-invited later.
+                {t("proStudents.helpDialog.statusInactive", locale)}
               </li>
             </ul>
           </div>
