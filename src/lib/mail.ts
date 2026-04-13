@@ -50,14 +50,25 @@ function getGmailClient() {
   return gmail({ version: "v1", auth });
 }
 
+export interface EmailAttachment {
+  filename: string;
+  contentType: string;
+  /** Raw string content. Will be base64-encoded into the MIME part. */
+  content: string;
+  /** Optional method= parameter for text/calendar parts (REQUEST, CANCEL, …). */
+  method?: string;
+}
+
 export async function sendEmail({
   to,
   subject,
   html,
+  attachments,
 }: {
   to: string;
   subject: string;
   html: string;
+  attachments?: EmailAttachment[];
 }): Promise<{ error?: string; messageId?: string }> {
   try {
     const gmail = getGmailClient();
@@ -67,15 +78,59 @@ export async function sendEmail({
       ? `=?UTF-8?B?${Buffer.from(subject).toString("base64")}?=`
       : subject;
 
-    const message = [
-      `From: Golf Lessons <${SEND_AS}>`,
-      `To: ${to}`,
-      `Subject: ${encodedSubject}`,
-      `MIME-Version: 1.0`,
-      `Content-Type: text/html; charset=utf-8`,
-      ``,
-      html,
-    ].join("\r\n");
+    const fromHeader = stripQuotesAndTrim(SEND_AS);
+
+    let message: string;
+    if (!attachments || attachments.length === 0) {
+      // Simple single-part message
+      message = [
+        `From: Golf Lessons <${fromHeader}>`,
+        `To: ${to}`,
+        `Subject: ${encodedSubject}`,
+        `MIME-Version: 1.0`,
+        `Content-Type: text/html; charset=utf-8`,
+        ``,
+        html,
+      ].join("\r\n");
+    } else {
+      // multipart/mixed with HTML body + attachments
+      const boundary = `gl_${Date.now().toString(36)}_${Math.random().toString(36).slice(2)}`;
+      const parts: string[] = [
+        `From: Golf Lessons <${fromHeader}>`,
+        `To: ${to}`,
+        `Subject: ${encodedSubject}`,
+        `MIME-Version: 1.0`,
+        `Content-Type: multipart/mixed; boundary="${boundary}"`,
+        ``,
+        `--${boundary}`,
+        `Content-Type: text/html; charset=utf-8`,
+        `Content-Transfer-Encoding: 7bit`,
+        ``,
+        html,
+      ];
+      for (const att of attachments) {
+        const b64 = Buffer.from(att.content).toString("base64");
+        // Wrap base64 at 76 chars per RFC 2045
+        const wrapped = b64.match(/.{1,76}/g)?.join("\r\n") ?? b64;
+        const ctParams = [
+          `${att.contentType}; charset=utf-8; name="${att.filename}"`,
+          att.method ? `method=${att.method}` : null,
+        ]
+          .filter(Boolean)
+          .join("; ");
+        parts.push(
+          ``,
+          `--${boundary}`,
+          `Content-Type: ${ctParams}`,
+          `Content-Transfer-Encoding: base64`,
+          `Content-Disposition: attachment; filename="${att.filename}"`,
+          ``,
+          wrapped
+        );
+      }
+      parts.push(``, `--${boundary}--`);
+      message = parts.join("\r\n");
+    }
 
     const encoded = Buffer.from(message)
       .toString("base64")

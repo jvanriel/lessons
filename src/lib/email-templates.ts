@@ -614,3 +614,256 @@ export function buildPaymentFailedEmail(opts: {
 export function getPaymentFailedSubject(locale: Locale): string {
   return (PAYMENT_FAILED_STRINGS[locale] ?? PAYMENT_FAILED_STRINGS.en).subject;
 }
+
+// ─── Booking confirmation emails ───────────────────────────────────
+
+const BOOKING_STUDENT_STRINGS: Record<Locale, {
+  subject: (proName: string) => string;
+  greeting: string;
+  body: string;
+  details: string;
+  pro: string;
+  location: string;
+  date: string;
+  time: string;
+  duration: string;
+  durationUnit: string;
+  cta: string;
+  helper: string;
+}> = {
+  en: {
+    subject: (pro) => `Your golf lesson with ${pro} is confirmed`,
+    greeting: "Hi",
+    body: "Your booking is confirmed. Here are the details:",
+    details: "Lesson details",
+    pro: "Pro",
+    location: "Location",
+    date: "Date",
+    time: "Time",
+    duration: "Duration",
+    durationUnit: "minutes",
+    cta: "View my bookings",
+    helper: "Need to cancel or reschedule? Open the booking from your dashboard.",
+  },
+  nl: {
+    subject: (pro) => `Je golfles bij ${pro} is bevestigd`,
+    greeting: "Hallo",
+    body: "Je boeking is bevestigd. Hier zijn de details:",
+    details: "Les details",
+    pro: "Pro",
+    location: "Locatie",
+    date: "Datum",
+    time: "Tijd",
+    duration: "Duur",
+    durationUnit: "minuten",
+    cta: "Mijn boekingen bekijken",
+    helper: "Annuleren of verplaatsen? Open de boeking vanuit je dashboard.",
+  },
+  fr: {
+    subject: (pro) => `Votre cours de golf avec ${pro} est confirmé`,
+    greeting: "Bonjour",
+    body: "Votre réservation est confirmée. Voici les détails :",
+    details: "Détails du cours",
+    pro: "Pro",
+    location: "Lieu",
+    date: "Date",
+    time: "Heure",
+    duration: "Durée",
+    durationUnit: "minutes",
+    cta: "Voir mes réservations",
+    helper: "Annuler ou reprogrammer ? Ouvrez la réservation depuis votre tableau de bord.",
+  },
+};
+
+function formatLessonDate(date: string, locale: Locale): string {
+  const dateLocale = locale === "nl" ? "nl-BE" : locale === "fr" ? "fr-BE" : "en-GB";
+  return new Intl.DateTimeFormat(dateLocale, {
+    weekday: "long",
+    day: "numeric",
+    month: "long",
+    year: "numeric",
+  }).format(new Date(date + "T00:00:00"));
+}
+
+function detailsTable(rows: Array<[string, string]>): string {
+  return `
+    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:${COLORS.green100};border:1px solid #b4d6c1;border-radius:8px;margin:0 0 24px 0;">
+      <tr><td style="padding:16px 20px;">
+        ${rows
+          .map(
+            ([k, v]) => `
+          <p style="margin:0 0 8px 0;font-size:14px;">
+            <strong style="color:${COLORS.green950};">${k}:</strong>
+            <span style="color:#3d6b4f;">${v}</span>
+          </p>`
+          )
+          .join("")}
+      </td></tr>
+    </table>
+  `;
+}
+
+export function buildStudentBookingConfirmationEmail(opts: {
+  firstName: string;
+  proName: string;
+  locationName: string;
+  date: string;
+  startTime: string;
+  endTime: string;
+  duration: number;
+  locale: Locale;
+}): string {
+  const s = BOOKING_STUDENT_STRINGS[opts.locale] ?? BOOKING_STUDENT_STRINGS.en;
+  const body = `
+    <h2 style="font-family:Georgia,'Times New Roman',serif;font-size:22px;color:${COLORS.green950};margin:0 0 16px 0;font-weight:normal;">
+      ${s.greeting} ${opts.firstName},
+    </h2>
+    <p style="margin:0 0 20px 0;">${s.body}</p>
+    ${detailsTable([
+      [s.pro, opts.proName],
+      [s.location, opts.locationName],
+      [s.date, formatLessonDate(opts.date, opts.locale)],
+      [s.time, `${opts.startTime} – ${opts.endTime}`],
+      [s.duration, `${opts.duration} ${s.durationUnit}`],
+    ])}
+    <p style="margin:0 0 24px 0;">
+      <a href="${getBaseUrl()}/member/bookings" style="display:inline-block;background:${COLORS.gold600};color:${COLORS.white};padding:12px 28px;border-radius:6px;text-decoration:none;font-weight:500;font-size:14px;">
+        ${s.cta}
+      </a>
+    </p>
+    <p style="color:#666;font-size:13px;margin:0;">${s.helper}</p>
+  `;
+  return emailLayout(body, undefined, opts.locale);
+}
+
+export function getStudentBookingConfirmationSubject(
+  proName: string,
+  locale: Locale
+): string {
+  return (BOOKING_STUDENT_STRINGS[locale] ?? BOOKING_STUDENT_STRINGS.en).subject(proName);
+}
+
+const BOOKING_PRO_STRINGS: Record<Locale, {
+  subject: (studentName: string) => string;
+  greeting: string;
+  body: (studentName: string) => string;
+  details: string;
+  student: string;
+  studentEmail: string;
+  studentPhone: string;
+  location: string;
+  date: string;
+  time: string;
+  duration: string;
+  durationUnit: string;
+  participants: string;
+  notes: string;
+  cta: string;
+}> = {
+  en: {
+    subject: (s) => `New lesson booking from ${s}`,
+    greeting: "Hi",
+    body: (s) => `${s} just booked a lesson with you. Here are the details:`,
+    details: "Lesson details",
+    student: "Student",
+    studentEmail: "Email",
+    studentPhone: "Phone",
+    location: "Location",
+    date: "Date",
+    time: "Time",
+    duration: "Duration",
+    durationUnit: "minutes",
+    participants: "Participants",
+    notes: "Notes",
+    cta: "Open in dashboard",
+  },
+  nl: {
+    subject: (s) => `Nieuwe lesboeking van ${s}`,
+    greeting: "Hallo",
+    body: (s) => `${s} heeft net een les bij je geboekt. Hier zijn de details:`,
+    details: "Les details",
+    student: "Leerling",
+    studentEmail: "E-mail",
+    studentPhone: "Telefoon",
+    location: "Locatie",
+    date: "Datum",
+    time: "Tijd",
+    duration: "Duur",
+    durationUnit: "minuten",
+    participants: "Deelnemers",
+    notes: "Notities",
+    cta: "Openen in dashboard",
+  },
+  fr: {
+    subject: (s) => `Nouvelle réservation de ${s}`,
+    greeting: "Bonjour",
+    body: (s) => `${s} vient de réserver un cours avec vous. Voici les détails :`,
+    details: "Détails du cours",
+    student: "Élève",
+    studentEmail: "E-mail",
+    studentPhone: "Téléphone",
+    location: "Lieu",
+    date: "Date",
+    time: "Heure",
+    duration: "Durée",
+    durationUnit: "minutes",
+    participants: "Participants",
+    notes: "Remarques",
+    cta: "Ouvrir dans le tableau de bord",
+  },
+};
+
+export function buildProBookingNotificationEmail(opts: {
+  proFirstName: string;
+  studentFirstName: string;
+  studentLastName: string;
+  studentEmail: string;
+  studentPhone: string | null;
+  locationName: string;
+  date: string;
+  startTime: string;
+  endTime: string;
+  duration: number;
+  participantCount: number;
+  notes: string | null;
+  locale: Locale;
+}): string {
+  const s = BOOKING_PRO_STRINGS[opts.locale] ?? BOOKING_PRO_STRINGS.en;
+  const studentFullName = `${opts.studentFirstName} ${opts.studentLastName}`;
+  const rows: Array<[string, string]> = [
+    [s.student, studentFullName],
+    [s.studentEmail, opts.studentEmail],
+  ];
+  if (opts.studentPhone) rows.push([s.studentPhone, opts.studentPhone]);
+  rows.push(
+    [s.location, opts.locationName],
+    [s.date, formatLessonDate(opts.date, opts.locale)],
+    [s.time, `${opts.startTime} – ${opts.endTime}`],
+    [s.duration, `${opts.duration} ${s.durationUnit}`]
+  );
+  if (opts.participantCount > 1) {
+    rows.push([s.participants, String(opts.participantCount)]);
+  }
+  if (opts.notes) rows.push([s.notes, opts.notes]);
+
+  const body = `
+    <h2 style="font-family:Georgia,'Times New Roman',serif;font-size:22px;color:${COLORS.green950};margin:0 0 16px 0;font-weight:normal;">
+      ${s.greeting} ${opts.proFirstName},
+    </h2>
+    <p style="margin:0 0 20px 0;">${s.body(studentFullName)}</p>
+    ${detailsTable(rows)}
+    <p style="margin:0 0 24px 0;">
+      <a href="${getBaseUrl()}/pro/bookings" style="display:inline-block;background:${COLORS.gold600};color:${COLORS.white};padding:12px 28px;border-radius:6px;text-decoration:none;font-weight:500;font-size:14px;">
+        ${s.cta}
+      </a>
+    </p>
+  `;
+  return emailLayout(body, undefined, opts.locale);
+}
+
+export function getProBookingNotificationSubject(
+  studentName: string,
+  locale: Locale
+): string {
+  return (BOOKING_PRO_STRINGS[locale] ?? BOOKING_PRO_STRINGS.en).subject(studentName);
+}

@@ -17,6 +17,7 @@ import { getSession, hasRole } from "@/lib/auth";
 import { createNotification } from "@/lib/notifications";
 import {
   computeAvailableSlots,
+  buildIcs,
   type AvailabilityTemplate,
   type AvailabilityOverride,
   type ExistingBooking,
@@ -24,6 +25,14 @@ import {
 import { redirect } from "next/navigation";
 import crypto from "node:crypto";
 import { getStripe } from "@/lib/stripe";
+import { sendEmail } from "@/lib/mail";
+import {
+  buildStudentBookingConfirmationEmail,
+  getStudentBookingConfirmationSubject,
+  buildProBookingNotificationEmail,
+  getProBookingNotificationSubject,
+} from "@/lib/email-templates";
+import { resolveLocale } from "@/lib/i18n";
 
 function requireMember() {
   return getSession().then((session) => {
@@ -420,12 +429,41 @@ export async function createBooking(formData: FormData) {
     });
   }
 
-  // Notify the pro
+  // Fetch the pro (with user details) for the notification + email
   const [pro] = await db
-    .select({ userId: proProfiles.userId, displayName: proProfiles.displayName })
+    .select({
+      userId: proProfiles.userId,
+      displayName: proProfiles.displayName,
+      proFirstName: users.firstName,
+      proEmail: users.email,
+      proLocale: users.preferredLocale,
+    })
     .from(proProfiles)
+    .innerJoin(users, eq(proProfiles.userId, users.id))
     .where(eq(proProfiles.id, proProfileId))
     .limit(1);
+
+  // Fetch student locale (the booker may differ from the participant
+  // first/last/email entered in the form, but they share the session locale)
+  const [student] = await db
+    .select({ preferredLocale: users.preferredLocale })
+    .from(users)
+    .where(eq(users.id, session.userId))
+    .limit(1);
+  const studentLocale = resolveLocale(student?.preferredLocale);
+
+  // Fetch location name for the email + ics
+  const [loc] = await db
+    .select({ name: locations.name, city: locations.city })
+    .from(proLocations)
+    .innerJoin(locations, eq(proLocations.locationId, locations.id))
+    .where(eq(proLocations.id, proLocationId))
+    .limit(1);
+  const locationName = loc
+    ? loc.city
+      ? `${loc.name}, ${loc.city}`
+      : loc.name
+    : "";
 
   if (pro) {
     await createNotification({
@@ -437,6 +475,65 @@ export async function createBooking(formData: FormData) {
       actionUrl: "/pro/bookings",
       actionLabel: "View bookings",
     });
+
+    // Build a single REQUEST ics that both parties can drop into their
+    // calendar. UTF-8 strings inside the description are fine for ics —
+    // most clients accept them.
+    const proLocale = resolveLocale(pro.proLocale);
+    const ics = buildIcs({
+      date,
+      startTime,
+      endTime,
+      summary: `Golf lesson with ${pro.displayName}`,
+      location: locationName,
+      description: `Booked via golflessons.be — ${firstName} ${lastName}${notes ? ` — Notes: ${notes}` : ""}`,
+      bookingId: booking.id,
+    });
+    const icsAttachment = {
+      filename: "lesson.ics",
+      contentType: "text/calendar",
+      content: ics,
+      method: "REQUEST",
+    };
+
+    // Email the student (best-effort)
+    sendEmail({
+      to: email,
+      subject: getStudentBookingConfirmationSubject(pro.displayName, studentLocale),
+      html: buildStudentBookingConfirmationEmail({
+        firstName,
+        proName: pro.displayName,
+        locationName,
+        date,
+        startTime,
+        endTime,
+        duration,
+        locale: studentLocale,
+      }),
+      attachments: [icsAttachment],
+    }).catch(() => {});
+
+    // Email the pro (best-effort)
+    sendEmail({
+      to: pro.proEmail,
+      subject: getProBookingNotificationSubject(`${firstName} ${lastName}`, proLocale),
+      html: buildProBookingNotificationEmail({
+        proFirstName: pro.proFirstName,
+        studentFirstName: firstName,
+        studentLastName: lastName,
+        studentEmail: email,
+        studentPhone: phone,
+        locationName,
+        date,
+        startTime,
+        endTime,
+        duration,
+        participantCount,
+        notes,
+        locale: proLocale,
+      }),
+      attachments: [icsAttachment],
+    }).catch(() => {});
   }
 
   // Auto-save booking preferences
