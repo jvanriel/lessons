@@ -3,9 +3,12 @@
 import { useState, useTransition, useEffect, useRef } from "react";
 import { QRCodeSVG } from "qrcode.react";
 import { generateQRToken } from "./actions";
+import { t } from "@/lib/i18n/translations";
+import type { Locale } from "@/lib/i18n";
 
-export function QRLoginButton({ label }: { label: string }) {
+export function QRLoginButton({ locale }: { locale: Locale }) {
   const [open, setOpen] = useState(false);
+  const label = t("dashboard.openOnPhone", locale);
 
   return (
     <>
@@ -31,12 +34,12 @@ export function QRLoginButton({ label }: { label: string }) {
         {label}
       </button>
 
-      {open && <QRLoginDialog onClose={() => setOpen(false)} />}
+      {open && <QRLoginDialog onClose={() => setOpen(false)} locale={locale} />}
     </>
   );
 }
 
-function QRLoginDialog({ onClose }: { onClose: () => void }) {
+function QRLoginDialog({ onClose, locale }: { onClose: () => void; locale: Locale }) {
   const [qrUrl, setQrUrl] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
   const [timeLeft, setTimeLeft] = useState(300); // 5 minutes
@@ -89,7 +92,7 @@ function QRLoginDialog({ onClose }: { onClose: () => void }) {
         {/* Header */}
         <div className="flex items-center justify-between mb-4">
           <h3 className="font-display text-lg font-semibold text-green-900">
-            Open on your phone
+            {t("qr.title", locale)}
           </h3>
           <button
             onClick={onClose}
@@ -147,12 +150,12 @@ function QRLoginDialog({ onClose }: { onClose: () => void }) {
             </div>
           ) : expired ? (
             <div className="flex h-52 w-52 flex-col items-center justify-center text-center">
-              <p className="text-sm text-green-500">QR code expired</p>
+              <p className="text-sm text-green-500">{t("qr.expired", locale)}</p>
               <button
                 onClick={regenerate}
                 className="mt-3 rounded-md bg-gold-600 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-gold-500"
               >
-                Generate new code
+                {t("qr.generateNew", locale)}
               </button>
             </div>
           ) : null}
@@ -160,7 +163,7 @@ function QRLoginDialog({ onClose }: { onClose: () => void }) {
           {/* Timer */}
           {!expired && qrUrl && (
             <p className="mt-2 text-xs text-green-400">
-              Expires in {minutes}:{String(seconds).padStart(2, "0")}
+              {t("qr.expiresIn", locale)} {minutes}:{String(seconds).padStart(2, "0")}
             </p>
           )}
         </div>
@@ -168,21 +171,21 @@ function QRLoginDialog({ onClose }: { onClose: () => void }) {
         {/* Instructions */}
         <div className="mt-5 space-y-3">
           <p className="text-sm text-green-700">
-            Scan this QR code with your phone camera to log in instantly.
+            {t("qr.scanInstruction", locale)}
           </p>
           <div className="rounded-lg bg-green-50 p-3">
             <p className="text-xs font-medium text-green-800 mb-1.5">
-              Add to home screen:
+              {t("qr.addToHomeTitle", locale)}
             </p>
             <ol className="space-y-1 text-xs text-green-600">
               <li className="flex gap-2">
                 <span className="font-medium text-green-700">1.</span>
-                Scan the QR code to open in your browser
+                {t("qr.step1", locale)}
               </li>
               <li className="flex gap-2">
                 <span className="font-medium text-green-700">2.</span>
                 <span>
-                  Tap the share button{" "}
+                  {t("qr.step2.tapShare", locale)}{" "}
                   <svg
                     className="inline h-3 w-3 text-green-500"
                     fill="none"
@@ -196,7 +199,7 @@ function QRLoginDialog({ onClose }: { onClose: () => void }) {
                       d="M9 8.25H7.5a2.25 2.25 0 0 0-2.25 2.25v9a2.25 2.25 0 0 0 2.25 2.25h9a2.25 2.25 0 0 0 2.25-2.25v-9a2.25 2.25 0 0 0-2.25-2.25H15m0-3-3-3m0 0-3 3m3-3V15"
                     />
                   </svg>{" "}
-                  (Safari) or menu{" "}
+                  {t("qr.step2.safariOr", locale)}{" "}
                   <svg
                     className="inline h-3 w-3 text-green-500"
                     fill="none"
@@ -210,12 +213,12 @@ function QRLoginDialog({ onClose }: { onClose: () => void }) {
                       d="M12 6.75a.75.75 0 1 1 0-1.5.75.75 0 0 1 0 1.5ZM12 12.75a.75.75 0 1 1 0-1.5.75.75 0 0 1 0 1.5ZM12 18.75a.75.75 0 1 1 0-1.5.75.75 0 0 1 0 1.5Z"
                     />
                   </svg>{" "}
-                  (Chrome)
+                  {t("qr.step2.chrome", locale)}
                 </span>
               </li>
               <li className="flex gap-2">
                 <span className="font-medium text-green-700">3.</span>
-                Select &quot;Add to Home Screen&quot;
+                {t("qr.step3", locale)}
               </li>
             </ol>
           </div>

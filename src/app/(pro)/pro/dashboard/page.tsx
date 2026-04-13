@@ -57,7 +57,7 @@ export default async function ProDashboard() {
             {t("proDashboard.tagline", locale)}
           </p>
         </div>
-        <QRLoginButton label={t("dashboard.openOnPhone", locale)} />
+        <QRLoginButton locale={locale} />
       </div>
 
       <div className="mt-8 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">

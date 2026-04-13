@@ -132,7 +132,7 @@ export default async function MemberDashboard() {
         </div>
         <div className="flex items-center gap-2">
           <HelpButton />
-          <QRLoginButton label={t("dashboard.openOnPhone", locale)} />
+          <QRLoginButton locale={locale} />
         </div>
       </div>
 
