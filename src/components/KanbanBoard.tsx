@@ -107,6 +107,7 @@ export default function KanbanBoard({
   );
   const [assigneeFilter, setAssigneeFilter] = useState<"all" | "mine" | number>("all");
   const [sortMode, setSortMode] = useState<SortMode>("priority");
+  const [doneRange, setDoneRange] = useState<1 | 7 | 30 | 90 | "all">(7);
 
   // Restore filter + sort selections from localStorage after hydration
   useEffect(() => {
@@ -124,6 +125,14 @@ export default function KanbanBoard({
         setSortMode(sm);
       }
     } catch {}
+    try {
+      const dr = localStorage.getItem("kanban-done-range");
+      if (dr === "all") setDoneRange("all");
+      else if (dr) {
+        const n = Number(dr);
+        if ([1, 7, 30, 90].includes(n)) setDoneRange(n as 1 | 7 | 30 | 90);
+      }
+    } catch {}
   }, []);
 
   // Persist filter + sort selections
@@ -137,6 +146,11 @@ export default function KanbanBoard({
       localStorage.setItem("kanban-sort-mode", sortMode);
     } catch {}
   }, [sortMode]);
+  useEffect(() => {
+    try {
+      localStorage.setItem("kanban-done-range", String(doneRange));
+    } catch {}
+  }, [doneRange]);
 
   // Keep local state in sync with server data (refreshed every 15s below)
   useEffect(() => {
@@ -331,10 +345,19 @@ export default function KanbanBoard({
               t.assigneeIds.includes(filterUserId)
             );
           }
-          // Apply sort — position order still drives within-priority layout
-          // when sortMode === "priority" via the secondary createdAt tiebreak,
-          // but we honour explicit drag positioning first when there are no
-          // filters active. Simplest: always sortTasks.
+          // Done column has its own time-window filter on top of assignee
+          let totalCount: number | undefined;
+          if (col.id === "done" && doneRange !== "all") {
+            const cutoff = new Date();
+            cutoff.setDate(cutoff.getDate() - doneRange);
+            const before = columnTasks.length;
+            columnTasks = columnTasks.filter((t) => {
+              if (!t.completedAt) return true; // legacy rows without timestamp
+              return new Date(t.completedAt) >= cutoff;
+            });
+            if (columnTasks.length !== before) totalCount = before;
+          }
+          // Apply sort
           columnTasks = sortTasks(columnTasks, sortMode);
 
           return (
@@ -346,8 +369,28 @@ export default function KanbanBoard({
                   {col.label}
                 </h2>
                 <span className="rounded-full bg-green-100 px-1.5 py-0.5 text-[10px] text-green-600">
-                  {columnTasks.length}
+                  {totalCount !== undefined
+                    ? `${columnTasks.length} / ${totalCount}`
+                    : columnTasks.length}
                 </span>
+                {col.id === "done" && (
+                  <select
+                    value={doneRange}
+                    onChange={(e) => {
+                      const v = e.target.value;
+                      setDoneRange(
+                        v === "all" ? "all" : (Number(v) as 1 | 7 | 30 | 90)
+                      );
+                    }}
+                    className="ml-auto rounded border border-green-200 bg-white px-1 py-0.5 text-[10px] text-green-700 focus:outline-none focus:ring-1 focus:ring-gold-500"
+                  >
+                    <option value={1}>1 day</option>
+                    <option value={7}>7 days</option>
+                    <option value={30}>30 days</option>
+                    <option value={90}>90 days</option>
+                    <option value="all">All</option>
+                  </select>
+                )}
               </div>
               <div className="space-y-1.5">
                 {columnTasks.map((task) => (
