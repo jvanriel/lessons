@@ -140,20 +140,20 @@ export default function KanbanBoard({
   );
 
   return (
-    <div className="mt-8">
+    <div className="mt-5">
       {/* Create form */}
-      <div className="mb-6 rounded-xl border border-green-200 bg-white p-4">
-        <form action={createAction} className="flex gap-3">
+      <div className="mb-4 rounded-lg border border-green-200 bg-white p-3">
+        <form action={createAction} className="flex gap-2">
           <input
             name="title"
             placeholder="New task..."
             required
-            className="flex-1 rounded-lg border border-green-300 px-3 py-2 text-sm focus:border-gold-500 focus:outline-none focus:ring-1 focus:ring-gold-500"
+            className="flex-1 rounded-md border border-green-300 px-2.5 py-1.5 text-xs focus:border-gold-500 focus:outline-none focus:ring-1 focus:ring-gold-500"
           />
           <select
             name="priority"
             defaultValue="normal"
-            className="rounded-lg border border-green-300 px-3 py-2 text-sm focus:border-gold-500 focus:outline-none"
+            className="rounded-md border border-green-300 px-2.5 py-1.5 text-xs focus:border-gold-500 focus:outline-none"
           >
             {PRIORITIES.map((p) => (
               <option key={p.value} value={p.value}>
@@ -164,18 +164,18 @@ export default function KanbanBoard({
           <button
             type="submit"
             disabled={createPending}
-            className="rounded-lg bg-gold-600 px-5 py-2 text-sm font-medium text-white hover:bg-gold-500 disabled:opacity-50"
+            className="rounded-md bg-gold-600 px-4 py-1.5 text-xs font-medium text-white hover:bg-gold-500 disabled:opacity-50"
           >
             {createPending ? "Creating..." : "Add"}
           </button>
         </form>
         {createState?.error && (
-          <p className="mt-2 text-sm text-red-600">{createState.error}</p>
+          <p className="mt-2 text-xs text-red-600">{createState.error}</p>
         )}
       </div>
 
       {/* Columns */}
-      <div className="grid gap-4 lg:grid-cols-3">
+      <div className="grid gap-3 lg:grid-cols-4">
         {COLUMNS.map((col) => {
           const columnTasks = allTasks
             .filter((t) => t.column === col.id)
@@ -184,16 +184,16 @@ export default function KanbanBoard({
           return (
             <div key={col.id}>
               <div
-                className={`mb-3 flex items-center gap-2 border-b-2 ${col.color} pb-2`}
+                className={`mb-2 flex items-center gap-1.5 border-b-2 ${col.color} pb-1.5`}
               >
-                <h2 className="text-sm font-semibold uppercase tracking-wider text-green-800">
+                <h2 className="text-[11px] font-semibold uppercase tracking-wider text-green-800">
                   {col.label}
                 </h2>
-                <span className="rounded-full bg-green-100 px-2 py-0.5 text-xs text-green-600">
+                <span className="rounded-full bg-green-100 px-1.5 py-0.5 text-[10px] text-green-600">
                   {columnTasks.length}
                 </span>
               </div>
-              <div className="space-y-2">
+              <div className="space-y-1.5">
                 {columnTasks.map((task) => (
                   <TaskCard
                     key={task.id}
@@ -204,7 +204,7 @@ export default function KanbanBoard({
                   />
                 ))}
                 {columnTasks.length === 0 && (
-                  <p className="py-4 text-center text-xs text-green-400">
+                  <p className="py-3 text-center text-[11px] text-green-400">
                     No tasks
                   </p>
                 )}
@@ -249,28 +249,32 @@ function TaskCard({
   const checkDone = task.checklist?.filter((c) => c.done).length ?? 0;
   const checkTotal = task.checklist?.length ?? 0;
 
+  const colIdx = COLUMNS.findIndex((c) => c.id === task.column);
+  const prevCol = colIdx > 0 ? COLUMNS[colIdx - 1].id : null;
+  const nextCol = colIdx >= 0 && colIdx < COLUMNS.length - 1 ? COLUMNS[colIdx + 1].id : null;
+
   return (
     <div
       onClick={onSelect}
-      className={`cursor-pointer rounded-lg border border-green-200 bg-white p-3 transition-colors hover:border-green-300 ${
+      className={`cursor-pointer rounded-md border border-green-200 bg-white p-2 transition-colors hover:border-green-300 ${
         borderClass ? `border-l-2 ${borderClass}` : ""
       }`}
     >
-      <div className="flex items-start justify-between gap-2">
-        <h3 className="text-sm font-medium text-green-800">{task.title}</h3>
+      <div className="flex items-start justify-between gap-1.5">
+        <h3 className="text-[12px] font-medium leading-snug text-green-800">{task.title}</h3>
         <span
-          className={`shrink-0 rounded-full px-1.5 py-0.5 text-[10px] font-medium ${PRIORITY_BADGE[task.priority]}`}
+          className={`shrink-0 rounded-full px-1.5 py-0.5 text-[9px] font-medium ${PRIORITY_BADGE[task.priority]}`}
         >
           {task.priority}
         </span>
       </div>
       {task.description && (
-        <p className="mt-1 line-clamp-2 text-xs text-green-500">
+        <p className="mt-1 line-clamp-2 text-[11px] text-green-500">
           {task.description}
         </p>
       )}
-      <div className="mt-2 flex items-center justify-between">
-        <div className="flex items-center gap-2">
+      <div className="mt-1.5 flex items-center justify-between">
+        <div className="flex items-center gap-1.5">
           {task.assigneeIds.length > 0 && (
             <span className="text-[10px] text-green-500">
               {task.assigneeIds
@@ -289,31 +293,27 @@ function TaskCard({
             </span>
           )}
         </div>
-        <div className="flex gap-1">
-          {task.column !== "todo" && (
+        <div className="flex gap-0.5">
+          {prevCol && (
             <button
               onClick={(e) => {
                 e.stopPropagation();
-                const prev =
-                  task.column === "done" ? "in_progress" : "todo";
-                onMove(task.id, prev as TaskColumn);
+                onMove(task.id, prevCol);
               }}
-              className="rounded p-1 text-green-400 hover:bg-green-100 hover:text-green-600"
+              className="rounded p-0.5 text-green-400 hover:bg-green-100 hover:text-green-600"
             >
               <svg className="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                 <path strokeLinecap="round" strokeLinejoin="round" d="M15.75 19.5 8.25 12l7.5-7.5" />
               </svg>
             </button>
           )}
-          {task.column !== "done" && (
+          {nextCol && (
             <button
               onClick={(e) => {
                 e.stopPropagation();
-                const next =
-                  task.column === "todo" ? "in_progress" : "done";
-                onMove(task.id, next as TaskColumn);
+                onMove(task.id, nextCol);
               }}
-              className="rounded p-1 text-green-400 hover:bg-green-100 hover:text-green-600"
+              className="rounded p-0.5 text-green-400 hover:bg-green-100 hover:text-green-600"
             >
               <svg className="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                 <path strokeLinecap="round" strokeLinejoin="round" d="m8.25 4.5 7.5 7.5-7.5 7.5" />

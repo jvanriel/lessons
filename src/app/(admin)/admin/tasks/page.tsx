@@ -45,11 +45,11 @@ export default async function AdminTasksPage() {
   }));
 
   return (
-    <div className="mx-auto max-w-7xl px-6 py-12">
-      <h1 className="font-display text-3xl font-semibold text-green-900">
+    <div className="mx-auto max-w-[96rem] px-6 py-8">
+      <h1 className="font-display text-2xl font-semibold text-green-900">
         Tasks
       </h1>
-      <p className="mt-2 text-sm text-green-600">
+      <p className="mt-1 text-xs text-green-600">
         Manage tasks and track progress.
       </p>
       <KanbanBoard tasks={serializedTasks} adminUsers={adminUsers} currentUserId={session!.userId} />
