@@ -12,6 +12,8 @@ interface ProfileData {
   specialties: string | null;
   pricePerHour: string | null;
   lessonDurations: number[];
+  /** Per-duration lesson price in EUR (whole euros). */
+  lessonPricing: Record<string, number>;
   maxGroupSize: number;
   bookingEnabled: boolean;
   bookingNotice: number;
@@ -44,6 +46,9 @@ export default function ProProfileEditor({
   // Booking settings
   const [pricePerHour, setPricePerHour] = useState(profile.pricePerHour ?? "");
   const [lessonDurations, setLessonDurations] = useState<number[]>(profile.lessonDurations);
+  const [lessonPricing, setLessonPricing] = useState<Record<string, number>>(
+    profile.lessonPricing
+  );
   const [maxGroupSize, setMaxGroupSize] = useState(profile.maxGroupSize);
   const [bookingEnabled, setBookingEnabled] = useState(profile.bookingEnabled);
   const [bookingNotice, setBookingNotice] = useState(profile.bookingNotice);
@@ -63,6 +68,15 @@ export default function ProProfileEditor({
       formData.set("pricePerHour", pricePerHour);
       formData.set("maxGroupSize", String(maxGroupSize));
       formData.set("lessonDurations", JSON.stringify(lessonDurations));
+      // Convert EUR → cents and only send entries for enabled durations.
+      const pricingCents: Record<string, number> = {};
+      for (const d of lessonDurations) {
+        const eur = lessonPricing[String(d)];
+        if (typeof eur === "number" && eur > 0) {
+          pricingCents[String(d)] = Math.round(eur * 100);
+        }
+      }
+      formData.set("lessonPricing", JSON.stringify(pricingCents));
       formData.set("bookingEnabled", String(bookingEnabled));
       formData.set("bookingNotice", String(bookingNotice));
       formData.set("bookingHorizon", String(bookingHorizon));
@@ -177,6 +191,15 @@ export default function ProProfileEditor({
                         setLessonDurations(
                           [...lessonDurations, d].sort((a, b) => a - b)
                         );
+                        // Pre-fill a price if one isn't set yet, pro-rated
+                        // from the 60-min baseline (or €50/h default).
+                        if (lessonPricing[String(d)] == null) {
+                          const baseline = lessonPricing["60"] ?? 50;
+                          setLessonPricing({
+                            ...lessonPricing,
+                            [String(d)]: Math.round((baseline * d) / 60),
+                          });
+                        }
                       } else {
                         const next = lessonDurations.filter((v) => v !== d);
                         if (next.length > 0) setLessonDurations(next);
@@ -191,6 +214,49 @@ export default function ProProfileEditor({
             <p className="mt-1 text-xs text-green-500">
               {t("proProfile.lessonDurationsHelp", locale)}
             </p>
+          </div>
+
+          {/* Per-duration lesson prices — real amounts charged at booking */}
+          <div className="rounded-lg border border-gold-200 bg-gold-50/40 p-4">
+            <h3 className="text-sm font-semibold text-green-900">
+              {t("proOnb.lessons.chargingHeading", locale)}{" "}
+              <span className="text-red-500">*</span>
+            </h3>
+            <p className="mt-1 text-xs text-green-600">
+              {t("proOnb.lessons.chargingHint", locale)}
+            </p>
+            <div className="mt-3 grid gap-3 sm:grid-cols-2">
+              {lessonDurations.map((d) => (
+                <div key={d}>
+                  <label className="block text-xs font-medium text-green-700">
+                    {t("proOnb.lessons.pricePerDuration", locale).replace(
+                      "{n}",
+                      String(d)
+                    )}
+                  </label>
+                  <div className="relative mt-1">
+                    <span className="pointer-events-none absolute inset-y-0 left-3 flex items-center text-sm text-green-500">
+                      €
+                    </span>
+                    <input
+                      type="number"
+                      min="0"
+                      step="5"
+                      value={lessonPricing[String(d)] ?? ""}
+                      onChange={(e) => {
+                        const n = Number(e.target.value);
+                        if (!Number.isFinite(n) || n < 0) return;
+                        setLessonPricing({
+                          ...lessonPricing,
+                          [String(d)]: n,
+                        });
+                      }}
+                      className={inputClass + " pl-7"}
+                    />
+                  </div>
+                </div>
+              ))}
+            </div>
           </div>
 
           <div>

@@ -42,7 +42,29 @@ export async function updateProProfile(
     }
   } catch {}
 
+  // Per-duration lesson prices in cents, filtered to enabled durations.
+  let lessonPricing: Record<string, number> = {};
+  try {
+    const parsed = JSON.parse(
+      (formData.get("lessonPricing") as string) ?? "{}"
+    );
+    if (parsed && typeof parsed === "object") {
+      const validDurations = new Set(lessonDurations.map(String));
+      for (const [k, v] of Object.entries(parsed)) {
+        if (!validDurations.has(k)) continue;
+        const cents = Math.round(Number(v));
+        if (!Number.isFinite(cents) || cents <= 0) continue;
+        lessonPricing[k] = cents;
+      }
+    }
+  } catch {}
+
   if (!displayName) return { error: "Display name is required." };
+  if (Object.keys(lessonPricing).length === 0) {
+    return {
+      error: "At least one selected lesson duration needs a price.",
+    };
+  }
 
   await db
     .update(proProfiles)
@@ -52,6 +74,7 @@ export async function updateProProfile(
       specialties,
       pricePerHour,
       lessonDurations,
+      lessonPricing,
       maxGroupSize,
       bookingEnabled,
       bookingNotice,

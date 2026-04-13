@@ -33,6 +33,8 @@ interface InitialData {
   specialties: string;
   pricePerHour: string;
   lessonDurations: number[];
+  /** Per-duration lesson price in EUR (user-facing, NOT cents). */
+  lessonPricing: Record<string, number>;
   maxGroupSize: number;
   cancellationHours: number;
   bankAccountHolder: string;
@@ -252,24 +254,38 @@ function LessonsStep({
         onChange({ lessonDurations: current.filter((x) => x !== d) });
       }
     } else {
-      onChange({ lessonDurations: [...current, d].sort((a, b) => a - b) });
+      // When enabling a duration, pre-fill its price from the 60-min
+      // baseline if the pro has one, otherwise default €50/hour pro-rated.
+      const baseline = data.lessonPricing["60"] ?? 50;
+      const prefilled =
+        data.lessonPricing[String(d)] ?? Math.round((baseline * d) / 60);
+      onChange({
+        lessonDurations: [...current, d].sort((a, b) => a - b),
+        lessonPricing: { ...data.lessonPricing, [String(d)]: prefilled },
+      });
     }
+  }
+
+  function updatePriceForDuration(d: number, value: string) {
+    const n = Number(value);
+    if (!Number.isFinite(n) || n < 0) return;
+    onChange({
+      lessonPricing: { ...data.lessonPricing, [String(d)]: n },
+    });
   }
 
   return (
     <div className="space-y-5">
       <div>
         <label className="block text-sm font-medium text-green-800">
-          {t("proOnb.lessons.priceLabel", locale)} <span className="text-red-500">*</span>
+          {t("proOnb.lessons.priceLabel", locale)}
         </label>
         <input
-          type="number"
+          type="text"
           value={data.pricePerHour}
           onChange={(e) => onChange({ pricePerHour: e.target.value })}
           placeholder={t("proOnb.lessons.pricePlaceholder", locale)}
-          min="50"
-          step="5"
-          className={inputClass + " max-w-[200px]"}
+          className={inputClass + " max-w-[280px]"}
         />
         <p className="mt-1 text-xs text-green-500">{t("proOnb.lessons.priceMin", locale)}</p>
       </div>
@@ -292,6 +308,42 @@ function LessonsStep({
             >
               {d} min
             </button>
+          ))}
+        </div>
+      </div>
+
+      {/* Per-duration lesson prices — REAL prices that get charged */}
+      <div className="rounded-lg border border-gold-200 bg-gold-50/40 p-4">
+        <h3 className="text-sm font-semibold text-green-900">
+          {t("proOnb.lessons.chargingHeading", locale)}{" "}
+          <span className="text-red-500">*</span>
+        </h3>
+        <p className="mt-1 text-xs text-green-600">
+          {t("proOnb.lessons.chargingHint", locale)}
+        </p>
+        <div className="mt-3 grid gap-3 sm:grid-cols-2">
+          {data.lessonDurations.map((d) => (
+            <div key={d}>
+              <label className="block text-xs font-medium text-green-700">
+                {t("proOnb.lessons.pricePerDuration", locale).replace(
+                  "{n}",
+                  String(d)
+                )}
+              </label>
+              <div className="relative mt-1">
+                <span className="pointer-events-none absolute inset-y-0 left-3 flex items-center text-sm text-green-500">
+                  €
+                </span>
+                <input
+                  type="number"
+                  min="0"
+                  step="5"
+                  value={data.lessonPricing[String(d)] ?? ""}
+                  onChange={(e) => updatePriceForDuration(d, e.target.value)}
+                  className={inputClass + " pl-7"}
+                />
+              </div>
+            </div>
           ))}
         </div>
       </div>
@@ -686,14 +738,32 @@ export default function OnboardingWizard({
       case 1: // Locations
         success = await saveStep("locations", { locations });
         break;
-      case 2: // Lessons
+      case 2: {
+        // Validate: at least one selected duration must have a price > 0
+        const anyPricedDuration = data.lessonDurations.some(
+          (d) => (data.lessonPricing[String(d)] ?? 0) > 0
+        );
+        if (!anyPricedDuration) {
+          setError(t("proOnb.lessons.chargingHint", locale));
+          return;
+        }
+        // Convert EUR → cents for storage
+        const lessonPricingCents: Record<string, number> = {};
+        for (const d of data.lessonDurations) {
+          const eur = data.lessonPricing[String(d)];
+          if (typeof eur === "number" && eur > 0) {
+            lessonPricingCents[String(d)] = Math.round(eur * 100);
+          }
+        }
         success = await saveStep("lessons", {
           pricePerHour: data.pricePerHour,
           lessonDurations: data.lessonDurations,
+          lessonPricing: lessonPricingCents,
           maxGroupSize: data.maxGroupSize,
           cancellationHours: data.cancellationHours,
         });
         break;
+      }
       case 3: // Bank
         success = await saveStep("bank", {
           accountHolder: data.bankAccountHolder,

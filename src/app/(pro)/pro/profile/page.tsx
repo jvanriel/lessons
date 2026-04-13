@@ -38,6 +38,12 @@ export default async function ProProfilePage() {
             specialties: profile.specialties,
             pricePerHour: profile.pricePerHour,
             lessonDurations: profile.lessonDurations as number[],
+            // Stored in cents; expose as whole euros to the editor.
+            lessonPricing: Object.fromEntries(
+              Object.entries(
+                (profile.lessonPricing as Record<string, number>) ?? {}
+              ).map(([k, cents]) => [k, Math.round(cents / 100)])
+            ),
             maxGroupSize: profile.maxGroupSize,
             bookingEnabled: profile.bookingEnabled,
             bookingNotice: profile.bookingNotice,

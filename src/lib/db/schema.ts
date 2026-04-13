@@ -130,7 +130,22 @@ export const proProfiles = pgTable("pro_profiles", {
     .notNull()
     .default([60]),
   maxGroupSize: integer("max_group_size").notNull().default(4),
+  /**
+   * Free-text price indication shown on the pro profile page
+   * (e.g. "€50-75/u"). NOT used for actual charging — that's
+   * `lessonPricing` below.
+   */
   pricePerHour: text("price_per_hour"),
+  /**
+   * Per-duration lesson price in EUR cents for actual charging.
+   * Keys are duration minutes as strings matching `lessonDurations`,
+   * values are prices in cents. Example: `{ "30": 3500, "60": 6500 }`.
+   * Used by the booking flow to compute the PaymentIntent amount.
+   */
+  lessonPricing: jsonb("lesson_pricing")
+    .$type<Record<string, number>>()
+    .notNull()
+    .default({}),
   bookingEnabled: boolean("booking_enabled").notNull().default(true),
   bookingNotice: integer("booking_notice").notNull().default(24),
   bookingHorizon: integer("booking_horizon").notNull().default(60),

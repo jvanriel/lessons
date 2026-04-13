@@ -59,7 +59,14 @@ export default async function OnboardingPage() {
         bio: profile.bio ?? "",
         specialties: profile.specialties ?? "",
         pricePerHour: profile.pricePerHour ?? "",
-        lessonDurations: profile.lessonDurations as number[] ?? [60],
+        lessonDurations: (profile.lessonDurations as number[]) ?? [60],
+        // lessonPricing is stored in cents on the DB; convert to EUR for the
+        // form (so the pro sees whole numbers in the input).
+        lessonPricing: Object.fromEntries(
+          Object.entries(
+            (profile.lessonPricing as Record<string, number>) ?? {}
+          ).map(([k, cents]) => [k, Math.round(cents / 100)])
+        ),
         maxGroupSize: profile.maxGroupSize,
         cancellationHours: profile.cancellationHours,
         bankAccountHolder: profile.bankAccountHolder ?? "",

@@ -81,22 +81,47 @@ export async function POST(request: Request) {
     }
 
     case "lessons": {
-      const { pricePerHour, lessonDurations, maxGroupSize, cancellationHours } =
-        data as {
-          pricePerHour: string;
-          lessonDurations: number[];
-          maxGroupSize: number;
-          cancellationHours: number;
-        };
+      const {
+        pricePerHour,
+        lessonDurations,
+        lessonPricing,
+        maxGroupSize,
+        cancellationHours,
+      } = data as {
+        pricePerHour: string;
+        lessonDurations: number[];
+        lessonPricing?: Record<string, number>;
+        maxGroupSize: number;
+        cancellationHours: number;
+      };
       const priceIndication = pricePerHour?.trim();
       if (!priceIndication) {
         return NextResponse.json({ error: "Price indication is required" }, { status: 400 });
       }
+
+      // Sanitise lessonPricing: only keep entries for enabled durations
+      // with a positive cent value.
+      const cleanedPricing: Record<string, number> = {};
+      const validDurations = new Set((lessonDurations ?? []).map(String));
+      for (const [k, v] of Object.entries(lessonPricing ?? {})) {
+        if (!validDurations.has(k)) continue;
+        const cents = Math.round(Number(v));
+        if (!Number.isFinite(cents) || cents <= 0) continue;
+        cleanedPricing[k] = cents;
+      }
+      if (Object.keys(cleanedPricing).length === 0) {
+        return NextResponse.json(
+          { error: "At least one lesson duration needs a price" },
+          { status: 400 }
+        );
+      }
+
       await db
         .update(proProfiles)
         .set({
           pricePerHour: priceIndication,
           lessonDurations: lessonDurations?.length ? lessonDurations : [60],
+          lessonPricing: cleanedPricing,
           maxGroupSize: maxGroupSize || 4,
           cancellationHours: cancellationHours || 24,
           updatedAt: new Date(),
