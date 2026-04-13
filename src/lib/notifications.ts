@@ -5,6 +5,7 @@ import { notifications, users, pushSubscriptions } from "@/lib/db/schema";
 import { eq, and, desc, inArray, sql, lt } from "drizzle-orm";
 import { sendPush } from "@/lib/push";
 import { logEvent } from "@/lib/events";
+import * as Sentry from "@sentry/nextjs";
 
 const GATEWAY_URL = process.env.GATEWAY_URL;
 const GATEWAY_API_KEY = process.env.GATEWAY_API_KEY;
@@ -137,16 +138,29 @@ export async function getNotifications(userId: number, limit = 50) {
 }
 
 export async function getUnreadCount(userId: number): Promise<number> {
-  const [row] = await db
-    .select({ count: sql<number>`count(*)::int` })
-    .from(notifications)
-    .where(
-      and(
-        eq(notifications.targetUserId, userId),
-        eq(notifications.read, false)
-      )
-    );
-  return row?.count ?? 0;
+  // Defensive: a transient DB hiccup here used to crash the entire
+  // /api/notifications request. The unread badge is non-critical UI;
+  // gracefully return 0 on failure and let the caller render an empty
+  // count rather than an error page. Sentry still sees the throw via
+  // captureException so we don't lose the signal.
+  try {
+    const [row] = await db
+      .select({ count: sql<number>`count(*)::int` })
+      .from(notifications)
+      .where(
+        and(
+          eq(notifications.targetUserId, userId),
+          eq(notifications.read, false)
+        )
+      );
+    return row?.count ?? 0;
+  } catch (err) {
+    Sentry.captureException(err, {
+      tags: { area: "notifications" },
+      extra: { userId, op: "getUnreadCount" },
+    });
+    return 0;
+  }
 }
 
 export async function markAsRead(userId: number, notificationIds: number[]) {
