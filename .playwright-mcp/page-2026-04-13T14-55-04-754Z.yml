@@ -1,0 +1,67 @@
+- generic [active] [ref=e1]:
+  - button "Open Next.js Dev Tools" [ref=e84] [cursor=pointer]:
+    - img [ref=e85]
+  - alert [ref=e88]: Pro Dashboard — Golf Lessons
+  - generic [ref=e90]:
+    - banner [ref=e91]:
+      - link [ref=e93] [cursor=pointer]:
+        - /url: /
+        - img [ref=e94]
+      - generic [ref=e105]:
+        - button "Help" [ref=e106]:
+          - img [ref=e107]
+        - button "NL" [ref=e110]:
+          - img [ref=e111]
+          - generic [ref=e113]: NL
+        - button "Notifications (10 unread)" [ref=e115]:
+          - img [ref=e116]
+          - generic [ref=e118]: "10"
+        - button "Test" [ref=e120]:
+          - img [ref=e121]
+          - generic [ref=e123]: Test
+    - main [ref=e125]:
+      - generic [ref=e126]:
+        - generic [ref=e128]:
+          - heading "Pro Dashboard" [level=1] [ref=e129]
+          - paragraph [ref=e130]: Beheer je lessen, beschikbaarheid en boekingen.
+        - generic [ref=e131]:
+          - generic [ref=e132]:
+            - generic [ref=e133]: "2"
+            - generic [ref=e134]: Lessen vandaag
+          - generic [ref=e135]:
+            - generic [ref=e136]: "3"
+            - generic [ref=e137]: Aankomende boekingen
+          - generic [ref=e138]:
+            - generic [ref=e139]: Snelkoppelingen
+            - generic [ref=e140]:
+              - link "Alle boekingen bekijken" [ref=e141] [cursor=pointer]:
+                - /url: /pro/bookings
+              - link "Beschikbaarheid beheren" [ref=e142] [cursor=pointer]:
+                - /url: /pro/availability
+              - link "Profiel bewerken" [ref=e143] [cursor=pointer]:
+                - /url: /pro/profile
+    - navigation [ref=e144]:
+      - link "Dashboard" [ref=e145] [cursor=pointer]:
+        - /url: /pro/dashboard
+        - img [ref=e146]
+        - text: Dashboard
+      - link "Leerlingen" [ref=e148] [cursor=pointer]:
+        - /url: /pro/students
+        - img [ref=e149]
+        - text: Leerlingen
+      - link "Boekingen" [ref=e151] [cursor=pointer]:
+        - /url: /pro/bookings
+        - img [ref=e152]
+        - text: Boekingen
+      - link "Profiel" [ref=e154] [cursor=pointer]:
+        - /url: /pro/profile
+        - img [ref=e155]
+        - text: Profiel
+  - generic [ref=e158]:
+    - img [ref=e160]
+    - generic [ref=e162]:
+      - paragraph [ref=e163]: Install Golf Lessons
+      - paragraph [ref=e164]: Add to your home screen for a faster experience.
+    - button "Install" [ref=e165]
+    - button "Dismiss" [ref=e166]:
+      - img [ref=e167]

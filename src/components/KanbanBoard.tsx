@@ -742,7 +742,7 @@ function TaskTab({
             ))}
           </div>
         </div>
-        <div className="grid grid-cols-3 gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
           <div>
             <label className="mb-1 block text-sm font-medium text-green-900">
               Priority
@@ -1170,7 +1170,7 @@ function TaskCreateModal({
               </div>
             </div>
 
-            <div className="grid grid-cols-3 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
               <div>
                 <label className="mb-1 block text-sm font-medium text-green-900">
                   Priority

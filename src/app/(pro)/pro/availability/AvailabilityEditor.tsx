@@ -396,6 +396,9 @@ function WeeklyTemplateGrid({
       <p className="mt-2 text-[10px] text-green-400 sm:hidden">
         {t("proAvail.holdToPaint", locale)}
       </p>
+      <p className="mt-1 text-[10px] italic text-green-500 md:hidden">
+        {t("proAvail.scrollHint", locale)}
+      </p>
 
       {/* Grid */}
       <div
@@ -1007,6 +1010,10 @@ function PreviewBlockingGrid({
           {t("proAvail.painting", locale)}
         </div>
       )}
+
+      <p className="mt-2 text-[10px] italic text-green-500 md:hidden">
+        {t("proAvail.scrollHint", locale)}
+      </p>
 
       {/* Grid */}
       <div

@@ -1,0 +1,98 @@
+- generic [active] [ref=e1]:
+  - generic [ref=e2]:
+    - banner [ref=e3]:
+      - link [ref=e5] [cursor=pointer]:
+        - /url: /
+        - img [ref=e6]
+      - generic [ref=e17]:
+        - button "Help" [ref=e18]:
+          - img [ref=e19]
+        - button "NL" [ref=e22]:
+          - img [ref=e23]
+          - generic [ref=e25]: NL
+        - button "Notifications" [ref=e27]:
+          - img [ref=e28]
+        - button "Test" [ref=e31]:
+          - img [ref=e32]
+          - generic [ref=e34]: Test
+    - main [ref=e36]:
+      - generic [ref=e38]:
+        - generic [ref=e40]:
+          - heading "Boek een les bij Dummy Pro" [level=1] [ref=e41]
+          - paragraph [ref=e42]: Testing
+        - generic [ref=e43]:
+          - img [ref=e46]
+          - img [ref=e51]
+          - generic [ref=e55]: "3"
+          - generic [ref=e58]: "4"
+          - generic [ref=e61]: "5"
+          - generic [ref=e64]: "6"
+        - generic [ref=e66]:
+          - heading "Kies een datum" [level=2] [ref=e67]
+          - generic [ref=e68]:
+            - generic [ref=e69]:
+              - button [ref=e70]:
+                - img
+              - generic [ref=e71]: april 2026
+              - button [ref=e72]:
+                - img
+            - generic [ref=e73]:
+              - generic [ref=e74]: Ma
+              - generic [ref=e75]: Di
+              - generic [ref=e76]: Wo
+              - generic [ref=e77]: Do
+              - generic [ref=e78]: Vr
+              - generic [ref=e79]: Za
+              - generic [ref=e80]: Zo
+            - generic [ref=e81]:
+              - button "1" [disabled] [ref=e84]
+              - button "2" [disabled] [ref=e85]
+              - button "3" [disabled] [ref=e86]
+              - button "4" [disabled] [ref=e87]
+              - button "5" [disabled] [ref=e88]
+              - button "6" [disabled] [ref=e89]
+              - button "7" [disabled] [ref=e90]
+              - button "8" [disabled] [ref=e91]
+              - button "9" [disabled] [ref=e92]
+              - button "10" [disabled] [ref=e93]
+              - button "11" [disabled] [ref=e94]
+              - button "12" [disabled] [ref=e95]
+              - button "13" [disabled] [ref=e96]
+              - button "14" [disabled] [ref=e97]
+              - button "15" [disabled] [ref=e98]
+              - button "16" [disabled] [ref=e99]
+              - button "17" [disabled] [ref=e100]
+              - button "18" [disabled] [ref=e101]
+              - button "19" [disabled] [ref=e102]
+              - button "20" [disabled] [ref=e103]
+              - button "21" [disabled] [ref=e104]
+              - button "22" [disabled] [ref=e105]
+              - button "23" [disabled] [ref=e106]
+              - button "24" [disabled] [ref=e107]
+              - button "25" [disabled] [ref=e108]
+              - button "26" [disabled] [ref=e109]
+              - button "27" [disabled] [ref=e110]
+              - button "28" [disabled] [ref=e111]
+              - button "29" [disabled] [ref=e112]
+              - button "30" [disabled] [ref=e113]
+            - paragraph [ref=e114]: Geen datums beschikbaar in de boekingshorizon.
+          - button "Terug" [ref=e116]
+    - navigation [ref=e117]:
+      - link "Dashboard" [ref=e118] [cursor=pointer]:
+        - /url: /pro/dashboard
+        - img [ref=e119]
+        - text: Dashboard
+      - link "Leerlingen" [ref=e121] [cursor=pointer]:
+        - /url: /pro/students
+        - img [ref=e122]
+        - text: Leerlingen
+      - link "Boekingen" [ref=e124] [cursor=pointer]:
+        - /url: /pro/bookings
+        - img [ref=e125]
+        - text: Boekingen
+      - link "Profiel" [ref=e127] [cursor=pointer]:
+        - /url: /pro/profile
+        - img [ref=e128]
+        - text: Profiel
+  - button "Open Next.js Dev Tools" [ref=e135] [cursor=pointer]:
+    - img [ref=e136]

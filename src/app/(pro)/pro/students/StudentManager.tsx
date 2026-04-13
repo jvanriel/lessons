@@ -673,8 +673,8 @@ function HelpDialog({ onClose, locale }: { onClose: () => void; locale: Locale }
             <h4 className="font-medium text-green-900">
               {t("proStudents.helpDialog.inviteResetHeading", locale)}
             </h4>
-            <div className="mt-2 rounded-lg border border-green-100 overflow-hidden">
-              <table className="w-full text-left text-xs">
+            <div className="mt-2 overflow-x-auto rounded-lg border border-green-100">
+              <table className="w-full min-w-[520px] text-left text-xs">
                 <thead>
                   <tr className="bg-green-50 text-green-800">
                     <th className="px-3 py-2 font-medium"></th>

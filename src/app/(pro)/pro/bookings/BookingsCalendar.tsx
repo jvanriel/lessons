@@ -165,6 +165,11 @@ export function BookingsCalendar({ bookings, availability, locale }: Props) {
         </div>
       </div>
 
+      {/* Mobile-only scroll hint */}
+      <p className="mb-1 text-[10px] italic text-green-500 md:hidden">
+        {t("proBookingsCal.scrollHint", locale)}
+      </p>
+
       {/* Calendar grid */}
       <div className="overflow-x-auto rounded-xl border border-green-200 bg-white">
         <div className="min-w-[720px]">

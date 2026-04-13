@@ -1,0 +1,41 @@
+- generic [active] [ref=e1]:
+  - button "Open Next.js Dev Tools" [ref=e7] [cursor=pointer]:
+    - img [ref=e8]
+  - generic [ref=e11]:
+    - banner [ref=e12]:
+      - link [ref=e14] [cursor=pointer]:
+        - /url: /
+        - img [ref=e15]
+      - generic [ref=e26]:
+        - button "Help" [ref=e27]:
+          - img [ref=e28]
+        - button "NL" [ref=e31]:
+          - img [ref=e32]
+          - generic [ref=e34]: NL
+        - button "Notifications" [ref=e36]:
+          - img [ref=e37]
+        - button "Test" [ref=e40]:
+          - img [ref=e41]
+          - generic [ref=e43]: Test
+    - main [ref=e45]:
+      - generic [ref=e47]:
+        - heading "404" [level=1] [ref=e48]
+        - heading "This page could not be found." [level=2] [ref=e50]
+    - navigation [ref=e51]:
+      - link "Dashboard" [ref=e52] [cursor=pointer]:
+        - /url: /pro/dashboard
+        - img [ref=e53]
+        - text: Dashboard
+      - link "Leerlingen" [ref=e55] [cursor=pointer]:
+        - /url: /pro/students
+        - img [ref=e56]
+        - text: Leerlingen
+      - link "Boekingen" [ref=e58] [cursor=pointer]:
+        - /url: /pro/bookings
+        - img [ref=e59]
+        - text: Boekingen
+      - link "Profiel" [ref=e61] [cursor=pointer]:
+        - /url: /pro/profile
+        - img [ref=e62]
+        - text: Profiel
+  - alert [ref=e64]

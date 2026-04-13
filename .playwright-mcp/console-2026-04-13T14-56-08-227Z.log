@@ -1,0 +1,9 @@
+[     252ms] [LOG] [Fast Refresh] rebuilding @ http://localhost:3000/_next/static/chunks/04tl_next_dist_0uu664a._.js:2432
+[    9031ms] [LOG] [Fast Refresh] done in 8873ms @ http://localhost:3000/_next/static/chunks/04tl_next_dist_0uu664a._.js:2432
+[   13453ms] [INFO] %cDownload the React DevTools for a better development experience: https://react.dev/link/react-devtools font-weight:bold @ http://localhost:3000/_next/static/chunks/04tl_next_dist_0uu664a._.js:2432
+[   13552ms] [LOG] [HMR] connected @ http://localhost:3000/_next/static/chunks/04tl_next_dist_0uu664a._.js:2432
+[   13743ms] [LOG] [Fast Refresh] rebuilding @ http://localhost:3000/_next/static/chunks/04tl_next_dist_0uu664a._.js:2432
+[   14032ms] [LOG] [Fast Refresh] done in 390ms @ http://localhost:3000/_next/static/chunks/04tl_next_dist_0uu664a._.js:2432
+[   14342ms] [INFO] Banner not shown: beforeinstallpromptevent.preventDefault() called. The page must call beforeinstallpromptevent.prompt() to show the banner. @ http://localhost:3000/pro/bookings:0
+[   22439ms] [LOG] [Fast Refresh] rebuilding @ http://localhost:3000/_next/static/chunks/04tl_next_dist_0uu664a._.js:2432
+[   22499ms] [LOG] [Fast Refresh] done in 163ms @ http://localhost:3000/_next/static/chunks/04tl_next_dist_0uu664a._.js:2432
