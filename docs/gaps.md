@@ -31,6 +31,28 @@ Cross-reference for sprint planning and Nadine's testing feedback.
 
 - Deadline ~**2026-04-24** (10 days out). Vercel needs to handle. See memory `project_dns_belgium`.
 
+### 5. Pro-authored content + translations + CMS architecture review (urgent)
+
+Pros author content in **multiple places** with no translation story:
+
+- `proProfiles.bio` and `proProfiles.specialties` — single text fields, single language
+- `pro_pages` (the marketing/flyer pages at `/pros/[slug]/[pageSlug]`) — `title`, `metaDescription`, `intro`, and `sections` (jsonb) all single-language
+- `pro_locations.notes` and `priceIndication` — single language
+- (`displayName` is fine — names don't translate)
+
+The platform CMS (`cms_blocks`) has per-locale rows but is operated by the platform team, not pros. There's no path for pros to publish content in NL/FR/EN.
+
+**Decisions needed before launch (or before any pro publishes a flyer page):**
+
+1. **Architecture**: per-locale columns vs. translations table vs. CMS-style blocks vs. auto-translation API vs. hybrid?
+2. **Pro UX**: are we asking every pro to write 3 versions, or fall back automatically?
+3. **Marketing page editor**: the current `/pro/pages` editor has zero locale switching. If we decide pros should write per-locale, the editor needs tabs.
+4. **Migration**: existing pro content (Nadine's Dickens accounts) needs a `contentLocale` column or assumption.
+
+**Stopgap shipped (commit fe47f70 → next push)**: a small italic notice on `/pros/[slug]` and `/pros/[slug]/[pageSlug]` saying "This pro writes their content in their preferred language. Multilingual support is coming soon." in EN/NL/FR. This is honest but not a real fix.
+
+**Recommended next step**: 1-hour design review to pick an approach. My initial lean is **auto-translate via DeepL or Claude**, cached in a `pro_content_translations` table keyed on `(table, id, field, locale)`, regenerated on edit. Avoids forcing pros into a 3-tab editor and works for existing content immediately. Roughly half a day of work plus a small monthly API bill.
+
 ## 🟡 Should-fix before launch
 
 - **`db.transaction()`** wrapping in `createBooking()` — multi-step inserts (booking + participant + relationship) can leave partial state on failure. **Blocked**: the current `drizzle-orm/neon-http` driver doesn't support multi-statement transactions. Move to `neon-serverless` (WebSocket) or `pg` first, then re-introduce. Initial attempt in commit `ea60e63` broke the booking flow (Nadine's task #12) and was reverted in `b95dc35`.

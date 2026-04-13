@@ -4,6 +4,8 @@ import { db } from "@/lib/db";
 import { proProfiles, proPages } from "@/lib/db/schema";
 import { eq, and, isNull } from "drizzle-orm";
 import type { ProPageSection } from "@/lib/db/schema";
+import { getLocale } from "@/lib/locale";
+import { t } from "@/lib/i18n/translations";
 
 interface Props {
   params: Promise<{ slug: string; pageSlug: string }>;
@@ -42,6 +44,7 @@ export async function generateMetadata({ params }: Props) {
 
 export default async function ProFlyerPage({ params }: Props) {
   const { slug, pageSlug } = await params;
+  const locale = await getLocale();
 
   const [pro] = await db
     .select({
@@ -106,9 +109,14 @@ export default async function ProFlyerPage({ params }: Props) {
         </div>
       </section>
 
-      {/* Intro */}
+      {/* Language notice + Intro */}
+      <section className="mx-auto max-w-4xl px-6 pt-6">
+        <p className="text-[11px] italic text-green-400">
+          {t("pro.contentLanguageNotice", locale)}
+        </p>
+      </section>
       {page.intro && (
-        <section className="mx-auto max-w-4xl px-6 py-10">
+        <section className="mx-auto max-w-4xl px-6 pb-10 pt-4">
           <p className="whitespace-pre-line text-lg leading-relaxed text-green-700">
             {page.intro}
           </p>

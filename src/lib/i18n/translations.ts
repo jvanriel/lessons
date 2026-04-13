@@ -127,6 +127,7 @@ const translations: Record<Locale, Record<string, string>> = {
     "proDashboard.manageAvailability": "Manage availability",
     "proDashboard.editProfile": "Edit profile",
     "coaching.empty": "No messages yet. Send a tip, photo, or question to start the conversation.",
+    "pro.contentLanguageNotice": "This pro writes their content in their preferred language. Multilingual support is coming soon.",
 
     // Booking wizard
     "book.title": "Book a lesson with",
@@ -488,6 +489,7 @@ const translations: Record<Locale, Record<string, string>> = {
     "proDashboard.manageAvailability": "Beschikbaarheid beheren",
     "proDashboard.editProfile": "Profiel bewerken",
     "coaching.empty": "Nog geen berichten. Stuur een tip, foto of vraag om het gesprek te starten.",
+    "pro.contentLanguageNotice": "Deze pro schrijft zijn of haar inhoud in de eigen voorkeurstaal. Meertalige ondersteuning komt eraan.",
 
     // Booking wizard
     "book.title": "Boek een les bij",
@@ -844,6 +846,7 @@ const translations: Record<Locale, Record<string, string>> = {
     "proDashboard.manageAvailability": "Gérer la disponibilité",
     "proDashboard.editProfile": "Modifier le profil",
     "coaching.empty": "Aucun message. Envoyez un conseil, une photo ou une question pour démarrer la conversation.",
+    "pro.contentLanguageNotice": "Ce pro rédige son contenu dans la langue de son choix. Le support multilingue arrive bientôt.",
 
     // Booking wizard
     "book.title": "Réserver un cours avec",

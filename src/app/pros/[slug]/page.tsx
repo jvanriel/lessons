@@ -11,6 +11,8 @@ import {
 import { eq, and, isNull } from "drizzle-orm";
 import { checkStudentRelationship } from "./actions";
 import JoinButton from "./JoinButton";
+import { getLocale } from "@/lib/locale";
+import { t } from "@/lib/i18n/translations";
 
 interface Props {
   params: Promise<{ slug: string }>;
@@ -33,6 +35,7 @@ export async function generateMetadata({ params }: Props) {
 
 export default async function ProProfilePage({ params }: Props) {
   const { slug } = await params;
+  const locale = await getLocale();
 
   const [pro] = await db
     .select({
@@ -155,6 +158,9 @@ export default async function ProProfilePage({ params }: Props) {
             <h2 className="font-display text-xl font-medium text-green-800">
               About
             </h2>
+            <p className="mt-1 text-[11px] italic text-green-400">
+              {t("pro.contentLanguageNotice", locale)}
+            </p>
             <p className="mt-3 whitespace-pre-line text-sm leading-relaxed text-green-600">
               {pro.bio}
             </p>
