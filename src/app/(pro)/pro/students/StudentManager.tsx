@@ -557,6 +557,7 @@ export default function StudentManager({
         <EditStudentDialog
           student={editingStudent}
           onClose={() => setEditingStudent(null)}
+          locale={locale}
         />
       )}
 

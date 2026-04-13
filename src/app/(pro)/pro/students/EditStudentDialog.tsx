@@ -2,6 +2,9 @@
 
 import { useState, useRef, useTransition } from "react";
 import { updateStudentInfo, resetStudentPassword, removeStudent } from "./actions";
+import type { Locale } from "@/lib/i18n";
+import { t } from "@/lib/i18n/translations";
+import { formatDate } from "@/lib/format-date";
 
 interface Student {
   id: number;
@@ -18,23 +21,23 @@ interface Student {
   preferredTime: string | null;
 }
 
-const DAYS = [
-  { value: 0, label: "Monday" },
-  { value: 1, label: "Tuesday" },
-  { value: 2, label: "Wednesday" },
-  { value: 3, label: "Thursday" },
-  { value: 4, label: "Friday" },
-  { value: 5, label: "Saturday" },
-  { value: 6, label: "Sunday" },
-];
+const DAY_KEYS = [
+  "onboarding.day.mon",
+  "onboarding.day.tue",
+  "onboarding.day.wed",
+  "onboarding.day.thu",
+  "onboarding.day.fri",
+  "onboarding.day.sat",
+  "onboarding.day.sun",
+] as const;
 
-const DURATIONS = [
-  { value: 30, label: "30 min" },
-  { value: 45, label: "45 min" },
-  { value: 60, label: "1 hour" },
-  { value: 90, label: "1.5 hours" },
-  { value: 120, label: "2 hours" },
-];
+const DURATION_KEYS: Record<number, string> = {
+  30: "proStudents.edit.duration30",
+  45: "proStudents.edit.duration45",
+  60: "proStudents.edit.duration60",
+  90: "proStudents.edit.duration90",
+  120: "proStudents.edit.duration120",
+};
 
 const TIMES: string[] = [];
 for (let h = 7; h <= 21; h++) {
@@ -52,9 +55,11 @@ const selectClass =
 export function EditStudentDialog({
   student,
   onClose,
+  locale,
 }: {
   student: Student;
   onClose: () => void;
+  locale: Locale;
 }) {
   const backdropRef = useRef<HTMLDivElement>(null);
   const [isPending, startTransition] = useTransition();
@@ -160,12 +165,12 @@ export function EditStudentDialog({
           {/* Personal info */}
           <div>
             <h4 className="mb-3 text-xs font-medium uppercase tracking-wider text-green-400">
-              Personal info
+              {t("proStudents.edit.personalInfo", locale)}
             </h4>
             <div className="grid gap-3 sm:grid-cols-2">
               <div>
                 <label className="mb-1 block text-xs font-medium text-green-600">
-                  First name
+                  {t("proStudents.firstName", locale)}
                 </label>
                 <input
                   value={firstName}
@@ -175,7 +180,7 @@ export function EditStudentDialog({
               </div>
               <div>
                 <label className="mb-1 block text-xs font-medium text-green-600">
-                  Last name
+                  {t("proStudents.lastName", locale)}
                 </label>
                 <input
                   value={lastName}
@@ -185,7 +190,7 @@ export function EditStudentDialog({
               </div>
               <div>
                 <label className="mb-1 block text-xs font-medium text-green-600">
-                  Email
+                  {t("proStudents.email", locale)}
                 </label>
                 <input
                   type="email"
@@ -196,7 +201,7 @@ export function EditStudentDialog({
               </div>
               <div>
                 <label className="mb-1 block text-xs font-medium text-green-600">
-                  Phone
+                  {t("proStudents.edit.phone", locale)}
                 </label>
                 <input
                   type="tel"
@@ -211,56 +216,56 @@ export function EditStudentDialog({
           {/* Booking preferences */}
           <div>
             <h4 className="mb-3 text-xs font-medium uppercase tracking-wider text-green-400">
-              Booking preferences
+              {t("proStudents.edit.bookingPrefs", locale)}
             </h4>
             <div className="grid gap-3 sm:grid-cols-2">
               <div>
                 <label className="mb-1 block text-xs font-medium text-green-600">
-                  Duration
+                  {t("proStudents.edit.duration", locale)}
                 </label>
                 <select
                   value={duration}
                   onChange={(e) => setDuration(e.target.value)}
                   className={selectClass}
                 >
-                  <option value="">Not set</option>
-                  {DURATIONS.map((d) => (
-                    <option key={d.value} value={d.value}>
-                      {d.label}
+                  <option value="">{t("proStudents.edit.notSet", locale)}</option>
+                  {[30, 45, 60, 90, 120].map((d) => (
+                    <option key={d} value={d}>
+                      {t(DURATION_KEYS[d], locale)}
                     </option>
                   ))}
                 </select>
               </div>
               <div>
                 <label className="mb-1 block text-xs font-medium text-green-600">
-                  Preferred day
+                  {t("proStudents.edit.preferredDay", locale)}
                 </label>
                 <select
                   value={day}
                   onChange={(e) => setDay(e.target.value)}
                   className={selectClass}
                 >
-                  <option value="">Not set</option>
-                  {DAYS.map((d) => (
-                    <option key={d.value} value={d.value}>
-                      {d.label}
+                  <option value="">{t("proStudents.edit.notSet", locale)}</option>
+                  {DAY_KEYS.map((key, idx) => (
+                    <option key={idx} value={idx}>
+                      {t(key, locale)}
                     </option>
                   ))}
                 </select>
               </div>
               <div>
                 <label className="mb-1 block text-xs font-medium text-green-600">
-                  Preferred time
+                  {t("proStudents.edit.preferredTime", locale)}
                 </label>
                 <select
                   value={time}
                   onChange={(e) => setTime(e.target.value)}
                   className={selectClass}
                 >
-                  <option value="">Not set</option>
-                  {TIMES.map((t) => (
-                    <option key={t} value={t}>
-                      {t}
+                  <option value="">{t("proStudents.edit.notSet", locale)}</option>
+                  {TIMES.map((tt) => (
+                    <option key={tt} value={tt}>
+                      {tt}
                     </option>
                   ))}
                 </select>
@@ -278,22 +283,26 @@ export function EditStudentDialog({
               disabled={isPending}
               className="rounded-md bg-gold-600 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-gold-500 disabled:opacity-50"
             >
-              {isPending ? "Saving..." : "Save changes"}
+              {isPending
+                ? t("proStudents.edit.saving", locale)
+                : t("proStudents.edit.saveChanges", locale)}
             </button>
             {saved && (
-              <span className="text-xs text-green-600">Saved</span>
+              <span className="text-xs text-green-600">
+                {t("proStudents.edit.saved", locale)}
+              </span>
             )}
           </div>
 
           {/* Password reset */}
           <div className="border-t border-green-100 pt-4">
             <h4 className="mb-2 text-xs font-medium uppercase tracking-wider text-green-400">
-              Account
+              {t("proStudents.edit.account", locale)}
             </h4>
             {resetPassword ? (
               <div className="rounded-md bg-green-50 p-3">
                 <p className="text-xs text-green-700">
-                  New password sent to {email}:
+                  {t("proStudents.edit.newPasswordSent", locale).replace("{email}", email)}
                 </p>
                 <code className="mt-1 block rounded bg-white px-2 py-1 text-sm font-mono text-green-900">
                   {resetPassword}
@@ -305,7 +314,7 @@ export function EditStudentDialog({
                 disabled={isPending}
                 className="rounded-md border border-green-200 px-3 py-1.5 text-xs font-medium text-green-700 transition-colors hover:bg-green-50 disabled:opacity-50"
               >
-                Reset password
+                {t("proStudents.edit.resetPassword", locale)}
               </button>
             )}
           </div>
@@ -317,23 +326,25 @@ export function EditStudentDialog({
                 onClick={() => setConfirmRemove(true)}
                 className="text-xs text-red-400 hover:text-red-600"
               >
-                Remove student
+                {t("proStudents.edit.remove", locale)}
               </button>
             ) : (
               <div className="flex items-center gap-3">
-                <p className="text-xs text-red-600">Are you sure?</p>
+                <p className="text-xs text-red-600">
+                  {t("proStudents.edit.confirmRemove", locale)}
+                </p>
                 <button
                   onClick={handleRemove}
                   disabled={isPending}
                   className="rounded-md bg-red-600 px-3 py-1.5 text-xs font-medium text-white transition-colors hover:bg-red-500 disabled:opacity-50"
                 >
-                  Yes, remove
+                  {t("proStudents.edit.yesRemove", locale)}
                 </button>
                 <button
                   onClick={() => setConfirmRemove(false)}
                   className="text-xs text-green-500 hover:text-green-700"
                 >
-                  Cancel
+                  {t("proStudents.cancel", locale)}
                 </button>
               </div>
             )}
@@ -341,15 +352,20 @@ export function EditStudentDialog({
 
           {/* Meta info */}
           <div className="border-t border-green-100 pt-3 text-xs text-green-400">
-            <span>Status: {student.status}</span>
+            <span>
+              {t("proStudents.edit.status", locale)}{" "}
+              {t(`proStudents.status.${student.status}` as const, locale)}
+            </span>
             <span className="mx-2">&middot;</span>
             <span>
-              Joined{" "}
-              {new Date(student.createdAt).toLocaleDateString("en-US", {
-                month: "short",
-                day: "numeric",
-                year: "numeric",
-              })}
+              {t("proStudents.edit.joined", locale).replace(
+                "{date}",
+                formatDate(new Date(student.createdAt), locale, {
+                  month: "short",
+                  day: "numeric",
+                  year: "numeric",
+                })
+              )}
             </span>
           </div>
         </div>
