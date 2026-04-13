@@ -7,6 +7,7 @@ import { BookingRefreshListener } from "@/components/BookingRefreshListener";
 import { getLocale } from "@/lib/locale";
 import { formatDate as formatDateHelper } from "@/lib/format-date";
 import type { Locale } from "@/lib/i18n";
+import { t } from "@/lib/i18n/translations";
 
 export const metadata = { title: "Earnings — Golf Lessons" };
 
@@ -23,7 +24,7 @@ function formatDate(dateStr: string, locale: Locale) {
   });
 }
 
-function PaymentStatusBadge({ status }: { status: string }) {
+function PaymentStatusBadge({ status, locale }: { status: string; locale: Locale }) {
   const styles: Record<string, string> = {
     paid: "bg-green-100 text-green-700",
     pending: "bg-amber-100 text-amber-700",
@@ -31,11 +32,14 @@ function PaymentStatusBadge({ status }: { status: string }) {
     failed: "bg-red-100 text-red-700",
   };
 
+  const key = `proEarnings.status.${status}`;
+  const label = t(key, locale);
+
   return (
     <span
       className={`inline-flex rounded-full px-2 py-0.5 text-xs font-medium ${styles[status] || "bg-gray-100 text-gray-600"}`}
     >
-      {status}
+      {label === key ? status : label}
     </span>
   );
 }
@@ -115,49 +119,51 @@ export default async function EarningsPage() {
     <div className="mx-auto max-w-4xl px-6 py-12">
       <BookingRefreshListener />
       <h1 className="font-display text-3xl font-semibold text-green-900">
-        Earnings
+        {t("proEarnings.title", locale)}
       </h1>
       <p className="mt-2 text-green-700">
-        Lesson payments from your students.
+        {t("proEarnings.subtitle", locale)}
       </p>
 
       {/* Summary Cards */}
       <div className="mt-8 grid gap-4 sm:grid-cols-3">
         <div className="rounded-xl border border-green-200 bg-white p-6">
           <p className="text-xs font-medium uppercase text-green-500">
-            This month
+            {t("proEarnings.thisMonth", locale)}
           </p>
           <p className="mt-2 font-display text-2xl font-bold text-green-900">
             {formatCents(monthlyNet)}
           </p>
           <p className="mt-1 text-xs text-green-600">
-            {monthlySummary?.totalLessons ?? 0} lessons &middot;{" "}
-            {formatCents(monthlySummary?.totalFees ?? 0)} platform fee
+            {t("proEarnings.lessonsPlatformFee", locale)
+              .replace("{lessons}", String(monthlySummary?.totalLessons ?? 0))
+              .replace("{fee}", formatCents(monthlySummary?.totalFees ?? 0))}
           </p>
         </div>
 
         <div className="rounded-xl border border-green-200 bg-white p-6">
           <p className="text-xs font-medium uppercase text-green-500">
-            All time
+            {t("proEarnings.allTime", locale)}
           </p>
           <p className="mt-2 font-display text-2xl font-bold text-green-900">
             {formatCents(allTimeNet)}
           </p>
           <p className="mt-1 text-xs text-green-600">
-            {allTimeSummary?.totalLessons ?? 0} lessons &middot;{" "}
-            {formatCents(allTimeSummary?.totalFees ?? 0)} platform fees
+            {t("proEarnings.lessonsPlatformFee", locale)
+              .replace("{lessons}", String(allTimeSummary?.totalLessons ?? 0))
+              .replace("{fee}", formatCents(allTimeSummary?.totalFees ?? 0))}
           </p>
         </div>
 
         <div className="rounded-xl border border-green-200 bg-white p-6">
           <p className="text-xs font-medium uppercase text-green-500">
-            Platform fee
+            {t("proEarnings.platformFee", locale)}
           </p>
           <p className="mt-2 font-display text-2xl font-bold text-green-900">
             2.5%
           </p>
           <p className="mt-1 text-xs text-green-600">
-            Per lesson, deducted automatically
+            {t("proEarnings.platformFeeNote", locale)}
           </p>
         </div>
       </div>
@@ -166,26 +172,25 @@ export default async function EarningsPage() {
       <div className="mt-8 rounded-xl border border-green-200 bg-white shadow-sm">
         <div className="border-b border-green-100 px-6 py-4">
           <h2 className="text-lg font-semibold text-green-900">
-            Recent Payments
+            {t("proEarnings.recentPayments", locale)}
           </h2>
         </div>
 
         {recentPayments.length === 0 ? (
           <div className="px-6 py-12 text-center text-sm text-green-500">
-            No lesson payments yet. When students book and pay for lessons,
-            they&apos;ll appear here.
+            {t("proEarnings.empty", locale)}
           </div>
         ) : (
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
               <thead>
                 <tr className="border-b border-green-100 text-left text-xs font-medium uppercase text-green-500">
-                  <th className="px-6 py-3">Student</th>
-                  <th className="px-6 py-3">Date</th>
-                  <th className="px-6 py-3 text-right">Amount</th>
-                  <th className="px-6 py-3 text-right">Fee</th>
-                  <th className="px-6 py-3 text-right">Net</th>
-                  <th className="px-6 py-3">Status</th>
+                  <th className="px-6 py-3">{t("proEarnings.col.student", locale)}</th>
+                  <th className="px-6 py-3">{t("proEarnings.col.date", locale)}</th>
+                  <th className="px-6 py-3 text-right">{t("proEarnings.col.amount", locale)}</th>
+                  <th className="px-6 py-3 text-right">{t("proEarnings.col.fee", locale)}</th>
+                  <th className="px-6 py-3 text-right">{t("proEarnings.col.net", locale)}</th>
+                  <th className="px-6 py-3">{t("proEarnings.col.status", locale)}</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-green-50">
@@ -211,7 +216,7 @@ export default async function EarningsPage() {
                         {formatCents(net)}
                       </td>
                       <td className="px-6 py-3">
-                        <PaymentStatusBadge status={payment.paymentStatus} />
+                        <PaymentStatusBadge status={payment.paymentStatus} locale={locale} />
                       </td>
                     </tr>
                   );
