@@ -34,6 +34,11 @@ export async function middleware(request: NextRequest) {
     }
   }
 
+  // ─── Public bypass: pro self-service signup is under /pro/ but unauthenticated
+  if (pathname === "/pro/register" || pathname.startsWith("/pro/register/")) {
+    return NextResponse.next();
+  }
+
   // ─── Role-based route protection ──────────────────────
   const routeConfig = ROLE_ROUTES.find((r) => pathname.startsWith(r.prefix));
   if (routeConfig) {

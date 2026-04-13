@@ -36,7 +36,7 @@ export default async function ForProsPage() {
         <CmsBlock page={PAGE} block="hero.title" content={cms["hero.title"]} fallback={t("pros.hero.title", locale)} as="h1" className="mt-6 font-display text-4xl font-semibold tracking-tight text-green-900 sm:text-5xl" />
         <CmsBlock page={PAGE} block="hero.subtitle" content={cms["hero.subtitle"]} fallback={t("pros.hero.subtitle", locale)} as="p" className="mx-auto mt-6 max-w-2xl text-lg leading-relaxed text-green-700" />
         <div className="mt-10 flex items-center justify-center gap-4">
-          <Link href="/contact" className="rounded-md bg-gold-600 px-6 py-3 text-sm font-medium text-white transition-colors hover:bg-gold-500">
+          <Link href="/pro/register" className="rounded-md bg-gold-600 px-6 py-3 text-sm font-medium text-white transition-colors hover:bg-gold-500">
             <CmsBlock page={PAGE} block="hero.cta" content={cms["hero.cta"]} fallback={t("pros.hero.cta", locale)} />
           </Link>
         </div>
@@ -161,7 +161,7 @@ export default async function ForProsPage() {
         <div className="mx-auto max-w-3xl px-6 text-center">
           <CmsBlock page={PAGE} block="cta.title" content={cms["cta.title"]} fallback={t("pros.cta.title", locale)} as="h2" className="font-display text-3xl font-semibold text-green-900" />
           <CmsBlock page={PAGE} block="cta.desc" content={cms["cta.desc"]} fallback={t("pros.cta.desc", locale)} as="p" className="mt-4 text-green-700" />
-          <Link href="/contact" className="mt-8 inline-block rounded-md bg-gold-600 px-8 py-3 text-sm font-medium text-white transition-colors hover:bg-gold-500">
+          <Link href="/pro/register" className="mt-8 inline-block rounded-md bg-gold-600 px-8 py-3 text-sm font-medium text-white transition-colors hover:bg-gold-500">
             <CmsBlock page={PAGE} block="cta.button" content={cms["cta.button"]} fallback={t("pros.cta.button", locale)} />
           </Link>
         </div>
