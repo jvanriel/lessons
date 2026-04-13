@@ -5,10 +5,37 @@ import { logEvent } from "@/lib/events";
 
 const SEND_AS = process.env.GMAIL_SEND_AS || "noreply@golflessons.be";
 
+/**
+ * Normalize a PEM private key from an env var. Tolerates the three common
+ * paste mistakes:
+ *  - Surrounding double or single quotes ("...key..." → ...key...)
+ *  - Literal \n escapes that need to be turned into real newlines
+ *  - Leading/trailing whitespace
+ *
+ * Without this, Vercel deployments that store the key with a slightly
+ * different format than .env.local fail with the cryptic OpenSSL error
+ * "error:1E08010C:DECODER routines::unsupported", which is what hit Nadine
+ * during her registration test (Sentry SENTRY-ORANGE-ZEBRA-7/8).
+ */
+function normalizePrivateKey(raw: string | undefined): string {
+  if (!raw) return "";
+  let key = raw.trim();
+  if (
+    (key.startsWith('"') && key.endsWith('"')) ||
+    (key.startsWith("'") && key.endsWith("'"))
+  ) {
+    key = key.slice(1, -1).trim();
+  }
+  // Convert literal \n escape sequences to actual newlines. Real newlines
+  // pass through this regex unchanged.
+  key = key.replace(/\\n/g, "\n");
+  return key;
+}
+
 function getGmailClient() {
   const auth = new JWT({
     email: process.env.GOOGLE_SERVICE_ACCOUNT_EMAIL,
-    key: process.env.GOOGLE_SERVICE_ACCOUNT_PRIVATE_KEY?.replace(/\\n/g, "\n"),
+    key: normalizePrivateKey(process.env.GOOGLE_SERVICE_ACCOUNT_PRIVATE_KEY),
     scopes: ["https://www.googleapis.com/auth/gmail.send"],
     subject: SEND_AS,
   });
