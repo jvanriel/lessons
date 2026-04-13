@@ -49,6 +49,7 @@ export default async function RegisterPage({ searchParams }: Props) {
 
   // If authenticated, load data for the wizard
   let userData = null;
+  let emailVerified = false;
   let publishedPros: Array<{
     id: number;
     displayName: string;
@@ -88,6 +89,7 @@ export default async function RegisterPage({ searchParams }: Props) {
         golfGoals: (user.golfGoals as string[]) || [],
         golfGoalsOther: user.golfGoalsOther || "",
       };
+      emailVerified = !!user.emailVerifiedAt;
 
       // Load published pros
       const rawPros = await db
@@ -164,6 +166,7 @@ export default async function RegisterPage({ searchParams }: Props) {
     <StudentOnboardingWizard
       locale={locale}
       isAuthenticated={!!userData}
+      emailVerified={emailVerified}
       initialStep={initialStep}
       initialData={userData}
       pros={publishedPros}

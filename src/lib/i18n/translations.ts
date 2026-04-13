@@ -393,6 +393,8 @@ const translations: Record<Locale, Record<string, string>> = {
     "onboarding.goToDashboard": "Go to Dashboard",
     "onboarding.selectAtLeastOne": "Select at least one pro",
     "onboarding.maybeLater": "Maybe later",
+    "onboarding.emailTypoHint": "Made a typo? You can fix your email here while it's still unverified.",
+    "onboarding.emailWillReverify": "We'll send a new verification to this address.",
   },
 
   nl: {
@@ -780,6 +782,8 @@ const translations: Record<Locale, Record<string, string>> = {
     "onboarding.goToDashboard": "Naar Dashboard",
     "onboarding.selectAtLeastOne": "Selecteer minstens een pro",
     "onboarding.maybeLater": "Misschien later",
+    "onboarding.emailTypoHint": "Typfout gemaakt? Je kan je e-mail hier nog wijzigen zolang die niet bevestigd is.",
+    "onboarding.emailWillReverify": "We sturen een nieuwe verificatie naar dit adres.",
   },
 
   fr: {
@@ -1167,6 +1171,8 @@ const translations: Record<Locale, Record<string, string>> = {
     "onboarding.goToDashboard": "Aller au tableau de bord",
     "onboarding.selectAtLeastOne": "Sélectionnez au moins un pro",
     "onboarding.maybeLater": "Plus tard",
+    "onboarding.emailTypoHint": "Une faute de frappe ? Vous pouvez encore modifier votre e-mail tant qu'il n'est pas confirmé.",
+    "onboarding.emailWillReverify": "Nous enverrons une nouvelle vérification à cette adresse.",
   },
 };
 

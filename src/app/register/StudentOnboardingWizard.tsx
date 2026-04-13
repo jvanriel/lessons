@@ -185,6 +185,8 @@ function AccountStep({
   data,
   onChange,
   isAuthenticated,
+  emailLocked,
+  originalEmail,
   password,
   confirmPassword,
   onPasswordChange,
@@ -195,6 +197,8 @@ function AccountStep({
   data: ProfileData;
   onChange: (d: Partial<ProfileData>) => void;
   isAuthenticated: boolean;
+  emailLocked: boolean;
+  originalEmail: string | null;
   password: string;
   confirmPassword: string;
   onPasswordChange: (v: string) => void;
@@ -260,9 +264,19 @@ function AccountStep({
           type="email"
           value={data.email}
           onChange={(e) => onChange({ email: e.target.value })}
-          disabled={isAuthenticated}
-          className={inputClass + (isAuthenticated ? " opacity-60" : "")}
+          disabled={emailLocked}
+          className={inputClass + (emailLocked ? " opacity-60" : "")}
         />
+        {isAuthenticated && !emailLocked && (
+          <p className="mt-1 text-xs text-green-500">
+            {t("onboarding.emailTypoHint", locale)}
+            {originalEmail && data.email !== originalEmail && (
+              <span className="ml-1 font-medium text-gold-600">
+                {t("onboarding.emailWillReverify", locale)}
+              </span>
+            )}
+          </p>
+        )}
       </div>
       <div>
         <label className="block text-sm font-medium text-green-800">
@@ -630,6 +644,7 @@ function PaymentStep({ onSuccess, onSkip, locale }: { onSuccess: () => void; onS
 export default function StudentOnboardingWizard({
   locale,
   isAuthenticated: initialAuth,
+  emailVerified,
   initialStep,
   initialData,
   pros,
@@ -639,6 +654,7 @@ export default function StudentOnboardingWizard({
 }: {
   locale: Locale;
   isAuthenticated: boolean;
+  emailVerified: boolean;
   initialStep: number;
   initialData: ProfileData | null;
   pros: Pro[];
@@ -656,6 +672,12 @@ export default function StudentOnboardingWizard({
 }) {
   const router = useRouter();
   const [isAuthenticated, setIsAuthenticated] = useState(initialAuth);
+  // Remember the email the user logged in with so we can detect a typo-fix.
+  // Updated whenever the change-email API succeeds.
+  const [originalEmail, setOriginalEmail] = useState<string | null>(
+    initialData?.email ?? null
+  );
+  const emailLocked = isAuthenticated && emailVerified;
   const [step, setStep] = useState(initialStep);
   const [data, setData] = useState<ProfileData>(
     initialData || {
@@ -760,6 +782,31 @@ export default function StudentOnboardingWizard({
         return;
       } else {
         // Already authenticated — save profile updates
+        // Detect a typo-fix on the email field. We only allow this while the
+        // email is still unverified (emailLocked === false). If it changed,
+        // call the dedicated change-email endpoint first; if that fails, we
+        // bail without advancing.
+        if (
+          !emailLocked &&
+          originalEmail &&
+          data.email.trim().toLowerCase() !== originalEmail.toLowerCase()
+        ) {
+          setSaving(true);
+          const newEmail = data.email.trim().toLowerCase();
+          const res = await fetch("/api/auth/change-email", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ email: newEmail }),
+          });
+          const json = await res.json().catch(() => ({}));
+          setSaving(false);
+          if (!res.ok) {
+            setError(json.error || "Failed to update email.");
+            return;
+          }
+          setOriginalEmail(newEmail);
+        }
+
         const result = await saveStep("profile", {
           firstName: data.firstName,
           lastName: data.lastName,
@@ -882,7 +929,7 @@ export default function StudentOnboardingWizard({
           {error && <div className="mb-4 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">{error}</div>}
 
           {step === 0 && <LanguageStep selected={data.preferredLocale} onChange={(v) => updateData({ preferredLocale: v })} />}
-          {step === 1 && <AccountStep data={data} onChange={updateData} isAuthenticated={isAuthenticated} password={password} confirmPassword={confirmPassword} onPasswordChange={setPassword} onConfirmChange={setConfirmPassword} onGenerate={() => setPasswordGenerated(true)} locale={loc} />}
+          {step === 1 && <AccountStep data={data} onChange={updateData} isAuthenticated={isAuthenticated} emailLocked={emailLocked} originalEmail={originalEmail} password={password} confirmPassword={confirmPassword} onPasswordChange={setPassword} onConfirmChange={setConfirmPassword} onGenerate={() => setPasswordGenerated(true)} locale={loc} />}
           {step === 2 && <GolfProfileStep data={data} onChange={updateData} locale={loc} />}
           {step === 3 && <ChooseProsStep pros={pros} selected={selectedPros} onToggle={togglePro} locale={loc} />}
           {step === 4 && <SchedulingStep prefs={schedulingPrefs} onChange={updateSchedulingPref} locale={loc} />}
