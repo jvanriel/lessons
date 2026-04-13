@@ -31,29 +31,7 @@ Cross-reference for sprint planning and Nadine's testing feedback.
 
 - Deadline ~**2026-04-24** (10 days out). Vercel needs to handle. See memory `project_dns_belgium`.
 
-### 5. Email delivery to external recipients is broken
-
-Discovered during Nadine's task #6 testing: verification + welcome emails are delivered **only to `golflessons.be` Workspace addresses**, not to external recipients (Gmail, Scarlet/Telenet, etc.). This is the platform's only outbound channel — without it, a student or pro who registers with a real email never gets their verification link, password reset, booking confirmation, or anything else.
-
-**Symptoms:**
-- `dummy-student-dickens@golflessons.be` ✅ receives mail
-- `nlj.dickens@gmail.com` ❌ never arrives
-- `nadine.dickens@scarlet.be` ❌ never arrives
-
-**Likely cause:** the Gmail-API send (`src/lib/mail.ts`) uses domain-wide delegation as `noreply@golflessons.be` via a Google Workspace service account. Internal sends work because they're treated as forwarding inside the domain. External sends require:
-
-1. **SPF record** on `golflessons.be` DNS authorising Google to send (`v=spf1 include:_spf.google.com ~all`)
-2. **DKIM record** generated in Google Workspace admin (Apps → Google Workspace → Gmail → Authenticate email) and added to DNS
-3. **DMARC record** at `_dmarc.golflessons.be` (`v=DMARC1; p=none; rua=mailto:postmaster@golflessons.be`) so we get reports
-4. **Workspace outbound restrictions** — Apps → Google Workspace → Gmail → Routing — verify "send from external" / "outgoing relay" are not blocking the service account
-
-**What I shipped (commit pending)**: `sendEmail` no longer silently swallows errors. Failures now write to the `events` table (`type=email.failed`) and to Sentry with the recipient + subject. Next time delivery fails we'll see exactly why in `/dev/sentry` and `/dev/logs`.
-
-**What needs to happen:** Jan must check the DNS records (probably via Vercel's domain panel) and the Google Workspace admin console. I can't fix this from code. Once SPF/DKIM/DMARC are correct, retry registering as a Gmail recipient and watch `/dev/sentry` for any remaining errors.
-
-This is a **launch blocker** — without working email, password reset and email verification are dead.
-
-### 6. Pro-authored content + translations + CMS architecture review (urgent)
+### 5. Pro-authored content + translations + CMS architecture review (urgent)
 
 Pros author content in **multiple places** with no translation story:
 
