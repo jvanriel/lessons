@@ -3,6 +3,8 @@
 import { useState, useTransition } from "react";
 import Link from "next/link";
 import { selectPros } from "./actions";
+import type { Locale } from "@/lib/i18n";
+import { t } from "@/lib/i18n/translations";
 
 interface Pro {
   id: number;
@@ -18,10 +20,12 @@ export default function ChoosePros({
   pros,
   preSelectedId,
   existingProIds,
+  locale,
 }: {
   pros: Pro[];
   preSelectedId: number | null;
   existingProIds: number[];
+  locale: Locale;
 }) {
   const [selected, setSelected] = useState<Set<number>>(() => {
     const initial = new Set<number>(existingProIds);
@@ -53,23 +57,22 @@ export default function ChoosePros({
   return (
     <div className="mx-auto max-w-4xl px-6 py-12">
       <h1 className="font-display text-3xl font-semibold text-green-900">
-        Choose your pros
+        {t("choosePros.title", locale)}
       </h1>
       <p className="mt-2 text-green-600">
-        Select the golf professionals you&apos;d like to work with. You can
-        always change this later.
+        {t("choosePros.subtitle", locale)}
       </p>
 
       {pros.length === 0 ? (
         <div className="mt-8 rounded-xl border border-green-200 bg-white p-8 text-center">
           <p className="text-green-600">
-            No golf professionals available yet. Check back soon!
+            {t("choosePros.empty", locale)}
           </p>
           <Link
             href="/member/dashboard"
             className="mt-4 inline-block text-sm text-gold-600 hover:text-gold-500"
           >
-            Go to dashboard
+            {t("choosePros.goToDashboard", locale)}
           </Link>
         </div>
       ) : (
@@ -91,7 +94,7 @@ export default function ChoosePros({
                 >
                   {isExisting && (
                     <span className="absolute top-2 right-2 rounded-full bg-green-100 px-2 py-0.5 text-xs text-green-600">
-                      Already joined
+                      {t("choosePros.alreadyJoined", locale)}
                     </span>
                   )}
                   <div className="flex items-center gap-3">
@@ -146,7 +149,7 @@ export default function ChoosePros({
               href="/member/dashboard"
               className="text-sm text-green-500 hover:text-green-600"
             >
-              Skip for now
+              {t("choosePros.skipForNow", locale)}
             </Link>
             <button
               type="button"
@@ -155,8 +158,13 @@ export default function ChoosePros({
               className="rounded-md bg-gold-600 px-6 py-2.5 text-sm font-medium text-white transition-colors hover:bg-gold-500 disabled:opacity-50 disabled:cursor-not-allowed"
             >
               {isPending
-                ? "Saving..."
-                : `Continue${selected.size > 0 ? ` (${selected.size} selected)` : ""}`}
+                ? t("choosePros.saving", locale)
+                : selected.size > 0
+                  ? t("choosePros.continueWithCount", locale).replace(
+                      "{n}",
+                      String(selected.size)
+                    )
+                  : t("choosePros.continue", locale)}
             </button>
           </div>
         </>

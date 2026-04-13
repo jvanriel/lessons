@@ -4,6 +4,7 @@ import { useState, useEffect, useTransition, useRef, useCallback } from "react";
 import { getStudentBookings, proCancelBooking } from "./actions";
 import { formatDate as formatDateHelper } from "@/lib/format-date";
 import type { Locale } from "@/lib/i18n";
+import { t } from "@/lib/i18n/translations";
 
 interface Booking {
   id: number;
@@ -28,12 +29,14 @@ function CancelDialog({
   onClose,
   pending,
   formatDate,
+  locale,
 }: {
   booking: Booking;
   onConfirm: () => void;
   onClose: () => void;
   pending: boolean;
   formatDate: (dateStr: string) => string;
+  locale: Locale;
 }) {
   const backdropRef = useRef<HTMLDivElement>(null);
 
@@ -47,7 +50,7 @@ function CancelDialog({
     >
       <div className="mx-4 w-full max-w-sm rounded-xl border border-green-200 bg-white p-6 shadow-2xl">
         <h3 className="font-display text-lg font-semibold text-green-900">
-          Cancel booking?
+          {t("proStudentBookings.cancelDialog.title", locale)}
         </h3>
         <div className="mt-4 rounded-lg border border-green-100 bg-green-50/50 p-4">
           <p className="text-sm font-medium text-green-900">
@@ -58,8 +61,7 @@ function CancelDialog({
           </p>
         </div>
         <p className="mt-3 text-sm text-green-600">
-          This will free up the slot for other bookings. The student will be
-          notified.
+          {t("proStudentBookings.cancelDialog.body", locale)}
         </p>
         <div className="mt-5 flex gap-3">
           <button
@@ -68,7 +70,7 @@ function CancelDialog({
             disabled={pending}
             className="flex-1 rounded-md border border-green-200 px-4 py-2 text-sm font-medium text-green-700 transition-colors hover:bg-green-50 disabled:opacity-50"
           >
-            Keep
+            {t("proStudentBookings.cancelDialog.keep", locale)}
           </button>
           <button
             type="button"
@@ -76,7 +78,9 @@ function CancelDialog({
             disabled={pending}
             className="flex-1 rounded-md bg-red-500 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-red-600 disabled:opacity-50"
           >
-            {pending ? "Cancelling..." : "Cancel booking"}
+            {pending
+              ? t("proStudentBookings.cancelDialog.cancelling", locale)
+              : t("proStudentBookings.cancelDialog.confirm", locale)}
           </button>
         </div>
       </div>
@@ -128,7 +132,7 @@ export function StudentBookings({ proStudentId, locale }: { proStudentId: number
   return (
     <div className="mt-2 border-t border-green-100 pt-2">
       <p className="mb-1.5 text-[10px] font-medium uppercase tracking-wider text-green-400">
-        Upcoming lessons
+        {t("proStudentBookings.upcoming", locale)}
       </p>
       <div className="space-y-1">
         {bookings.map((b) => (
@@ -148,7 +152,7 @@ export function StudentBookings({ proStudentId, locale }: { proStudentId: number
               disabled={isPending}
               className="text-[10px] font-medium text-red-400 hover:text-red-600 disabled:opacity-50"
             >
-              Cancel
+              {t("proStudentBookings.cancel", locale)}
             </button>
           </div>
         ))}
@@ -161,6 +165,7 @@ export function StudentBookings({ proStudentId, locale }: { proStudentId: number
           onClose={() => setCancelTarget(null)}
           pending={isPending}
           formatDate={formatDate}
+          locale={locale}
         />
       )}
     </div>

@@ -387,14 +387,14 @@ function AccountStep({
 
 // ─── Step 2: Golf Profile ──────────────────────────────
 
-const GOALS = [
-  { id: "driving", label: "Driving" },
-  { id: "short_game", label: "Short Game" },
-  { id: "putting", label: "Putting" },
-  { id: "course_management", label: "Course Management" },
-  { id: "learn_basics", label: "Learn the Basics" },
-  { id: "fitness", label: "Fitness & Flexibility" },
-];
+const GOAL_IDS = [
+  "driving",
+  "short_game",
+  "putting",
+  "course_management",
+  "learn_basics",
+  "fitness",
+] as const;
 
 function GolfProfileStep({
   data,
@@ -443,18 +443,18 @@ function GolfProfileStep({
           {t("onboarding.goals", locale)}
         </label>
         <div className="mt-2 flex flex-wrap gap-2">
-          {GOALS.map((goal) => (
+          {GOAL_IDS.map((goalId) => (
             <button
-              key={goal.id}
+              key={goalId}
               type="button"
-              onClick={() => toggleGoal(goal.id)}
+              onClick={() => toggleGoal(goalId)}
               className={`rounded-lg border px-4 py-2 text-sm font-medium transition-colors ${
-                data.golfGoals.includes(goal.id)
+                data.golfGoals.includes(goalId)
                   ? "border-green-700 bg-green-700 text-white"
                   : "border-green-200 bg-white text-green-700 hover:border-green-400"
               }`}
             >
-              {t(`onboarding.goal.${goal.id}`, locale)}
+              {t(`onboarding.goal.${goalId}`, locale)}
             </button>
           ))}
           <button
