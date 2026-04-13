@@ -35,23 +35,26 @@ export default async function ContactPage() {
           <p className="mt-3 text-sm text-green-600">
             {t("contact.email.help", locale)}
           </p>
-        </div>
 
-        <div className="mt-6 rounded-xl border border-green-200 bg-green-50/50 p-8">
-          <h2 className="font-display text-xl font-medium text-green-900">
-            {t("contact.pro.title", locale)}
-          </h2>
-          <p className="mt-3 text-sm leading-relaxed text-green-700">
-            {t("contact.pro.body", locale)}
-          </p>
-          <a
-            href={`mailto:${CONTACT_EMAIL}?subject=${encodeURIComponent(
-              "Pro application"
-            )}`}
-            className="mt-5 inline-block rounded-md bg-gold-600 px-6 py-3 text-sm font-medium text-white transition-colors hover:bg-gold-500"
-          >
-            {CONTACT_EMAIL}
-          </a>
+          <div className="mt-8 border-t border-green-100 pt-6">
+            <h2 className="font-display text-base font-medium text-green-900">
+              {t("contact.helpWith.title", locale)}
+            </h2>
+            <ul className="mt-3 space-y-2 text-sm text-green-700">
+              <li className="flex items-start gap-2">
+                <span className="mt-1.5 inline-block h-1.5 w-1.5 shrink-0 rounded-full bg-gold-500" />
+                <span>{t("contact.helpWith.lessons", locale)}</span>
+              </li>
+              <li className="flex items-start gap-2">
+                <span className="mt-1.5 inline-block h-1.5 w-1.5 shrink-0 rounded-full bg-gold-500" />
+                <span>{t("contact.helpWith.pro", locale)}</span>
+              </li>
+              <li className="flex items-start gap-2">
+                <span className="mt-1.5 inline-block h-1.5 w-1.5 shrink-0 rounded-full bg-gold-500" />
+                <span>{t("contact.helpWith.other", locale)}</span>
+              </li>
+            </ul>
+          </div>
         </div>
       </section>
     </div>

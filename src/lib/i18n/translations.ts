@@ -200,8 +200,10 @@ const translations: Record<Locale, Record<string, string>> = {
     "contact.subtitle": "We'd love to hear from you. Reach out with any question about lessons, becoming a pro, or anything else.",
     "contact.email.label": "Email us",
     "contact.email.help": "We typically reply within one business day.",
-    "contact.pro.title": "Want to join as a pro?",
-    "contact.pro.body": "Send us a short note about your coaching background and we'll guide you through the onboarding.",
+    "contact.helpWith.title": "How can we help?",
+    "contact.helpWith.lessons": "Questions about lessons or your booking",
+    "contact.helpWith.pro": "You're a coach interested in joining the platform",
+    "contact.helpWith.other": "Anything else — feedback, partnerships, press",
 
     // For Students page
     "students.badge": "Free to join",
@@ -590,8 +592,10 @@ const translations: Record<Locale, Record<string, string>> = {
     "contact.subtitle": "We horen graag van je. Stel ons je vraag over lessen, pro worden, of iets anders.",
     "contact.email.label": "Mail ons",
     "contact.email.help": "We antwoorden meestal binnen één werkdag.",
-    "contact.pro.title": "Wil je je aansluiten als pro?",
-    "contact.pro.body": "Stuur ons een korte boodschap over je coachingachtergrond en we begeleiden je door de onboarding.",
+    "contact.helpWith.title": "Waarmee kunnen we je helpen?",
+    "contact.helpWith.lessons": "Vragen over lessen of je boeking",
+    "contact.helpWith.pro": "Je bent een coach en wil je aansluiten bij het platform",
+    "contact.helpWith.other": "Iets anders — feedback, samenwerkingen, pers",
 
     "pros.badge": "Voor professionals",
     "pros.hero.title": "Laat Je Coachingbedrijf Groeien",
@@ -947,8 +951,10 @@ const translations: Record<Locale, Record<string, string>> = {
     "contact.subtitle": "Nous serions ravis d'avoir de vos nouvelles. Posez-nous toutes vos questions sur les cours, le statut de pro, ou tout autre sujet.",
     "contact.email.label": "Écrivez-nous",
     "contact.email.help": "Nous répondons généralement sous un jour ouvrable.",
-    "contact.pro.title": "Vous souhaitez nous rejoindre en tant que pro ?",
-    "contact.pro.body": "Envoyez-nous un mot sur votre parcours de coach et nous vous guiderons pour l'inscription.",
+    "contact.helpWith.title": "Comment pouvons-nous vous aider ?",
+    "contact.helpWith.lessons": "Questions sur les cours ou votre réservation",
+    "contact.helpWith.pro": "Vous êtes un coach intéressé à rejoindre la plateforme",
+    "contact.helpWith.other": "Autre chose — retours, partenariats, presse",
 
     "pros.badge": "Pour les professionnels",
     "pros.hero.title": "Développez Votre Activité de Coaching",
