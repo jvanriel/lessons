@@ -1,6 +1,6 @@
 # Gap Analysis — Pre-Launch
 
-Last updated: 2026-04-13
+Last updated: 2026-04-13 (late afternoon)
 
 Living document tracking what's left before golflessons.be can go live.
 Cross-reference for sprint planning and Nadine's testing feedback.
@@ -61,11 +61,7 @@ The platform CMS (`cms_blocks`) has per-locale rows but is operated by the platf
 - **Stripe webhook payload typed as `any`** — `src/app/api/webhooks/stripe/route.ts:11`. Type narrowing for safety.
 - **Health check** doesn't verify webhook secret presence or other Stripe production signals.
 - **Sentry source map upload** — `next.config.ts:37` has `silent: !process.env.CI`. Verify Vercel sets `CI=1` or sourcemaps silently fail to upload, leaving production errors as minified noise.
-- **Locale-aware date formatting sweep** — `formatDate(locale)` helper exists and is wired into `/member/bookings`, `/member/dashboard`, the booking wizard, `/pro/bookings` (BookingsView + BookingsCalendar), `/pro/students/StudentBookings`, `/pro/earnings`, `/member/dashboard/CancelBookingDialog`, and `/member/dashboard/QuickRebook`. ~20 other files still call `toLocaleDateString("en-US", ...)` directly. Remaining: admin-side (UserManager, ContentPanel, payouts), pro-side (`AvailabilityEditor`, `EditStudentDialog`, `ProQuickBook`), various smaller dialogs.
-- ~~**Pro-side editor component translations**~~ — **done**. `LocationManager`, `AvailabilityEditor`, `StudentManager` (incl. HelpDialog), `EditStudentDialog`, and `ProQuickBook` all i18n-wired in EN/NL/FR.
-- ~~**Welcome-as-pro email**~~ — **done**. `buildWelcomeEmail` rewritten with a 4-step pro onboarding guide (verify → subscribe → profile/locations/availability → publish) and wired into `/pro/register` alongside the verify email.
-- ~~**Remaining member/pro i18n gaps (audit 2026-04-13)**~~ — **done**. Full sweep shipped across the app shell, all `/pro/*` editor and admin screens, `/member/bookings` + `/member/coaching`, and the `/pro/onboarding` wizard. Second-pass audit caught a further ~35 strings in `/member/dashboard` + HelpDialog + QuickRebook, `/pro/bookings/page.tsx`, `/pros/[slug]` public profile, `SlotExplanationDialog` (incl. hardcoded `en-US` date format), `components/app/HelpDialog.tsx` (install + notifications guide), and `/pro/subscribe/SubscribePage`. All fixed. `admin/*` and `dev/*` remain intentionally English-only. The only English fallback left is `components/comments/Comments.tsx`'s default `emptyText`, which is now only hit inside the shared Kanban (admin + claude.code's `/pro/tasks`, both internal).
-- ~~**Hardcoded subscription prices**~~ — **done**. Prices (€12.50 monthly, €125 annual) were scattered across `SubscribePage`, `OnboardingWizard`, `BillingClient`, `RegisterProForm`, `for-pros/page.tsx`, and translation strings. Centralised in `src/lib/pricing.ts` sourced from `NEXT_PUBLIC_PRO_PRICE_MONTHLY` / `NEXT_PUBLIC_PRO_PRICE_ANNUAL` env vars with 12.5 / 125 defaults. Translation strings now use `{price}` / `{monthly}` / `{annual}` placeholders that call sites interpolate via `formatPrice(amount, locale)` (locale-correct currency formatting for en-GB / nl-BE / fr-BE).
+- **Locale-aware date formatting — residuals**. Main sweep done (member/* and pro/* use `formatDate(locale)` from `src/lib/format-date.ts`). Two small user-visible leftovers: `src/app/(member)/member/bookings/actions.ts:163` (hardcoded `"en-US"` in a cancel-deadline error returned to the UI) and `src/components/TimezoneNote.tsx:21` (timezone label formatting). Admin-side (`ContentPanel.tsx`, `UserManager`, `payouts`) still has hardcoded locales but is intentionally English-only and therefore out of scope.
 
 ## 🟢 Polish / post-launch
 
