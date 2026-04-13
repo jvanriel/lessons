@@ -15,17 +15,20 @@ export function TimezoneNote({ courseTimezone }: { courseTimezone: string }) {
     const userTz = Intl.DateTimeFormat().resolvedOptions().timeZone;
     if (userTz === courseTimezone) return; // same timezone, no note needed
 
-    // Get the short timezone abbreviation for the course
-    const now = new Date();
-    const abbr = now
-      .toLocaleString("en-US", { timeZone: courseTimezone, timeZoneName: "short" })
-      .split(" ")
-      .pop();
+    // Extract the short timezone name via formatToParts, using the browser's
+    // own locale so the abbreviation (CET, GMT+1, …) matches what the user
+    // sees elsewhere on the page.
+    const parts = new Intl.DateTimeFormat(navigator.language, {
+      timeZone: courseTimezone,
+      timeZoneName: "short",
+    }).formatToParts(new Date());
+    const abbr = parts.find((p) => p.type === "timeZoneName")?.value ?? "";
 
     // Get city name from timezone (e.g. "Europe/Brussels" → "Brussels")
-    const city = courseTimezone.split("/").pop()?.replace(/_/g, " ") || courseTimezone;
+    const city =
+      courseTimezone.split("/").pop()?.replace(/_/g, " ") || courseTimezone;
 
-    setNote(`${abbr} (${city})`);
+    setNote(abbr ? `${abbr} (${city})` : `(${city})`);
   }, [courseTimezone]);
 
   if (!note) return null;

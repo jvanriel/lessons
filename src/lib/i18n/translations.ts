@@ -36,6 +36,7 @@ const translations: Record<Locale, Record<string, string>> = {
     "memberBookings.pastCancelled": "Past & cancelled ({n})",
     "memberBookings.status.cancelled": "Cancelled",
     "memberBookings.status.completed": "Completed",
+    "memberBookings.cancelTooLate": "Cancellation is no longer allowed. The deadline was {deadline}.",
     // Member — coaching list
     "memberCoaching.title": "Coaching",
     "memberCoaching.subtitle": "Chat with your pros",
@@ -1133,6 +1134,7 @@ const translations: Record<Locale, Record<string, string>> = {
     "memberBookings.pastCancelled": "Verleden & geannuleerd ({n})",
     "memberBookings.status.cancelled": "Geannuleerd",
     "memberBookings.status.completed": "Voltooid",
+    "memberBookings.cancelTooLate": "Annuleren is niet meer toegestaan. De deadline was {deadline}.",
     "memberCoaching.title": "Coaching",
     "memberCoaching.subtitle": "Chat met je pro's",
     "memberCoaching.noPros": "Je hebt nog geen pro's.",
@@ -2200,6 +2202,7 @@ const translations: Record<Locale, Record<string, string>> = {
     "memberBookings.pastCancelled": "Passés & annulés ({n})",
     "memberBookings.status.cancelled": "Annulé",
     "memberBookings.status.completed": "Terminé",
+    "memberBookings.cancelTooLate": "L'annulation n'est plus autorisée. La date limite était {deadline}.",
     "memberCoaching.title": "Coaching",
     "memberCoaching.subtitle": "Discutez avec vos pros",
     "memberCoaching.noPros": "Vous n'avez pas encore de pros.",

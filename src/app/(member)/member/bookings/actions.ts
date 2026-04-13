@@ -18,6 +18,9 @@ import { revalidatePath } from "next/cache";
 import { sendEmail } from "@/lib/mail";
 import { resolveLocale, type Locale } from "@/lib/i18n";
 import { emailLayout } from "@/lib/email-templates";
+import { getLocale } from "@/lib/locale";
+import { t } from "@/lib/i18n/translations";
+import { formatDate as formatDateLocale } from "@/lib/format-date";
 
 const CANCEL_STRINGS: Record<Locale, {
   studentSubject: (pro: string) => string;
@@ -159,8 +162,20 @@ export async function cancelBooking(bookingId: number) {
   );
 
   if (!check.canCancel) {
+    const locale = await getLocale();
+    const deadline = formatDateLocale(check.deadline, locale, {
+      weekday: "long",
+      day: "numeric",
+      month: "long",
+      year: "numeric",
+      hour: "2-digit",
+      minute: "2-digit",
+    });
     return {
-      error: `Cancellation is no longer allowed. The deadline was ${check.deadline.toLocaleString("en-US")}.`,
+      error: t("memberBookings.cancelTooLate", locale).replace(
+        "{deadline}",
+        deadline
+      ),
     };
   }
 
