@@ -1,8 +1,8 @@
 import { requireProProfile } from "@/lib/pro";
 import { redirect } from "next/navigation";
 import { db } from "@/lib/db";
-import { users } from "@/lib/db/schema";
-import { eq } from "drizzle-orm";
+import { users, lessonBookings } from "@/lib/db/schema";
+import { and, eq, isNotNull, sql, desc } from "drizzle-orm";
 import BillingClient from "./BillingClient";
 import { getLocale } from "@/lib/locale";
 
@@ -20,6 +20,46 @@ export default async function BillingPage() {
     .where(eq(users.id, session.userId))
     .limit(1);
 
+  // Pending cash-only commission: sum of platform_fee_cents on bookings that
+  // are cash-only (paymentStatus='manual'), still have a live invoice-item
+  // pointer, and are not cancelled. These roll onto the pro's next invoice.
+  const [pendingAgg] = await db
+    .select({
+      total: sql<number>`coalesce(sum(${lessonBookings.platformFeeCents}), 0)::int`,
+      count: sql<number>`count(*)::int`,
+    })
+    .from(lessonBookings)
+    .where(
+      and(
+        eq(lessonBookings.proProfileId, profile.id),
+        eq(lessonBookings.paymentStatus, "manual"),
+        isNotNull(lessonBookings.stripeInvoiceItemId),
+        sql`${lessonBookings.status} != 'cancelled'`
+      )
+    );
+
+  const pendingBookings = pendingAgg?.count
+    ? await db
+        .select({
+          id: lessonBookings.id,
+          date: lessonBookings.date,
+          startTime: lessonBookings.startTime,
+          priceCents: lessonBookings.priceCents,
+          platformFeeCents: lessonBookings.platformFeeCents,
+        })
+        .from(lessonBookings)
+        .where(
+          and(
+            eq(lessonBookings.proProfileId, profile.id),
+            eq(lessonBookings.paymentStatus, "manual"),
+            isNotNull(lessonBookings.stripeInvoiceItemId),
+            sql`${lessonBookings.status} != 'cancelled'`
+          )
+        )
+        .orderBy(desc(lessonBookings.date))
+        .limit(10)
+    : [];
+
   return (
     <BillingClient
       subscriptionStatus={profile.subscriptionStatus ?? "none"}
@@ -34,6 +74,9 @@ export default async function BillingPage() {
       bankAccountHolder={profile.bankAccountHolder ?? null}
       bankIban={profile.bankIban ?? null}
       bankBic={profile.bankBic ?? null}
+      pendingCommissionCents={pendingAgg?.total ?? 0}
+      pendingCommissionCount={pendingAgg?.count ?? 0}
+      pendingCommissionBookings={pendingBookings}
       locale={locale}
     />
   );

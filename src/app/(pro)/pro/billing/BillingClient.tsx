@@ -11,6 +11,14 @@ import {
   formatPrice,
 } from "@/lib/pricing";
 
+interface PendingCommissionBooking {
+  id: number;
+  date: string;
+  startTime: string;
+  priceCents: number | null;
+  platformFeeCents: number | null;
+}
+
 interface BillingProps {
   subscriptionStatus: string;
   subscriptionPlan: string | null;
@@ -20,6 +28,9 @@ interface BillingProps {
   bankAccountHolder: string | null;
   bankIban: string | null;
   bankBic: string | null;
+  pendingCommissionCents: number;
+  pendingCommissionCount: number;
+  pendingCommissionBookings: PendingCommissionBooking[];
   locale: Locale;
 }
 
@@ -184,6 +195,9 @@ export default function BillingClient({
   bankAccountHolder: initialHolder,
   bankIban: initialIban,
   bankBic: initialBic,
+  pendingCommissionCents,
+  pendingCommissionCount,
+  pendingCommissionBookings,
   locale,
 }: BillingProps) {
   const [portalLoading, setPortalLoading] = useState(false);
@@ -342,6 +356,71 @@ export default function BillingClient({
           </div>
         )}
       </div>
+
+      {/* Pending Cash-Only Commission */}
+      {pendingCommissionCount > 0 && (
+        <div className="mt-6 rounded-xl border border-amber-200 bg-amber-50/40 p-6 shadow-sm">
+          <h2 className="text-lg font-semibold text-green-900">
+            {t("proBilling.pendingCommission.title", locale)}
+          </h2>
+          <p className="mt-1 text-sm text-green-700">
+            {t("proBilling.pendingCommission.desc", locale)}
+          </p>
+
+          <div className="mt-4 grid grid-cols-1 gap-4 rounded-lg border border-amber-200 bg-white p-4 sm:grid-cols-2">
+            <div>
+              <p className="text-xs font-medium uppercase text-amber-700">
+                {t("proBilling.pendingCommission.totalOwed", locale)}
+              </p>
+              <p className="mt-1 text-2xl font-semibold text-green-900">
+                {formatPrice(pendingCommissionCents / 100, locale)}
+              </p>
+            </div>
+            <div>
+              <p className="text-xs font-medium uppercase text-amber-700">
+                &nbsp;
+              </p>
+              <p className="mt-1 text-sm text-green-700">
+                {t(
+                  pendingCommissionCount === 1
+                    ? "proBilling.pendingCommission.bookingCountOne"
+                    : "proBilling.pendingCommission.bookingCountMany",
+                  locale
+                ).replace("{n}", String(pendingCommissionCount))}
+              </p>
+            </div>
+          </div>
+
+          {pendingCommissionBookings.length > 0 && (
+            <div className="mt-4">
+              <p className="text-xs font-medium uppercase text-green-500">
+                {t("proBilling.pendingCommission.recentBookings", locale)}
+              </p>
+              <ul className="mt-2 divide-y divide-amber-100 rounded-lg border border-amber-100 bg-white">
+                {pendingCommissionBookings.map((b) => (
+                  <li
+                    key={b.id}
+                    className="flex items-center justify-between px-4 py-2 text-sm"
+                  >
+                    <span className="text-green-900">
+                      {formatBillingDate(b.date, locale)} · {b.startTime}
+                    </span>
+                    <span className="font-mono text-green-700">
+                      {b.platformFeeCents != null
+                        ? formatPrice(b.platformFeeCents / 100, locale)
+                        : "—"}
+                    </span>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
+
+          <p className="mt-3 text-xs text-green-600">
+            {t("proBilling.pendingCommission.nextInvoiceNote", locale)}
+          </p>
+        </div>
+      )}
 
       {/* Payment Method */}
       {hasStripeCustomer && isActive && (
