@@ -4,6 +4,8 @@ import { db } from "@/lib/db";
 import { proStudents, proProfiles } from "@/lib/db/schema";
 import { eq, and } from "drizzle-orm";
 import { getSession, hasRole } from "@/lib/auth";
+import { getLocale } from "@/lib/locale";
+import { t } from "@/lib/i18n/translations";
 
 export const metadata = { title: "Coaching — Golf Lessons" };
 
@@ -12,6 +14,8 @@ export default async function MemberCoachingListPage() {
   if (!session || !hasRole(session, "member")) {
     redirect("/login");
   }
+
+  const locale = await getLocale();
 
   const myPros = await db
     .select({
@@ -32,22 +36,22 @@ export default async function MemberCoachingListPage() {
   return (
     <div className="mx-auto max-w-2xl px-4 py-6">
       <h1 className="font-display text-2xl font-bold text-green-900">
-        Coaching
+        {t("memberCoaching.title", locale)}
       </h1>
       <p className="mt-1 text-sm text-green-600">
-        Chat with your pros
+        {t("memberCoaching.subtitle", locale)}
       </p>
 
       {myPros.length === 0 ? (
         <div className="mt-6 rounded-xl border border-green-200 bg-white p-6 text-center">
           <p className="text-sm text-green-600">
-            You don&apos;t have any pros yet.
+            {t("memberCoaching.noPros", locale)}
           </p>
           <Link
             href="/pros"
             className="mt-3 inline-block rounded-md bg-gold-600 px-4 py-2 text-sm font-medium text-white hover:bg-gold-500"
           >
-            Browse pros
+            {t("memberCoaching.browsePros", locale)}
           </Link>
         </div>
       ) : (
