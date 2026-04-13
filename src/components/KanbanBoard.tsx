@@ -243,31 +243,39 @@ export default function KanbanBoard({
     <div className="mt-5">
       {/* Create form */}
       <div className="mb-4 rounded-lg border border-green-200 bg-white p-3">
-        <form action={createAction} className="flex gap-2">
-          <input
-            name="title"
-            placeholder="New task..."
-            required
-            className="flex-1 rounded-md border border-green-300 px-2.5 py-1.5 text-xs focus:border-gold-500 focus:outline-none focus:ring-1 focus:ring-gold-500"
+        <form action={createAction} className="space-y-2">
+          <div className="flex gap-2">
+            <input
+              name="title"
+              placeholder="New task..."
+              required
+              className="flex-1 rounded-md border border-green-300 px-2.5 py-1.5 text-xs focus:border-gold-500 focus:outline-none focus:ring-1 focus:ring-gold-500"
+            />
+            <select
+              name="priority"
+              defaultValue="normal"
+              className="rounded-md border border-green-300 px-2.5 py-1.5 text-xs focus:border-gold-500 focus:outline-none"
+            >
+              {PRIORITIES.map((p) => (
+                <option key={p.value} value={p.value}>
+                  {p.label}
+                </option>
+              ))}
+            </select>
+            <button
+              type="submit"
+              disabled={createPending}
+              className="rounded-md bg-gold-600 px-4 py-1.5 text-xs font-medium text-white hover:bg-gold-500 disabled:opacity-50"
+            >
+              {createPending ? "Creating..." : "Add"}
+            </button>
+          </div>
+          <textarea
+            name="firstComment"
+            placeholder="First comment (optional) — will become the first entry in the task's comment thread"
+            rows={2}
+            className="w-full resize-none rounded-md border border-green-200 px-2.5 py-1.5 text-xs text-green-800 focus:border-gold-500 focus:outline-none focus:ring-1 focus:ring-gold-500"
           />
-          <select
-            name="priority"
-            defaultValue="normal"
-            className="rounded-md border border-green-300 px-2.5 py-1.5 text-xs focus:border-gold-500 focus:outline-none"
-          >
-            {PRIORITIES.map((p) => (
-              <option key={p.value} value={p.value}>
-                {p.label}
-              </option>
-            ))}
-          </select>
-          <button
-            type="submit"
-            disabled={createPending}
-            className="rounded-md bg-gold-600 px-4 py-1.5 text-xs font-medium text-white hover:bg-gold-500 disabled:opacity-50"
-          >
-            {createPending ? "Creating..." : "Add"}
-          </button>
         </form>
         {createState?.error && (
           <p className="mt-2 text-xs text-red-600">{createState.error}</p>

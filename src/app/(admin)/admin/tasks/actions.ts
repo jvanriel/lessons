@@ -3,7 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { eq, sql, inArray } from "drizzle-orm";
 import { db } from "@/lib/db";
-import { tasks, taskNotes, users } from "@/lib/db/schema";
+import { tasks, taskNotes, users, comments } from "@/lib/db/schema";
 import { getSession, hasRole, type SessionPayload } from "@/lib/auth";
 import { createNotification } from "@/lib/notifications";
 
@@ -79,6 +79,8 @@ export async function createTask(
   const title = (formData.get("title") as string)?.trim();
   if (!title) return { error: "Title is required." };
 
+  const firstComment =
+    (formData.get("firstComment") as string)?.trim() || null;
   const assigneeIds = formData
     .getAll("assigneeIds")
     .map(Number)
@@ -111,6 +113,16 @@ export async function createTask(
       dueDate,
     })
     .returning();
+
+  // Seed the comment thread with the first comment if provided
+  if (firstComment) {
+    await db.insert(comments).values({
+      contextType: "task",
+      contextId: inserted.id,
+      authorId: session.userId,
+      content: firstComment,
+    });
+  }
 
   // Notify assignees
   if (assigneeIds.length > 0) {
