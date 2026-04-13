@@ -4,6 +4,7 @@ import { useState } from "react";
 import { BookingsCalendar } from "./BookingsCalendar";
 import { formatDate as formatDateHelper } from "@/lib/format-date";
 import type { Locale } from "@/lib/i18n";
+import { t } from "@/lib/i18n/translations";
 
 interface Booking {
   id: number;
@@ -46,7 +47,7 @@ function BookingsList({ bookings, locale }: { bookings: Booking[]; locale: Local
   if (upcoming.length === 0) {
     return (
       <p className="py-8 text-center text-sm text-green-500">
-        No upcoming bookings.
+        {t("proBookingsView.noUpcoming", locale)}
       </p>
     );
   }
@@ -89,7 +90,10 @@ function BookingsList({ bookings, locale }: { bookings: Booking[]; locale: Local
                 <div className="text-right">
                   {b.participantCount > 1 && (
                     <span className="text-xs text-green-500">
-                      {b.participantCount} participants
+                      {t("proBookingsView.participants", locale).replace(
+                        "{n}",
+                        String(b.participantCount)
+                      )}
                     </span>
                   )}
                   {b.notes && (
@@ -145,7 +149,7 @@ export function BookingsView({
           <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
             <path strokeLinecap="round" strokeLinejoin="round" d="M6.75 3v2.25M17.25 3v2.25M3 18.75V7.5a2.25 2.25 0 0 1 2.25-2.25h13.5A2.25 2.25 0 0 1 21 7.5v11.25m-18 0A2.25 2.25 0 0 0 5.25 21h13.5A2.25 2.25 0 0 0 21 18.75m-18 0v-7.5A2.25 2.25 0 0 1 5.25 9h13.5A2.25 2.25 0 0 1 21 11.25v7.5" />
           </svg>
-          Calendar
+          {t("proBookingsView.calendar", locale)}
         </button>
         <button
           type="button"
@@ -159,7 +163,7 @@ export function BookingsView({
           <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
             <path strokeLinecap="round" strokeLinejoin="round" d="M8.25 6.75h12M8.25 12h12m-12 5.25h12M3.75 6.75h.007v.008H3.75V6.75Zm.375 0a.375.375 0 1 1-.75 0 .375.375 0 0 1 .75 0ZM3.75 12h.007v.008H3.75V12Zm.375 0a.375.375 0 1 1-.75 0 .375.375 0 0 1 .75 0Zm-.375 5.25h.007v.008H3.75v-.008Zm.375 0a.375.375 0 1 1-.75 0 .375.375 0 0 1 .75 0Z" />
           </svg>
-          List
+          {t("proBookingsView.list", locale)}
         </button>
       </div>
 

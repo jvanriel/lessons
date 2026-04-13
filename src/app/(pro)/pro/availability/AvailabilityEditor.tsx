@@ -11,6 +11,7 @@ import type {
 import { saveWeeklyTemplate, saveWeekOverrides } from "./actions";
 import { t } from "@/lib/i18n/translations";
 import type { Locale } from "@/lib/i18n";
+import { formatDate as formatDateLocale } from "@/lib/format-date";
 
 // ─── Constants ───────────────────────────────────────
 
@@ -118,9 +119,8 @@ function toLocalDateStr(d: Date): string {
   return `${y}-${m}-${day}`;
 }
 
-function formatDateShort(dateStr: string): string {
-  const d = new Date(dateStr + "T12:00:00");
-  return d.toLocaleDateString("en-GB", { day: "numeric", month: "short" });
+function formatDateShort(dateStr: string, locale: Locale): string {
+  return formatDateLocale(dateStr, locale, { day: "numeric", month: "short" });
 }
 
 function getWeekNumber(d: Date): number {
@@ -1028,7 +1028,7 @@ function PreviewBlockingGrid({
                 <div className={`text-xs font-medium ${isToday ? "text-gold-700" : "text-green-700/60"}`}>
                   {t(DAY_KEYS[day.dayOfWeek], locale)}
                 </div>
-                <div className="text-[10px] text-green-700/40">{formatDateShort(day.date)}</div>
+                <div className="text-[10px] text-green-700/40">{formatDateShort(day.date, locale)}</div>
               </div>
             );
           })}
