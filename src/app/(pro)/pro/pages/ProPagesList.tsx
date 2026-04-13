@@ -7,6 +7,8 @@ import {
   deleteProPage,
   togglePublishProPage,
 } from "./actions";
+import type { Locale } from "@/lib/i18n";
+import { t } from "@/lib/i18n/translations";
 
 interface ProPage {
   id: number;
@@ -20,9 +22,11 @@ interface ProPage {
 export default function ProPagesList({
   pages,
   proSlug,
+  locale,
 }: {
   pages: ProPage[];
   proSlug: string;
+  locale: Locale;
 }) {
   const [createState, createAction, createPending] = useActionState(
     createProPage,
@@ -31,7 +35,7 @@ export default function ProPagesList({
   const [, startTransition] = useTransition();
 
   function handleDelete(pageId: number) {
-    if (!confirm("Delete this page? This cannot be undone.")) return;
+    if (!confirm(t("proPages.deleteConfirm", locale))) return;
     startTransition(() => {
       deleteProPage(pageId);
     });
@@ -48,12 +52,12 @@ export default function ProPagesList({
       {/* Create new page */}
       <div className="rounded-xl border border-green-200 bg-white p-6">
         <h2 className="font-display text-lg font-medium text-green-800">
-          New Page
+          {t("proPages.newPage", locale)}
         </h2>
         <form action={createAction} className="mt-4 flex gap-3">
           <input
             name="title"
-            placeholder="Page title..."
+            placeholder={t("proPages.titlePlaceholder", locale)}
             required
             className="flex-1 rounded-lg border border-green-300 px-3 py-2 text-sm focus:border-gold-500 focus:outline-none focus:ring-1 focus:ring-gold-500"
           />
@@ -62,7 +66,7 @@ export default function ProPagesList({
             disabled={createPending}
             className="rounded-lg bg-gold-600 px-5 py-2 text-sm font-medium text-white hover:bg-gold-500 disabled:opacity-50"
           >
-            {createPending ? "Creating..." : "Create"}
+            {createPending ? t("proPages.creating", locale) : t("proPages.create", locale)}
           </button>
         </form>
         {createState?.error && (
@@ -73,7 +77,7 @@ export default function ProPagesList({
       {/* Pages list */}
       {pages.length === 0 ? (
         <div className="rounded-xl border border-green-200 bg-white p-8 text-center text-sm text-green-500">
-          No pages yet. Create your first one above.
+          {t("proPages.empty", locale)}
         </div>
       ) : (
         <div className="space-y-3">
@@ -92,7 +96,9 @@ export default function ProPagesList({
                         : "bg-amber-100 text-amber-700"
                     }`}
                   >
-                    {page.published ? "Published" : "Draft"}
+                    {page.published
+                      ? t("proPages.published", locale)
+                      : t("proPages.draft", locale)}
                   </span>
                 </div>
                 <p className="mt-0.5 text-xs text-green-500">
@@ -106,7 +112,7 @@ export default function ProPagesList({
                     className="text-xs text-gold-600 hover:text-gold-500"
                     target="_blank"
                   >
-                    View
+                    {t("proPages.view", locale)}
                   </Link>
                 )}
                 <button
@@ -115,13 +121,15 @@ export default function ProPagesList({
                   }
                   className="rounded border border-green-300 px-3 py-1 text-xs text-green-700 hover:bg-green-50"
                 >
-                  {page.published ? "Unpublish" : "Publish"}
+                  {page.published
+                    ? t("proPages.unpublish", locale)
+                    : t("proPages.publish", locale)}
                 </button>
                 <button
                   onClick={() => handleDelete(page.id)}
                   className="rounded border border-red-200 px-3 py-1 text-xs text-red-500 hover:bg-red-50"
                 >
-                  Delete
+                  {t("proPages.delete", locale)}
                 </button>
               </div>
             </div>

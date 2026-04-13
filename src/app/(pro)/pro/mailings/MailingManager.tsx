@@ -7,6 +7,8 @@ import {
   syncStudentContacts,
   sendProMailing,
 } from "./actions";
+import type { Locale } from "@/lib/i18n";
+import { t } from "@/lib/i18n/translations";
 
 interface Contact {
   id: number;
@@ -29,9 +31,11 @@ const inputClass =
 export default function MailingManager({
   contacts,
   flyerPages,
+  locale,
 }: {
   contacts: Contact[];
   flyerPages: FlyerPage[];
+  locale: Locale;
 }) {
   const [addState, addAction, addPending] = useActionState(
     addMailingContact,
@@ -55,8 +59,11 @@ export default function MailingManager({
       } else {
         setSyncMessage(
           result.count > 0
-            ? `${result.count} new student(s) added`
-            : "All students already synced"
+            ? t("proMailings.syncedNew", locale).replace(
+                "{n}",
+                String(result.count)
+              )
+            : t("proMailings.syncedNone", locale)
         );
       }
     });
@@ -88,14 +95,16 @@ export default function MailingManager({
       <div className="rounded-xl border border-green-200 bg-white p-6">
         <div className="flex items-center justify-between">
           <h2 className="font-display text-lg font-medium text-green-800">
-            Contacts ({contacts.length})
+            {t("proMailings.contacts", locale)} ({contacts.length})
           </h2>
           <button
             onClick={handleSync}
             disabled={syncing}
             className="text-xs text-gold-600 hover:text-gold-500 disabled:opacity-50"
           >
-            {syncing ? "Syncing..." : "Sync students"}
+            {syncing
+              ? t("proMailings.syncing", locale)
+              : t("proMailings.syncStudents", locale)}
           </button>
         </div>
         {syncMessage && (
@@ -106,18 +115,18 @@ export default function MailingManager({
         <form action={addAction} className="mt-4 flex gap-2">
           <input
             name="firstName"
-            placeholder="First name"
+            placeholder={t("proMailings.firstNamePlaceholder", locale)}
             className={inputClass + " max-w-[120px]"}
           />
           <input
             name="lastName"
-            placeholder="Last name"
+            placeholder={t("proMailings.lastNamePlaceholder", locale)}
             className={inputClass + " max-w-[120px]"}
           />
           <input
             name="email"
             type="email"
-            placeholder="Email"
+            placeholder={t("proMailings.emailPlaceholder", locale)}
             required
             className={inputClass + " flex-1"}
           />
@@ -126,7 +135,7 @@ export default function MailingManager({
             disabled={addPending}
             className="rounded-lg bg-green-800 px-4 py-2 text-xs font-medium text-white hover:bg-green-700 disabled:opacity-50"
           >
-            Add
+            {t("proMailings.add", locale)}
           </button>
         </form>
         {addState?.error && (
@@ -141,10 +150,13 @@ export default function MailingManager({
                 onClick={selectAll}
                 className="text-xs text-green-600 hover:text-green-800"
               >
-                Select all
+                {t("proMailings.selectAll", locale)}
               </button>
               <span className="text-xs text-green-500">
-                {selectedIds.size} selected
+                {t("proMailings.nSelected", locale).replace(
+                  "{n}",
+                  String(selectedIds.size)
+                )}
               </span>
             </div>
             <div className="max-h-60 space-y-1 overflow-y-auto">
@@ -180,7 +192,7 @@ export default function MailingManager({
                     onClick={() => handleRemove(c.id)}
                     className="text-xs text-red-400 hover:text-red-600"
                   >
-                    Remove
+                    {t("proMailings.remove", locale)}
                   </button>
                 </div>
               ))}
@@ -192,7 +204,7 @@ export default function MailingManager({
       {/* Compose */}
       <div className="rounded-xl border border-green-200 bg-white p-6">
         <h2 className="font-display text-lg font-medium text-green-800">
-          Compose Email
+          {t("proMailings.compose", locale)}
         </h2>
         <form action={sendAction} className="mt-4 space-y-4">
           <input
@@ -202,17 +214,17 @@ export default function MailingManager({
           />
           <div>
             <label className="block text-sm font-medium text-green-800">
-              Subject
+              {t("proMailings.subject", locale)}
             </label>
             <input name="subject" required className={inputClass} />
           </div>
           {flyerPages.length > 0 && (
             <div>
               <label className="block text-sm font-medium text-green-800">
-                Attach page (optional)
+                {t("proMailings.attachPage", locale)}
               </label>
               <select name="pageId" className={inputClass}>
-                <option value="">None</option>
+                <option value="">{t("proMailings.none", locale)}</option>
                 {flyerPages.map((p) => (
                   <option key={p.id} value={p.id}>
                     {p.title}
@@ -223,13 +235,13 @@ export default function MailingManager({
           )}
           <div>
             <label className="block text-sm font-medium text-green-800">
-              Body
+              {t("proMailings.body", locale)}
             </label>
             <textarea
               name="bodyHtml"
               required
               rows={8}
-              placeholder="Write your email content here..."
+              placeholder={t("proMailings.bodyPlaceholder", locale)}
               className={inputClass + " resize-none"}
             />
           </div>
@@ -239,7 +251,10 @@ export default function MailingManager({
           )}
           {sendState?.success && (
             <p className="text-sm text-green-700">
-              Email sent to {sendState.sent} recipient(s).
+              {t("proMailings.sent", locale).replace(
+                "{n}",
+                String(sendState.sent)
+              )}
             </p>
           )}
 
@@ -249,8 +264,11 @@ export default function MailingManager({
             className="rounded-lg bg-gold-600 px-5 py-2 text-sm font-medium text-white hover:bg-gold-500 disabled:opacity-50"
           >
             {sendPending
-              ? "Sending..."
-              : `Send to ${selectedIds.size} recipient(s)`}
+              ? t("proMailings.sending", locale)
+              : t("proMailings.sendTo", locale).replace(
+                  "{n}",
+                  String(selectedIds.size)
+                )}
           </button>
         </form>
       </div>

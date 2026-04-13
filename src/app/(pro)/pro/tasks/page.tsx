@@ -4,12 +4,15 @@ import { asc, or, like, and, not, ilike, sql } from "drizzle-orm";
 import { requireProProfile } from "@/lib/pro";
 import KanbanBoard from "@/components/KanbanBoard";
 import type { SerializedTask } from "@/app/(admin)/admin/tasks/actions";
+import { getLocale } from "@/lib/locale";
+import { t } from "@/lib/i18n/translations";
 
 export const metadata = { title: "Tasks — Golf Lessons" };
 
 export default async function ProTasksPage() {
   const { session } = await requireProProfile();
   const userId = session.userId;
+  const locale = await getLocale();
 
   // Pro sees only tasks they are assigned to, shared with, or created
   const allTasks = await db
@@ -59,10 +62,10 @@ export default async function ProTasksPage() {
   return (
     <div className="mx-auto max-w-7xl px-6 py-12">
       <h1 className="font-display text-3xl font-semibold text-green-900">
-        My Tasks
+        {t("proTasks.title", locale)}
       </h1>
       <p className="mt-2 text-sm text-green-600">
-        Tasks assigned to you or shared with you.
+        {t("proTasks.subtitle", locale)}
       </p>
       <KanbanBoard tasks={serializedTasks} adminUsers={adminUsers} currentUserId={session.userId} />
     </div>
