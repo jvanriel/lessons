@@ -12,36 +12,21 @@ import {
 } from "./actions";
 import { explainDateSlots, type SlotExplanation } from "@/app/(member)/member/book/actions";
 import { TabbedExplanationDialog } from "@/components/SlotExplanationDialog";
+import type { Locale } from "@/lib/i18n";
+import { t } from "@/lib/i18n/translations";
+import { formatDate } from "@/lib/format-date";
 
 interface Props {
   proStudentId: number;
   studentName: string;
   initialData?: ProQuickBookData;
   autoOpen?: boolean;
+  locale: Locale;
 }
 
 const HOLD_MS = 600;
 
-function formatShortDate(dateStr: string) {
-  const d = new Date(dateStr + "T00:00:00");
-  return d.toLocaleDateString("en-US", {
-    weekday: "short",
-    month: "short",
-    day: "numeric",
-  });
-}
-
-function formatDatePillDay(dateStr: string) {
-  const d = new Date(dateStr + "T00:00:00");
-  return d.toLocaleDateString("en-US", { weekday: "short" });
-}
-
-function formatDatePillDate(dateStr: string) {
-  const d = new Date(dateStr + "T00:00:00");
-  return d.toLocaleDateString("en-US", { month: "short", day: "numeric" });
-}
-
-export function ProQuickBook({ proStudentId, studentName, initialData, autoOpen }: Props) {
+export function ProQuickBook({ proStudentId, studentName, initialData, autoOpen, locale }: Props) {
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
   const [data, setData] = useState<ProQuickBookData | null>(initialData ?? null);
@@ -235,7 +220,7 @@ export function ProQuickBook({ proStudentId, studentName, initialData, autoOpen 
       <button
         onClick={handleOpen}
         className="rounded p-1.5 text-gold-600 transition-colors hover:bg-gold-50 hover:text-gold-700"
-        title={`Book for ${studentName}`}
+        title={t("proStudents.quickBook.bookFor", locale).replace("{name}", studentName)}
       >
         <svg
           className="h-4 w-4"
@@ -260,7 +245,7 @@ export function ProQuickBook({ proStudentId, studentName, initialData, autoOpen 
       {!autoOpen && (
         <div className="mb-2 flex items-center justify-between">
           <span className="text-xs font-medium text-green-800">
-            Book for {studentName}
+            {t("proStudents.quickBook.bookFor", locale).replace("{name}", studentName)}
           </span>
           <button
             onClick={() => {
@@ -311,15 +296,14 @@ export function ProQuickBook({ proStudentId, studentName, initialData, autoOpen 
               d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"
             />
           </svg>
-          Loading preferences...
+          {t("proStudents.quickBook.loadingPreferences", locale)}
         </div>
       )}
 
       {/* No preferences */}
       {noPrefs && (
         <p className="py-2 text-xs text-green-500">
-          No booking preferences saved yet. This student needs to book at least
-          one lesson first.
+          {t("proStudents.quickBook.noPreferences", locale)}
         </p>
       )}
 
@@ -329,7 +313,16 @@ export function ProQuickBook({ proStudentId, studentName, initialData, autoOpen 
           <svg className="h-4 w-4 shrink-0 text-green-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
             <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
           </svg>
-          Booked {formatShortDate(selectedDate)} at {bookedSlot.startTime}
+          {t("proStudents.quickBook.bookedAt", locale)
+            .replace(
+              "{date}",
+              formatDate(selectedDate, locale, {
+                weekday: "short",
+                month: "short",
+                day: "numeric",
+              })
+            )
+            .replace("{time}", bookedSlot.startTime)}
         </div>
       )}
 
@@ -392,8 +385,12 @@ export function ProQuickBook({ proStudentId, studentName, initialData, autoOpen 
                       : "bg-white text-green-700 hover:bg-green-100"
                   }`}
                 >
-                  <div className="text-[10px] font-medium leading-tight">{formatDatePillDay(d)}</div>
-                  <div className="text-[10px] leading-tight">{formatDatePillDate(d)}</div>
+                  <div className="text-[10px] font-medium leading-tight">
+                    {formatDate(d, locale, { weekday: "short" })}
+                  </div>
+                  <div className="text-[10px] leading-tight">
+                    {formatDate(d, locale, { month: "short", day: "numeric" })}
+                  </div>
                 </button>
               ))}
             </div>
@@ -414,11 +411,13 @@ export function ProQuickBook({ proStudentId, studentName, initialData, autoOpen 
 
           {/* Time slots — hold to book */}
           {isPending && (
-            <p className="py-1 text-xs text-green-500">Loading...</p>
+            <p className="py-1 text-xs text-green-500">
+              {t("proStudents.quickBook.loading", locale)}
+            </p>
           )}
           {slots.length === 0 && !isPending && (
             <p className="py-1 text-xs text-green-400">
-              No slots on this date.
+              {t("proStudents.quickBook.noSlots", locale)}
             </p>
           )}
           {slots.length > 0 && !isPending && (
@@ -473,9 +472,9 @@ export function ProQuickBook({ proStudentId, studentName, initialData, autoOpen 
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-1">
               {([
-                { value: "weekly", label: "In a week" },
-                { value: "biweekly", label: "In 2 weeks" },
-                { value: "monthly", label: "In a month" },
+                { value: "weekly", label: t("proStudents.quickBook.inAWeek", locale) },
+                { value: "biweekly", label: t("proStudents.quickBook.inTwoWeeks", locale) },
+                { value: "monthly", label: t("proStudents.quickBook.inAMonth", locale) },
               ] as const).map((iv) => (
                 <button
                   key={iv.value}
@@ -526,7 +525,11 @@ export function ProQuickBook({ proStudentId, studentName, initialData, autoOpen 
               }}
               className="text-xs text-green-500 hover:text-green-700"
             >
-              {isPending ? "Loading..." : allDates ? "Fewer dates" : "More dates"}
+              {isPending
+                ? t("proStudents.quickBook.loading", locale)
+                : allDates
+                  ? t("proStudents.quickBook.fewerDates", locale)
+                  : t("proStudents.quickBook.moreDates", locale)}
             </button>
           </div>
 
@@ -544,7 +547,7 @@ export function ProQuickBook({ proStudentId, studentName, initialData, autoOpen 
               const dateStr = `${year}-${String(month + 1).padStart(2, "0")}-${String(d).padStart(2, "0")}`;
               cells.push({ date: dateStr, day: d, available: allDates.includes(dateStr) });
             }
-            const monthLabel = calendarMonth.toLocaleDateString("en-US", { month: "long", year: "numeric" });
+            const monthLabel = formatDate(calendarMonth, locale, { month: "long", year: "numeric" });
 
             return (
               <div className="mt-2">

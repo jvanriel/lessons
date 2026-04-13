@@ -348,6 +348,7 @@ export default function StudentManager({
               studentName={`${currentStudent.firstName} ${currentStudent.lastName}`}
               initialData={currentQuickBook}
               autoOpen
+              locale={locale}
             />
           )}
           <StudentBookings proStudentId={currentStudent.id} locale={locale} />
@@ -537,6 +538,7 @@ export default function StudentManager({
                         proStudentId={student.id}
                         studentName={`${student.firstName} ${student.lastName}`}
                         autoOpen
+                        locale={locale}
                       />
                     )}
 
