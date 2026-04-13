@@ -59,6 +59,25 @@ export interface EmailAttachment {
   method?: string;
 }
 
+/**
+ * Is this error a transient network hiccup that a short retry is likely
+ * to fix? We retry on TCP-level failures (socket hang up, ECONNRESET,
+ * ETIMEDOUT) and on Google's 5xx responses. We do NOT retry on auth or
+ * format errors — those will keep failing.
+ */
+function isTransientEmailError(err: unknown): boolean {
+  if (!(err instanceof Error)) return false;
+  const msg = err.message.toLowerCase();
+  if (msg.includes("socket hang up")) return true;
+  if (msg.includes("econnreset")) return true;
+  if (msg.includes("etimedout")) return true;
+  if (msg.includes("network socket disconnected")) return true;
+  // google-auth-library / googleapis surface 5xx through error.code
+  const code = (err as { code?: number | string }).code;
+  if (typeof code === "number" && code >= 500 && code < 600) return true;
+  return false;
+}
+
 export async function sendEmail({
   to,
   subject,
@@ -138,15 +157,40 @@ export async function sendEmail({
       .replace(/\//g, "_")
       .replace(/=+$/, "");
 
-    const res = await gmail.users.messages.send({
-      userId: "me",
-      requestBody: { raw: encoded },
-    });
+    // Send with one short retry for transient network errors. Socket hang ups
+    // on the Gmail API are rare but real (SENTRY-ORANGE-ZEBRA-F) — usually
+    // the TCP connection is dropped before Google receives the request, so
+    // a retry is safe and succeeds.
+    let res;
+    let attempt = 0;
+    while (true) {
+      try {
+        res = await gmail.users.messages.send({
+          userId: "me",
+          requestBody: { raw: encoded },
+        });
+        break;
+      } catch (err) {
+        attempt++;
+        if (attempt >= 2 || !isTransientEmailError(err)) throw err;
+        const wait = 400 * attempt;
+        console.warn(
+          `sendEmail transient error on attempt ${attempt}, retrying in ${wait}ms:`,
+          err instanceof Error ? err.message : err
+        );
+        await new Promise((r) => setTimeout(r, wait));
+      }
+    }
 
     logEvent({
       type: "email.sent",
       level: "info",
-      payload: { to, subject, messageId: res.data.id ?? null },
+      payload: {
+        to,
+        subject,
+        messageId: res.data.id ?? null,
+        attempts: attempt + 1,
+      },
     }).catch(() => {});
 
     return { messageId: res.data.id ?? undefined };
