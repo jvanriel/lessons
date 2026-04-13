@@ -21,7 +21,8 @@ export default async function AdminTasksPage() {
       .where(
         and(
           or(like(users.roles, "%admin%"), like(users.roles, "%pro%")),
-          not(ilike(users.email, "dummy%"))
+          not(ilike(users.email, "dummy%")),
+          not(ilike(users.email, "thibaut.leys@%"))
         )
       ),
   ]);
