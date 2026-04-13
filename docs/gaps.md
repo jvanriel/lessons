@@ -42,7 +42,7 @@ Cross-reference for sprint planning and Nadine's testing feedback.
 ## 🟡 Should-fix before launch
 
 - **Rate limiting** on `/api/register`, `/api/auth/*`, payment endpoints. Brute-force / enumeration risk.
-- **`db.transaction()`** wrapping in `createBooking()` — multi-step inserts (booking + participant + relationship) can leave partial state on failure.
+- **`db.transaction()`** wrapping in `createBooking()` — multi-step inserts (booking + participant + relationship) can leave partial state on failure. **Blocked**: the current `drizzle-orm/neon-http` driver doesn't support multi-statement transactions. Move to `neon-serverless` (WebSocket) or `pg` first, then re-introduce. Initial attempt in commit `ea60e63` broke the booking flow (Nadine's task #12) and was reverted in `b95dc35`.
 - **`robots.txt` + `app/sitemap.ts`** for SEO of pro pages. No sitemap = pro profiles invisible to search engines.
 - **GDPR data export/delete endpoints** — privacy policy promises them; nothing exists. Article 15/17/20 compliance.
 - **Per-segment `error.tsx`** boundaries for `(pro)`, `(member)`, `(admin)` — currently one root error page for everything.
