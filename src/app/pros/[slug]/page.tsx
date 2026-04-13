@@ -121,7 +121,7 @@ export default async function ProProfilePage({ params }: Props) {
             <div className="mt-3 flex flex-wrap gap-3 text-sm text-green-600">
               {pro.pricePerHour && (
                 <span className="rounded-full bg-green-100 px-3 py-1 text-xs font-medium text-green-700">
-                  &euro;{pro.pricePerHour}/h
+                  {pro.pricePerHour}
                 </span>
               )}
               {pro.lessonDurations && (

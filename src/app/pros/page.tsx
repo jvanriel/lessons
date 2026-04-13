@@ -108,7 +108,7 @@ export default async function ProsPage() {
                     )}
                     {pro.pricePerHour && (
                       <span className="text-xs font-medium text-green-700">
-                        &euro;{pro.pricePerHour}/h
+                        {pro.pricePerHour}
                       </span>
                     )}
                   </div>

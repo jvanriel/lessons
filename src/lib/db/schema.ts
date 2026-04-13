@@ -130,7 +130,7 @@ export const proProfiles = pgTable("pro_profiles", {
     .notNull()
     .default([60]),
   maxGroupSize: integer("max_group_size").notNull().default(4),
-  pricePerHour: numeric("price_per_hour"),
+  pricePerHour: text("price_per_hour"),
   bookingEnabled: boolean("booking_enabled").notNull().default(true),
   bookingNotice: integer("booking_notice").notNull().default(24),
   bookingHorizon: integer("booking_horizon").notNull().default(60),

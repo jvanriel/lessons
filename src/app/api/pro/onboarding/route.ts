@@ -88,14 +88,14 @@ export async function POST(request: Request) {
           maxGroupSize: number;
           cancellationHours: number;
         };
-      const price = parseFloat(pricePerHour);
-      if (isNaN(price) || price < 50) {
-        return NextResponse.json({ error: "Minimum price is €50/hour" }, { status: 400 });
+      const priceIndication = pricePerHour?.trim();
+      if (!priceIndication) {
+        return NextResponse.json({ error: "Price indication is required" }, { status: 400 });
       }
       await db
         .update(proProfiles)
         .set({
-          pricePerHour: String(price),
+          pricePerHour: priceIndication,
           lessonDurations: lessonDurations?.length ? lessonDurations : [60],
           maxGroupSize: maxGroupSize || 4,
           cancellationHours: cancellationHours || 24,
