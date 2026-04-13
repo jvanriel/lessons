@@ -4,12 +4,15 @@ import { db } from "@/lib/db";
 import { users } from "@/lib/db/schema";
 import { eq } from "drizzle-orm";
 import BillingClient from "./BillingClient";
+import { getLocale } from "@/lib/locale";
 
 export const metadata = { title: "Billing — Golf Lessons" };
 
 export default async function BillingPage() {
   const { session, profile } = await requireProProfile();
   if (!profile) redirect("/login");
+
+  const locale = await getLocale();
 
   const [user] = await db
     .select({ stripeCustomerId: users.stripeCustomerId })
@@ -31,6 +34,7 @@ export default async function BillingPage() {
       bankAccountHolder={profile.bankAccountHolder ?? null}
       bankIban={profile.bankIban ?? null}
       bankBic={profile.bankBic ?? null}
+      locale={locale}
     />
   );
 }

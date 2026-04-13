@@ -2,6 +2,9 @@
 
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
+import type { Locale } from "@/lib/i18n";
+import { t } from "@/lib/i18n/translations";
+import { formatDate as formatDateLocale } from "@/lib/format-date";
 
 interface BillingProps {
   subscriptionStatus: string;
@@ -12,9 +15,10 @@ interface BillingProps {
   bankAccountHolder: string | null;
   bankIban: string | null;
   bankBic: string | null;
+  locale: Locale;
 }
 
-function StatusBadge({ status }: { status: string }) {
+function StatusBadge({ status, locale }: { status: string; locale: Locale }) {
   const styles: Record<string, string> = {
     trialing: "bg-blue-100 text-blue-700",
     active: "bg-green-100 text-green-700",
@@ -24,27 +28,21 @@ function StatusBadge({ status }: { status: string }) {
     none: "bg-gray-100 text-gray-600",
   };
 
-  const labels: Record<string, string> = {
-    trialing: "Trial",
-    active: "Active",
-    past_due: "Past Due",
-    cancelled: "Cancelled",
-    expired: "Expired",
-    none: "No Subscription",
-  };
+  const key = `proBilling.status.${status}`;
+  const label = t(key, locale);
 
   return (
     <span
       className={`inline-flex rounded-full px-3 py-1 text-xs font-semibold ${styles[status] || styles.none}`}
     >
-      {labels[status] || status}
+      {label === key ? status : label}
     </span>
   );
 }
 
-function formatDate(iso: string | null) {
+function formatBillingDate(iso: string | null, locale: Locale) {
   if (!iso) return "—";
-  return new Date(iso).toLocaleDateString("en-GB", {
+  return formatDateLocale(new Date(iso), locale, {
     day: "numeric",
     month: "long",
     year: "numeric",
@@ -70,11 +68,13 @@ function BankDetailsForm({
   initialIban,
   initialBic,
   onSaved,
+  locale,
 }: {
   initialHolder: string;
   initialIban: string;
   initialBic: string;
   onSaved: (holder: string, iban: string, bic: string) => void;
+  locale: Locale;
 }) {
   const [holder, setHolder] = useState(initialHolder);
   const [iban, setIban] = useState(initialIban);
@@ -98,7 +98,7 @@ function BankDetailsForm({
     if (res.ok) {
       onSaved(holder, iban.replace(/\s/g, "").toUpperCase(), bic.toUpperCase());
     } else {
-      setError(data.error || "Failed to save");
+      setError(data.error || t("proBilling.form.genericError", locale));
     }
     setSaving(false);
   }
@@ -113,13 +113,13 @@ function BankDetailsForm({
 
       <div>
         <label className="block text-sm font-medium text-green-800">
-          Account holder name
+          {t("proBilling.form.holder", locale)}
         </label>
         <input
           type="text"
           value={holder}
           onChange={(e) => setHolder(e.target.value)}
-          placeholder="e.g. Jan Van Riel"
+          placeholder={t("proBilling.form.holderPlaceholder", locale)}
           className="mt-1 w-full rounded-md border border-green-200 bg-white px-3 py-2 text-sm text-green-900 placeholder:text-green-400 focus:border-green-400 focus:outline-none focus:ring-1 focus:ring-green-400"
           required
         />
@@ -127,13 +127,13 @@ function BankDetailsForm({
 
       <div>
         <label className="block text-sm font-medium text-green-800">
-          IBAN
+          {t("proBilling.iban", locale)}
         </label>
         <input
           type="text"
           value={iban}
           onChange={(e) => setIban(e.target.value)}
-          placeholder="e.g. BE68 5390 0754 7034"
+          placeholder={t("proBilling.form.ibanPlaceholder", locale)}
           className="mt-1 w-full rounded-md border border-green-200 bg-white px-3 py-2 text-sm font-mono text-green-900 placeholder:text-green-400 focus:border-green-400 focus:outline-none focus:ring-1 focus:ring-green-400"
           required
         />
@@ -141,14 +141,16 @@ function BankDetailsForm({
 
       <div>
         <label className="block text-sm font-medium text-green-800">
-          BIC / SWIFT{" "}
-          <span className="font-normal text-green-500">(optional)</span>
+          {t("proBilling.form.bicSwift", locale)}{" "}
+          <span className="font-normal text-green-500">
+            {t("proBilling.form.optional", locale)}
+          </span>
         </label>
         <input
           type="text"
           value={bic}
           onChange={(e) => setBic(e.target.value)}
-          placeholder="e.g. GKCCBEBB"
+          placeholder={t("proBilling.form.bicPlaceholder", locale)}
           className="mt-1 w-full rounded-md border border-green-200 bg-white px-3 py-2 text-sm font-mono text-green-900 placeholder:text-green-400 focus:border-green-400 focus:outline-none focus:ring-1 focus:ring-green-400"
         />
       </div>
@@ -159,7 +161,7 @@ function BankDetailsForm({
           disabled={saving}
           className="bg-gold-600 text-white hover:bg-gold-500"
         >
-          {saving ? "Saving..." : "Save bank details"}
+          {saving ? t("proBilling.form.saving", locale) : t("proBilling.form.save", locale)}
         </Button>
       </div>
     </form>
@@ -177,6 +179,7 @@ export default function BillingClient({
   bankAccountHolder: initialHolder,
   bankIban: initialIban,
   bankBic: initialBic,
+  locale,
 }: BillingProps) {
   const [portalLoading, setPortalLoading] = useState(false);
   const [editingBank, setEditingBank] = useState(false);
@@ -191,6 +194,11 @@ export default function BillingClient({
     subscriptionStatus === "past_due";
   const trialDays = daysUntil(subscriptionTrialEnd);
   const hasBankDetails = !!bankIban;
+
+  const priceLabel =
+    subscriptionPlan === "annual"
+      ? t("proBilling.priceAnnual", locale)
+      : t("proBilling.priceMonthly", locale);
 
   async function openPortal() {
     setPortalLoading(true);
@@ -210,10 +218,10 @@ export default function BillingClient({
   return (
     <div className="mx-auto max-w-3xl px-6 py-12">
       <h1 className="font-display text-3xl font-semibold text-green-900">
-        Billing
+        {t("proBilling.title", locale)}
       </h1>
       <p className="mt-2 text-green-700">
-        Manage your subscription and payout details.
+        {t("proBilling.subtitle", locale)}
       </p>
 
       {/* Subscription Card */}
@@ -221,15 +229,15 @@ export default function BillingClient({
         <div className="flex items-start justify-between">
           <div>
             <h2 className="text-lg font-semibold text-green-900">
-              Subscription
+              {t("proBilling.subscription", locale)}
             </h2>
             <div className="mt-2 flex items-center gap-3">
-              <StatusBadge status={subscriptionStatus} />
+              <StatusBadge status={subscriptionStatus} locale={locale} />
               {subscriptionPlan && (
                 <span className="text-sm text-green-600">
                   {subscriptionPlan === "annual"
-                    ? "Annual — €125/year"
-                    : "Monthly — €12.50/month"}
+                    ? t("proBilling.plan.annual", locale)
+                    : t("proBilling.plan.monthly", locale)}
                 </span>
               )}
             </div>
@@ -241,7 +249,9 @@ export default function BillingClient({
               disabled={portalLoading}
               className="border-green-200 text-green-700 hover:bg-green-50"
             >
-              {portalLoading ? "Loading..." : "Manage"}
+              {portalLoading
+                ? t("proBilling.loading", locale)
+                : t("proBilling.manage", locale)}
             </Button>
           )}
         </div>
@@ -249,13 +259,17 @@ export default function BillingClient({
         {isTrialing && trialDays !== null && (
           <div className="mt-4 rounded-lg border border-blue-200 bg-blue-50 px-4 py-3">
             <p className="text-sm font-medium text-blue-800">
-              Trial period — {trialDays} {trialDays === 1 ? "day" : "days"}{" "}
-              remaining
+              {t(
+                trialDays === 1
+                  ? "proBilling.trialHeading"
+                  : "proBilling.trialHeadingPlural",
+                locale
+              ).replace("{n}", String(trialDays))}
             </p>
             <p className="mt-1 text-xs text-blue-600">
-              Your trial ends on {formatDate(subscriptionTrialEnd)}. After that,
-              you&apos;ll be charged{" "}
-              {subscriptionPlan === "annual" ? "€125/year" : "€12.50/month"}.
+              {t("proBilling.trialEnds", locale)
+                .replace("{date}", formatBillingDate(subscriptionTrialEnd, locale))
+                .replace("{price}", priceLabel)}
             </p>
           </div>
         )}
@@ -263,11 +277,10 @@ export default function BillingClient({
         {subscriptionStatus === "past_due" && (
           <div className="mt-4 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3">
             <p className="text-sm font-medium text-amber-800">
-              Payment failed
+              {t("proBilling.pastDueHeading", locale)}
             </p>
             <p className="mt-1 text-xs text-amber-600">
-              We couldn&apos;t process your last payment. Please update your
-              payment method to avoid losing access.
+              {t("proBilling.pastDueBody", locale)}
             </p>
           </div>
         )}
@@ -276,20 +289,22 @@ export default function BillingClient({
           <div className="mt-6 grid grid-cols-2 gap-4 border-t border-green-100 pt-4">
             <div>
               <p className="text-xs font-medium uppercase text-green-500">
-                Current period ends
+                {t("proBilling.currentPeriodEnds", locale)}
               </p>
               <p className="mt-1 text-sm text-green-900">
-                {formatDate(subscriptionCurrentPeriodEnd)}
+                {formatBillingDate(subscriptionCurrentPeriodEnd, locale)}
               </p>
             </div>
             <div>
               <p className="text-xs font-medium uppercase text-green-500">
-                {isTrialing ? "First charge" : "Next payment"}
+                {isTrialing
+                  ? t("proBilling.firstCharge", locale)
+                  : t("proBilling.nextPayment", locale)}
               </p>
               <p className="mt-1 text-sm text-green-900">
                 {isTrialing
-                  ? formatDate(subscriptionTrialEnd)
-                  : formatDate(subscriptionCurrentPeriodEnd)}
+                  ? formatBillingDate(subscriptionTrialEnd, locale)
+                  : formatBillingDate(subscriptionCurrentPeriodEnd, locale)}
               </p>
             </div>
           </div>
@@ -298,13 +313,13 @@ export default function BillingClient({
         {!isActive && (
           <div className="mt-4">
             <p className="text-sm text-green-600">
-              You don&apos;t have an active subscription.
+              {t("proBilling.noActive", locale)}
             </p>
             <Button
               onClick={() => (window.location.href = "/pro/subscribe")}
               className="mt-3 bg-gold-600 text-white hover:bg-gold-500"
             >
-              Subscribe now
+              {t("proBilling.subscribeNow", locale)}
             </Button>
           </div>
         )}
@@ -316,10 +331,10 @@ export default function BillingClient({
           <div className="flex items-start justify-between">
             <div>
               <h2 className="text-lg font-semibold text-green-900">
-                Payment Method
+                {t("proBilling.paymentMethod", locale)}
               </h2>
               <p className="mt-1 text-sm text-green-600">
-                Manage your payment method via the Stripe portal.
+                {t("proBilling.paymentMethodDesc", locale)}
               </p>
             </div>
             <Button
@@ -328,7 +343,7 @@ export default function BillingClient({
               disabled={portalLoading}
               className="border-green-200 text-green-700 hover:bg-green-50"
             >
-              Update
+              {t("proBilling.update", locale)}
             </Button>
           </div>
         </div>
@@ -338,7 +353,7 @@ export default function BillingClient({
       <div className="mt-6 rounded-xl border border-green-200 bg-white p-6 shadow-sm">
         <div className="flex items-start justify-between">
           <h2 className="text-lg font-semibold text-green-900">
-            Bank Account for Payouts
+            {t("proBilling.bankAccount", locale)}
           </h2>
           {hasBankDetails && !editingBank && (
             <Button
@@ -346,20 +361,20 @@ export default function BillingClient({
               onClick={() => setEditingBank(true)}
               className="border-green-200 text-green-700 hover:bg-green-50"
             >
-              Edit
+              {t("proBilling.edit", locale)}
             </Button>
           )}
         </div>
 
         <p className="mt-1 text-sm text-green-600">
-          Lesson payments from students are paid out monthly to this account.
+          {t("proBilling.bankAccountDesc", locale)}
         </p>
 
         {hasBankDetails && !editingBank ? (
           <div className="mt-4 grid grid-cols-1 gap-3 rounded-lg border border-green-100 bg-green-50/50 p-4 sm:grid-cols-3">
             <div>
               <p className="text-xs font-medium uppercase text-green-500">
-                Account holder
+                {t("proBilling.accountHolder", locale)}
               </p>
               <p className="mt-1 text-sm font-medium text-green-900">
                 {bankHolder}
@@ -367,7 +382,7 @@ export default function BillingClient({
             </div>
             <div>
               <p className="text-xs font-medium uppercase text-green-500">
-                IBAN
+                {t("proBilling.iban", locale)}
               </p>
               <p className="mt-1 text-sm font-mono text-green-900">
                 {formatIban(bankIban!)}
@@ -376,7 +391,7 @@ export default function BillingClient({
             {bankBic && (
               <div>
                 <p className="text-xs font-medium uppercase text-green-500">
-                  BIC
+                  {t("proBilling.bic", locale)}
                 </p>
                 <p className="mt-1 text-sm font-mono text-green-900">
                   {bankBic}
@@ -388,14 +403,14 @@ export default function BillingClient({
           <div className="mt-4">
             {!hasBankDetails && (
               <div className="mb-4 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-700">
-                Please add your bank details so we can pay out your lesson
-                earnings.
+                {t("proBilling.bankMissing", locale)}
               </div>
             )}
             <BankDetailsForm
               initialHolder={bankHolder ?? ""}
               initialIban={bankIban ? formatIban(bankIban) : ""}
               initialBic={bankBic ?? ""}
+              locale={locale}
               onSaved={(h, i, b) => {
                 setBankHolder(h);
                 setBankIban(i);
@@ -413,10 +428,10 @@ export default function BillingClient({
           <div className="flex items-start justify-between">
             <div>
               <h2 className="text-lg font-semibold text-green-900">
-                Invoices
+                {t("proBilling.invoices", locale)}
               </h2>
               <p className="mt-1 text-sm text-green-600">
-                View and download your subscription invoices.
+                {t("proBilling.invoicesDesc", locale)}
               </p>
             </div>
             <Button
@@ -425,7 +440,7 @@ export default function BillingClient({
               disabled={portalLoading}
               className="border-green-200 text-green-700 hover:bg-green-50"
             >
-              View invoices
+              {t("proBilling.viewInvoices", locale)}
             </Button>
           </div>
         </div>
