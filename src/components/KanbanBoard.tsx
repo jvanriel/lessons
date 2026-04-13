@@ -261,7 +261,10 @@ function TaskCard({
       }`}
     >
       <div className="flex items-start justify-between gap-1.5">
-        <h3 className="text-[12px] font-medium leading-snug text-green-800">{task.title}</h3>
+        <h3 className="text-[12px] font-medium leading-snug text-green-800">
+          <span className="mr-1 text-green-400">#{task.id}</span>
+          {task.title}
+        </h3>
         <span
           className={`shrink-0 rounded-full px-1.5 py-0.5 text-[9px] font-medium ${PRIORITY_BADGE[task.priority]}`}
         >
