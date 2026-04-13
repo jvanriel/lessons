@@ -3,6 +3,8 @@
 import { useState, useTransition } from "react";
 import { updateProProfile } from "./actions";
 import Link from "next/link";
+import { t } from "@/lib/i18n/translations";
+import type { Locale } from "@/lib/i18n";
 
 interface ProfileData {
   displayName: string;
@@ -25,8 +27,10 @@ const inputClass =
 
 export default function ProProfileEditor({
   profile,
+  locale,
 }: {
   profile: ProfileData;
+  locale: Locale;
 }) {
   const [pending, startTransition] = useTransition();
   const [saved, setSaved] = useState(false);
@@ -82,7 +86,7 @@ export default function ProProfileEditor({
                 : "bg-amber-100 text-amber-700"
             }`}
           >
-            {profile.published ? "Published" : "Draft"}
+            {profile.published ? t("proProfile.published", locale) : t("proProfile.draft", locale)}
           </span>
         </div>
         {profile.published && (
@@ -91,7 +95,7 @@ export default function ProProfileEditor({
             className="text-xs text-gold-600 hover:text-gold-500"
             target="_blank"
           >
-            View public profile &rarr;
+            {t("proProfile.viewPublic", locale)} &rarr;
           </Link>
         )}
       </div>
@@ -100,11 +104,11 @@ export default function ProProfileEditor({
         {/* ── Profile Details ── */}
         <div className="space-y-4">
           <h2 className="font-display text-lg font-semibold text-green-950">
-            Profile
+            {t("proProfile.section.profile", locale)}
           </h2>
           <div>
             <label className="block text-sm font-medium text-green-800">
-              Display Name
+              {t("proProfile.displayName", locale)}
             </label>
             <input
               value={displayName}
@@ -115,18 +119,18 @@ export default function ProProfileEditor({
           </div>
           <div>
             <label className="block text-sm font-medium text-green-800">
-              Specialties
+              {t("proProfile.specialties", locale)}
             </label>
             <input
               value={specialties}
               onChange={(e) => setSpecialties(e.target.value)}
-              placeholder="e.g. Short game, putting, beginners"
+              placeholder={t("proProfile.specialtiesPlaceholder", locale)}
               className={inputClass}
             />
           </div>
           <div>
             <label className="block text-sm font-medium text-green-800">
-              Bio
+              {t("proProfile.bio", locale)}
             </label>
             <textarea
               value={bio}
@@ -140,24 +144,24 @@ export default function ProProfileEditor({
         {/* ── Lesson Settings ── */}
         <div className="space-y-4 border-t border-green-100 pt-6">
           <h2 className="font-display text-lg font-semibold text-green-950">
-            Lesson Settings
+            {t("proProfile.section.lessons", locale)}
           </h2>
 
           <div>
             <label className="block text-sm font-medium text-green-800">
-              Price indication
+              {t("proProfile.priceIndication", locale)}
             </label>
             <input
               value={pricePerHour}
               onChange={(e) => setPricePerHour(e.target.value)}
-              placeholder="e.g. €75 per hour"
+              placeholder={t("proProfile.priceIndicationPlaceholder", locale)}
               className={inputClass + " max-w-xs"}
             />
           </div>
 
           <div>
             <label className="block text-sm font-medium text-green-800">
-              Lesson durations
+              {t("proProfile.lessonDurations", locale)}
             </label>
             <div className="mt-2 flex flex-wrap gap-3">
               {[30, 60, 90, 120].map((d) => (
@@ -185,13 +189,13 @@ export default function ProProfileEditor({
               ))}
             </div>
             <p className="mt-1 text-xs text-green-500">
-              Select which lesson durations you want to offer.
+              {t("proProfile.lessonDurationsHelp", locale)}
             </p>
           </div>
 
           <div>
             <label className="block text-sm font-medium text-green-800">
-              Max group size
+              {t("proProfile.maxGroupSize", locale)}
             </label>
             <input
               type="number"
@@ -202,7 +206,7 @@ export default function ProProfileEditor({
               max={10}
             />
             <p className="mt-1 text-xs text-green-500">
-              Maximum participants per lesson.
+              {t("proProfile.maxGroupSizeHelp", locale)}
             </p>
           </div>
         </div>
@@ -211,7 +215,7 @@ export default function ProProfileEditor({
         <div className="space-y-4 border-t border-green-100 pt-6">
           <div className="flex items-center justify-between">
             <h2 className="font-display text-lg font-semibold text-green-950">
-              Booking Settings
+              {t("proProfile.section.booking", locale)}
             </h2>
             <button
               type="button"
@@ -231,15 +235,14 @@ export default function ProProfileEditor({
           </div>
           {!bookingEnabled && (
             <p className="text-sm text-amber-600">
-              Bookings are currently disabled. Students cannot book lessons with
-              you.
+              {t("proProfile.bookingsDisabled", locale)}
             </p>
           )}
 
           <div className="grid gap-4 sm:grid-cols-3">
             <div>
               <label className="block text-sm font-medium text-green-800">
-                Booking notice (hours)
+                {t("proProfile.bookingNotice", locale)}
               </label>
               <input
                 type="number"
@@ -250,12 +253,12 @@ export default function ProProfileEditor({
                 max={168}
               />
               <p className="mt-1 text-xs text-green-500">
-                Minimum hours in advance a lesson can be booked.
+                {t("proProfile.bookingNoticeHelp", locale)}
               </p>
             </div>
             <div>
               <label className="block text-sm font-medium text-green-800">
-                Booking horizon (days)
+                {t("proProfile.bookingHorizon", locale)}
               </label>
               <input
                 type="number"
@@ -266,12 +269,12 @@ export default function ProProfileEditor({
                 max={365}
               />
               <p className="mt-1 text-xs text-green-500">
-                How many days ahead students can book.
+                {t("proProfile.bookingHorizonHelp", locale)}
               </p>
             </div>
             <div>
               <label className="block text-sm font-medium text-green-800">
-                Cancellation window (hours)
+                {t("proProfile.cancellationWindow", locale)}
               </label>
               <input
                 type="number"
@@ -282,7 +285,7 @@ export default function ProProfileEditor({
                 max={168}
               />
               <p className="mt-1 text-xs text-green-500">
-                How many hours before the lesson a student can cancel.
+                {t("proProfile.cancellationWindowHelp", locale)}
               </p>
             </div>
           </div>
@@ -291,12 +294,10 @@ export default function ProProfileEditor({
           <div className="flex items-start gap-4 rounded-lg border border-green-100 bg-green-50/50 p-4">
             <div className="flex-1">
               <p className="text-sm font-medium text-green-800">
-                Allow booking without pre-payment
+                {t("proProfile.allowNoPayment", locale)}
               </p>
               <p className="mt-1 text-xs text-green-500">
-                When enabled, students can book lessons without a saved payment
-                method. Useful if you accept cash or want to handle payments
-                separately.
+                {t("proProfile.allowNoPaymentHelp", locale)}
               </p>
             </div>
             <button
@@ -323,14 +324,14 @@ export default function ProProfileEditor({
 
         {/* ── Actions ── */}
         {error && <p className="text-sm text-red-600">{error}</p>}
-        {saved && <p className="text-sm text-green-700">Profile saved.</p>}
+        {saved && <p className="text-sm text-green-700">{t("proProfile.saved", locale)}</p>}
 
         <button
           type="submit"
           disabled={pending}
           className="rounded-lg bg-green-800 px-5 py-2 text-sm font-medium text-white hover:bg-green-700 disabled:opacity-50"
         >
-          {pending ? "Saving..." : "Save"}
+          {pending ? t("proProfile.saving", locale) : t("proProfile.save", locale)}
         </button>
       </form>
     </div>

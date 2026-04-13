@@ -13,6 +13,8 @@ import { requireProProfile } from "@/lib/pro";
 import { redirect } from "next/navigation";
 import AvailabilityEditor from "./AvailabilityEditor";
 import { BookingRefreshListener } from "@/components/BookingRefreshListener";
+import { getLocale } from "@/lib/locale";
+import { t } from "@/lib/i18n/translations";
 import type {
   SerializedAvailability,
   SerializedOverride,
@@ -179,26 +181,27 @@ export default async function AvailabilityPage() {
         lessonDurations: [60],
       };
 
+  const locale = await getLocale();
+
   return (
     <div className="mx-auto max-w-5xl px-6 py-12">
       <BookingRefreshListener />
       <h1 className="mb-2 font-display text-3xl font-semibold text-green-900">
-        Availability
+        {t("proAvailability.pageTitle", locale)}
       </h1>
       <p className="mb-8 text-green-600">
-        Set your weekly schedule and manage date-specific overrides.
+        {t("proAvailability.pageSubtitle", locale)}
       </p>
       {serializedLocations.length === 0 ? (
         <div className="rounded-xl border border-amber-200 bg-amber-50 p-6 text-center">
           <p className="text-sm text-amber-800">
-            You need to add at least one teaching location before setting
-            availability.
+            {t("proAvailability.needLocation", locale)}
           </p>
           <a
             href="/pro/locations"
             className="mt-3 inline-block rounded-md bg-gold-600 px-4 py-2 text-sm font-medium text-white hover:bg-gold-500"
           >
-            Add Location
+            {t("proAvailability.addLocation", locale)}
           </a>
         </div>
       ) : (
