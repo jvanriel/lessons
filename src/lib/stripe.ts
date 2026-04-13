@@ -9,6 +9,11 @@ export function getStripe(): Stripe {
     }
     _stripe = new Stripe(process.env.STRIPE_SECRET_KEY, {
       typescript: true,
+      // Retry on transient network errors + 5xx responses. Catches the
+      // same class of socket-hang-up hiccups that we saw with the Gmail
+      // API in SENTRY-ORANGE-ZEBRA-F. Built-in Stripe SDK retry with
+      // idempotency keys, so it's safe for POSTs as well as GETs.
+      maxNetworkRetries: 2,
     });
   }
   return _stripe;

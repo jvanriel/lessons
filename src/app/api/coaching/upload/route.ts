@@ -5,6 +5,7 @@ import { db } from "@/lib/db";
 import { proStudents, proProfiles } from "@/lib/db/schema";
 import { eq } from "drizzle-orm";
 import { blobPath } from "@/lib/env";
+import { withRetry } from "@/lib/retry";
 
 const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10MB
 
@@ -102,10 +103,14 @@ export async function POST(request: NextRequest) {
   const safeName = file.name.replace(/[^a-zA-Z0-9._-]/g, "_");
   const pathname = blobPath(`coaching/${proStudentId}/${timestamp}-${safeName}`);
 
-  const blob = await put(pathname, file, {
-    access: "public",
-    contentType: file.type,
-  });
+  const blob = await withRetry(
+    () =>
+      put(pathname, file, {
+        access: "public",
+        contentType: file.type,
+      }),
+    { label: "blob.put(coaching upload)" }
+  );
 
   return NextResponse.json({
     name: file.name,

@@ -5,6 +5,7 @@ import { db } from "@/lib/db";
 import { tasks } from "@/lib/db/schema";
 import { eq } from "drizzle-orm";
 import { blobPath } from "@/lib/env";
+import { withRetry } from "@/lib/retry";
 
 const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10MB
 
@@ -88,10 +89,14 @@ export async function POST(request: NextRequest) {
   const safeName = file.name.replace(/[^a-zA-Z0-9._-]/g, "_");
   const pathname = blobPath(`tasks/${taskId}/${timestamp}-${safeName}`);
 
-  const blob = await put(pathname, file, {
-    access: "public",
-    contentType: file.type,
-  });
+  const blob = await withRetry(
+    () =>
+      put(pathname, file, {
+        access: "public",
+        contentType: file.type,
+      }),
+    { label: "blob.put(task upload)" }
+  );
 
   return NextResponse.json({
     name: file.name,
