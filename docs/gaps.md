@@ -33,7 +33,6 @@ Cross-reference for sprint planning and Nadine's testing feedback.
 
 ## 🟡 Should-fix before launch
 
-- **Rate limiting** on `/api/register`, `/api/auth/*`, payment endpoints. Brute-force / enumeration risk.
 - **`db.transaction()`** wrapping in `createBooking()` — multi-step inserts (booking + participant + relationship) can leave partial state on failure. **Blocked**: the current `drizzle-orm/neon-http` driver doesn't support multi-statement transactions. Move to `neon-serverless` (WebSocket) or `pg` first, then re-introduce. Initial attempt in commit `ea60e63` broke the booking flow (Nadine's task #12) and was reverted in `b95dc35`.
 - **GDPR data export/delete endpoints** — privacy policy promises them; nothing exists. Article 15/17/20 compliance.
 - **Mobile responsiveness audit** — `AvailabilityEditor` 7×48 grid and `BookingWizard` 6-step wizard untested on real phones.
