@@ -2,6 +2,8 @@
 
 import { useState } from "react";
 import { BookingsCalendar } from "./BookingsCalendar";
+import { formatDate as formatDateHelper } from "@/lib/format-date";
+import type { Locale } from "@/lib/i18n";
 
 interface Booking {
   id: number;
@@ -27,17 +29,15 @@ interface AvailabilitySlot {
   proLocationId: number;
 }
 
-function formatDate(dateStr: string) {
-  const d = new Date(dateStr + "T00:00:00");
-  return d.toLocaleDateString("en-US", {
-    weekday: "short",
-    month: "short",
-    day: "numeric",
-    year: "numeric",
-  });
-}
+function BookingsList({ bookings, locale }: { bookings: Booking[]; locale: Locale }) {
+  const formatDate = (dateStr: string) =>
+    formatDateHelper(dateStr, locale, {
+      weekday: "short",
+      month: "short",
+      day: "numeric",
+      year: "numeric",
+    });
 
-function BookingsList({ bookings }: { bookings: Booking[] }) {
   const today = new Date().toISOString().split("T")[0];
   const upcoming = bookings.filter(
     (b) => b.date >= today && b.status === "confirmed"
@@ -110,9 +110,11 @@ function BookingsList({ bookings }: { bookings: Booking[] }) {
 export function BookingsView({
   bookings,
   availability,
+  locale,
 }: {
   bookings: Booking[];
   availability: AvailabilitySlot[];
+  locale: Locale;
 }) {
   const [view, setView] = useState<"calendar" | "list">(() => {
     if (typeof window !== "undefined") {
@@ -162,9 +164,9 @@ export function BookingsView({
       </div>
 
       {view === "calendar" ? (
-        <BookingsCalendar bookings={bookings} availability={availability} />
+        <BookingsCalendar bookings={bookings} availability={availability} locale={locale} />
       ) : (
-        <BookingsList bookings={bookings} />
+        <BookingsList bookings={bookings} locale={locale} />
       )}
     </div>
   );

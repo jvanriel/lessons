@@ -5,6 +5,8 @@ import { proStudents, proProfiles, users } from "@/lib/db/schema";
 import { eq, and } from "drizzle-orm";
 import { getSession, hasRole } from "@/lib/auth";
 import CoachingChat from "@/components/coaching/CoachingChat";
+import { getLocale } from "@/lib/locale";
+import { t } from "@/lib/i18n/translations";
 
 export const metadata = { title: "Coaching Chat — Golf Lessons" };
 
@@ -97,6 +99,7 @@ export default async function ProStudentChatPage({
           currentUserId={session.userId}
           partnerName={studentName}
           partnerRole="student"
+          emptyText={t("coaching.empty", await getLocale())}
         />
       </div>
     </div>

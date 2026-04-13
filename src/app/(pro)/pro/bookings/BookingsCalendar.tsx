@@ -3,6 +3,8 @@
 import { useState, useMemo } from "react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
+import { formatDate as formatDateLocale } from "@/lib/format-date";
+import type { Locale } from "@/lib/i18n";
 
 // ─── Types ──────────────────────────────────────────
 
@@ -33,6 +35,7 @@ interface AvailabilitySlot {
 interface Props {
   bookings: Booking[];
   availability: AvailabilitySlot[];
+  locale: Locale;
 }
 
 // ─── Constants ──────────────────────────────────────
@@ -80,7 +83,7 @@ function timeToGridRow(time: string): number {
 
 // ─── Component ──────────────────────────────────────
 
-export function BookingsCalendar({ bookings, availability }: Props) {
+export function BookingsCalendar({ bookings, availability, locale }: Props) {
   const [weekStart, setWeekStart] = useState(() => getMonday(new Date()));
   const [expandedBookingId, setExpandedBookingId] = useState<number | null>(null);
 
@@ -126,7 +129,7 @@ export function BookingsCalendar({ bookings, availability }: Props) {
   const totalMinutes = (END_HOUR - START_HOUR) * 60;
 
   // Format week range for header
-  const weekLabel = `${weekDates[0].toLocaleDateString("en-US", { month: "short", day: "numeric" })} - ${weekDates[6].toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}`;
+  const weekLabel = `${formatDateLocale(weekDates[0], locale, { month: "short", day: "numeric" })} - ${formatDateLocale(weekDates[6], locale, { month: "short", day: "numeric", year: "numeric" })}`;
 
   return (
     <div>
@@ -313,15 +316,7 @@ export function BookingsCalendar({ bookings, availability }: Props) {
                   {booking.studentFirstName} {booking.studentLastName}
                 </h3>
                 <p className="mt-0.5 text-sm text-green-600">
-                  {new Date(booking.date + "T00:00:00").toLocaleDateString(
-                    "en-US",
-                    {
-                      weekday: "long",
-                      day: "numeric",
-                      month: "long",
-                      year: "numeric",
-                    }
-                  )}
+                  {formatDateLocale(booking.date, locale)}
                 </p>
               </div>
               <button

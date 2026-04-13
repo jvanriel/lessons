@@ -8,6 +8,7 @@ interface CoachingChatProps {
   currentUserId: number;
   partnerName: string;
   partnerRole: "pro" | "student";
+  emptyText?: string;
 }
 
 export default function CoachingChat({
@@ -15,6 +16,7 @@ export default function CoachingChat({
   currentUserId,
   partnerName,
   partnerRole,
+  emptyText,
 }: CoachingChatProps) {
   const handleUpload = useCallback(
     async (file: File) => {
@@ -53,6 +55,7 @@ export default function CoachingChat({
         ]}
         onUpload={handleUpload}
         fillHeight
+        emptyText={emptyText}
       />
     </div>
   );

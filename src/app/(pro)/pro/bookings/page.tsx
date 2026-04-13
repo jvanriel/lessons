@@ -12,12 +12,15 @@ import { redirect } from "next/navigation";
 import Link from "next/link";
 import { BookingsView } from "./BookingsView";
 import { BookingRefreshListener } from "@/components/BookingRefreshListener";
+import { getLocale } from "@/lib/locale";
 
 export const metadata = { title: "Bookings — Golf Lessons" };
 
 export default async function ProBookingsPage() {
   const { profile } = await requireProProfile();
   if (!profile) redirect("/login");
+
+  const locale = await getLocale();
 
   const [bookings, availability] = await Promise.all([
     db
@@ -81,7 +84,7 @@ export default async function ProBookingsPage() {
 
       {/* Bookings view (calendar or list) */}
       <section className="mb-10">
-        <BookingsView bookings={bookings} availability={availability} />
+        <BookingsView bookings={bookings} availability={availability} locale={locale} />
       </section>
 
       {/* Past & cancelled */}

@@ -7,6 +7,7 @@ import { inviteStudent, getStudentBookings, proCancelBooking, type ProQuickBookD
 import { ProQuickBook } from "./ProQuickBook";
 import { EditStudentDialog } from "./EditStudentDialog";
 import { StudentBookings } from "./StudentBookings";
+import type { Locale } from "@/lib/i18n";
 
 interface Student {
   id: number;
@@ -72,11 +73,13 @@ export default function StudentManager({
   currentStudentId,
   currentBooking,
   currentQuickBook,
+  locale,
 }: {
   students: Student[];
   currentStudentId: number | null;
   currentBooking: { date: string; startTime: string; endTime: string } | null;
   currentQuickBook: ProQuickBookData | null;
+  locale: Locale;
 }) {
   const router = useRouter();
 
@@ -347,7 +350,7 @@ export default function StudentManager({
               autoOpen
             />
           )}
-          <StudentBookings proStudentId={currentStudent.id} />
+          <StudentBookings proStudentId={currentStudent.id} locale={locale} />
         </div>
       )}
 
@@ -537,7 +540,7 @@ export default function StudentManager({
 
                     {/* Upcoming bookings */}
                     {student.status === "active" && (
-                      <StudentBookings proStudentId={student.id} />
+                      <StudentBookings proStudentId={student.id} locale={locale} />
                     )}
                   </div>
                 )}

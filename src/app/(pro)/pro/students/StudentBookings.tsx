@@ -2,6 +2,8 @@
 
 import { useState, useEffect, useTransition, useRef, useCallback } from "react";
 import { getStudentBookings, proCancelBooking } from "./actions";
+import { formatDate as formatDateHelper } from "@/lib/format-date";
+import type { Locale } from "@/lib/i18n";
 
 interface Booking {
   id: number;
@@ -11,13 +13,13 @@ interface Booking {
   status: string;
 }
 
-function formatDate(dateStr: string) {
-  const d = new Date(dateStr + "T00:00:00");
-  return d.toLocaleDateString("en-US", {
-    weekday: "short",
-    month: "short",
-    day: "numeric",
-  });
+function makeFormatDate(locale: Locale) {
+  return (dateStr: string) =>
+    formatDateHelper(dateStr, locale, {
+      weekday: "short",
+      month: "short",
+      day: "numeric",
+    });
 }
 
 function CancelDialog({
@@ -25,11 +27,13 @@ function CancelDialog({
   onConfirm,
   onClose,
   pending,
+  formatDate,
 }: {
   booking: Booking;
   onConfirm: () => void;
   onClose: () => void;
   pending: boolean;
+  formatDate: (dateStr: string) => string;
 }) {
   const backdropRef = useRef<HTMLDivElement>(null);
 
@@ -80,11 +84,12 @@ function CancelDialog({
   );
 }
 
-export function StudentBookings({ proStudentId }: { proStudentId: number }) {
+export function StudentBookings({ proStudentId, locale }: { proStudentId: number; locale: Locale }) {
   const [bookings, setBookings] = useState<Booking[]>([]);
   const [loaded, setLoaded] = useState(false);
   const [isPending, startTransition] = useTransition();
   const [cancelTarget, setCancelTarget] = useState<Booking | null>(null);
+  const formatDate = makeFormatDate(locale);
 
   const fetchBookings = useCallback(() => {
     startTransition(async () => {
@@ -155,6 +160,7 @@ export function StudentBookings({ proStudentId }: { proStudentId: number }) {
           onConfirm={handleCancel}
           onClose={() => setCancelTarget(null)}
           pending={isPending}
+          formatDate={formatDate}
         />
       )}
     </div>

@@ -9,12 +9,14 @@ import {
 import { eq, and, gte, asc } from "drizzle-orm";
 import { getMyStudents, getProQuickBookData, type ProQuickBookData } from "./actions";
 import StudentManager from "./StudentManager";
+import { getLocale } from "@/lib/locale";
 
 export const metadata = { title: "Students — Golf Lessons" };
 
 export default async function ProStudentsPage() {
   const { profile } = await requireProProfile();
   const students = await getMyStudents();
+  const locale = await getLocale();
 
   // Find the current/next student (lesson happening now or next upcoming)
   let currentStudentId: number | null = null;
@@ -79,6 +81,7 @@ export default async function ProStudentsPage() {
       currentStudentId={currentStudentId}
       currentBooking={currentBooking}
       currentQuickBook={currentQuickBook}
+      locale={locale}
     />
   );
 }

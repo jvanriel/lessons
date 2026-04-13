@@ -4,6 +4,9 @@ import { db } from "@/lib/db";
 import { lessonBookings, users } from "@/lib/db/schema";
 import { eq, and, desc, sql, gte } from "drizzle-orm";
 import { BookingRefreshListener } from "@/components/BookingRefreshListener";
+import { getLocale } from "@/lib/locale";
+import { formatDate as formatDateHelper } from "@/lib/format-date";
+import type { Locale } from "@/lib/i18n";
 
 export const metadata = { title: "Earnings — Golf Lessons" };
 
@@ -12,8 +15,8 @@ function formatCents(cents: number | null) {
   return `€${(cents / 100).toFixed(2)}`;
 }
 
-function formatDate(dateStr: string) {
-  return new Date(dateStr).toLocaleDateString("en-GB", {
+function formatDate(dateStr: string, locale: Locale) {
+  return formatDateHelper(dateStr, locale, {
     day: "numeric",
     month: "short",
     year: "numeric",
@@ -40,6 +43,8 @@ function PaymentStatusBadge({ status }: { status: string }) {
 export default async function EarningsPage() {
   const { profile } = await requireProProfile();
   if (!profile) redirect("/login");
+
+  const locale = await getLocale();
 
   // Get first day of current month
   const now = new Date();
@@ -194,7 +199,7 @@ export default async function EarningsPage() {
                         {payment.studentFirstName} {payment.studentLastName}
                       </td>
                       <td className="px-6 py-3 text-green-600">
-                        {formatDate(payment.date)}
+                        {formatDate(payment.date, locale)}
                       </td>
                       <td className="px-6 py-3 text-right text-green-900">
                         {formatCents(payment.priceCents)}

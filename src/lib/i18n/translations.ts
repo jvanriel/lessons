@@ -116,6 +116,17 @@ const translations: Record<Locale, Record<string, string>> = {
     // Member dashboard
     "member.welcome": "Welcome back",
     "dashboard.openOnPhone": "Open on phone",
+    "proDashboard.title": "Pro Dashboard",
+    "proDashboard.tagline": "Manage your lessons, availability, and bookings.",
+    "proDashboard.lessonToday": "Lesson today",
+    "proDashboard.lessonsToday": "Lessons today",
+    "proDashboard.upcomingBooking": "Upcoming booking",
+    "proDashboard.upcomingBookings": "Upcoming bookings",
+    "proDashboard.quickLinks": "Quick links",
+    "proDashboard.viewAllBookings": "View all bookings",
+    "proDashboard.manageAvailability": "Manage availability",
+    "proDashboard.editProfile": "Edit profile",
+    "coaching.empty": "No messages yet. Send a tip, photo, or question to start the conversation.",
 
     // Booking wizard
     "book.title": "Book a lesson with",
@@ -466,6 +477,17 @@ const translations: Record<Locale, Record<string, string>> = {
     // Member dashboard
     "member.welcome": "Welkom terug",
     "dashboard.openOnPhone": "Open op telefoon",
+    "proDashboard.title": "Pro Dashboard",
+    "proDashboard.tagline": "Beheer je lessen, beschikbaarheid en boekingen.",
+    "proDashboard.lessonToday": "Les vandaag",
+    "proDashboard.lessonsToday": "Lessen vandaag",
+    "proDashboard.upcomingBooking": "Aankomende boeking",
+    "proDashboard.upcomingBookings": "Aankomende boekingen",
+    "proDashboard.quickLinks": "Snelkoppelingen",
+    "proDashboard.viewAllBookings": "Alle boekingen bekijken",
+    "proDashboard.manageAvailability": "Beschikbaarheid beheren",
+    "proDashboard.editProfile": "Profiel bewerken",
+    "coaching.empty": "Nog geen berichten. Stuur een tip, foto of vraag om het gesprek te starten.",
 
     // Booking wizard
     "book.title": "Boek een les bij",
@@ -811,6 +833,17 @@ const translations: Record<Locale, Record<string, string>> = {
     // Member dashboard
     "member.welcome": "Bienvenue",
     "dashboard.openOnPhone": "Ouvrir sur téléphone",
+    "proDashboard.title": "Tableau de bord Pro",
+    "proDashboard.tagline": "Gérez vos cours, votre disponibilité et vos réservations.",
+    "proDashboard.lessonToday": "Cours aujourd'hui",
+    "proDashboard.lessonsToday": "Cours aujourd'hui",
+    "proDashboard.upcomingBooking": "Réservation à venir",
+    "proDashboard.upcomingBookings": "Réservations à venir",
+    "proDashboard.quickLinks": "Liens rapides",
+    "proDashboard.viewAllBookings": "Voir toutes les réservations",
+    "proDashboard.manageAvailability": "Gérer la disponibilité",
+    "proDashboard.editProfile": "Modifier le profil",
+    "coaching.empty": "Aucun message. Envoyez un conseil, une photo ou une question pour démarrer la conversation.",
 
     // Booking wizard
     "book.title": "Réserver un cours avec",

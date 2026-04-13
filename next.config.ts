@@ -33,8 +33,11 @@ const nextConfig: NextConfig = {
 export default withSentryConfig(nextConfig, {
   org: process.env.SENTRY_ORG,
   project: process.env.SENTRY_PROJECT,
-  // Only upload source maps when auth token is present (skip in local dev)
-  silent: !process.env.CI,
+  // Be loud whenever we have an auth token (i.e. we're actually trying to
+  // upload source maps — Vercel builds, CI). Stay silent in local dev where
+  // there's no token. Previously gated on CI, which would silently swallow
+  // upload failures if Vercel ever didn't set CI=1.
+  silent: !process.env.SENTRY_AUTH_TOKEN,
   widenClientFileUpload: true,
   tunnelRoute: "/monitoring", // avoid ad-blockers eating Sentry requests
 });

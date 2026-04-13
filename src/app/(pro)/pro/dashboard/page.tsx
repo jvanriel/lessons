@@ -51,10 +51,10 @@ export default async function ProDashboard() {
       <div className="flex items-start justify-between gap-4">
         <div>
           <h1 className="font-display text-3xl font-semibold text-green-900">
-            Pro Dashboard
+            {t("proDashboard.title", locale)}
           </h1>
           <p className="mt-2 text-green-700">
-            Manage your lessons, availability, and bookings.
+            {t("proDashboard.tagline", locale)}
           </p>
         </div>
         <QRLoginButton label={t("dashboard.openOnPhone", locale)} />
@@ -67,7 +67,7 @@ export default async function ProDashboard() {
             {todayCount}
           </div>
           <div className="mt-1 text-sm text-green-600">
-            {todayCount === 1 ? "Lesson today" : "Lessons today"}
+            {todayCount === 1 ? t("proDashboard.lessonToday", locale) : t("proDashboard.lessonsToday", locale)}
           </div>
         </div>
 
@@ -77,31 +77,31 @@ export default async function ProDashboard() {
             {upcomingCount}
           </div>
           <div className="mt-1 text-sm text-green-600">
-            Upcoming {upcomingCount === 1 ? "booking" : "bookings"}
+            {upcomingCount === 1 ? t("proDashboard.upcomingBooking", locale) : t("proDashboard.upcomingBookings", locale)}
           </div>
         </div>
 
         {/* Quick links */}
         <div className="rounded-xl border border-green-200 bg-white p-6">
-          <div className="text-sm font-medium text-green-800">Quick links</div>
+          <div className="text-sm font-medium text-green-800">{t("proDashboard.quickLinks", locale)}</div>
           <div className="mt-3 space-y-2">
             <Link
               href="/pro/bookings"
               className="block text-sm text-gold-600 hover:text-gold-500"
             >
-              View all bookings
+              {t("proDashboard.viewAllBookings", locale)}
             </Link>
             <Link
               href="/pro/availability"
               className="block text-sm text-gold-600 hover:text-gold-500"
             >
-              Manage availability
+              {t("proDashboard.manageAvailability", locale)}
             </Link>
             <Link
               href="/pro/profile"
               className="block text-sm text-gold-600 hover:text-gold-500"
             >
-              Edit profile
+              {t("proDashboard.editProfile", locale)}
             </Link>
           </div>
         </div>
