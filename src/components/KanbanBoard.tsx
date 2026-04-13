@@ -1,6 +1,7 @@
 "use client";
 
-import { useState, useActionState, useTransition } from "react";
+import { useState, useActionState, useTransition, useEffect } from "react";
+import { useRouter } from "next/navigation";
 import {
   createTask,
   moveTask,
@@ -68,10 +69,32 @@ export default function KanbanBoard({
   adminUsers: AdminUser[];
   currentUserId: number;
 }) {
+  const router = useRouter();
   const [allTasks, setAllTasks] = useState(initialTasks);
   const [selectedTask, setSelectedTask] = useState<SerializedTask | null>(
     null
   );
+
+  // Keep local state in sync with server data (refreshed every 15s below)
+  useEffect(() => {
+    setAllTasks(initialTasks);
+    // If a task is open in the detail panel, refresh its data too
+    if (selectedTask) {
+      const fresh = initialTasks.find((t) => t.id === selectedTask.id);
+      if (fresh) setSelectedTask(fresh);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [initialTasks]);
+
+  // Auto-refresh every 15s, paused while a detail panel is open so we don't
+  // clobber whatever the user is editing.
+  useEffect(() => {
+    if (selectedTask) return;
+    const id = setInterval(() => {
+      router.refresh();
+    }, 15000);
+    return () => clearInterval(id);
+  }, [router, selectedTask]);
   const [createState, createAction, createPending] = useActionState(
     async (
       prev: {
