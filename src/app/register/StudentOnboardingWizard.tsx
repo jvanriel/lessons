@@ -362,8 +362,8 @@ function AccountStep({
             {t("auth.login", locale)}
           </Link>
           {" · "}
-          <Link href="/pro/onboarding" className="text-gold-600 hover:text-gold-500">
-            I&apos;m a Golf Pro
+          <Link href="/pro/register" className="text-gold-600 hover:text-gold-500">
+            {t("auth.imAGolfPro", locale)}
           </Link>
         </p>
       )}
