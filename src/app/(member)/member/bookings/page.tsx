@@ -11,6 +11,8 @@ import { redirect } from "next/navigation";
 import Link from "next/link";
 import { CancelBookingButton } from "./CancelBookingButton";
 import { BookingRefreshListener } from "@/components/BookingRefreshListener";
+import { getLocale } from "@/lib/locale";
+import { formatDate } from "@/lib/format-date";
 
 export const metadata = { title: "My Bookings — Golf Lessons" };
 
@@ -19,6 +21,8 @@ export default async function MemberBookingsPage() {
   if (!session || !hasRole(session, "member")) {
     redirect("/login");
   }
+
+  const locale = await getLocale();
 
   const today = new Date().toISOString().split("T")[0];
 
@@ -104,14 +108,7 @@ export default async function MemberBookingsPage() {
                 <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                   <div>
                     <div className="font-medium text-green-900">
-                      {new Date(
-                        booking.date + "T00:00:00"
-                      ).toLocaleDateString("en-US", {
-                        weekday: "long",
-                        day: "numeric",
-                        month: "long",
-                        year: "numeric",
-                      })}
+                      {formatDate(booking.date, locale)}
                     </div>
                     <div className="mt-0.5 text-sm text-green-700">
                       {booking.startTime} - {booking.endTime}
@@ -157,9 +154,7 @@ export default async function MemberBookingsPage() {
                   <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
                     <div>
                       <div className="font-medium text-green-800">
-                        {new Date(
-                          booking.date + "T00:00:00"
-                        ).toLocaleDateString("en-US", {
+                        {formatDate(booking.date, locale, {
                           weekday: "short",
                           day: "numeric",
                           month: "long",
