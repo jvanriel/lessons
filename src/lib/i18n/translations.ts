@@ -295,6 +295,7 @@ const translations: Record<Locale, Record<string, string>> = {
     "onboarding.doneProfileHint": "You can update all your information anytime via the profile page under the person icon.",
     "onboarding.goToDashboard": "Go to Dashboard",
     "onboarding.selectAtLeastOne": "Select at least one pro",
+    "onboarding.maybeLater": "Maybe later",
   },
 
   nl: {
@@ -584,6 +585,7 @@ const translations: Record<Locale, Record<string, string>> = {
     "onboarding.doneProfileHint": "Je kunt al je gegevens altijd bijwerken via de profielpagina onder het persoonsicoon.",
     "onboarding.goToDashboard": "Naar Dashboard",
     "onboarding.selectAtLeastOne": "Selecteer minstens een pro",
+    "onboarding.maybeLater": "Misschien later",
   },
 
   fr: {
@@ -873,6 +875,7 @@ const translations: Record<Locale, Record<string, string>> = {
     "onboarding.doneProfileHint": "Vous pouvez modifier toutes vos informations à tout moment via la page profil sous l'icône de personne.",
     "onboarding.goToDashboard": "Aller au tableau de bord",
     "onboarding.selectAtLeastOne": "Sélectionnez au moins un pro",
+    "onboarding.maybeLater": "Plus tard",
   },
 };
 

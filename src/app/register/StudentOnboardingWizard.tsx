@@ -471,17 +471,17 @@ function GolfProfileStep({
 
 // ─── Step 3: Choose Pros ───────────────────────────────
 
-function ChooseProsStep({ pros, selected, onToggle }: { pros: Pro[]; selected: Set<number>; onToggle: (id: number) => void }) {
+function ChooseProsStep({ pros, selected, onToggle, locale }: { pros: Pro[]; selected: Set<number>; onToggle: (id: number) => void; locale: Locale }) {
   if (pros.length === 0) {
     return (
       <div className="rounded-xl border border-green-200 bg-white p-8 text-center">
-        <p className="text-green-600">No golf professionals available yet. You can skip this step and add one later.</p>
+        <p className="text-green-600">{t("onboarding.noPros", locale)}</p>
       </div>
     );
   }
   return (
     <div className="space-y-4">
-      <p className="text-sm text-green-600">Select the golf professionals you&apos;d like to work with.</p>
+      <p className="text-sm text-green-600">{t("onboarding.chooseProsDesc", locale)}</p>
       <div className="grid gap-4 sm:grid-cols-2">
         {pros.map((pro) => {
           const isSelected = selected.has(pro.id);
@@ -508,17 +508,17 @@ function ChooseProsStep({ pros, selected, onToggle }: { pros: Pro[]; selected: S
 
 // ─── Step 4: Scheduling ────────────────────────────────
 
-const DAY_LABELS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
-const TIME_OPTIONS = [{ value: "morning", label: "Morning" }, { value: "afternoon", label: "Afternoon" }, { value: "evening", label: "Evening" }];
-function SchedulingStep({ prefs, onChange }: { prefs: SchedulingPref[]; onChange: (i: number, u: Partial<SchedulingPref>) => void }) {
+const DAY_KEYS = ["mon", "tue", "wed", "thu", "fri", "sat", "sun"] as const;
+const TIME_KEYS = ["morning", "afternoon", "evening"] as const;
+function SchedulingStep({ prefs, onChange, locale }: { prefs: SchedulingPref[]; onChange: (i: number, u: Partial<SchedulingPref>) => void; locale: Locale }) {
   return (
     <div className="space-y-6">
-      <p className="text-sm text-green-600">Set your preferred lesson schedule for each pro. This powers Quick Book on your dashboard.</p>
+      <p className="text-sm text-green-600">{t("onboarding.schedulingDesc", locale)}</p>
       {prefs.map((pref, i) => (
         <div key={pref.proStudentId} className="rounded-xl border border-green-200 bg-green-50/30 p-5 space-y-4">
           <h3 className="font-medium text-green-900">{pref.proName}</h3>
           <div>
-            <label className="block text-xs font-medium text-green-700">Duration</label>
+            <label className="block text-xs font-medium text-green-700">{t("onboarding.duration", locale)}</label>
             <div className="mt-1.5 flex flex-wrap gap-1.5">
               {pref.lessonDurations.map((d) => (
                 <button key={d} type="button" onClick={() => onChange(i, { preferredDuration: d })} className={`rounded-md border px-3 py-1.5 text-xs font-medium transition-colors ${pref.preferredDuration === d ? "border-green-700 bg-green-700 text-white" : "border-green-200 bg-white text-green-700 hover:border-green-400"}`}>{d} min</button>
@@ -526,26 +526,26 @@ function SchedulingStep({ prefs, onChange }: { prefs: SchedulingPref[]; onChange
             </div>
           </div>
           <div>
-            <label className="block text-xs font-medium text-green-700">Preferred day</label>
+            <label className="block text-xs font-medium text-green-700">{t("onboarding.preferredDay", locale)}</label>
             <div className="mt-1.5 flex flex-wrap gap-1.5">
-              {DAY_LABELS.map((label, dayIdx) => (
-                <button key={dayIdx} type="button" onClick={() => onChange(i, { preferredDayOfWeek: dayIdx })} className={`rounded-md border px-3 py-1.5 text-xs font-medium transition-colors ${pref.preferredDayOfWeek === dayIdx ? "border-green-700 bg-green-700 text-white" : "border-green-200 bg-white text-green-700 hover:border-green-400"}`}>{label}</button>
+              {DAY_KEYS.map((dayKey, dayIdx) => (
+                <button key={dayIdx} type="button" onClick={() => onChange(i, { preferredDayOfWeek: dayIdx })} className={`rounded-md border px-3 py-1.5 text-xs font-medium transition-colors ${pref.preferredDayOfWeek === dayIdx ? "border-green-700 bg-green-700 text-white" : "border-green-200 bg-white text-green-700 hover:border-green-400"}`}>{t(`onboarding.day.${dayKey}`, locale).slice(0, 3)}</button>
               ))}
             </div>
           </div>
           <div>
-            <label className="block text-xs font-medium text-green-700">Preferred time</label>
+            <label className="block text-xs font-medium text-green-700">{t("onboarding.preferredTime", locale)}</label>
             <div className="mt-1.5 flex flex-wrap gap-1.5">
-              {TIME_OPTIONS.map((opt) => (
-                <button key={opt.value} type="button" onClick={() => onChange(i, { preferredTime: opt.value })} className={`rounded-md border px-3 py-1.5 text-xs font-medium transition-colors ${pref.preferredTime === opt.value ? "border-green-700 bg-green-700 text-white" : "border-green-200 bg-white text-green-700 hover:border-green-400"}`}>{opt.label}</button>
+              {TIME_KEYS.map((timeKey) => (
+                <button key={timeKey} type="button" onClick={() => onChange(i, { preferredTime: timeKey })} className={`rounded-md border px-3 py-1.5 text-xs font-medium transition-colors ${pref.preferredTime === timeKey ? "border-green-700 bg-green-700 text-white" : "border-green-200 bg-white text-green-700 hover:border-green-400"}`}>{t(`onboarding.${timeKey}`, locale)}</button>
               ))}
             </div>
           </div>
           {pref.locations.length > 1 && (
             <div>
-              <label className="block text-xs font-medium text-green-700">Preferred location</label>
+              <label className="block text-xs font-medium text-green-700">{t("onboarding.preferredLocation", locale)}</label>
               <select value={pref.preferredLocationId || ""} onChange={(e) => onChange(i, { preferredLocationId: e.target.value ? Number(e.target.value) : null })} className={inputClass + " max-w-xs"}>
-                <option value="">No preference</option>
+                <option value="">{t("onboarding.noPreference", locale)}</option>
                 {pref.locations.map((loc) => <option key={loc.proLocationId} value={loc.proLocationId}>{loc.name}{loc.city ? ` (${loc.city})` : ""}</option>)}
               </select>
             </div>
@@ -558,7 +558,7 @@ function SchedulingStep({ prefs, onChange }: { prefs: SchedulingPref[]; onChange
 
 // ─── Step 5: Payment (Skippable) ───────────────────────
 
-function PaymentForm({ onSuccess }: { onSuccess: () => void }) {
+function PaymentForm({ onSuccess, locale }: { onSuccess: () => void; locale: Locale }) {
   const stripe = useStripe();
   const elements = useElements();
   const [loading, setLoading] = useState(false);
@@ -579,12 +579,12 @@ function PaymentForm({ onSuccess }: { onSuccess: () => void }) {
     <form onSubmit={handleSubmit}>
       <div className="rounded-lg border border-green-100 bg-green-50/30 p-4"><PaymentElement options={{ layout: "tabs" }} /></div>
       {error && <div className="mt-4 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">{error}</div>}
-      <Button type="submit" disabled={!stripe || loading} className="mt-6 w-full bg-gold-600 py-3 text-base font-medium text-white hover:bg-gold-500">{loading ? "Saving..." : "Save payment method"}</Button>
+      <Button type="submit" disabled={!stripe || loading} className="mt-6 w-full bg-gold-600 py-3 text-base font-medium text-white hover:bg-gold-500">{loading ? t("onboarding.paymentSaving", locale) : t("onboarding.savePayment", locale)}</Button>
     </form>
   );
 }
 
-function PaymentStep({ onSuccess, onSkip }: { onSuccess: () => void; onSkip: () => void }) {
+function PaymentStep({ onSuccess, onSkip, locale }: { onSuccess: () => void; onSkip: () => void; locale: Locale }) {
   const [clientSecret, setClientSecret] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -603,11 +603,11 @@ function PaymentStep({ onSuccess, onSkip }: { onSuccess: () => void; onSkip: () 
   if (clientSecret) {
     return (
       <div className="space-y-4">
-        <p className="text-sm text-green-600">Your card will be saved securely for future lesson payments.</p>
+        <p className="text-sm text-green-600">{t("onboarding.paymentSecure", locale)}</p>
         <Elements stripe={getStripe()} options={{ clientSecret, appearance: { theme: "stripe", variables: { colorPrimary: "#091a12", colorBackground: "#faf7f0", colorText: "#091a12", fontFamily: "Outfit, system-ui, sans-serif", borderRadius: "8px" } } }}>
-          <PaymentForm onSuccess={onSuccess} />
+          <PaymentForm onSuccess={onSuccess} locale={locale} />
         </Elements>
-        <button type="button" onClick={onSkip} className="mt-2 w-full text-center text-sm text-green-500 hover:text-green-700">Skip for now</button>
+        <button type="button" onClick={onSkip} className="mt-2 w-full text-center text-sm text-green-500 hover:text-green-700">{t("onboarding.skipPayment", locale)}</button>
       </div>
     );
   }
@@ -615,12 +615,12 @@ function PaymentStep({ onSuccess, onSkip }: { onSuccess: () => void; onSkip: () 
   return (
     <div className="space-y-6">
       <div className="rounded-lg border border-green-100 bg-green-50/50 p-5">
-        <h3 className="font-medium text-green-900">Enable Quick Book</h3>
-        <p className="mt-2 text-sm text-green-600">Save a payment method to book lessons instantly from your dashboard. Without it, you&apos;ll need to enter payment details for each booking.</p>
+        <h3 className="font-medium text-green-900">{t("onboarding.enableQuickBook", locale)}</h3>
+        <p className="mt-2 text-sm text-green-600">{t("onboarding.paymentDesc", locale)}</p>
       </div>
       {error && <div className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">{error}</div>}
-      <Button onClick={initPayment} disabled={loading} className="w-full bg-gold-600 py-3 text-base font-medium text-white hover:bg-gold-500">{loading ? "Loading..." : "Add payment method"}</Button>
-      <button type="button" onClick={onSkip} className="w-full text-center text-sm text-green-500 hover:text-green-700">Skip for now — I&apos;ll pay per lesson</button>
+      <Button onClick={initPayment} disabled={loading} className="w-full bg-gold-600 py-3 text-base font-medium text-white hover:bg-gold-500">{loading ? t("onboarding.saving", locale) : t("onboarding.addPayment", locale)}</Button>
+      <button type="button" onClick={onSkip} className="w-full text-center text-sm text-green-500 hover:text-green-700">{t("onboarding.skipPayment", locale)}</button>
     </div>
   );
 }
@@ -744,6 +744,7 @@ export default function StudentOnboardingWizard({
         formData.set("password", password);
         formData.set("confirmPassword", confirmPassword);
         formData.set("accountType", "student");
+        formData.set("preferredLocale", data.preferredLocale);
 
         const res = await fetch("/api/register", { method: "POST", body: formData });
         const result = await res.json();
@@ -828,9 +829,33 @@ export default function StudentOnboardingWizard({
   const progressSteps = STEP_KEYS.length - 1; // 5
   const progressCurrent = step - 1; // -1 for language step
 
+  async function handleMaybeLater() {
+    if (!isAuthenticated) {
+      router.push("/");
+      return;
+    }
+    // Authenticated: mark onboarding complete so middleware doesn't redirect
+    // them back to the wizard. They can fill in details later from /member/profile.
+    await saveStep("complete", { generatedPassword: null });
+    router.push("/member/dashboard");
+  }
+
   return (
     <div className="min-h-screen bg-[#faf7f0]">
       <div className="mx-auto max-w-2xl px-6 py-12">
+        <div className="flex justify-end">
+          <button
+            type="button"
+            onClick={handleMaybeLater}
+            className="flex items-center gap-1.5 rounded-md px-3 py-1.5 text-sm text-green-600 transition-colors hover:bg-green-50 hover:text-green-900"
+            aria-label={t("onboarding.maybeLater", loc)}
+          >
+            <span>{t("onboarding.maybeLater", loc)}</span>
+            <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M6 18 18 6M6 6l12 12" />
+            </svg>
+          </button>
+        </div>
         <div className="text-center">
           <h1 className="font-display text-3xl font-semibold text-green-900">
             {isAuthenticated ? t("onboarding.welcome", loc) : t("onboarding.getStarted", loc)}
@@ -849,9 +874,9 @@ export default function StudentOnboardingWizard({
           {step === 0 && <LanguageStep selected={data.preferredLocale} onChange={(v) => updateData({ preferredLocale: v })} />}
           {step === 1 && <AccountStep data={data} onChange={updateData} isAuthenticated={isAuthenticated} password={password} confirmPassword={confirmPassword} onPasswordChange={setPassword} onConfirmChange={setConfirmPassword} onGenerate={() => setPasswordGenerated(true)} locale={loc} />}
           {step === 2 && <GolfProfileStep data={data} onChange={updateData} locale={loc} />}
-          {step === 3 && <ChooseProsStep pros={pros} selected={selectedPros} onToggle={togglePro} />}
-          {step === 4 && <SchedulingStep prefs={schedulingPrefs} onChange={updateSchedulingPref} />}
-          {step === 5 && <PaymentStep onSuccess={completeOnboarding} onSkip={completeOnboarding} />}
+          {step === 3 && <ChooseProsStep pros={pros} selected={selectedPros} onToggle={togglePro} locale={loc} />}
+          {step === 4 && <SchedulingStep prefs={schedulingPrefs} onChange={updateSchedulingPref} locale={loc} />}
+          {step === 5 && <PaymentStep onSuccess={completeOnboarding} onSkip={completeOnboarding} locale={loc} />}
 
           {step < 5 && (
             <div className="mt-8 flex justify-between">

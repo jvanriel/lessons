@@ -24,6 +24,7 @@ export async function POST(request: Request) {
   const phone = (formData.get("phone") as string)?.trim() || "";
   const password = formData.get("password") as string;
   const confirm = formData.get("confirmPassword") as string;
+  const preferredLocaleRaw = (formData.get("preferredLocale") as string) || "";
 
   if (!firstName || !lastName || !email || !password) {
     return NextResponse.json({ error: "All fields are required." }, { status: 400 });
@@ -44,15 +45,16 @@ export async function POST(request: Request) {
     .limit(1);
 
   const hashed = await hashPassword(password);
+  const preferredLocale = resolveLocale(preferredLocaleRaw);
   let userId: number;
 
   if (existing && (!existing.roles || existing.roles.trim() === "")) {
-    await db.update(users).set({ firstName, lastName, phone, password: hashed, roles: "member" }).where(eq(users.id, existing.id));
+    await db.update(users).set({ firstName, lastName, phone, password: hashed, roles: "member", preferredLocale }).where(eq(users.id, existing.id));
     userId = existing.id;
   } else if (existing) {
     return NextResponse.json({ error: "An account with this email already exists." }, { status: 400 });
   } else {
-    const inserted = await db.insert(users).values({ firstName, lastName, email, phone, password: hashed, roles: "member" }).returning({ id: users.id });
+    const inserted = await db.insert(users).values({ firstName, lastName, email, phone, password: hashed, roles: "member", preferredLocale }).returning({ id: users.id });
     userId = inserted[0].id;
     await db.insert(userEmails).values({ userId, email, label: "primary", isPrimary: true }).onConflictDoNothing();
   }
@@ -67,7 +69,7 @@ export async function POST(request: Request) {
     metadata: { userId, email, accountType: "student" },
   }).catch(() => {});
 
-  const locale = resolveLocale("en");
+  const locale = preferredLocale;
   sendEmail({
     to: email,
     subject: getWelcomeSubject("student", locale),
