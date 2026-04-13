@@ -2,44 +2,20 @@
 
 import { redirect } from "next/navigation";
 import { db } from "@/lib/db";
-import { users, userEmails, proProfiles } from "@/lib/db/schema";
-import { eq, like, and, isNull } from "drizzle-orm";
+import { users, userEmails } from "@/lib/db/schema";
+import { eq, and, isNull } from "drizzle-orm";
 import { hashPassword, setSessionCookie } from "@/lib/auth";
 import { sendEmail } from "@/lib/mail";
 import { resolveLocale, type Locale } from "@/lib/i18n";
 import { limitByIp, registerLimiter } from "@/lib/rate-limit";
 import { SignJWT } from "jose";
 import { emailLayout } from "@/lib/email-templates";
+import { ensureProProfile, normalizeRoles } from "@/lib/pro";
 
 function getSecret() {
   return new TextEncoder().encode(
     process.env.AUTH_SECRET || "dev-secret-change-me"
   );
-}
-
-function slugify(input: string): string {
-  return input
-    .toLowerCase()
-    .normalize("NFD")
-    .replace(/[\u0300-\u036f]/g, "")
-    .replace(/[^a-z0-9]+/g, "-")
-    .replace(/^-+|-+$/g, "")
-    .slice(0, 80);
-}
-
-async function pickUniqueSlug(base: string): Promise<string> {
-  const cleanBase = slugify(base) || "pro";
-  const existing = await db
-    .select({ slug: proProfiles.slug })
-    .from(proProfiles)
-    .where(like(proProfiles.slug, `${cleanBase}%`));
-  const taken = new Set(existing.map((r) => r.slug));
-  if (!taken.has(cleanBase)) return cleanBase;
-  for (let i = 2; i < 1000; i++) {
-    const candidate = `${cleanBase}-${i}`;
-    if (!taken.has(candidate)) return candidate;
-  }
-  return `${cleanBase}-${Date.now()}`;
 }
 
 export async function registerPro(
@@ -84,9 +60,9 @@ export async function registerPro(
 
   const hashed = await hashPassword(password);
   const preferredLocale = resolveLocale(preferredLocaleRaw);
-  const displayName = `${firstName} ${lastName}`;
 
-  // Create user as a pro
+  // Pros are also members so they can book lessons with other pros for
+  // their own training.
   const [inserted] = await db
     .insert(users)
     .values({
@@ -94,7 +70,7 @@ export async function registerPro(
       lastName,
       email,
       password: hashed,
-      roles: "pro",
+      roles: normalizeRoles("pro"),
       preferredLocale,
     })
     .returning({ id: users.id });
@@ -107,13 +83,7 @@ export async function registerPro(
 
   // Create the pro profile shell. Onboarding wizard fills in bio, locations,
   // pricing, bank details, etc. afterwards.
-  const slug = await pickUniqueSlug(displayName);
-  await db.insert(proProfiles).values({
-    userId,
-    slug,
-    displayName,
-    published: false,
-  });
+  await ensureProProfile({ userId, firstName, lastName });
 
   // Email verification (best-effort, fire-and-forget)
   const verifyToken = await new SignJWT({
@@ -163,7 +133,7 @@ export async function registerPro(
   await setSessionCookie({
     userId,
     email,
-    roles: ["pro"],
+    roles: ["pro", "member"],
   });
 
   redirect("/pro/subscribe");

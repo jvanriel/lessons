@@ -8,6 +8,7 @@ import { getSession, hasRole, hashPassword } from "@/lib/auth";
 import { sendEmail } from "@/lib/mail";
 import { buildInviteEmail, buildPasswordResetEmail, getEmailStrings } from "@/lib/email-templates";
 import { resolveLocale } from "@/lib/i18n";
+import { ensureProProfile, normalizeRoles } from "@/lib/pro";
 
 async function requireAdmin() {
   const session = await getSession();
@@ -24,7 +25,7 @@ export async function createUser(
   const firstName = (formData.get("firstName") as string).trim();
   const lastName = (formData.get("lastName") as string).trim();
   const email = (formData.get("email") as string).trim().toLowerCase();
-  const roles = (formData.get("roles") as string)?.trim() || "";
+  const rolesRaw = (formData.get("roles") as string)?.trim() || "";
   const password = (formData.get("password") as string)?.trim();
 
   if (!firstName || !lastName || !email) {
@@ -40,6 +41,7 @@ export async function createUser(
   if (existing) return { error: "A user with this email already exists." };
 
   const hashed = password ? await hashPassword(password) : null;
+  const roles = normalizeRoles(rolesRaw);
 
   const [inserted] = await db
     .insert(users)
@@ -53,6 +55,12 @@ export async function createUser(
     label: "primary",
     isPrimary: true,
   });
+
+  // If this user is a pro, create the pro_profile shell so /pro/* pages
+  // don't bounce them to /login via requireProProfile.
+  if (roles.split(",").includes("pro")) {
+    await ensureProProfile({ userId: inserted.id, firstName, lastName });
+  }
 
   revalidatePath("/admin/users");
   return { success: true };
@@ -68,7 +76,8 @@ export async function updateUser(
   const firstName = (formData.get("firstName") as string).trim();
   const lastName = (formData.get("lastName") as string).trim();
   const email = (formData.get("email") as string).trim().toLowerCase();
-  const roles = (formData.get("roles") as string)?.trim() || "";
+  const rolesRaw = (formData.get("roles") as string)?.trim() || "";
+  const roles = normalizeRoles(rolesRaw);
   const newPassword = (formData.get("newPassword") as string)?.trim();
 
   if (!firstName || !lastName || !email) {
@@ -110,6 +119,13 @@ export async function updateUser(
       .where(
         and(eq(userEmails.userId, userId), eq(userEmails.isPrimary, true))
       );
+  }
+
+  // If admin promoted this user to a pro (or they already were one),
+  // make sure they have a pro_profile shell. ensureProProfile is a no-op
+  // if a profile already exists.
+  if (roles.split(",").includes("pro")) {
+    await ensureProProfile({ userId, firstName, lastName });
   }
 
   revalidatePath("/admin/users");
