@@ -8,14 +8,23 @@ import { eq, or } from "drizzle-orm";
 import { verifyPassword, setSessionCookie, parseRoles } from "@/lib/auth";
 import { logEvent } from "@/lib/events";
 import { limitByIp, loginLimiter } from "@/lib/rate-limit";
+import { getLocale } from "@/lib/locale";
+import { t } from "@/lib/i18n/translations";
 
 export async function userLogin(
   _prevState: { error: string } | null,
   formData: FormData
 ) {
+  const locale = await getLocale();
+
   const limit = await limitByIp(loginLimiter);
   if (!limit.ok) {
-    return { error: `Too many login attempts. Try again in ${limit.retryAfter}s.` };
+    return {
+      error: t("authErr.tooManyAttempts", locale).replace(
+        "{n}",
+        String(limit.retryAfter)
+      ),
+    };
   }
 
   const email = (formData.get("email") as string).trim().toLowerCase();
@@ -46,18 +55,18 @@ export async function userLogin(
   }
 
   if (result.length === 0) {
-    return { error: "Invalid email or password" };
+    return { error: t("authErr.invalidCredentials", locale) };
   }
 
   const user = result[0];
 
   if (!user.password) {
-    return { error: "This account has no password set. Contact an administrator." };
+    return { error: t("authErr.noPasswordSet", locale) };
   }
 
   const valid = await verifyPassword(password, user.password);
   if (!valid) {
-    return { error: "Invalid email or password" };
+    return { error: t("authErr.invalidCredentials", locale) };
   }
 
   await db

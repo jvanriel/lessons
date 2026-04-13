@@ -7,6 +7,8 @@ import { eq } from "drizzle-orm";
 import { jwtVerify } from "jose";
 import { hashPassword, setSessionCookie, parseRoles } from "@/lib/auth";
 import { limitByIp, resetPasswordLimiter } from "@/lib/rate-limit";
+import { getLocale } from "@/lib/locale";
+import { t } from "@/lib/i18n/translations";
 
 function getSecret() {
   return new TextEncoder().encode(
@@ -18,19 +20,27 @@ export async function resetPasswordWithToken(
   _prev: { error?: string } | null,
   formData: FormData
 ): Promise<{ error?: string }> {
+  const locale = await getLocale();
+
   const limit = await limitByIp(resetPasswordLimiter);
   if (!limit.ok) {
-    return { error: `Too many attempts. Try again in ${limit.retryAfter}s.` };
+    return {
+      error: t("authErr.tooManyAttempts", locale).replace(
+        "{n}",
+        String(limit.retryAfter)
+      ),
+    };
   }
 
   const token = formData.get("token") as string;
   const password = formData.get("password") as string;
   const confirm = formData.get("confirmPassword") as string;
 
-  if (!token) return { error: "Invalid or missing reset token." };
+  if (!token) return { error: t("authErr.invalidToken", locale) };
   if (!password || password.length < 8)
-    return { error: "Password must be at least 8 characters." };
-  if (password !== confirm) return { error: "Passwords do not match." };
+    return { error: t("authErr.passwordTooShort", locale) };
+  if (password !== confirm)
+    return { error: t("authErr.passwordsDontMatch", locale) };
 
   // Verify token
   let payload: { userId: number; email: string };
@@ -38,7 +48,7 @@ export async function resetPasswordWithToken(
     const result = await jwtVerify(token, getSecret());
     payload = result.payload as unknown as { userId: number; email: string };
   } catch {
-    return { error: "This reset link has expired or is invalid. Please request a new one." };
+    return { error: t("authErr.expiredToken", locale) };
   }
 
   // Check user exists
@@ -48,7 +58,7 @@ export async function resetPasswordWithToken(
     .where(eq(users.id, payload.userId))
     .limit(1);
 
-  if (!user) return { error: "User not found." };
+  if (!user) return { error: t("authErr.userNotFound", locale) };
 
   // Update password
   const hashed = await hashPassword(password);

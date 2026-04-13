@@ -8,6 +8,8 @@ import { sendEmail } from "@/lib/mail";
 import { emailLayout, getEmailStrings } from "@/lib/email-templates";
 import { resolveLocale, type Locale } from "@/lib/i18n";
 import { limitByKey, forgotPasswordLimiter, getClientIp } from "@/lib/rate-limit";
+import { getLocale } from "@/lib/locale";
+import { t } from "@/lib/i18n/translations";
 
 function getSecret() {
   return new TextEncoder().encode(
@@ -19,15 +21,22 @@ export async function requestPasswordReset(
   _prev: { error?: string; success?: boolean } | null,
   formData: FormData
 ): Promise<{ error?: string; success?: boolean }> {
+  const uiLocale = await getLocale();
+
   const email = (formData.get("email") as string).trim().toLowerCase();
-  if (!email) return { error: "Email is required." };
+  if (!email) return { error: t("authErr.emailRequired", uiLocale) };
 
   // Rate limit by IP+email so an attacker can't enumerate addresses or spam
   // a single victim's inbox.
   const ip = await getClientIp();
   const limit = await limitByKey(forgotPasswordLimiter, `${ip}:${email}`);
   if (!limit.ok) {
-    return { error: `Too many requests. Try again in ${limit.retryAfter}s.` };
+    return {
+      error: t("authErr.tooManyAttempts", uiLocale).replace(
+        "{n}",
+        String(limit.retryAfter)
+      ),
+    };
   }
 
   // Look up user by primary email or alias
