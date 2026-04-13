@@ -43,6 +43,37 @@ const PRIORITY_BADGE: Record<string, string> = {
   low: "bg-gray-100 text-gray-600",
 };
 
+const PRIORITY_RANK: Record<string, number> = {
+  high: 3,
+  normal: 2,
+  low: 1,
+};
+
+type SortMode = "priority" | "time_desc" | "time_asc";
+
+function sortTasks(tasks: SerializedTask[], mode: SortMode): SerializedTask[] {
+  const sorted = [...tasks];
+  if (mode === "priority") {
+    sorted.sort((a, b) => {
+      const rankDiff =
+        (PRIORITY_RANK[b.priority] ?? 0) - (PRIORITY_RANK[a.priority] ?? 0);
+      if (rankDiff !== 0) return rankDiff;
+      return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
+    });
+  } else if (mode === "time_desc") {
+    sorted.sort(
+      (a, b) =>
+        new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+    );
+  } else {
+    sorted.sort(
+      (a, b) =>
+        new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime()
+    );
+  }
+  return sorted;
+}
+
 const COLOR_MAP: Record<string, string> = {
   red: "border-l-red-500",
   orange: "border-l-orange-500",
@@ -74,6 +105,38 @@ export default function KanbanBoard({
   const [selectedTask, setSelectedTask] = useState<SerializedTask | null>(
     null
   );
+  const [assigneeFilter, setAssigneeFilter] = useState<"all" | "mine" | number>("all");
+  const [sortMode, setSortMode] = useState<SortMode>("priority");
+
+  // Restore filter + sort selections from localStorage after hydration
+  useEffect(() => {
+    try {
+      const af = localStorage.getItem("kanban-assignee-filter");
+      if (af === "all" || af === "mine") setAssigneeFilter(af);
+      else if (af) {
+        const n = Number(af);
+        if (!isNaN(n)) setAssigneeFilter(n);
+      }
+    } catch {}
+    try {
+      const sm = localStorage.getItem("kanban-sort-mode");
+      if (sm === "priority" || sm === "time_desc" || sm === "time_asc") {
+        setSortMode(sm);
+      }
+    } catch {}
+  }, []);
+
+  // Persist filter + sort selections
+  useEffect(() => {
+    try {
+      localStorage.setItem("kanban-assignee-filter", String(assigneeFilter));
+    } catch {}
+  }, [assigneeFilter]);
+  useEffect(() => {
+    try {
+      localStorage.setItem("kanban-sort-mode", sortMode);
+    } catch {}
+  }, [sortMode]);
 
   // Keep local state in sync with server data (refreshed every 15s below)
   useEffect(() => {
@@ -197,12 +260,82 @@ export default function KanbanBoard({
         )}
       </div>
 
+      {/* Toolbar: sort + assignee filter */}
+      <div className="mb-3 flex flex-wrap items-center gap-2">
+        <div className="flex items-center gap-1.5 rounded-md border border-green-200 bg-white px-2 py-1">
+          <label className="text-[10px] font-medium uppercase tracking-wider text-green-600">
+            Sort
+          </label>
+          <select
+            value={sortMode}
+            onChange={(e) => setSortMode(e.target.value as SortMode)}
+            className="rounded px-1 py-0.5 text-xs text-green-800 focus:outline-none focus:ring-1 focus:ring-gold-500"
+          >
+            <option value="priority">Priority (high → low)</option>
+            <option value="time_desc">Newest first</option>
+            <option value="time_asc">Oldest first</option>
+          </select>
+        </div>
+
+        <div className="flex items-center gap-0.5 rounded-md border border-green-200 bg-white p-0.5">
+          <button
+            type="button"
+            onClick={() => setAssigneeFilter("all")}
+            className={`rounded px-2 py-0.5 text-[11px] font-medium transition-colors ${
+              assigneeFilter === "all"
+                ? "bg-green-700 text-white"
+                : "text-green-700 hover:bg-green-50"
+            }`}
+          >
+            All
+          </button>
+          <button
+            type="button"
+            onClick={() => setAssigneeFilter("mine")}
+            className={`rounded px-2 py-0.5 text-[11px] font-medium transition-colors ${
+              assigneeFilter === "mine"
+                ? "bg-green-700 text-white"
+                : "text-green-700 hover:bg-green-50"
+            }`}
+          >
+            Mine
+          </button>
+          {adminUsers.map((u) => (
+            <button
+              key={u.id}
+              type="button"
+              onClick={() =>
+                setAssigneeFilter(assigneeFilter === u.id ? "all" : u.id)
+              }
+              className={`rounded px-2 py-0.5 text-[11px] font-medium transition-colors ${
+                assigneeFilter === u.id
+                  ? "bg-green-700 text-white"
+                  : "text-green-700 hover:bg-green-50"
+              }`}
+            >
+              {u.firstName}
+            </button>
+          ))}
+        </div>
+      </div>
+
       {/* Columns */}
       <div className="grid gap-3 lg:grid-cols-4">
         {COLUMNS.map((col) => {
-          const columnTasks = allTasks
-            .filter((t) => t.column === col.id)
-            .sort((a, b) => a.position - b.position);
+          let columnTasks = allTasks.filter((t) => t.column === col.id);
+          // Apply assignee filter
+          if (assigneeFilter !== "all") {
+            const filterUserId =
+              assigneeFilter === "mine" ? currentUserId : assigneeFilter;
+            columnTasks = columnTasks.filter((t) =>
+              t.assigneeIds.includes(filterUserId)
+            );
+          }
+          // Apply sort — position order still drives within-priority layout
+          // when sortMode === "priority" via the secondary createdAt tiebreak,
+          // but we honour explicit drag positioning first when there are no
+          // filters active. Simplest: always sortTasks.
+          columnTasks = sortTasks(columnTasks, sortMode);
 
           return (
             <div key={col.id}>
