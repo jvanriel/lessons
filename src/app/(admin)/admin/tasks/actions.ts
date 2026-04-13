@@ -92,6 +92,25 @@ export async function createTask(
     ? new Date(formData.get("dueDate") as string)
     : null;
 
+  // Checklist is passed as JSON via a hidden field so the modal can post it
+  // along with everything else in a single form submission.
+  let checklist: Array<{ text: string; done: boolean }> | null = null;
+  const checklistRaw = formData.get("checklist") as string | null;
+  if (checklistRaw) {
+    try {
+      const parsed = JSON.parse(checklistRaw);
+      if (Array.isArray(parsed) && parsed.length > 0) {
+        checklist = parsed
+          .filter(
+            (x): x is { text: string; done: boolean } =>
+              x && typeof x.text === "string" && typeof x.done === "boolean"
+          );
+      }
+    } catch {
+      // Ignore malformed checklist JSON — task still gets created without one.
+    }
+  }
+
   const sharedWithIds = [...new Set([session.userId, ...assigneeIds])];
 
   const [maxPos] = await db
@@ -111,6 +130,7 @@ export async function createTask(
       priority,
       colorLabel,
       dueDate,
+      checklist,
     })
     .returning();
 
@@ -161,7 +181,9 @@ export async function createTask(
       priority: inserted.priority as TaskPriority,
       colorLabel: inserted.colorLabel,
       dueDate: inserted.dueDate?.toISOString() ?? null,
-      checklist: null,
+      checklist:
+        (inserted.checklist as Array<{ text: string; done: boolean }> | null) ??
+        null,
       completedAt: null,
       createdAt: inserted.createdAt.toISOString(),
       updatedAt: inserted.updatedAt.toISOString(),

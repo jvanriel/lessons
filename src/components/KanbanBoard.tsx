@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useActionState, useTransition, useEffect } from "react";
+import { useState, useTransition, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import {
   createTask,
@@ -105,6 +105,7 @@ export default function KanbanBoard({
   const [selectedTask, setSelectedTask] = useState<SerializedTask | null>(
     null
   );
+  const [creating, setCreating] = useState(false);
   const [assigneeFilter, setAssigneeFilter] = useState<"all" | "mine" | number>("all");
   const [sortMode, setSortMode] = useState<SortMode>("priority");
   const [doneRange, setDoneRange] = useState<1 | 7 | 30 | 90 | "all">(7);
@@ -172,24 +173,12 @@ export default function KanbanBoard({
     }, 15000);
     return () => clearInterval(id);
   }, [router, selectedTask]);
-  const [createState, createAction, createPending] = useActionState(
-    async (
-      prev: {
-        error?: string;
-        success?: boolean;
-        task?: SerializedTask;
-      } | null,
-      formData: FormData
-    ) => {
-      const result = await createTask(prev, formData);
-      if (result.success && result.task) {
-        setAllTasks((prev) => [...prev, result.task!]);
-      }
-      return result;
-    },
-    null
-  );
   const [, startTransition] = useTransition();
+
+  function handleTaskCreated(created: SerializedTask) {
+    setAllTasks((prev) => [...prev, created]);
+    setCreating(false);
+  }
 
   function handleMove(taskId: number, toColumn: TaskColumn) {
     setAllTasks((prev) => {
@@ -241,45 +230,18 @@ export default function KanbanBoard({
 
   return (
     <div className="mt-5">
-      {/* Create form */}
-      <div className="mb-4 rounded-lg border border-green-200 bg-white p-3">
-        <form action={createAction} className="space-y-2">
-          <div className="flex gap-2">
-            <input
-              name="title"
-              placeholder="New task..."
-              required
-              className="flex-1 rounded-md border border-green-300 px-2.5 py-1.5 text-xs focus:border-gold-500 focus:outline-none focus:ring-1 focus:ring-gold-500"
-            />
-            <select
-              name="priority"
-              defaultValue="normal"
-              className="rounded-md border border-green-300 px-2.5 py-1.5 text-xs focus:border-gold-500 focus:outline-none"
-            >
-              {PRIORITIES.map((p) => (
-                <option key={p.value} value={p.value}>
-                  {p.label}
-                </option>
-              ))}
-            </select>
-            <button
-              type="submit"
-              disabled={createPending}
-              className="rounded-md bg-gold-600 px-4 py-1.5 text-xs font-medium text-white hover:bg-gold-500 disabled:opacity-50"
-            >
-              {createPending ? "Creating..." : "Add"}
-            </button>
-          </div>
-          <textarea
-            name="firstComment"
-            placeholder="First comment (optional) — will become the first entry in the task's comment thread"
-            rows={2}
-            className="w-full resize-none rounded-md border border-green-200 px-2.5 py-1.5 text-xs text-green-800 focus:border-gold-500 focus:outline-none focus:ring-1 focus:ring-gold-500"
-          />
-        </form>
-        {createState?.error && (
-          <p className="mt-2 text-xs text-red-600">{createState.error}</p>
-        )}
+      {/* New task button */}
+      <div className="mb-4 flex justify-end">
+        <button
+          type="button"
+          onClick={() => setCreating(true)}
+          className="inline-flex items-center gap-1.5 rounded-md bg-gold-600 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-gold-500"
+        >
+          <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+            <path strokeLinecap="round" strokeLinejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
+          </svg>
+          New task
+        </button>
       </div>
 
       {/* Toolbar: sort + assignee filter */}
@@ -431,6 +393,15 @@ export default function KanbanBoard({
           onClose={() => setSelectedTask(null)}
           onDelete={handleDelete}
           onUpdate={handleUpdate}
+        />
+      )}
+
+      {/* Create modal */}
+      {creating && (
+        <TaskCreateModal
+          adminUsers={adminUsers}
+          onClose={() => setCreating(false)}
+          onCreated={handleTaskCreated}
         />
       )}
     </div>
@@ -1067,6 +1038,274 @@ function ShareTab({
         {saved && (
           <span className="text-sm text-green-700">Saved</span>
         )}
+      </div>
+    </div>
+  );
+}
+
+// ─── Create Modal ───────────────────────────────────────
+
+function TaskCreateModal({
+  adminUsers,
+  onClose,
+  onCreated,
+}: {
+  adminUsers: AdminUser[];
+  onClose: () => void;
+  onCreated: (task: SerializedTask) => void;
+}) {
+  const [title, setTitle] = useState("");
+  const [assigneeIds, setAssigneeIds] = useState<number[]>([]);
+  const [priority, setPriority] = useState<TaskPriority>("normal");
+  const [colorLabel, setColorLabel] = useState("");
+  const [dueDate, setDueDate] = useState("");
+  const [checklist, setChecklist] = useState<
+    Array<{ text: string; done: boolean }>
+  >([]);
+  const [newCheckItem, setNewCheckItem] = useState("");
+  const [firstComment, setFirstComment] = useState("");
+  const [isPending, startTransition] = useTransition();
+  const [error, setError] = useState<string | null>(null);
+
+  function handleCreate() {
+    if (!title.trim()) {
+      setError("Title is required.");
+      return;
+    }
+    setError(null);
+    startTransition(async () => {
+      const fd = new FormData();
+      fd.set("title", title.trim());
+      fd.set("priority", priority);
+      if (colorLabel) fd.set("colorLabel", colorLabel);
+      if (dueDate) fd.set("dueDate", dueDate);
+      if (firstComment.trim()) fd.set("firstComment", firstComment.trim());
+      for (const id of assigneeIds) fd.append("assigneeIds", String(id));
+      if (checklist.length > 0) fd.set("checklist", JSON.stringify(checklist));
+      const result = await createTask(null, fd);
+      if (result.error) {
+        setError(result.error);
+      } else if (result.task) {
+        onCreated(result.task);
+      }
+    });
+  }
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-start justify-center bg-black/50 pt-12">
+      <div
+        className="flex w-full max-w-2xl flex-col rounded-xl border border-green-200 bg-white shadow-2xl"
+        style={{ maxHeight: "85vh" }}
+      >
+        {/* Header */}
+        <div className="flex items-center justify-between border-b border-green-100 px-6 py-4">
+          <h2 className="font-display text-xl font-semibold text-green-950">
+            New task
+          </h2>
+          <button
+            onClick={onClose}
+            className="rounded-lg p-1 text-green-800/50 hover:bg-green-100 hover:text-green-800"
+          >
+            <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M6 18 18 6M6 6l12 12" />
+            </svg>
+          </button>
+        </div>
+
+        {/* Body */}
+        <div className="flex-1 overflow-y-auto p-6">
+          {error && <p className="mb-3 text-sm text-red-600">{error}</p>}
+          <div className="space-y-4">
+            <div>
+              <label className="mb-1 block text-sm font-medium text-green-900">
+                Title *
+              </label>
+              <input
+                autoFocus
+                value={title}
+                onChange={(e) => setTitle(e.target.value)}
+                placeholder="What needs to be done?"
+                className="w-full rounded-lg border border-green-200 bg-white px-3 py-2 text-sm focus:border-green-500 focus:outline-none focus:ring-1 focus:ring-green-500"
+              />
+            </div>
+
+            <div>
+              <label className="mb-1 block text-sm font-medium text-green-900">
+                Initial comment
+              </label>
+              <textarea
+                value={firstComment}
+                onChange={(e) => setFirstComment(e.target.value)}
+                rows={4}
+                placeholder="Optional — will become the first entry in the task's comment thread."
+                className="w-full resize-none rounded-lg border border-green-200 bg-white px-3 py-2 text-sm text-green-900 focus:border-green-500 focus:outline-none focus:ring-1 focus:ring-green-500"
+              />
+            </div>
+
+            <div>
+              <label className="mb-1 block text-sm font-medium text-green-900">
+                Assigned to
+              </label>
+              <div className="flex flex-wrap gap-x-4 gap-y-1.5 rounded-lg border border-green-200 bg-white px-3 py-2.5">
+                {adminUsers.map((u) => (
+                  <label
+                    key={u.id}
+                    className="flex items-center gap-1.5 text-sm text-green-900"
+                  >
+                    <input
+                      type="checkbox"
+                      checked={assigneeIds.includes(u.id)}
+                      onChange={() =>
+                        setAssigneeIds((prev) =>
+                          prev.includes(u.id)
+                            ? prev.filter((a) => a !== u.id)
+                            : [...prev, u.id]
+                        )
+                      }
+                      className="h-4 w-4 rounded border-green-300 text-green-600 focus:ring-green-500"
+                    />
+                    {u.firstName} {u.lastName}
+                  </label>
+                ))}
+              </div>
+            </div>
+
+            <div className="grid grid-cols-3 gap-4">
+              <div>
+                <label className="mb-1 block text-sm font-medium text-green-900">
+                  Priority
+                </label>
+                <select
+                  value={priority}
+                  onChange={(e) => setPriority(e.target.value as TaskPriority)}
+                  className="w-full rounded-lg border border-green-200 bg-white px-3 py-2 text-sm focus:border-green-500 focus:outline-none"
+                >
+                  {PRIORITIES.map((p) => (
+                    <option key={p.value} value={p.value}>
+                      {p.label}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <div>
+                <label className="mb-1 block text-sm font-medium text-green-900">
+                  Color label
+                </label>
+                <select
+                  value={colorLabel}
+                  onChange={(e) => setColorLabel(e.target.value)}
+                  className="w-full rounded-lg border border-green-200 bg-white px-3 py-2 text-sm focus:border-green-500 focus:outline-none"
+                >
+                  {COLOR_LABELS.map((c) => (
+                    <option key={c.value} value={c.value}>
+                      {c.label}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <div>
+                <label className="mb-1 block text-sm font-medium text-green-900">
+                  Due date
+                </label>
+                <input
+                  type="date"
+                  value={dueDate}
+                  onChange={(e) => setDueDate(e.target.value)}
+                  className="w-full rounded-lg border border-green-200 bg-white px-3 py-2 text-sm focus:border-green-500 focus:outline-none"
+                />
+              </div>
+            </div>
+
+            <div>
+              <label className="mb-2 block text-sm font-medium text-green-900">
+                Checklist
+              </label>
+              <div className="space-y-2">
+                {checklist.map((item, i) => (
+                  <div key={i} className="flex items-center gap-2">
+                    <input
+                      type="checkbox"
+                      checked={item.done}
+                      onChange={() => {
+                        const updated = checklist.map((c, j) =>
+                          j === i ? { ...c, done: !c.done } : c
+                        );
+                        setChecklist(updated);
+                      }}
+                      className="h-4 w-4 rounded border-green-300 text-green-600 focus:ring-green-500"
+                    />
+                    <span
+                      className={`flex-1 text-sm ${
+                        item.done
+                          ? "text-green-800/40 line-through"
+                          : "text-green-900"
+                      }`}
+                    >
+                      {item.text}
+                    </span>
+                    <button
+                      onClick={() =>
+                        setChecklist(checklist.filter((_, j) => j !== i))
+                      }
+                      className="text-xs text-red-400 hover:text-red-600"
+                    >
+                      &times;
+                    </button>
+                  </div>
+                ))}
+              </div>
+              <div className="mt-2 flex gap-2">
+                <input
+                  value={newCheckItem}
+                  onChange={(e) => setNewCheckItem(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter" && newCheckItem.trim()) {
+                      e.preventDefault();
+                      setChecklist([
+                        ...checklist,
+                        { text: newCheckItem.trim(), done: false },
+                      ]);
+                      setNewCheckItem("");
+                    }
+                  }}
+                  placeholder="New item..."
+                  className="flex-1 rounded-lg border border-green-200 bg-white px-3 py-1.5 text-sm focus:border-green-500 focus:outline-none"
+                />
+                <button
+                  onClick={() => {
+                    if (!newCheckItem.trim()) return;
+                    setChecklist([
+                      ...checklist,
+                      { text: newCheckItem.trim(), done: false },
+                    ]);
+                    setNewCheckItem("");
+                  }}
+                  className="rounded-lg bg-green-100 px-3 py-1.5 text-sm font-medium text-green-700 hover:bg-green-200"
+                >
+                  +
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Footer */}
+        <div className="flex items-center justify-end gap-3 border-t border-green-100 px-6 py-4">
+          <button
+            onClick={onClose}
+            disabled={isPending}
+            className="rounded-lg border border-green-200 px-4 py-2 text-sm font-medium text-green-800 hover:bg-green-50 disabled:opacity-50"
+          >
+            Cancel
+          </button>
+          <button
+            onClick={handleCreate}
+            disabled={isPending || !title.trim()}
+            className="rounded-lg bg-gold-600 px-4 py-2 text-sm font-medium text-white hover:bg-gold-500 disabled:opacity-50"
+          >
+            {isPending ? "Creating..." : "Create task"}
+          </button>
+        </div>
       </div>
     </div>
   );
