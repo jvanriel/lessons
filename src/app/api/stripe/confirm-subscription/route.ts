@@ -5,8 +5,7 @@ import { users, proProfiles } from "@/lib/db/schema";
 import { eq } from "drizzle-orm";
 import {
   getStripe,
-  STRIPE_PRICE_MONTHLY,
-  STRIPE_PRICE_ANNUAL,
+  requireStripePrice,
   TRIAL_PERIOD_DAYS,
 } from "@/lib/stripe";
 
@@ -70,8 +69,7 @@ export async function POST(request: Request) {
   }
 
   const stripe = getStripe();
-  const priceId =
-    plan === "annual" ? STRIPE_PRICE_ANNUAL : STRIPE_PRICE_MONTHLY;
+  const priceId = requireStripePrice(plan as "monthly" | "annual");
 
   // Attach payment method to customer and set as default
   try {

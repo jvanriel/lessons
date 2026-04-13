@@ -14,9 +14,21 @@ export function getStripe(): Stripe {
   return _stripe;
 }
 
-// Price IDs from Stripe Dashboard (env vars)
-export const STRIPE_PRICE_MONTHLY = process.env.STRIPE_PRICE_MONTHLY!;
-export const STRIPE_PRICE_ANNUAL = process.env.STRIPE_PRICE_ANNUAL!;
+// Price IDs from Stripe Dashboard (env vars). Use requireStripePrice() to
+// fetch — it throws a clear error at the point of use if the env var is
+// missing on Vercel, instead of silently passing `undefined` to Stripe and
+// getting back the cryptic "Missing required param: items" (which is what
+// hit production on 2026-04-13 / SENTRY-ORANGE-ZEBRA-A).
+export function requireStripePrice(plan: "monthly" | "annual"): string {
+  const key = plan === "monthly" ? "STRIPE_PRICE_MONTHLY" : "STRIPE_PRICE_ANNUAL";
+  const val = process.env[key];
+  if (!val) {
+    throw new Error(
+      `${key} env var is not set — add the Stripe price ID to the Vercel project settings`
+    );
+  }
+  return val;
+}
 
 // Platform commission: 2.5% of lesson price
 export const PLATFORM_FEE_PERCENT = 2.5;

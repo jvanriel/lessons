@@ -61,7 +61,9 @@ The platform CMS (`cms_blocks`) has per-locale rows but is operated by the platf
 - **Stripe webhook payload typed as `any`** — `src/app/api/webhooks/stripe/route.ts:11`. Type narrowing for safety.
 - **Health check** doesn't verify webhook secret presence or other Stripe production signals.
 - **Sentry source map upload** — `next.config.ts:37` has `silent: !process.env.CI`. Verify Vercel sets `CI=1` or sourcemaps silently fail to upload, leaving production errors as minified noise.
-- **Locale-aware date formatting sweep** — `formatDate(locale)` helper exists and is wired into `/member/bookings`, `/member/dashboard`, and the booking wizard. ~26 other files still call `toLocaleDateString("en-US", ...)` directly. High-visibility ones: `/pro/bookings`, `BookingsView`, `BookingsCalendar`, `/pro/students/StudentBookings`, `/pro/earnings`, `/admin/users/UserManager`.
+- **Locale-aware date formatting sweep** — `formatDate(locale)` helper exists and is wired into `/member/bookings`, `/member/dashboard`, the booking wizard, `/pro/bookings` (BookingsView + BookingsCalendar), `/pro/students/StudentBookings`, `/pro/earnings`, `/member/dashboard/CancelBookingDialog`, and `/member/dashboard/QuickRebook`. ~20 other files still call `toLocaleDateString("en-US", ...)` directly. Remaining: admin-side (UserManager, ContentPanel, payouts), pro-side (`AvailabilityEditor`, `EditStudentDialog`, `ProQuickBook`), various smaller dialogs.
+- **Pro-side page translations** — `/pro/profile` (0 t() calls), `/pro/locations` (1), `/pro/availability` (3) are nearly all hard-coded English. Pros are mostly Belgian and read NL/FR. Form-heavy components like `AvailabilityEditor` need a focused sweep: lots of labels, helper text, error messages.
+- **Welcome-as-pro email** — pros currently get the verification email and land on `/pro/subscribe` immediately, but no warm welcome message. Student welcome already exists in `email-templates.ts` (`buildWelcomeEmail`); just needs pro-specific copy in 3 locales.
 
 ## 🟢 Polish / post-launch
 

@@ -867,3 +867,110 @@ export function getProBookingNotificationSubject(
 ): string {
   return (BOOKING_PRO_STRINGS[locale] ?? BOOKING_PRO_STRINGS.en).subject(studentName);
 }
+
+// ─── Lesson reminder (24h before) ──────────────────────────────────
+
+const REMINDER_STRINGS: Record<Locale, {
+  studentSubject: (pro: string) => string;
+  proSubject: (student: string) => string;
+  greeting: string;
+  studentBody: (pro: string) => string;
+  proBody: (student: string) => string;
+  pro: string;
+  student: string;
+  location: string;
+  date: string;
+  time: string;
+  cta: string;
+}> = {
+  en: {
+    studentSubject: (pro) => `Reminder: your golf lesson with ${pro} is tomorrow`,
+    proSubject: (student) => `Reminder: lesson with ${student} tomorrow`,
+    greeting: "Hi",
+    studentBody: (pro) => `Just a friendly reminder — your lesson with ${pro} is tomorrow.`,
+    proBody: (student) => `Just a friendly reminder — your lesson with ${student} is tomorrow.`,
+    pro: "Pro",
+    student: "Student",
+    location: "Location",
+    date: "Date",
+    time: "Time",
+    cta: "Open booking",
+  },
+  nl: {
+    studentSubject: (pro) => `Herinnering: je golfles bij ${pro} is morgen`,
+    proSubject: (student) => `Herinnering: les met ${student} morgen`,
+    greeting: "Hallo",
+    studentBody: (pro) => `Een vriendelijke herinnering — je les bij ${pro} is morgen.`,
+    proBody: (student) => `Een vriendelijke herinnering — je les met ${student} is morgen.`,
+    pro: "Pro",
+    student: "Leerling",
+    location: "Locatie",
+    date: "Datum",
+    time: "Tijd",
+    cta: "Boeking openen",
+  },
+  fr: {
+    studentSubject: (pro) => `Rappel : votre cours de golf avec ${pro} est demain`,
+    proSubject: (student) => `Rappel : cours avec ${student} demain`,
+    greeting: "Bonjour",
+    studentBody: (pro) => `Petit rappel — votre cours avec ${pro} est demain.`,
+    proBody: (student) => `Petit rappel — votre cours avec ${student} est demain.`,
+    pro: "Pro",
+    student: "Élève",
+    location: "Lieu",
+    date: "Date",
+    time: "Heure",
+    cta: "Ouvrir la réservation",
+  },
+};
+
+export function buildLessonReminderEmail(opts: {
+  recipient: "student" | "pro";
+  recipientFirstName: string;
+  otherPartyName: string;
+  locationName: string;
+  date: string;
+  startTime: string;
+  endTime: string;
+  locale: Locale;
+}): string {
+  const s = REMINDER_STRINGS[opts.locale] ?? REMINDER_STRINGS.en;
+  const bodyLine =
+    opts.recipient === "student"
+      ? s.studentBody(opts.otherPartyName)
+      : s.proBody(opts.otherPartyName);
+  const otherLabel = opts.recipient === "student" ? s.pro : s.student;
+  const ctaUrl =
+    opts.recipient === "student"
+      ? `${getBaseUrl()}/member/bookings`
+      : `${getBaseUrl()}/pro/bookings`;
+  const body = `
+    <h2 style="font-family:Georgia,'Times New Roman',serif;font-size:22px;color:${COLORS.green950};margin:0 0 16px 0;font-weight:normal;">
+      ${s.greeting} ${opts.recipientFirstName},
+    </h2>
+    <p style="margin:0 0 20px 0;">${bodyLine}</p>
+    ${detailsTable([
+      [otherLabel, opts.otherPartyName],
+      [s.location, opts.locationName],
+      [s.date, formatLessonDate(opts.date, opts.locale)],
+      [s.time, `${opts.startTime} – ${opts.endTime}`],
+    ])}
+    <p style="margin:0 0 24px 0;">
+      <a href="${ctaUrl}" style="display:inline-block;background:${COLORS.gold600};color:${COLORS.white};padding:12px 28px;border-radius:6px;text-decoration:none;font-weight:500;font-size:14px;">
+        ${s.cta}
+      </a>
+    </p>
+  `;
+  return emailLayout(body, undefined, opts.locale);
+}
+
+export function getLessonReminderSubject(
+  recipient: "student" | "pro",
+  otherPartyName: string,
+  locale: Locale
+): string {
+  const s = REMINDER_STRINGS[locale] ?? REMINDER_STRINGS.en;
+  return recipient === "student"
+    ? s.studentSubject(otherPartyName)
+    : s.proSubject(otherPartyName);
+}

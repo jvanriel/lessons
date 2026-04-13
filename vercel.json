@@ -3,6 +3,10 @@
     {
       "path": "/api/backup",
       "schedule": "0 2 * * *"
+    },
+    {
+      "path": "/api/cron/lesson-reminders",
+      "schedule": "0 * * * *"
     }
   ]
 }

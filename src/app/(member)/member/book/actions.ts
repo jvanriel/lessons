@@ -32,7 +32,17 @@ import {
   buildProBookingNotificationEmail,
   getProBookingNotificationSubject,
 } from "@/lib/email-templates";
-import { resolveLocale } from "@/lib/i18n";
+import { resolveLocale, type Locale } from "@/lib/i18n";
+import { t } from "@/lib/i18n/translations";
+
+async function getUserLocale(userId: number): Promise<Locale> {
+  const [u] = await db
+    .select({ preferredLocale: users.preferredLocale })
+    .from(users)
+    .where(eq(users.id, userId))
+    .limit(1);
+  return resolveLocale(u?.preferredLocale);
+}
 
 function requireMember() {
   return getSession().then((session) => {
@@ -312,7 +322,8 @@ async function userHasPaymentMethod(userId: number): Promise<boolean> {
  */
 async function checkPaymentGate(
   proProfileId: number,
-  userId: number
+  userId: number,
+  locale: Locale
 ): Promise<string | null> {
   const [pro] = await db
     .select({ allowBookingWithoutPayment: proProfiles.allowBookingWithoutPayment })
@@ -329,7 +340,7 @@ async function checkPaymentGate(
   const hasPayment = await userHasPaymentMethod(userId);
   if (hasPayment) return null;
 
-  return "A payment method is required to book with this pro. Please add one in your profile.";
+  return t("bookErr.paymentMethodRequired", locale);
 }
 
 export async function createBooking(formData: FormData) {
@@ -359,11 +370,14 @@ export async function createBooking(formData: FormData) {
     !lastName ||
     !email
   ) {
-    return { error: "Please fill in all required fields." };
+    const locale = await getUserLocale(session.userId);
+    return { error: t("bookErr.fillRequired", locale) };
   }
 
+  const locale = await getUserLocale(session.userId);
+
   // Payment gate: check if pro requires payment method
-  const paymentError = await checkPaymentGate(proProfileId, session.userId);
+  const paymentError = await checkPaymentGate(proProfileId, session.userId, locale);
   if (paymentError) return { error: paymentError };
 
   // Verify slot is still available
@@ -373,10 +387,7 @@ export async function createBooking(formData: FormData) {
   );
 
   if (!slotAvailable) {
-    return {
-      error:
-        "This time slot is no longer available. Please choose a different time.",
-    };
+    return { error: t("bookErr.slotUnavailable", locale) };
   }
 
   // NOTE: would ideally be wrapped in db.transaction() for atomicity, but
@@ -910,15 +921,17 @@ export async function quickCreateBooking(data: {
       lastName: users.lastName,
       email: users.email,
       phone: users.phone,
+      preferredLocale: users.preferredLocale,
     })
     .from(users)
     .where(eq(users.id, session.userId))
     .limit(1);
 
-  if (!user) return { error: "User not found." };
+  const locale = resolveLocale(user?.preferredLocale);
+  if (!user) return { error: t("bookErr.userNotFound", locale) };
 
   // Payment gate: check if pro requires payment method
-  const paymentError = await checkPaymentGate(data.proProfileId, session.userId);
+  const paymentError = await checkPaymentGate(data.proProfileId, session.userId, locale);
   if (paymentError) return { error: paymentError };
 
   // Verify slot is still available
@@ -933,7 +946,7 @@ export async function quickCreateBooking(data: {
   );
 
   if (!slotAvailable) {
-    return { error: "This time slot is no longer available." };
+    return { error: t("bookErr.slotUnavailable", locale) };
   }
 
   // Create booking

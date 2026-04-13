@@ -1,6 +1,7 @@
 import { neon } from "@neondatabase/serverless";
 import { list } from "@vercel/blob";
 import { getStripe } from "@/lib/stripe";
+import { JWT } from "google-auth-library";
 
 export interface HealthCheck {
   ok: boolean;
@@ -53,6 +54,12 @@ async function checkStripe(): Promise<HealthCheck> {
   return timed("stripe", async () => {
     if (!process.env.STRIPE_SECRET_KEY)
       throw new Error("STRIPE_SECRET_KEY not set");
+    if (!process.env.STRIPE_WEBHOOK_SECRET)
+      throw new Error("STRIPE_WEBHOOK_SECRET not set");
+    if (!process.env.STRIPE_PRICE_MONTHLY)
+      throw new Error("STRIPE_PRICE_MONTHLY not set");
+    if (!process.env.STRIPE_PRICE_ANNUAL)
+      throw new Error("STRIPE_PRICE_ANNUAL not set");
     const stripe = getStripe();
     // Cheap Stripe call — retrieves platform balance (no args required)
     await stripe.balance.retrieve();
@@ -64,6 +71,53 @@ async function checkBlob(): Promise<HealthCheck> {
     if (!process.env.BLOB_READ_WRITE_TOKEN)
       throw new Error("BLOB_READ_WRITE_TOKEN not set");
     await list({ limit: 1 });
+  });
+}
+
+/**
+ * Verify the Google service account credentials parse and authorize WITHOUT
+ * sending an email. Catches the env-var format issues we hit on 2026-04-13
+ * (DECODER routines::unsupported, invalid_client) at deploy time instead of
+ * waiting for Sentry to surface them in production.
+ */
+async function checkGmail(): Promise<HealthCheck> {
+  return timed("gmail", async () => {
+    const rawEmail = process.env.GOOGLE_SERVICE_ACCOUNT_EMAIL;
+    const rawKey = process.env.GOOGLE_SERVICE_ACCOUNT_PRIVATE_KEY;
+    if (!rawEmail) throw new Error("GOOGLE_SERVICE_ACCOUNT_EMAIL not set");
+    if (!rawKey) throw new Error("GOOGLE_SERVICE_ACCOUNT_PRIVATE_KEY not set");
+
+    const stripQuotes = (v: string) => {
+      const t = v.trim();
+      return (t.startsWith('"') && t.endsWith('"')) ||
+        (t.startsWith("'") && t.endsWith("'"))
+        ? t.slice(1, -1).trim()
+        : t;
+    };
+
+    const email = stripQuotes(rawEmail);
+    const key = stripQuotes(rawKey).replace(/\\n/g, "\n");
+
+    if (!email.includes("@") || !email.endsWith(".gserviceaccount.com")) {
+      throw new Error(
+        `service account email looks malformed: ${email.slice(0, 24)}...`
+      );
+    }
+    if (!key.includes("BEGIN PRIVATE KEY") && !key.includes("BEGIN RSA PRIVATE KEY")) {
+      throw new Error("private key missing BEGIN PRIVATE KEY header");
+    }
+
+    const auth = new JWT({
+      email,
+      key,
+      scopes: ["https://www.googleapis.com/auth/gmail.send"],
+      subject: stripQuotes(process.env.GMAIL_SEND_AS || "noreply@golflessons.be"),
+    });
+
+    // authorize() exchanges the JWT for an access token. This actually hits
+    // Google's OAuth2 token endpoint, so a malformed key (DECODER error) or
+    // unknown service account (invalid_client) will fail right here.
+    await auth.authorize();
   });
 }
 
@@ -110,11 +164,16 @@ export async function runHealthChecks(
 
   const checks: Record<string, HealthCheck> = { db, env: env_, sentry };
 
-  // Deep checks: Stripe + Blob — heavier external calls, only on request
+  // Deep checks: Stripe + Blob + Gmail — heavier external calls, only on request
   if (opts.deep) {
-    const [stripe, blob] = await Promise.all([checkStripe(), checkBlob()]);
+    const [stripe, blob, gmail] = await Promise.all([
+      checkStripe(),
+      checkBlob(),
+      checkGmail(),
+    ]);
     checks.stripe = stripe;
     checks.blob = blob;
+    checks.gmail = gmail;
   }
 
   const ok = Object.values(checks).every((c) => c.ok);
