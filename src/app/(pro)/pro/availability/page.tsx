@@ -211,6 +211,7 @@ export default async function AvailabilityPage() {
           overrides={serializedOverrides}
           bookings={serializedBookings}
           profileSettings={settings}
+          locale={locale}
         />
       )}
     </div>

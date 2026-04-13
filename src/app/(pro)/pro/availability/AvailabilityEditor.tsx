@@ -9,10 +9,20 @@ import type {
   SerializedProfileSettings,
 } from "./actions";
 import { saveWeeklyTemplate, saveWeekOverrides } from "./actions";
+import { t } from "@/lib/i18n/translations";
+import type { Locale } from "@/lib/i18n";
 
 // ─── Constants ───────────────────────────────────────
 
-const DAYS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
+const DAY_KEYS = [
+  "book.day.mon",
+  "book.day.tue",
+  "book.day.wed",
+  "book.day.thu",
+  "book.day.fri",
+  "book.day.sat",
+  "book.day.sun",
+] as const;
 const GRID_START_HOUR = 7;
 const GRID_END_HOUR = 22;
 const ROWS = (GRID_END_HOUR - GRID_START_HOUR) * 2; // 30 half-hour rows
@@ -129,6 +139,7 @@ interface Props {
   overrides: SerializedOverride[];
   bookings: SerializedBooking[];
   profileSettings: SerializedProfileSettings;
+  locale: Locale;
 }
 
 export default function AvailabilityEditor({
@@ -137,6 +148,7 @@ export default function AvailabilityEditor({
   overrides,
   bookings,
   profileSettings,
+  locale,
 }: Props) {
   const CELL_H = useCellHeight();
 
@@ -165,11 +177,11 @@ export default function AvailabilityEditor({
   if (locations.length === 0) {
     return (
       <div className="mt-8 rounded-xl border border-dashed border-amber-300 bg-amber-50 p-8 text-center text-sm text-amber-800">
-        No locations linked.{" "}
+        {t("proAvail.noLocationsLinked", locale)}{" "}
         <a href="/pro/profile" className="text-gold-600 underline hover:text-gold-500">
-          Add locations via your profile
+          {t("proAvail.addViaProfile", locale)}
         </a>{" "}
-        to set availability.
+        {t("proAvail.toSetAvailability", locale)}
       </div>
     );
   }
@@ -184,6 +196,7 @@ export default function AvailabilityEditor({
         onActiveLocationChange={setActiveLocationId}
         grid={templateGrid}
         onGridChange={setTemplateGrid}
+        locale={locale}
       />
 
       {/* Section 2: Preview / blocking grid */}
@@ -194,6 +207,7 @@ export default function AvailabilityEditor({
         overrides={overrides}
         bookings={bookings}
         profileSettings={profileSettings}
+        locale={locale}
       />
     </div>
   );
@@ -208,6 +222,7 @@ function WeeklyTemplateGrid({
   onActiveLocationChange,
   grid,
   onGridChange,
+  locale,
 }: {
   locations: SerializedProLocationWithName[];
   locationColorMap: Map<number, number>;
@@ -215,6 +230,7 @@ function WeeklyTemplateGrid({
   onActiveLocationChange: (id: number) => void;
   grid: LocationGrid;
   onGridChange: (grid: LocationGrid) => void;
+  locale: Locale;
 }) {
   const CELL_H = useCellHeight();
   const [dirtyLocations, setDirtyLocations] = useState<Set<number>>(new Set());
@@ -326,24 +342,24 @@ function WeeklyTemplateGrid({
     <div className="rounded-xl border border-green-200 bg-white p-6">
       <div className="flex items-center justify-between">
         <div>
-          <h2 className="font-display text-lg font-semibold text-green-950">Weekly Schedule</h2>
+          <h2 className="font-display text-lg font-semibold text-green-950">{t("proAvail.weeklyHeading", locale)}</h2>
           <p className="mt-0.5 text-xs text-green-700/50">
-            Select a location and paint availability. Click again to clear.
+            {t("proAvail.weeklyHelp", locale)}
           </p>
         </div>
         <div className="flex items-center gap-3">
           {saveStatus === "saving" && (
-            <span className="text-xs text-green-700/50 animate-pulse">Saving...</span>
+            <span className="text-xs text-green-700/50 animate-pulse">{t("proAvail.saving", locale)}</span>
           )}
           {saveStatus === "saved" && (
-            <span className="text-xs text-green-600">Saved</span>
+            <span className="text-xs text-green-600">{t("proAvail.saved", locale)}</span>
           )}
         </div>
       </div>
 
       {/* Location brush selector */}
       <div className="mt-3 flex flex-wrap items-center gap-2">
-        <span className="text-xs text-green-700/50">Location:</span>
+        <span className="text-xs text-green-700/50">{t("proAvail.location", locale)}:</span>
         {locations.map((loc) => {
           const colorIdx = locationColorMap.get(loc.id) ?? 0;
           const color = LOCATION_COLORS[colorIdx];
@@ -372,13 +388,13 @@ function WeeklyTemplateGrid({
       {paintingMode && (
         <div className="mt-2 flex items-center gap-2 rounded-md bg-gold-50 px-3 py-1.5 text-xs font-medium text-gold-700">
           <div className="h-2 w-2 animate-pulse rounded-full bg-gold-500" />
-          Painting — drag to select slots
+          {t("proAvail.painting", locale)}
         </div>
       )}
 
       {/* Instruction for mobile */}
       <p className="mt-2 text-[10px] text-green-400 sm:hidden">
-        Press and hold to start painting
+        {t("proAvail.holdToPaint", locale)}
       </p>
 
       {/* Grid */}
@@ -394,9 +410,9 @@ function WeeklyTemplateGrid({
         }}>
           {/* Header */}
           <div />
-          {DAYS.map((d) => (
-            <div key={d} className="pb-1 text-center text-xs font-medium text-green-700/60">
-              {d}
+          {DAY_KEYS.map((dk) => (
+            <div key={dk} className="pb-1 text-center text-xs font-medium text-green-700/60">
+              {t(dk, locale)}
             </div>
           ))}
 
@@ -556,6 +572,7 @@ function PreviewBlockingGrid({
   overrides,
   bookings,
   profileSettings,
+  locale,
 }: {
   locations: SerializedProLocationWithName[];
   locationColorMap: Map<number, number>;
@@ -563,6 +580,7 @@ function PreviewBlockingGrid({
   overrides: SerializedOverride[];
   bookings: SerializedBooking[];
   profileSettings: SerializedProfileSettings;
+  locale: Locale;
 }) {
   const CELL_H = useCellHeight();
   const [weekOffset, setWeekOffset] = useState(0);
@@ -643,7 +661,7 @@ function PreviewBlockingGrid({
       if (dayIdx < 0) continue;
       const startRow = timeToRow(b.startTime);
       const endRow = timeToRow(b.endTime);
-      const label = b.bookerName || "Booked";
+      const label = b.bookerName || t("proAvail.booked", locale);
       for (let r = startRow; r < endRow; r++) bMap[dayIdx][r] = label;
     }
 
@@ -904,17 +922,17 @@ function PreviewBlockingGrid({
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h2 className="font-display text-lg font-semibold text-green-950">Schedule & Blocks</h2>
+          <h2 className="font-display text-lg font-semibold text-green-950">{t("proAvail.blocksHeading", locale)}</h2>
           <p className="mt-0.5 text-xs text-green-700/50">
-            Paint blocks or extra availability. Double-click a block to add a reason.
+            {t("proAvail.blocksHelp", locale)}
           </p>
         </div>
         <div className="flex items-center gap-3">
           {saveStatus === "saving" && (
-            <span className="text-xs text-green-700/50 animate-pulse">Saving...</span>
+            <span className="text-xs text-green-700/50 animate-pulse">{t("proAvail.saving", locale)}</span>
           )}
           {saveStatus === "saved" && (
-            <span className="text-xs text-green-600">Saved</span>
+            <span className="text-xs text-green-600">{t("proAvail.saved", locale)}</span>
           )}
           <div className="flex items-center gap-2">
             <button
@@ -924,7 +942,7 @@ function PreviewBlockingGrid({
               &#9664;
             </button>
             <span className="min-w-[80px] text-center text-sm font-medium text-green-950">
-              Week {getWeekNumber(weekStart)}
+              {t("proAvail.week", locale)} {getWeekNumber(weekStart)}
             </span>
             <button
               onClick={() => setWeekOffset((w) => w + 1)}
@@ -937,7 +955,7 @@ function PreviewBlockingGrid({
                 onClick={() => setWeekOffset(0)}
                 className="ml-1 text-xs text-gold-600 hover:text-gold-500"
               >
-                Today
+                {t("proAvail.today", locale)}
               </button>
             )}
           </div>
@@ -946,7 +964,7 @@ function PreviewBlockingGrid({
 
       {/* Brush selector */}
       <div className="mt-3 flex flex-wrap items-center gap-2">
-        <span className="text-xs text-green-700/50">Mode:</span>
+        <span className="text-xs text-green-700/50">{t("proAvail.mode", locale)}:</span>
         <button
           onClick={() => setBrush({ mode: "blocked" })}
           className={`flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-medium transition-all ${
@@ -956,7 +974,7 @@ function PreviewBlockingGrid({
           }`}
         >
           <span className="inline-block h-2.5 w-2.5 rounded-full bg-red-500" />
-          Block
+          {t("proAvail.modeBlock", locale)}
         </button>
         {locations.map((loc) => {
           const colorIdx = locationColorMap.get(loc.id) ?? 0;
@@ -986,7 +1004,7 @@ function PreviewBlockingGrid({
       {paintingMode2 && (
         <div className="mt-2 flex items-center gap-2 rounded-md bg-gold-50 px-3 py-1.5 text-xs font-medium text-gold-700">
           <div className="h-2 w-2 animate-pulse rounded-full bg-gold-500" />
-          Painting — drag to select slots
+          {t("proAvail.painting", locale)}
         </div>
       )}
 
@@ -1008,7 +1026,7 @@ function PreviewBlockingGrid({
             return (
               <div key={day.date} className="flex flex-col items-center gap-0.5 pb-1">
                 <div className={`text-xs font-medium ${isToday ? "text-gold-700" : "text-green-700/60"}`}>
-                  {DAYS[day.dayOfWeek]}
+                  {t(DAY_KEYS[day.dayOfWeek], locale)}
                 </div>
                 <div className="text-[10px] text-green-700/40">{formatDateShort(day.date)}</div>
               </div>
@@ -1017,7 +1035,7 @@ function PreviewBlockingGrid({
 
           {/* ── Full day row: label + checkboxes + reason ── */}
           <div className="flex items-start justify-end pr-2 pt-0.5 text-[10px] text-red-400 whitespace-nowrap">
-            Full day
+            {t("proAvail.fullDay", locale)}
           </div>
           {days.map((day, dayIdx) => (
             <div key={`fd-${day.date}`} className="flex min-w-0 flex-col items-center gap-0.5 pb-1">
@@ -1032,7 +1050,7 @@ function PreviewBlockingGrid({
                 <input
                   value={reasons.get(`${dayIdx}`) || ""}
                   onChange={(e) => updateReason(`${dayIdx}`, e.target.value)}
-                  placeholder="Reason..."
+                  placeholder={t("proAvail.reasonPlaceholderShort", locale)}
                   className="w-full min-w-0 rounded border border-red-200 px-1 py-0.5 text-center text-[10px] focus:border-red-400 focus:outline-none"
                 />
               )}
@@ -1129,9 +1147,9 @@ function PreviewBlockingGrid({
                     ? `${dayIdx}`
                     : `${dayIdx}-${findBlockStart(blockedCells, dayIdx, row)}`;
                   const reason = reasons.get(rKey);
-                  title += ` - Blocked${reason ? ` -- ${reason}` : ""}`;
+                  title += ` - ${t("proAvail.blocked", locale)}${reason ? ` -- ${reason}` : ""}`;
                 } else if (hasExtra) {
-                  title += ` - Extra: ${cellLocNames(extraLocs)}`;
+                  title += ` - ${t("proAvail.extraPrefix", locale)}: ${cellLocNames(extraLocs)}`;
                 } else if (booking) {
                   title += ` - ${booking}`;
                 }
@@ -1191,11 +1209,11 @@ function PreviewBlockingGrid({
         })}
         <div className="flex items-center gap-1.5">
           <div className="h-3 w-5 rounded-sm" style={{ backgroundColor: "rgba(20, 184, 166, 0.55)" }} />
-          <span className="text-[10px] text-green-700/60">Booked</span>
+          <span className="text-[10px] text-green-700/60">{t("proAvail.booked", locale)}</span>
         </div>
         <div className="flex items-center gap-1.5">
           <div className="h-3 w-5 rounded-sm" style={{ backgroundColor: "rgba(239, 68, 68, 0.45)" }} />
-          <span className="text-[10px] text-green-700/60">Blocked</span>
+          <span className="text-[10px] text-green-700/60">{t("proAvail.blocked", locale)}</span>
         </div>
       </div>
 
@@ -1209,13 +1227,13 @@ function PreviewBlockingGrid({
             style={{ left: Math.max(16, editPopover.x - 100), top: editPopover.y + 12 }}
           >
             <label className="mb-1.5 block text-[10px] font-medium uppercase tracking-wide text-green-700/60">
-              Reason (optional)
+              {t("proAvail.reasonOptional", locale)}
             </label>
             <div className="flex gap-1.5">
               <input
                 value={reasons.get(editPopover.key) || ""}
                 onChange={(e) => updateReason(editPopover.key, e.target.value)}
-                placeholder="e.g. holiday, away..."
+                placeholder={t("proAvail.reasonPlaceholder", locale)}
                 className="w-40 rounded border border-green-200 px-2 py-1 text-xs focus:border-gold-500 focus:outline-none focus:ring-1 focus:ring-gold-500"
                 autoFocus
                 onKeyDown={(e) => {
@@ -1226,7 +1244,7 @@ function PreviewBlockingGrid({
                 onClick={() => setEditPopover(null)}
                 className="rounded bg-green-100 px-2 py-1 text-xs font-medium text-green-700 hover:bg-green-200"
               >
-                OK
+                {t("proAvail.ok", locale)}
               </button>
             </div>
           </div>
