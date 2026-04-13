@@ -10,12 +10,19 @@ interface CmsPageInitProps {
 
 export default function CmsPageInit({ pageSlug, blocks }: CmsPageInitProps) {
   const { initPage } = useCms();
-  const initialized = useRef(false);
+  const lastSnapshot = useRef<string>("");
 
   useEffect(() => {
-    if (!initialized.current) {
+    // Re-init whenever slug or block content actually changes (not on
+    // every parent re-render). This is what makes language switching
+    // work on CMS pages: when the server re-renders with the new locale's
+    // blocks, the snapshot differs and we push the fresh content into the
+    // CmsProvider. Previously a useRef boolean gated this to first-mount
+    // only, leaving stale NL content visible after a locale switch.
+    const snapshot = pageSlug + ":" + JSON.stringify(blocks);
+    if (snapshot !== lastSnapshot.current) {
       initPage(pageSlug, blocks);
-      initialized.current = true;
+      lastSnapshot.current = snapshot;
     }
   }, [pageSlug, blocks, initPage]);
 
