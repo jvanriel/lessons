@@ -354,7 +354,6 @@ export const proMailings = pgTable("pro_mailings", {
 export const tasks = pgTable("tasks", {
   id: serial("id").primaryKey(),
   title: varchar("title", { length: 255 }).notNull(),
-  description: text("description"),
   column: varchar("column", { length: 20 }).notNull().default("todo"),
   position: integer("position").notNull().default(0),
   assigneeIds: jsonb("assignee_ids").$type<number[]>(),

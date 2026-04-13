@@ -41,7 +41,6 @@ export type TaskPriority = "low" | "normal" | "high";
 export interface SerializedTask {
   id: number;
   title: string;
-  description: string | null;
   column: TaskColumn;
   position: number;
   assigneeIds: number[];
@@ -80,8 +79,6 @@ export async function createTask(
   const title = (formData.get("title") as string)?.trim();
   if (!title) return { error: "Title is required." };
 
-  const description =
-    (formData.get("description") as string)?.trim() || null;
   const assigneeIds = formData
     .getAll("assigneeIds")
     .map(Number)
@@ -104,7 +101,6 @@ export async function createTask(
     .insert(tasks)
     .values({
       title,
-      description,
       column: "todo",
       position: (maxPos?.max ?? -1) + 1,
       assigneeIds: assigneeIds.length > 0 ? assigneeIds : null,
@@ -127,7 +123,6 @@ export async function createTask(
         type: "task_assigned",
         targetUserId: u.id,
         title: `New task: ${title}`,
-        message: description || undefined,
         actionUrl: roleAwareUrl(
           u.roles,
           `/admin/tasks?id=${inserted.id}`,
@@ -146,7 +141,6 @@ export async function createTask(
     task: {
       id: inserted.id,
       title: inserted.title,
-      description: inserted.description,
       column: inserted.column as TaskColumn,
       position: inserted.position,
       assigneeIds: (inserted.assigneeIds as number[]) ?? [],

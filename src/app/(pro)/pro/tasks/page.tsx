@@ -44,7 +44,6 @@ export default async function ProTasksPage() {
   const serializedTasks: SerializedTask[] = allTasks.map((t) => ({
     id: t.id,
     title: t.title,
-    description: t.description,
     column: t.column as SerializedTask["column"],
     position: t.position,
     assigneeIds: (t.assigneeIds as number[]) ?? [],

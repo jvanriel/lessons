@@ -470,11 +470,6 @@ function TaskCard({
           {task.priority}
         </span>
       </div>
-      {task.description && (
-        <p className="mt-1 line-clamp-2 text-[11px] text-green-500">
-          {task.description}
-        </p>
-      )}
       <div className="mt-1.5 flex items-center justify-between">
         <div className="flex items-center gap-1.5">
           {task.assigneeIds.length > 0 && (
