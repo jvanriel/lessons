@@ -370,58 +370,55 @@ export async function createBooking(formData: FormData) {
     };
   }
 
-  // Create booking + participant + pro-student relation atomically.
-  // If any insert fails, the others roll back so we never leave a booking
-  // without a participant or vice versa.
+  // NOTE: would ideally be wrapped in db.transaction() for atomicity, but
+  // the @neondatabase/serverless HTTP driver does not support multi-statement
+  // transactions. Revisit when we move to the WebSocket / pg driver.
+  // See docs/gaps.md "data integrity" item.
   const manageToken = crypto.randomBytes(32).toString("hex");
 
-  const booking = await db.transaction(async (tx) => {
-    const [inserted] = await tx
-      .insert(lessonBookings)
-      .values({
-        proProfileId,
-        bookedById: session.userId,
-        proLocationId,
-        date,
-        startTime,
-        endTime,
-        participantCount,
-        status: "confirmed",
-        notes,
-        manageToken,
-      })
-      .returning({ id: lessonBookings.id });
+  const [booking] = await db
+    .insert(lessonBookings)
+    .values({
+      proProfileId,
+      bookedById: session.userId,
+      proLocationId,
+      date,
+      startTime,
+      endTime,
+      participantCount,
+      status: "confirmed",
+      notes,
+      manageToken,
+    })
+    .returning({ id: lessonBookings.id });
 
-    await tx.insert(lessonParticipants).values({
-      bookingId: inserted.id,
-      firstName,
-      lastName,
-      email,
-      phone,
-    });
-
-    const [existingRelation] = await tx
-      .select({ id: proStudents.id })
-      .from(proStudents)
-      .where(
-        and(
-          eq(proStudents.proProfileId, proProfileId),
-          eq(proStudents.userId, session.userId)
-        )
-      )
-      .limit(1);
-
-    if (!existingRelation) {
-      await tx.insert(proStudents).values({
-        proProfileId: proProfileId,
-        userId: session.userId,
-        source: "self",
-        status: "active",
-      });
-    }
-
-    return inserted;
+  await db.insert(lessonParticipants).values({
+    bookingId: booking.id,
+    firstName,
+    lastName,
+    email,
+    phone,
   });
+
+  const [existingRelation] = await db
+    .select({ id: proStudents.id })
+    .from(proStudents)
+    .where(
+      and(
+        eq(proStudents.proProfileId, proProfileId),
+        eq(proStudents.userId, session.userId)
+      )
+    )
+    .limit(1);
+
+  if (!existingRelation) {
+    await db.insert(proStudents).values({
+      proProfileId: proProfileId,
+      userId: session.userId,
+      source: "self",
+      status: "active",
+    });
+  }
 
   // Notify the pro
   const [pro] = await db
