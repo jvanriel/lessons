@@ -12,47 +12,48 @@ import {
   type SlotExplanation,
 } from "../book/actions";
 import { SlotExplanationDialog } from "@/components/SlotExplanationDialog";
+import { formatDate as formatDateLocale } from "@/lib/format-date";
+import type { Locale } from "@/lib/i18n";
 
 interface Props {
   data: QuickBookData;
   proSlug: string;
   hasPaymentMethod?: boolean;
   allowBookingWithoutPayment?: boolean;
+  locale: Locale;
 }
 
 const HOLD_MS = 600;
 
 const DAY_NAMES = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
 
-function formatShortDate(dateStr: string) {
-  const d = new Date(dateStr + "T00:00:00");
-  return d.toLocaleDateString("en-US", {
-    weekday: "short",
-    month: "short",
-    day: "numeric",
-  });
+function makeDateFormatters(locale: Locale) {
+  return {
+    short: (dateStr: string) =>
+      formatDateLocale(dateStr, locale, {
+        weekday: "short",
+        month: "short",
+        day: "numeric",
+      }),
+    long: (dateStr: string) =>
+      formatDateLocale(dateStr, locale, {
+        weekday: "long",
+        month: "long",
+        day: "numeric",
+      }),
+    pillDay: (dateStr: string) =>
+      formatDateLocale(dateStr, locale, { weekday: "short" }),
+    pillDate: (dateStr: string) =>
+      formatDateLocale(dateStr, locale, { month: "short", day: "numeric" }),
+  };
 }
 
-function formatLongDate(dateStr: string) {
-  const d = new Date(dateStr + "T00:00:00");
-  return d.toLocaleDateString("en-US", {
-    weekday: "long",
-    month: "long",
-    day: "numeric",
-  });
-}
-
-function formatDatePillDay(dateStr: string) {
-  const d = new Date(dateStr + "T00:00:00");
-  return d.toLocaleDateString("en-US", { weekday: "short" });
-}
-
-function formatDatePillDate(dateStr: string) {
-  const d = new Date(dateStr + "T00:00:00");
-  return d.toLocaleDateString("en-US", { month: "short", day: "numeric" });
-}
-
-export function QuickBook({ data, proSlug, hasPaymentMethod = true, allowBookingWithoutPayment = false }: Props) {
+export function QuickBook({ data, proSlug, hasPaymentMethod = true, allowBookingWithoutPayment = false, locale }: Props) {
+  const fd = makeDateFormatters(locale);
+  const formatShortDate = fd.short;
+  const formatLongDate = fd.long;
+  const formatDatePillDay = fd.pillDay;
+  const formatDatePillDate = fd.pillDate;
   const paymentBlocked = !hasPaymentMethod && !allowBookingWithoutPayment;
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
@@ -263,7 +264,7 @@ export function QuickBook({ data, proSlug, hasPaymentMethod = true, allowBooking
                     dateHoldTimer.current = setTimeout(() => {
                       dateHoldTimer.current = null;
                       startTransition(async () => {
-                        const prefDay = new Date(data.suggestedDate + "T00:00:00").toLocaleDateString("en-US", { weekday: "long" });
+                        const prefDay = formatDateLocale(data.suggestedDate, locale, { weekday: "long" });
                         const result = await explainDateSlots(data.proProfileId, data.locationId, d, data.duration, idx === 0, false, prefDay, interval);
                         setExplanation(result);
                       });

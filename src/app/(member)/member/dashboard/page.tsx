@@ -219,6 +219,7 @@ export default async function MemberDashboard() {
                     proSlug={pro.slug}
                     hasPaymentMethod={hasPaymentMethod}
                     allowBookingWithoutPayment={pro.allowBookingWithoutPayment}
+                    locale={locale}
                   />
                 )}
               </div>
@@ -269,6 +270,7 @@ export default async function MemberDashboard() {
                   </div>
                 </div>
                 <CancelBookingButton
+                  locale={locale}
                   bookingId={booking.id}
                   date={booking.date}
                   startTime={booking.startTime}

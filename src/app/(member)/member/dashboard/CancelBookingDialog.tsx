@@ -3,12 +3,16 @@
 import { useState, useRef, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { cancelBooking } from "../bookings/actions";
+import { t } from "@/lib/i18n/translations";
+import type { Locale } from "@/lib/i18n";
+import { formatDate } from "@/lib/format-date";
 
 interface Props {
   bookingId: number;
   date: string;
   startTime: string;
   proName: string;
+  locale: Locale;
 }
 
 export function CancelBookingButton({
@@ -16,6 +20,7 @@ export function CancelBookingButton({
   date,
   startTime,
   proName,
+  locale,
 }: Props) {
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
@@ -42,7 +47,7 @@ export function CancelBookingButton({
         onClick={() => setOpen(true)}
         className="text-xs text-red-400 hover:text-red-600"
       >
-        Cancel
+        {t("bookings.cancelLink", locale)}
       </button>
 
       {open && (
@@ -55,19 +60,20 @@ export function CancelBookingButton({
         >
           <div className="mx-4 w-full max-w-sm rounded-xl border border-green-200 bg-white p-6 shadow-2xl">
             <h3 className="font-display text-lg font-semibold text-green-900">
-              Cancel lesson?
+              {t("bookings.cancelTitle", locale)}
             </h3>
             <p className="mt-2 text-sm text-green-600">
-              Are you sure you want to cancel your lesson with{" "}
-              <span className="font-medium text-green-800">{proName}</span> on{" "}
+              {t("bookings.cancelConfirmStart", locale)}{" "}
+              <span className="font-medium text-green-800">{proName}</span>{" "}
+              {t("bookings.cancelConfirmOn", locale)}{" "}
               <span className="font-medium text-green-800">
-                {new Date(date + "T00:00:00").toLocaleDateString("en-US", {
+                {formatDate(date, locale, {
                   weekday: "long",
                   month: "long",
                   day: "numeric",
                 })}
               </span>{" "}
-              at{" "}
+              {t("bookings.cancelConfirmAt", locale)}{" "}
               <span className="font-medium text-green-800">{startTime}</span>?
             </p>
 
@@ -82,14 +88,14 @@ export function CancelBookingButton({
                 onClick={() => setOpen(false)}
                 className="flex-1 rounded-md border border-green-200 px-4 py-2 text-sm font-medium text-green-700 transition-colors hover:bg-green-50"
               >
-                Keep lesson
+                {t("bookings.keepLesson", locale)}
               </button>
               <button
                 onClick={handleCancel}
                 disabled={isPending}
                 className="flex-1 rounded-md bg-red-600 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-red-500 disabled:opacity-50"
               >
-                {isPending ? "Cancelling..." : "Yes, cancel"}
+                {isPending ? t("bookings.cancelling", locale) : t("bookings.cancelLesson", locale)}
               </button>
             </div>
           </div>

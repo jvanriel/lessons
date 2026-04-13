@@ -500,3 +500,117 @@ export function getWelcomeSubject(accountType: "student" | "pro", locale: Locale
   };
   return (subjects[locale] ?? subjects.en)[accountType];
 }
+
+// ─── Trial ending email (sent ~3 days before trial_end via Stripe) ──
+
+const TRIAL_ENDING_STRINGS: Record<Locale, { subject: string; greeting: string; body: string; cta: string; help: string }> = {
+  en: {
+    subject: "Your Golf Lessons trial ends soon",
+    greeting: "Hi",
+    body: "Your free trial of Golf Lessons ends in a few days. To keep receiving bookings, make sure your payment method is up to date — we'll automatically charge you when the trial ends.",
+    cta: "Manage your subscription",
+    help: "Questions? Just reply to this email.",
+  },
+  nl: {
+    subject: "Je Golf Lessons proefperiode eindigt binnenkort",
+    greeting: "Hallo",
+    body: "Je gratis proefperiode van Golf Lessons eindigt over enkele dagen. Zorg dat je betaalmethode up-to-date is om boekingen te blijven ontvangen — we rekenen automatisch af wanneer de proef afloopt.",
+    cta: "Beheer je abonnement",
+    help: "Vragen? Antwoord gewoon op deze e-mail.",
+  },
+  fr: {
+    subject: "Votre période d'essai Golf Lessons se termine bientôt",
+    greeting: "Bonjour",
+    body: "Votre essai gratuit Golf Lessons se termine dans quelques jours. Assurez-vous que votre moyen de paiement est à jour pour continuer à recevoir des réservations — nous prélevons automatiquement à la fin de l'essai.",
+    cta: "Gérer votre abonnement",
+    help: "Des questions ? Répondez simplement à cet e-mail.",
+  },
+};
+
+export function buildTrialEndingEmail(opts: {
+  firstName: string;
+  trialEndDate: Date;
+  locale: Locale;
+}): string {
+  const s = TRIAL_ENDING_STRINGS[opts.locale] ?? TRIAL_ENDING_STRINGS.en;
+  const dateLocale = opts.locale === "nl" ? "nl-BE" : opts.locale === "fr" ? "fr-BE" : "en-GB";
+  const dateStr = new Intl.DateTimeFormat(dateLocale, {
+    weekday: "long",
+    day: "numeric",
+    month: "long",
+    year: "numeric",
+  }).format(opts.trialEndDate);
+
+  const body = `
+    <h2 style="font-family:Georgia,'Times New Roman',serif;font-size:22px;color:${COLORS.green950};margin:0 0 16px 0;font-weight:normal;">
+      ${s.greeting} ${opts.firstName},
+    </h2>
+    <p style="margin:0 0 16px 0;">${s.body}</p>
+    <p style="margin:0 0 24px 0;color:#555;font-size:14px;"><strong>${dateStr}</strong></p>
+    <p style="margin:0 0 24px 0;">
+      <a href="${getBaseUrl()}/pro/billing" style="display:inline-block;background:${COLORS.gold600};color:${COLORS.white};padding:12px 28px;border-radius:6px;text-decoration:none;font-weight:500;font-size:14px;">
+        ${s.cta}
+      </a>
+    </p>
+    <p style="color:#666;font-size:13px;margin:0;">${s.help}</p>
+  `;
+  return emailLayout(body, undefined, opts.locale);
+}
+
+export function getTrialEndingSubject(locale: Locale): string {
+  return (TRIAL_ENDING_STRINGS[locale] ?? TRIAL_ENDING_STRINGS.en).subject;
+}
+
+// ─── Payment failed email ──────────────────────────────────────────
+
+const PAYMENT_FAILED_STRINGS: Record<Locale, { subject: string; greeting: string; body: string; impact: string; cta: string; help: string }> = {
+  en: {
+    subject: "Action needed: payment failed for Golf Lessons",
+    greeting: "Hi",
+    body: "We couldn't charge your card for your Golf Lessons subscription. This usually means your card has expired, was declined by your bank, or has insufficient funds.",
+    impact: "Your account is still active, but we'll retry the payment over the next few days. If it keeps failing, your subscription will be paused and you'll stop receiving new bookings.",
+    cta: "Update payment method",
+    help: "Need help? Just reply to this email.",
+  },
+  nl: {
+    subject: "Actie nodig: betaling mislukt voor Golf Lessons",
+    greeting: "Hallo",
+    body: "We konden je kaart niet afrekenen voor je Golf Lessons abonnement. Meestal komt dit omdat je kaart is verlopen, geweigerd is door je bank, of onvoldoende saldo heeft.",
+    impact: "Je account is nog actief, maar we proberen de betaling de komende dagen opnieuw. Als het blijft falen, wordt je abonnement gepauzeerd en ontvang je geen nieuwe boekingen meer.",
+    cta: "Betaalmethode bijwerken",
+    help: "Hulp nodig? Antwoord gewoon op deze e-mail.",
+  },
+  fr: {
+    subject: "Action requise : paiement échoué pour Golf Lessons",
+    greeting: "Bonjour",
+    body: "Nous n'avons pas pu prélever votre carte pour votre abonnement Golf Lessons. Cela signifie généralement que votre carte a expiré, a été refusée par votre banque, ou a un solde insuffisant.",
+    impact: "Votre compte est toujours actif, mais nous réessayerons le paiement les jours prochains. Si l'échec persiste, votre abonnement sera suspendu et vous ne recevrez plus de nouvelles réservations.",
+    cta: "Mettre à jour le moyen de paiement",
+    help: "Besoin d'aide ? Répondez simplement à cet e-mail.",
+  },
+};
+
+export function buildPaymentFailedEmail(opts: {
+  firstName: string;
+  locale: Locale;
+}): string {
+  const s = PAYMENT_FAILED_STRINGS[opts.locale] ?? PAYMENT_FAILED_STRINGS.en;
+  const body = `
+    <h2 style="font-family:Georgia,'Times New Roman',serif;font-size:22px;color:${COLORS.green950};margin:0 0 16px 0;font-weight:normal;">
+      ${s.greeting} ${opts.firstName},
+    </h2>
+    <p style="margin:0 0 16px 0;">${s.body}</p>
+    <p style="margin:0 0 24px 0;color:#555;font-size:14px;">${s.impact}</p>
+    <p style="margin:0 0 24px 0;">
+      <a href="${getBaseUrl()}/pro/billing" style="display:inline-block;background:${COLORS.gold600};color:${COLORS.white};padding:12px 28px;border-radius:6px;text-decoration:none;font-weight:500;font-size:14px;">
+        ${s.cta}
+      </a>
+    </p>
+    <p style="color:#666;font-size:13px;margin:0;">${s.help}</p>
+  `;
+  return emailLayout(body, undefined, opts.locale);
+}
+
+export function getPaymentFailedSubject(locale: Locale): string {
+  return (PAYMENT_FAILED_STRINGS[locale] ?? PAYMENT_FAILED_STRINGS.en).subject;
+}

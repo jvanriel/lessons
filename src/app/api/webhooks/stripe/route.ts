@@ -3,8 +3,16 @@ import { headers } from "next/headers";
 import Stripe from "stripe";
 import { getStripe } from "@/lib/stripe";
 import { db } from "@/lib/db";
-import { proProfiles, stripeEvents } from "@/lib/db/schema";
+import { proProfiles, stripeEvents, users } from "@/lib/db/schema";
 import { eq } from "drizzle-orm";
+import { sendEmail } from "@/lib/mail";
+import {
+  buildTrialEndingEmail,
+  getTrialEndingSubject,
+  buildPaymentFailedEmail,
+  getPaymentFailedSubject,
+} from "@/lib/email-templates";
+import { resolveLocale } from "@/lib/i18n";
 
 // Stripe v22 types — use plain objects for webhook data
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -214,7 +222,32 @@ async function handleTrialWillEnd(subscription: StripeObject) {
   const profile = await findProfileBySubscription(subscription.id);
   if (!profile) return;
 
-  // TODO: Send trial-ending email via Resend
+  const [user] = await db
+    .select({
+      firstName: users.firstName,
+      email: users.email,
+      preferredLocale: users.preferredLocale,
+    })
+    .from(users)
+    .where(eq(users.id, profile.userId))
+    .limit(1);
+  if (!user) return;
+
+  const locale = resolveLocale(user.preferredLocale);
+  const trialEndDate = subscription.trial_end
+    ? new Date(subscription.trial_end * 1000)
+    : new Date();
+
+  sendEmail({
+    to: user.email,
+    subject: getTrialEndingSubject(locale),
+    html: buildTrialEndingEmail({
+      firstName: user.firstName,
+      trialEndDate,
+      locale,
+    }),
+  }).catch(() => {});
+
   console.log(
     `Trial ending soon for pro ${profile.id}, trial_end: ${subscription.trial_end}`
   );
@@ -266,7 +299,27 @@ async function handleInvoicePaymentFailed(invoice: StripeObject) {
     })
     .where(eq(proProfiles.id, profile.id));
 
-  // TODO: Send "update payment method" email via Resend
+  const [user] = await db
+    .select({
+      firstName: users.firstName,
+      email: users.email,
+      preferredLocale: users.preferredLocale,
+    })
+    .from(users)
+    .where(eq(users.id, profile.userId))
+    .limit(1);
+  if (user) {
+    const locale = resolveLocale(user.preferredLocale);
+    sendEmail({
+      to: user.email,
+      subject: getPaymentFailedSubject(locale),
+      html: buildPaymentFailedEmail({
+        firstName: user.firstName,
+        locale,
+      }),
+    }).catch(() => {});
+  }
+
   console.log(`Payment failed for pro ${profile.id}`);
 }
 
