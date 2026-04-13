@@ -6,6 +6,7 @@
  */
 
 import { DEFAULT_LOCALE, type Locale } from "@/lib/i18n";
+import { formatDate } from "@/lib/format-date";
 
 function getBaseUrl(): string {
   if (process.env.NEXT_PUBLIC_APP_URL) return process.env.NEXT_PUBLIC_APP_URL;
@@ -601,13 +602,12 @@ export function buildTrialEndingEmail(opts: {
   locale: Locale;
 }): string {
   const s = TRIAL_ENDING_STRINGS[opts.locale] ?? TRIAL_ENDING_STRINGS.en;
-  const dateLocale = opts.locale === "nl" ? "nl-BE" : opts.locale === "fr" ? "fr-BE" : "en-GB";
-  const dateStr = new Intl.DateTimeFormat(dateLocale, {
+  const dateStr = formatDate(opts.trialEndDate, opts.locale, {
     weekday: "long",
     day: "numeric",
     month: "long",
     year: "numeric",
-  }).format(opts.trialEndDate);
+  });
 
   const body = `
     <h2 style="font-family:Georgia,'Times New Roman',serif;font-size:22px;color:${COLORS.green950};margin:0 0 16px 0;font-weight:normal;">

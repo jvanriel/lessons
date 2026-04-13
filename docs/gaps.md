@@ -18,10 +18,17 @@ Cross-reference for sprint planning and Nadine's testing feedback.
 - Admin payouts view — aggregate paid bookings per pro, mark batches as paid out, execute SEPA transfer manually from platform account.
 - Commission decision (0% + higher subscription, or % cut).
 
-### 2. Trial-ending + payment-failed webhook emails
+### ~~2. Trial-ending + payment-failed webhook emails~~ — **done (stale entry)**
 
-- `src/app/api/webhooks/stripe/route.ts:217,269` — both still `TODO`.
-- Gmail-API `sendEmail` (`src/lib/mail.ts`) is fully implemented; just needs templates + wiring.
+Both handlers in `src/app/api/webhooks/stripe/route.ts` are fully
+wired: `handleTrialWillEnd` calls `buildTrialEndingEmail` +
+`getTrialEndingSubject`, and `handleInvoicePaymentFailed` calls
+`buildPaymentFailedEmail` + `getPaymentFailedSubject`. Both templates
+exist in EN / NL / FR in `src/lib/email-templates.ts` (TRIAL_ENDING_STRINGS
+and PAYMENT_FAILED_STRINGS records). Each email reads the recipient's
+preferredLocale from the user row before rendering. The trial-ending
+date now uses the locale-aware `formatDate()` helper for consistency
+with the rest of the codebase.
 
 ### 3. Pre-launch site password hardcoded
 
