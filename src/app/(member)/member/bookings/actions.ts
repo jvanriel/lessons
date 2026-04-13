@@ -181,9 +181,9 @@ export async function cancelBooking(bookingId: number) {
   }
 
   // Auto-refund if the booking was paid online and we're within the
-  // cancellation window. Skips entirely for cash-only pros
-  // (paymentStatus="manual") since the platform never touched that money —
-  // the pro refunds the student directly in whatever way they settled.
+  // cancellation window. Cash-only (paymentStatus="manual") follows the
+  // inverse path below — we void the pending commission invoice item so
+  // the pro isn't billed for a booking that didn't actually happen.
   let refundedCents: number | null = null;
   if (
     booking.paymentStatus === "paid" &&
@@ -215,6 +215,33 @@ export async function cancelBooking(bookingId: number) {
       console.error("Refund failed for booking", bookingId, err);
       // Don't block the cancel — the booking still gets cancelled, refund
       // will need manual reconciliation via admin.
+    }
+  } else if (
+    booking.paymentStatus === "manual" &&
+    booking.stripeInvoiceItemId
+  ) {
+    // Cash-only booking: delete the pending commission invoice item from
+    // the pro's Stripe customer so they're not billed. Only works if the
+    // item hasn't been finalised onto an invoice yet (most cancels will
+    // happen soon after booking, before the next monthly invoice cycle).
+    try {
+      const stripe = getStripe();
+      await stripe.invoiceItems.del(booking.stripeInvoiceItemId);
+      await db
+        .update(lessonBookings)
+        .set({
+          stripeInvoiceItemId: null,
+          platformFeeCents: null,
+        })
+        .where(eq(lessonBookings.id, bookingId));
+    } catch (err) {
+      console.error(
+        "Invoice item reversal failed for booking",
+        bookingId,
+        err
+      );
+      // Don't block the cancel — item may already be on a finalised
+      // invoice and needs manual credit-note reconciliation.
     }
   }
 

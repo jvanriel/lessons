@@ -418,9 +418,9 @@ export async function createBooking(formData: FormData) {
 
   // Cash-only pros: `allowBookingWithoutPayment=true` means the pro settles
   // with the student offline (cash at the course, bank transfer, whatever).
-  // The platform never touches this money, so we record the amount on the
-  // booking row for the receipt but do NOT fire a PaymentIntent and do NOT
-  // count it in /pro/earnings revenue (which filters by paymentStatus='paid').
+  // The platform never touches the lesson money, but we still claim our
+  // commission — see the invoice-item logic below that bills it to the pro
+  // via their existing Stripe subscription.
   const cashOnly = priceRow?.allowBookingWithoutPayment === true;
 
   // If the pro charges online but we couldn't compute a price, bail out.
@@ -429,8 +429,12 @@ export async function createBooking(formData: FormData) {
   }
 
   const priceCents = computedPriceCents;
+  // Commission is recorded on every priced booking — online or cash-only.
+  // For online bookings we deduct it from the paid lesson amount; for
+  // cash-only bookings we bill it separately to the pro via an invoice
+  // item further down.
   const platformFeeCents =
-    !cashOnly && priceCents !== null ? calculatePlatformFee(priceCents) : null;
+    priceCents !== null ? calculatePlatformFee(priceCents) : null;
 
   // NOTE: would ideally be wrapped in db.transaction() for atomicity, but
   // the @neondatabase/serverless HTTP driver does not support multi-statement
@@ -593,6 +597,69 @@ export async function createBooking(formData: FormData) {
         .where(eq(lessonBookings.id, booking.id));
       // Don't rollback the booking — user will see it in "failed" state
       // and can retry from /member/bookings.
+    }
+  }
+
+  // Cash-only commission claim: for cash-only pros with a priced booking,
+  // add a one-off invoice item to the pro's existing Stripe customer so
+  // our commission rolls into their next subscription invoice automatically.
+  // Failure is logged to Sentry and swallowed — the booking still goes
+  // through and the commission can be reconciled manually from /admin.
+  if (cashOnly && priceCents !== null && platformFeeCents !== null && platformFeeCents > 0) {
+    try {
+      const [proUser] = await db
+        .select({
+          stripeCustomerId: users.stripeCustomerId,
+          displayName: proProfiles.displayName,
+        })
+        .from(proProfiles)
+        .innerJoin(users, eq(users.id, proProfiles.userId))
+        .where(eq(proProfiles.id, proProfileId))
+        .limit(1);
+
+      if (!proUser?.stripeCustomerId) {
+        throw new Error(
+          `Cash-only pro ${proProfileId} has no stripeCustomerId — cannot bill commission`
+        );
+      }
+
+      const stripe = getStripe();
+      const item = await stripe.invoiceItems.create(
+        {
+          customer: proUser.stripeCustomerId,
+          amount: platformFeeCents,
+          currency: "eur",
+          description: `Commission — booking #${booking.id} (${date} ${startTime})`,
+          metadata: {
+            bookingId: String(booking.id),
+            type: "cash_commission",
+          },
+        },
+        { idempotencyKey: `commission-${booking.id}-v1` }
+      );
+
+      await db
+        .update(lessonBookings)
+        .set({
+          stripeInvoiceItemId: item.id,
+          updatedAt: new Date(),
+        })
+        .where(eq(lessonBookings.id, booking.id));
+    } catch (err) {
+      console.error(
+        "Commission invoice item failed for cash-only booking",
+        booking.id,
+        err
+      );
+      Sentry.captureException(err, {
+        tags: { area: "cash-commission" },
+        extra: {
+          bookingId: booking.id,
+          proProfileId,
+          platformFeeCents,
+        },
+      });
+      // Swallow: booking still succeeds, commission needs manual reconciliation.
     }
   }
 

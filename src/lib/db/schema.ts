@@ -258,6 +258,13 @@ export const lessonBookings = pgTable("lesson_bookings", {
   paymentStatus: varchar("payment_status", { length: 20 }).notNull().default("pending"),
   stripePaymentIntentId: varchar("stripe_payment_intent_id", { length: 255 }),
   stripeCheckoutSessionId: varchar("stripe_checkout_session_id", { length: 255 }),
+  /**
+   * For cash-only pros (`allowBookingWithoutPayment=true`): the Stripe
+   * invoice item ID we created against the pro's subscription customer to
+   * claim our commission. Used at cancel-within-window time to reverse the
+   * claim via `stripe.invoiceItems.del()`. Null for online-pay bookings.
+   */
+  stripeInvoiceItemId: varchar("stripe_invoice_item_id", { length: 255 }),
   platformFeeCents: integer("platform_fee_cents"),
   paidAt: timestamp("paid_at"),
   refundedAt: timestamp("refunded_at"),
