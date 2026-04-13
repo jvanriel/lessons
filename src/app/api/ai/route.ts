@@ -3,10 +3,7 @@ import { getSession, hasRole } from "@/lib/auth";
 
 export async function POST(request: NextRequest) {
   const session = await getSession();
-  if (
-    !session ||
-    (!hasRole(session, "admin") && !hasRole(session, "dev"))
-  ) {
+  if (!session || !hasRole(session, "dev")) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 403 });
   }
 

@@ -2,13 +2,11 @@
 
 import { useState, useRef, useCallback, useEffect } from "react";
 import { useToolbox } from "./ToolboxProvider";
-import AIPanel from "./ai/AIPanel";
 import ContentPanel from "./cms/ContentPanel";
 import { useCms } from "@/components/cms/CmsProvider";
 
 const TABS = [
   { id: "content", label: "Content" },
-  { id: "ai", label: "AI" },
 ] as const;
 
 const MIN_WIDTH = 300;
@@ -171,7 +169,6 @@ export default function AdminToolbox() {
           {/* Tab content */}
           <div className="flex-1 overflow-hidden">
             {activeTab === "content" && <ContentPanel />}
-            {activeTab === "ai" && <AIPanel />}
           </div>
         </div>
       </div>
