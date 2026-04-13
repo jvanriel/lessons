@@ -4,6 +4,7 @@ import { db } from "@/lib/db";
 import { proProfiles, proLocations } from "@/lib/db/schema";
 import { eq } from "drizzle-orm";
 import OnboardingWizard from "./OnboardingWizard";
+import { getLocale } from "@/lib/locale";
 
 export const metadata = { title: "Get Started — Golf Lessons" };
 
@@ -40,6 +41,8 @@ export default async function OnboardingPage() {
   const hasLessons = !!profile.pricePerHour;
   const hasBank = !!profile.bankIban;
 
+  const locale = await getLocale();
+
   // Find the first incomplete step
   let initialStep = 0;
   if (hasProfile) initialStep = 1;
@@ -50,6 +53,7 @@ export default async function OnboardingPage() {
   return (
     <OnboardingWizard
       initialStep={initialStep}
+      locale={locale}
       initialData={{
         displayName: profile.displayName,
         bio: profile.bio ?? "",

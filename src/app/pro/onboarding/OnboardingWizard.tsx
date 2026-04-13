@@ -5,8 +5,18 @@ import { Button } from "@/components/ui/button";
 import { Elements, PaymentElement, useStripe, useElements } from "@stripe/react-stripe-js";
 import { getStripe } from "@/lib/stripe-client";
 import { useRouter } from "next/navigation";
+import type { Locale } from "@/lib/i18n";
+import { t } from "@/lib/i18n/translations";
+import { formatDate } from "@/lib/format-date";
 
-const STEPS = ["Profile", "Locations", "Lessons", "Bank Account", "Subscription"];
+const STEP_KEYS = [
+  "proOnb.step.profile",
+  "proOnb.step.locations",
+  "proOnb.step.lessons",
+  "proOnb.step.bank",
+  "proOnb.step.subscription",
+] as const;
+const STEP_COUNT = STEP_KEYS.length;
 
 const inputClass =
   "mt-1 w-full rounded-md border border-green-200 bg-white px-3 py-2 text-sm text-green-900 placeholder:text-green-400 focus:border-green-400 focus:outline-none focus:ring-1 focus:ring-green-400";
@@ -60,43 +70,47 @@ function ProgressBar({ current, total }: { current: number; total: number }) {
 function ProfileStep({
   data,
   onChange,
+  locale,
 }: {
   data: InitialData;
   onChange: (d: Partial<InitialData>) => void;
+  locale: Locale;
 }) {
   return (
     <div className="space-y-4">
       <div>
         <label className="block text-sm font-medium text-green-800">
-          Display name <span className="text-red-500">*</span>
+          {t("proOnb.profile.displayName", locale)} <span className="text-red-500">*</span>
         </label>
         <input
           type="text"
           value={data.displayName}
           onChange={(e) => onChange({ displayName: e.target.value })}
-          placeholder="How students will see your name"
+          placeholder={t("proOnb.profile.displayNamePlaceholder", locale)}
           className={inputClass}
           required
         />
       </div>
       <div>
         <label className="block text-sm font-medium text-green-800">
-          Specialties
+          {t("proOnb.profile.specialties", locale)}
         </label>
         <input
           type="text"
           value={data.specialties}
           onChange={(e) => onChange({ specialties: e.target.value })}
-          placeholder="e.g. Short game, Putting, Beginners, Junior coaching"
+          placeholder={t("proOnb.profile.specialtiesPlaceholder", locale)}
           className={inputClass}
         />
       </div>
       <div>
-        <label className="block text-sm font-medium text-green-800">Bio</label>
+        <label className="block text-sm font-medium text-green-800">
+          {t("proOnb.profile.bio", locale)}
+        </label>
         <textarea
           value={data.bio}
           onChange={(e) => onChange({ bio: e.target.value })}
-          placeholder="Tell students about your background and teaching approach..."
+          placeholder={t("proOnb.profile.bioPlaceholder", locale)}
           rows={4}
           className={inputClass}
         />
@@ -116,9 +130,11 @@ interface Location {
 function LocationsStep({
   locations,
   onChange,
+  locale,
 }: {
   locations: Location[];
   onChange: (locs: Location[]) => void;
+  locale: Locale;
 }) {
   function addLocation() {
     onChange([...locations, { name: "", address: "", city: "" }]);
@@ -138,7 +154,7 @@ function LocationsStep({
   return (
     <div className="space-y-4">
       <p className="text-sm text-green-600">
-        Where do you give lessons? Add at least one location.
+        {t("proOnb.loc.intro", locale)}
       </p>
       {locations.map((loc, i) => (
         <div
@@ -147,7 +163,7 @@ function LocationsStep({
         >
           <div className="flex items-center justify-between">
             <span className="text-sm font-medium text-green-700">
-              Location {i + 1}
+              {t("proOnb.loc.label", locale).replace("{n}", String(i + 1))}
             </span>
             {locations.length > 1 && (
               <button
@@ -155,44 +171,44 @@ function LocationsStep({
                 onClick={() => removeLocation(i)}
                 className="text-xs text-red-500 hover:text-red-700"
               >
-                Remove
+                {t("proOnb.loc.remove", locale)}
               </button>
             )}
           </div>
           <div>
             <label className="block text-xs font-medium text-green-700">
-              Name <span className="text-red-500">*</span>
+              {t("proOnb.loc.name", locale)} <span className="text-red-500">*</span>
             </label>
             <input
               type="text"
               value={loc.name}
               onChange={(e) => updateLocation(i, "name", e.target.value)}
-              placeholder="e.g. Royal Antwerp Golf Club"
+              placeholder={t("proOnb.loc.namePlaceholder", locale)}
               className={inputClass}
             />
           </div>
           <div className="grid grid-cols-2 gap-3">
             <div>
               <label className="block text-xs font-medium text-green-700">
-                Address
+                {t("proOnb.loc.address", locale)}
               </label>
               <input
                 type="text"
                 value={loc.address}
                 onChange={(e) => updateLocation(i, "address", e.target.value)}
-                placeholder="Street and number"
+                placeholder={t("proOnb.loc.addressPlaceholder", locale)}
                 className={inputClass}
               />
             </div>
             <div>
               <label className="block text-xs font-medium text-green-700">
-                City
+                {t("proOnb.loc.city", locale)}
               </label>
               <input
                 type="text"
                 value={loc.city}
                 onChange={(e) => updateLocation(i, "city", e.target.value)}
-                placeholder="e.g. Antwerp"
+                placeholder={t("proOnb.loc.cityPlaceholder", locale)}
                 className={inputClass}
               />
             </div>
@@ -204,7 +220,7 @@ function LocationsStep({
         onClick={addLocation}
         className="text-sm font-medium text-gold-600 hover:text-gold-500"
       >
-        + Add another location
+        {t("proOnb.loc.addAnother", locale)}
       </button>
     </div>
   );
@@ -215,9 +231,11 @@ function LocationsStep({
 function LessonsStep({
   data,
   onChange,
+  locale,
 }: {
   data: InitialData;
   onChange: (d: Partial<InitialData>) => void;
+  locale: Locale;
 }) {
   const durations = [30, 45, 60, 90, 120];
 
@@ -236,23 +254,23 @@ function LessonsStep({
     <div className="space-y-5">
       <div>
         <label className="block text-sm font-medium text-green-800">
-          Price per hour (EUR) <span className="text-red-500">*</span>
+          {t("proOnb.lessons.priceLabel", locale)} <span className="text-red-500">*</span>
         </label>
         <input
           type="number"
           value={data.pricePerHour}
           onChange={(e) => onChange({ pricePerHour: e.target.value })}
-          placeholder="e.g. 60"
+          placeholder={t("proOnb.lessons.pricePlaceholder", locale)}
           min="50"
           step="5"
           className={inputClass + " max-w-[200px]"}
         />
-        <p className="mt-1 text-xs text-green-500">Minimum €50/hour</p>
+        <p className="mt-1 text-xs text-green-500">{t("proOnb.lessons.priceMin", locale)}</p>
       </div>
 
       <div>
         <label className="block text-sm font-medium text-green-800">
-          Lesson durations
+          {t("proOnb.lessons.durations", locale)}
         </label>
         <div className="mt-2 flex flex-wrap gap-2">
           {durations.map((d) => (
@@ -274,7 +292,7 @@ function LessonsStep({
 
       <div>
         <label className="block text-sm font-medium text-green-800">
-          Max group size
+          {t("proOnb.lessons.maxGroup", locale)}
         </label>
         <input
           type="number"
@@ -290,7 +308,7 @@ function LessonsStep({
 
       <div>
         <label className="block text-sm font-medium text-green-800">
-          Cancellation notice (hours)
+          {t("proOnb.lessons.cancellation", locale)}
         </label>
         <input
           type="number"
@@ -303,7 +321,7 @@ function LessonsStep({
           className={inputClass + " max-w-[200px]"}
         />
         <p className="mt-1 text-xs text-green-500">
-          Students can cancel for free up to this many hours before the lesson
+          {t("proOnb.lessons.cancellationHint", locale)}
         </p>
       </div>
     </div>
@@ -315,49 +333,53 @@ function LessonsStep({
 function BankStep({
   data,
   onChange,
+  locale,
 }: {
   data: InitialData;
   onChange: (d: Partial<InitialData>) => void;
+  locale: Locale;
 }) {
   return (
     <div className="space-y-4">
       <p className="text-sm text-green-600">
-        Your lesson earnings will be paid out monthly to this bank account.
+        {t("proOnb.bank.intro", locale)}
       </p>
       <div>
         <label className="block text-sm font-medium text-green-800">
-          Account holder name <span className="text-red-500">*</span>
+          {t("proOnb.bank.holder", locale)} <span className="text-red-500">*</span>
         </label>
         <input
           type="text"
           value={data.bankAccountHolder}
           onChange={(e) => onChange({ bankAccountHolder: e.target.value })}
-          placeholder="e.g. Jan Van Riel"
+          placeholder={t("proOnb.bank.holderPlaceholder", locale)}
           className={inputClass}
         />
       </div>
       <div>
         <label className="block text-sm font-medium text-green-800">
-          IBAN <span className="text-red-500">*</span>
+          {t("proOnb.bank.iban", locale)} <span className="text-red-500">*</span>
         </label>
         <input
           type="text"
           value={data.bankIban}
           onChange={(e) => onChange({ bankIban: e.target.value })}
-          placeholder="e.g. BE68 5390 0754 7034"
+          placeholder={t("proOnb.bank.ibanPlaceholder", locale)}
           className={inputClass + " font-mono"}
         />
       </div>
       <div>
         <label className="block text-sm font-medium text-green-800">
-          BIC / SWIFT{" "}
-          <span className="font-normal text-green-500">(optional)</span>
+          {t("proOnb.bank.bicSwift", locale)}{" "}
+          <span className="font-normal text-green-500">
+            {t("proOnb.bank.optional", locale)}
+          </span>
         </label>
         <input
           type="text"
           value={data.bankBic}
           onChange={(e) => onChange({ bankBic: e.target.value })}
-          placeholder="e.g. GKCCBEBB"
+          placeholder={t("proOnb.bank.bicPlaceholder", locale)}
           className={inputClass + " font-mono"}
         />
       </div>
@@ -370,9 +392,11 @@ function BankStep({
 function SubscriptionPaymentForm({
   plan,
   onSuccess,
+  locale,
 }: {
   plan: "monthly" | "annual";
   onSuccess: () => void;
+  locale: Locale;
 }) {
   const stripe = useStripe();
   const elements = useElements();
@@ -395,14 +419,14 @@ function SubscriptionPaymentForm({
     });
 
     if (result.error) {
-      setError(result.error.message || "Payment setup failed");
+      setError(result.error.message || t("proOnb.sub.paymentSetupFailed", locale));
       setLoading(false);
       return;
     }
 
     const setupIntent = result.setupIntent;
     if (!setupIntent || setupIntent.status !== "succeeded") {
-      setError("Payment setup did not complete.");
+      setError(t("proOnb.sub.paymentIncomplete", locale));
       setLoading(false);
       return;
     }
@@ -413,7 +437,7 @@ function SubscriptionPaymentForm({
         : setupIntent.payment_method?.id;
 
     if (!pmId) {
-      setError("Could not retrieve payment method.");
+      setError(t("proOnb.sub.noPaymentMethod", locale));
       setLoading(false);
       return;
     }
@@ -429,11 +453,11 @@ function SubscriptionPaymentForm({
       if (res.ok) {
         onSuccess();
       } else {
-        setError(data.error || "Failed to create subscription");
+        setError(data.error || t("proOnb.sub.createFailed", locale));
         setLoading(false);
       }
     } catch {
-      setError("Something went wrong. Please try again.");
+      setError(t("proOnb.sub.tryAgain", locale));
       setLoading(false);
     }
   }
@@ -453,16 +477,18 @@ function SubscriptionPaymentForm({
         disabled={!stripe || loading}
         className="mt-6 w-full bg-gold-600 text-white hover:bg-gold-500 py-3 text-base font-medium"
       >
-        {loading ? "Setting up..." : "Start 14-day free trial"}
+        {loading
+          ? t("proOnb.sub.settingUp", locale)
+          : t("proOnb.sub.startTrial", locale)}
       </Button>
       <p className="mt-3 text-center text-xs text-green-500">
-        No charge during the 14-day trial period.
+        {t("proOnb.sub.noCharge", locale)}
       </p>
     </form>
   );
 }
 
-function SubscriptionStep({ onSuccess }: { onSuccess: () => void }) {
+function SubscriptionStep({ onSuccess, locale }: { onSuccess: () => void; locale: Locale }) {
   const [plan, setPlan] = useState<"monthly" | "annual">("annual");
   const [clientSecret, setClientSecret] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
@@ -481,29 +507,31 @@ function SubscriptionStep({ onSuccess }: { onSuccess: () => void }) {
       if (data.clientSecret) {
         setClientSecret(data.clientSecret);
       } else {
-        setError(data.error || "Failed to initialize payment");
+        setError(data.error || t("proOnb.sub.initFailed", locale));
       }
     } catch {
-      setError("Something went wrong.");
+      setError(t("proOnb.sub.generic", locale));
     } finally {
       setLoading(false);
     }
-  }, [plan]);
+  }, [plan, locale]);
 
   if (clientSecret) {
+    const firstChargeDate = formatDate(new Date(Date.now() + 14 * 86400000), locale, {
+      day: "numeric",
+      month: "long",
+      year: "numeric",
+    });
     return (
       <div className="space-y-4">
         <div className="text-center">
           <p className="text-sm text-green-600">
-            {plan === "annual" ? "Annual — €125/year" : "Monthly — €12.50/month"}
+            {plan === "annual"
+              ? t("proOnb.sub.planAnnual", locale)
+              : t("proOnb.sub.planMonthly", locale)}
           </p>
           <p className="mt-1 text-xs text-green-500">
-            14-day free trial, first charge on{" "}
-            {new Date(Date.now() + 14 * 86400000).toLocaleDateString("en-GB", {
-              day: "numeric",
-              month: "long",
-              year: "numeric",
-            })}
+            {t("proOnb.sub.firstChargeOn", locale).replace("{date}", firstChargeDate)}
           </p>
         </div>
         <Elements
@@ -522,7 +550,7 @@ function SubscriptionStep({ onSuccess }: { onSuccess: () => void }) {
             },
           }}
         >
-          <SubscriptionPaymentForm plan={plan} onSuccess={onSuccess} />
+          <SubscriptionPaymentForm plan={plan} onSuccess={onSuccess} locale={locale} />
         </Elements>
       </div>
     );
@@ -531,7 +559,7 @@ function SubscriptionStep({ onSuccess }: { onSuccess: () => void }) {
   return (
     <div className="space-y-6">
       <p className="text-sm text-green-600">
-        Choose your plan. 14-day free trial on both options.
+        {t("proOnb.sub.choose", locale)}
       </p>
 
       {error && (
@@ -552,7 +580,7 @@ function SubscriptionStep({ onSuccess }: { onSuccess: () => void }) {
           <div className="font-display text-2xl font-bold text-green-900">
             €12.50
           </div>
-          <div className="text-sm text-green-600">per month</div>
+          <div className="text-sm text-green-600">{t("proOnb.sub.perMonth", locale)}</div>
         </button>
         <button
           onClick={() => setPlan("annual")}
@@ -567,10 +595,10 @@ function SubscriptionStep({ onSuccess }: { onSuccess: () => void }) {
               €125
             </div>
             <span className="rounded-full bg-gold-100 px-2 py-0.5 text-xs font-semibold text-gold-700">
-              Save 17%
+              {t("proOnb.sub.save17", locale)}
             </span>
           </div>
-          <div className="text-sm text-green-600">per year</div>
+          <div className="text-sm text-green-600">{t("proOnb.sub.perYear", locale)}</div>
         </button>
       </div>
 
@@ -579,7 +607,9 @@ function SubscriptionStep({ onSuccess }: { onSuccess: () => void }) {
         disabled={loading}
         className="w-full bg-gold-600 text-white hover:bg-gold-500 py-3 text-base font-medium"
       >
-        {loading ? "Loading..." : "Continue to payment"}
+        {loading
+          ? t("proOnb.sub.loading", locale)
+          : t("proOnb.sub.continueToPayment", locale)}
       </Button>
     </div>
   );
@@ -590,9 +620,11 @@ function SubscriptionStep({ onSuccess }: { onSuccess: () => void }) {
 export default function OnboardingWizard({
   initialStep,
   initialData,
+  locale,
 }: {
   initialStep: number;
   initialData: InitialData;
+  locale: Locale;
 }) {
   const router = useRouter();
   const [step, setStep] = useState(initialStep);
@@ -621,7 +653,7 @@ export default function OnboardingWizard({
     setSaving(false);
 
     if (!res.ok) {
-      setError(result.error || "Failed to save");
+      setError(result.error || t("proOnb.genericSaveError", locale));
       return false;
     }
     return true;
@@ -664,7 +696,7 @@ export default function OnboardingWizard({
   }
 
   // Done step
-  if (step >= STEPS.length) {
+  if (step >= STEP_COUNT) {
     return (
       <div className="flex min-h-screen items-center justify-center bg-[#faf7f0] px-6">
         <div className="max-w-md text-center">
@@ -672,22 +704,23 @@ export default function OnboardingWizard({
             <span className="text-4xl text-green-700">✓</span>
           </div>
           <h1 className="font-display text-4xl font-semibold text-green-900">
-            You&apos;re all set!
+            {t("proOnb.done.title", locale)}
           </h1>
           <p className="mt-3 text-lg text-green-700">
-            Your pro profile is ready. Start configuring your availability and
-            accepting bookings.
+            {t("proOnb.done.body", locale)}
           </p>
           <Button
             onClick={() => router.push("/pro/dashboard")}
             className="mt-8 bg-gold-600 text-white hover:bg-gold-500 px-8 py-3 text-base font-medium"
           >
-            Go to Dashboard
+            {t("proOnb.done.cta", locale)}
           </Button>
         </div>
       </div>
     );
   }
+
+  const currentStepName = t(STEP_KEYS[step], locale);
 
   return (
     <div className="min-h-screen bg-[#faf7f0]">
@@ -695,22 +728,25 @@ export default function OnboardingWizard({
         {/* Header */}
         <div className="text-center">
           <h1 className="font-display text-3xl font-semibold text-green-900">
-            Set up your pro profile
+            {t("proOnb.wizardTitle", locale)}
           </h1>
           <p className="mt-2 text-green-600">
-            Step {step + 1} of {STEPS.length} — {STEPS[step]}
+            {t("proOnb.stepLabel", locale)
+              .replace("{current}", String(step + 1))
+              .replace("{total}", String(STEP_COUNT))
+              .replace("{name}", currentStepName)}
           </p>
         </div>
 
         {/* Progress */}
         <div className="mt-6 flex justify-center">
-          <ProgressBar current={step} total={STEPS.length} />
+          <ProgressBar current={step} total={STEP_COUNT} />
         </div>
 
         {/* Step content */}
         <div className="mt-8 rounded-xl border border-green-200 bg-white p-6 shadow-sm sm:p-8">
           <h2 className="mb-6 text-lg font-semibold text-green-900">
-            {STEPS[step]}
+            {currentStepName}
           </h2>
 
           {error && (
@@ -719,14 +755,14 @@ export default function OnboardingWizard({
             </div>
           )}
 
-          {step === 0 && <ProfileStep data={data} onChange={updateData} />}
+          {step === 0 && <ProfileStep data={data} onChange={updateData} locale={locale} />}
           {step === 1 && (
-            <LocationsStep locations={locations} onChange={setLocations} />
+            <LocationsStep locations={locations} onChange={setLocations} locale={locale} />
           )}
-          {step === 2 && <LessonsStep data={data} onChange={updateData} />}
-          {step === 3 && <BankStep data={data} onChange={updateData} />}
+          {step === 2 && <LessonsStep data={data} onChange={updateData} locale={locale} />}
+          {step === 3 && <BankStep data={data} onChange={updateData} locale={locale} />}
           {step === 4 && (
-            <SubscriptionStep onSuccess={() => setStep(STEPS.length)} />
+            <SubscriptionStep onSuccess={() => setStep(STEP_COUNT)} locale={locale} />
           )}
 
           {/* Navigation (not shown for subscription step — it has its own buttons) */}
@@ -739,14 +775,14 @@ export default function OnboardingWizard({
                 disabled={step === 0 || saving}
                 className="border-green-200 text-green-700 hover:bg-green-50"
               >
-                Back
+                {t("proOnb.back", locale)}
               </Button>
               <Button
                 onClick={handleNext}
                 disabled={saving}
                 className="bg-gold-600 text-white hover:bg-gold-500"
               >
-                {saving ? "Saving..." : "Continue"}
+                {saving ? t("proOnb.saving", locale) : t("proOnb.continue", locale)}
               </Button>
             </div>
           )}
