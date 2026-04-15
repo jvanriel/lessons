@@ -846,6 +846,7 @@ const BOOKING_PRO_STRINGS: Record<Locale, {
   participants: string;
   notes: string;
   cta: string;
+  unverifiedBadge: string;
 }> = {
   en: {
     subject: (s) => `New lesson booking from ${s}`,
@@ -863,6 +864,8 @@ const BOOKING_PRO_STRINGS: Record<Locale, {
     participants: "Participants",
     notes: "Notes",
     cta: "Open in dashboard",
+    unverifiedBadge:
+      "Heads up: the student hasn't verified their email yet. They'll be prompted to do so when they click the link in their confirmation email.",
   },
   nl: {
     subject: (s) => `Nieuwe lesboeking van ${s}`,
@@ -880,6 +883,8 @@ const BOOKING_PRO_STRINGS: Record<Locale, {
     participants: "Deelnemers",
     notes: "Notities",
     cta: "Openen in dashboard",
+    unverifiedBadge:
+      "Let op: de leerling heeft zijn e-mailadres nog niet bevestigd. Dat gebeurt zodra hij op de link in zijn bevestigingsmail klikt.",
   },
   fr: {
     subject: (s) => `Nouvelle réservation de ${s}`,
@@ -897,6 +902,8 @@ const BOOKING_PRO_STRINGS: Record<Locale, {
     participants: "Participants",
     notes: "Remarques",
     cta: "Ouvrir dans le tableau de bord",
+    unverifiedBadge:
+      "Attention : l'élève n'a pas encore vérifié son adresse e-mail. Il le fera en cliquant sur le lien dans son e-mail de confirmation.",
   },
 };
 
@@ -914,6 +921,7 @@ export function buildProBookingNotificationEmail(opts: {
   participantCount: number;
   notes: string | null;
   locale: Locale;
+  emailUnverified?: boolean;
 }): string {
   const s = BOOKING_PRO_STRINGS[opts.locale] ?? BOOKING_PRO_STRINGS.en;
   const studentFullName = `${opts.studentFirstName} ${opts.studentLastName}`;
@@ -933,11 +941,16 @@ export function buildProBookingNotificationEmail(opts: {
   }
   if (opts.notes) rows.push([s.notes, opts.notes]);
 
+  const unverifiedNotice = opts.emailUnverified
+    ? `<div style="background:#fef3c7;border:1px solid #fbbf24;border-radius:6px;padding:12px 16px;margin:0 0 16px 0;font-size:13px;color:#92400e;">${s.unverifiedBadge}</div>`
+    : "";
+
   const body = `
     <h2 style="font-family:Georgia,'Times New Roman',serif;font-size:22px;color:${COLORS.green950};margin:0 0 16px 0;font-weight:normal;">
       ${s.greeting} ${opts.proFirstName},
     </h2>
     <p style="margin:0 0 20px 0;">${s.body(studentFullName)}</p>
+    ${unverifiedNotice}
     ${detailsTable(rows)}
     <p style="margin:0 0 24px 0;">
       <a href="${getBaseUrl()}/pro/bookings" style="display:inline-block;background:${COLORS.gold600};color:${COLORS.white};padding:12px 28px;border-radius:6px;text-decoration:none;font-weight:500;font-size:14px;">
@@ -1060,4 +1073,211 @@ export function getLessonReminderSubject(
   return recipient === "student"
     ? s.studentSubject(otherPartyName)
     : s.proSubject(otherPartyName);
+}
+
+// ─── Claim-and-verify booking email (new public flow) ──
+
+const CLAIM_BOOKING_STRINGS: Record<
+  Locale,
+  {
+    subject: (proName: string) => string;
+    greeting: string;
+    claimIntro: (proName: string) => string;
+    claimButton: string;
+    claimExpiry: string;
+    detailsHeading: string;
+    date: string;
+    time: string;
+    duration: string;
+    durationUnit: string;
+    location: string;
+    alreadyIntro: (proName: string) => string;
+    loginButton: string;
+    registerHeading: string;
+    registerIntro: string;
+    perkAutoPay: string;
+    perkChat: string;
+    perkQuickBook: string;
+    perkManage: string;
+    registerButton: string;
+  }
+> = {
+  en: {
+    subject: (pro) => `Your lesson with ${pro} is booked`,
+    greeting: "Hi",
+    claimIntro: (pro) =>
+      `Your lesson with ${pro} is on the books. Tap the button below to confirm your email address and view your booking.`,
+    claimButton: "Confirm Email",
+    claimExpiry: "This link expires in 7 days.",
+    detailsHeading: "Lesson details",
+    date: "Date",
+    time: "Time",
+    duration: "Duration",
+    durationUnit: "minutes",
+    location: "Location",
+    alreadyIntro: (pro) =>
+      `We just added a new lesson with ${pro} to your account.`,
+    loginButton: "View booking",
+    registerHeading: "Optional: finish setting up your account",
+    registerIntro:
+      "You don't have to, but completing your registration (about one minute) unlocks a few extras:",
+    perkAutoPay: "Save a card for one-tap payments on future bookings",
+    perkChat: "Chat directly with your pro between lessons",
+    perkQuickBook: "Quick-rebook — your preferences are remembered",
+    perkManage: "View, reschedule, and cancel lessons from your dashboard",
+    registerButton: "Set up my account",
+  },
+  nl: {
+    subject: (pro) => `Je les bij ${pro} is geboekt`,
+    greeting: "Hallo",
+    claimIntro: (pro) =>
+      `Je les bij ${pro} staat ingepland. Klik op de knop hieronder om je e-mailadres te bevestigen en je boeking te bekijken.`,
+    claimButton: "E-mail bevestigen",
+    claimExpiry: "Deze link is 7 dagen geldig.",
+    detailsHeading: "Les details",
+    date: "Datum",
+    time: "Tijd",
+    duration: "Duur",
+    durationUnit: "minuten",
+    location: "Locatie",
+    alreadyIntro: (pro) =>
+      `We hebben zojuist een nieuwe les bij ${pro} aan je account toegevoegd.`,
+    loginButton: "Boeking bekijken",
+    registerHeading: "Optioneel: maak je account verder af",
+    registerIntro:
+      "Hoeft niet, maar je registratie afronden (ongeveer een minuut) geeft je een paar extra's:",
+    perkAutoPay:
+      "Sla een kaart op voor een-tap-betalingen bij volgende boekingen",
+    perkChat: "Chat rechtstreeks met je pro tussen lessen door",
+    perkQuickBook: "Snel herboeken — je voorkeuren worden onthouden",
+    perkManage:
+      "Bekijk, verplaats en annuleer lessen vanuit je dashboard",
+    registerButton: "Mijn account instellen",
+  },
+  fr: {
+    subject: (pro) => `Votre cours avec ${pro} est réservé`,
+    greeting: "Bonjour",
+    claimIntro: (pro) =>
+      `Votre cours avec ${pro} est confirmé. Cliquez sur le bouton ci-dessous pour confirmer votre adresse e-mail et consulter votre réservation.`,
+    claimButton: "Confirmer l'e-mail",
+    claimExpiry: "Ce lien expire dans 7 jours.",
+    detailsHeading: "Détails du cours",
+    date: "Date",
+    time: "Heure",
+    duration: "Durée",
+    durationUnit: "minutes",
+    location: "Lieu",
+    alreadyIntro: (pro) =>
+      `Nous venons d'ajouter un nouveau cours avec ${pro} à votre compte.`,
+    loginButton: "Voir la réservation",
+    registerHeading: "Optionnel : finalisez votre compte",
+    registerIntro:
+      "Ce n'est pas obligatoire, mais finaliser votre inscription (environ une minute) débloque quelques avantages :",
+    perkAutoPay:
+      "Enregistrez une carte pour des paiements en un clic",
+    perkChat: "Discutez directement avec votre pro entre les cours",
+    perkQuickBook:
+      "Réservation rapide — vos préférences sont mémorisées",
+    perkManage:
+      "Consultez, reportez et annulez vos cours depuis votre tableau de bord",
+    registerButton: "Configurer mon compte",
+  },
+};
+
+export function getClaimBookingSubject(proName: string, locale: Locale): string {
+  const s = CLAIM_BOOKING_STRINGS[locale] ?? CLAIM_BOOKING_STRINGS.en;
+  return s.subject(proName);
+}
+
+export function buildClaimAndVerifyBookingEmail(opts: {
+  firstName: string;
+  proName: string;
+  locationName: string;
+  date: string;
+  startTime: string;
+  endTime: string;
+  duration: number;
+  claimUrl: string;
+  registerUrl: string;
+  locale: Locale;
+}): string {
+  const s = CLAIM_BOOKING_STRINGS[opts.locale] ?? CLAIM_BOOKING_STRINGS.en;
+  const rows: Array<[string, string]> = [
+    [s.date, formatLessonDate(opts.date, opts.locale)],
+    [s.time, `${opts.startTime} – ${opts.endTime}`],
+    [s.duration, `${opts.duration} ${s.durationUnit}`],
+    [s.location, opts.locationName],
+  ];
+
+  const body = `
+    <h2 style="font-family:Georgia,'Times New Roman',serif;font-size:22px;color:${COLORS.green950};margin:0 0 16px 0;font-weight:normal;">
+      ${s.greeting} ${opts.firstName},
+    </h2>
+    <p style="margin:0 0 20px 0;">${s.claimIntro(opts.proName)}</p>
+    ${detailsTable(rows)}
+    <p style="margin:0 0 12px 0;">
+      <a href="${opts.claimUrl}" style="display:inline-block;background:${COLORS.gold600};color:${COLORS.white};padding:12px 28px;border-radius:6px;text-decoration:none;font-weight:500;font-size:14px;">
+        ${s.claimButton}
+      </a>
+    </p>
+    <p style="color:#666;font-size:12px;margin:0 0 28px 0;">${s.claimExpiry}</p>
+    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#fdf8ec;border:1px solid #e8d9a8;border-radius:8px;">
+      <tr>
+        <td style="padding:18px 22px;">
+          <p style="margin:0 0 8px 0;font-family:Georgia,'Times New Roman',serif;font-size:16px;color:${COLORS.green950};font-weight:normal;">
+            ${s.registerHeading}
+          </p>
+          <p style="margin:0 0 12px 0;font-size:13px;color:${COLORS.green800};">
+            ${s.registerIntro}
+          </p>
+          <ul style="margin:0 0 16px 0;padding:0 0 0 18px;font-size:13px;color:${COLORS.green800};line-height:1.7;">
+            <li>${s.perkAutoPay}</li>
+            <li>${s.perkChat}</li>
+            <li>${s.perkQuickBook}</li>
+            <li>${s.perkManage}</li>
+          </ul>
+          <p style="margin:0;">
+            <a href="${opts.registerUrl}" style="display:inline-block;background:#ffffff;border:1px solid #c4a035;color:${COLORS.green950};padding:10px 22px;border-radius:6px;text-decoration:none;font-weight:500;font-size:13px;">
+              ${s.registerButton}
+            </a>
+          </p>
+        </td>
+      </tr>
+    </table>
+  `;
+  return emailLayout(body, undefined, opts.locale);
+}
+
+export function buildNewBookingOnAccountEmail(opts: {
+  firstName: string;
+  proName: string;
+  locationName: string;
+  date: string;
+  startTime: string;
+  endTime: string;
+  duration: number;
+  loginUrl: string;
+  locale: Locale;
+}): string {
+  const s = CLAIM_BOOKING_STRINGS[opts.locale] ?? CLAIM_BOOKING_STRINGS.en;
+  const rows: Array<[string, string]> = [
+    [s.date, formatLessonDate(opts.date, opts.locale)],
+    [s.time, `${opts.startTime} – ${opts.endTime}`],
+    [s.duration, `${opts.duration} ${s.durationUnit}`],
+    [s.location, opts.locationName],
+  ];
+
+  const body = `
+    <h2 style="font-family:Georgia,'Times New Roman',serif;font-size:22px;color:${COLORS.green950};margin:0 0 16px 0;font-weight:normal;">
+      ${s.greeting} ${opts.firstName},
+    </h2>
+    <p style="margin:0 0 20px 0;">${s.alreadyIntro(opts.proName)}</p>
+    ${detailsTable(rows)}
+    <p style="margin:0 0 12px 0;">
+      <a href="${opts.loginUrl}" style="display:inline-block;background:${COLORS.gold600};color:${COLORS.white};padding:12px 28px;border-radius:6px;text-decoration:none;font-weight:500;font-size:14px;">
+        ${s.loginButton}
+      </a>
+    </p>
+  `;
+  return emailLayout(body, undefined, opts.locale);
 }

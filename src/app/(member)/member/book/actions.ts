@@ -36,6 +36,7 @@ import {
 import { resolveLocale, type Locale } from "@/lib/i18n";
 import { t } from "@/lib/i18n/translations";
 import { getLocale } from "@/lib/locale";
+import { updateBookingPreferences } from "@/lib/booking-preferences";
 
 /**
  * Read the UI locale from the cookie (set by the language switcher), not
@@ -785,81 +786,12 @@ export async function createBooking(formData: FormData) {
   return { success: true, bookingId: booking.id };
 }
 
-// ─── Booking Preferences ─────────────────────────────
+// ─── Quick Book ────────────────────────────────────
 
 /** Convert JS Date.getDay() (0=Sun) to ISO weekday (0=Mon..6=Sun) */
 function jsDayToIso(jsDay: number): number {
   return jsDay === 0 ? 6 : jsDay - 1;
 }
-
-/**
- * Auto-save/update booking preferences on the proStudents row.
- * Detects interval from the last 3 bookings with this pro.
- */
-async function updateBookingPreferences(
-  userId: number,
-  proProfileId: number,
-  proLocationId: number,
-  duration: number,
-  date: string,
-  startTime: string
-) {
-  const dayOfWeek = jsDayToIso(new Date(date + "T00:00:00").getDay());
-
-  // Detect interval from recent bookings
-  const recentBookings = await db
-    .select({ date: lessonBookings.date })
-    .from(lessonBookings)
-    .where(
-      and(
-        eq(lessonBookings.bookedById, userId),
-        eq(lessonBookings.proProfileId, proProfileId),
-        eq(lessonBookings.status, "confirmed")
-      )
-    )
-    .orderBy(desc(lessonBookings.date))
-    .limit(4); // current + 3 previous
-
-  let interval: string | null = null;
-
-  if (recentBookings.length >= 2) {
-    const gaps: number[] = [];
-    for (let i = 0; i < recentBookings.length - 1 && i < 3; i++) {
-      const d1 = new Date(recentBookings[i].date + "T00:00:00");
-      const d2 = new Date(recentBookings[i + 1].date + "T00:00:00");
-      const diffDays = Math.round(
-        (d1.getTime() - d2.getTime()) / (1000 * 60 * 60 * 24)
-      );
-      gaps.push(diffDays);
-    }
-
-    const avgGap =
-      gaps.reduce((sum, g) => sum + g, 0) / gaps.length;
-
-    if (avgGap >= 6 && avgGap <= 8) interval = "weekly";
-    else if (avgGap >= 13 && avgGap <= 15) interval = "biweekly";
-    else if (avgGap >= 27 && avgGap <= 32) interval = "monthly";
-  }
-
-  // Upsert preferences on the proStudents row
-  await db
-    .update(proStudents)
-    .set({
-      preferredLocationId: proLocationId,
-      preferredDuration: duration,
-      preferredDayOfWeek: dayOfWeek,
-      preferredTime: startTime,
-      ...(interval !== null ? { preferredInterval: interval } : {}),
-    })
-    .where(
-      and(
-        eq(proStudents.userId, userId),
-        eq(proStudents.proProfileId, proProfileId)
-      )
-    );
-}
-
-// ─── Quick Book ────────────────────────────────────
 
 export interface QuickBookData {
   hasPreferences: true;

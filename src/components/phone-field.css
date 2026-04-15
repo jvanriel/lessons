@@ -1,0 +1,55 @@
+/* Override react-phone-number-input styles to match the cream/green theme. */
+
+.phone-field {
+  --PhoneInputCountryFlag-borderColor: #a8c8b1;
+  --PhoneInputCountryFlag-borderColor--focus: #8fb89c;
+  --PhoneInputCountrySelectArrow-color: #3d6b4f;
+  --PhoneInputCountrySelectArrow-opacity: 1;
+  --PhoneInput-color--focus: #c4a035;
+
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  border-radius: 0.375rem;
+  border: 1px solid #b4d6c1;
+  background-color: #ffffff;
+  padding: 0.5rem 0.75rem;
+  transition: border-color 150ms;
+}
+
+.phone-field:focus-within {
+  border-color: #8fb89c;
+  box-shadow: 0 0 0 1px #8fb89c;
+}
+
+.phone-field .PhoneInputInput {
+  flex: 1;
+  min-width: 0;
+  border: none;
+  outline: none;
+  background: transparent;
+  color: #0f2b1d;
+  font-size: 0.875rem;
+  line-height: 1.25rem;
+}
+
+.phone-field .PhoneInputInput::placeholder {
+  color: #89a892;
+}
+
+.phone-field .PhoneInputCountry {
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+  margin-right: 0.25rem;
+}
+
+.phone-field .PhoneInputCountryIcon {
+  width: 1.25rem;
+  height: 0.875rem;
+}
+
+.phone-field .PhoneInputCountrySelect {
+  font-size: 0.75rem;
+  color: #3d6b4f;
+}

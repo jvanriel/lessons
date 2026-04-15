@@ -49,8 +49,12 @@ export default async function RootLayout({
   children: React.ReactNode;
 }>) {
   const session = await getSession();
-  // Determine if this is an app-mode session (logged in user)
-  const isAppMode = !!session;
+  // App-mode chrome (sidebar / top-bar / bottom-nav) should only show for
+  // users who are actually set up: pros/admins/devs unconditionally, and
+  // members only once they've completed onboarding. A half-onboarded
+  // student who just booked via the public flow is signed in but should
+  // still see the public website chrome — anything else is disorienting.
+  let isAppMode = false;
 
   // Gather app-mode props when logged in
   let appProps:
@@ -66,6 +70,27 @@ export default async function RootLayout({
         impersonableUsers: { id: number; name: string; email: string; roles: string }[];
       }
     | null = null;
+
+  if (session) {
+    // Must fetch before deciding isAppMode — we need to know whether a
+    // member has completed onboarding.
+    const [user] = await db
+      .select({
+        firstName: users.firstName,
+        onboardingCompletedAt: users.onboardingCompletedAt,
+      })
+      .from(users)
+      .where(eq(users.id, session.userId))
+      .limit(1);
+
+    const isPrivileged =
+      session.roles.includes("pro") ||
+      session.roles.includes("admin") ||
+      session.roles.includes("dev");
+    const memberOnboarded =
+      session.roles.includes("member") && !!user?.onboardingCompletedAt;
+    isAppMode = isPrivileged || memberOnboarded;
+  }
 
   if (isAppMode && session) {
     const locale = await getLocale();

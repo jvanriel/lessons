@@ -36,7 +36,7 @@ export async function register(
   }
 
   const [existing] = await db
-    .select({ id: users.id, roles: users.roles })
+    .select({ id: users.id, roles: users.roles, password: users.password })
     .from(users)
     .where(and(eq(users.email, email), isNull(users.deletedAt)))
     .limit(1);
@@ -48,7 +48,15 @@ export async function register(
 
   let userId: number;
 
-  if (existing && (!existing.roles || existing.roles.trim() === "")) {
+  // A row with no password is a stub from the public booking flow —
+  // claim it instead of bailing with "already exists".
+  const claimable =
+    existing &&
+    (!existing.password ||
+      !existing.roles ||
+      existing.roles.trim() === "");
+
+  if (claimable) {
     await db
       .update(users)
       .set({

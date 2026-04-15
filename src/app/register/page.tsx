@@ -16,12 +16,24 @@ import StudentOnboardingWizard from "./StudentOnboardingWizard";
 export const metadata = { title: "Register — Golf Lessons" };
 
 interface Props {
-  searchParams: Promise<{ pro?: string }>;
+  searchParams: Promise<{
+    pro?: string;
+    firstName?: string;
+    lastName?: string;
+    email?: string;
+    phone?: string;
+  }>;
 }
 
 export default async function RegisterPage({ searchParams }: Props) {
   const locale = await getLocale();
-  const { pro } = await searchParams;
+  const {
+    pro,
+    firstName: qFirstName,
+    lastName: qLastName,
+    email: qEmail,
+    phone: qPhone,
+  } = await searchParams;
   const preSelectedProId = pro ? parseInt(pro) : null;
   const session = await getSession();
 
@@ -71,6 +83,12 @@ export default async function RegisterPage({ searchParams }: Props) {
     preferredInterval: string | null;
   }> = [];
 
+  // A signed-in member row that has no password is a stub created by
+  // the public booking flow. The wizard should treat them as "needs to
+  // set a password" and put them on step 1 with password inputs,
+  // otherwise they'd skip the account step entirely and never set one.
+  let needsPasswordSetup = false;
+
   if (session && hasRole(session, "member")) {
     const [user] = await db
       .select()
@@ -90,6 +108,7 @@ export default async function RegisterPage({ searchParams }: Props) {
         golfGoalsOther: user.golfGoalsOther || "",
       };
       emailVerified = !!user.emailVerifiedAt;
+      needsPasswordSetup = !user.password;
 
       // Load published pros
       const rawPros = await db
@@ -146,9 +165,30 @@ export default async function RegisterPage({ searchParams }: Props) {
     }
   }
 
+  // Unauthenticated arrivals from the public-flow success screen or from
+  // a claim-booking page: pre-fill firstName/lastName/email from the
+  // query string so the student doesn't have to re-type them. They still
+  // have to pick a password before continuing.
+  if (!userData && (qFirstName || qLastName || qEmail || qPhone)) {
+    userData = {
+      firstName: (qFirstName ?? "").trim(),
+      lastName: (qLastName ?? "").trim(),
+      email: (qEmail ?? "").trim().toLowerCase(),
+      phone: (qPhone ?? "").trim(),
+      preferredLocale: locale,
+      handicap: "",
+      golfGoals: [],
+      golfGoalsOther: "",
+    };
+  }
+
   // Determine initial step (0=language, 1=account, 2=golf, 3=pros, 4=scheduling, 5=payment)
   let initialStep = 0; // language selection
-  if (userData) {
+  // Unauthenticated pre-fill from the booking flow OR a signed-in stub
+  // user that still needs a password: land directly on the account
+  // step (1) with details pre-filled.
+  if (userData && (!session || needsPasswordSetup)) initialStep = 1;
+  if (userData && session && !needsPasswordSetup) {
     // Already registered — start from step 2 (golf profile) at minimum
     initialStep = 2;
     const hasGolfProfile =
@@ -162,10 +202,23 @@ export default async function RegisterPage({ searchParams }: Props) {
     if (hasGolfProfile && hasPros && hasScheduling) initialStep = 5;
   }
 
+  // The "Already have an account?" footer only makes sense for users
+  // who actively chose to register — not for students who were routed
+  // here from the public booking flow (they already submitted contact
+  // info and just need to attach a password).
+  const cameFromBookingFlow =
+    !!(qFirstName || qLastName || qEmail || qPhone) || needsPasswordSetup;
+
   return (
     <StudentOnboardingWizard
       locale={locale}
-      isAuthenticated={!!userData}
+      // Only reflect a real session AND a password on file. Query-
+      // param pre-fill does NOT mean the user is signed in. A signed-
+      // in stub user (no password) must also be treated as unauthed
+      // here so the wizard renders password inputs in step 1 and
+      // posts to /api/register (which runs the claim path to attach
+      // a password to the existing row).
+      isAuthenticated={!!session && !needsPasswordSetup}
       emailVerified={emailVerified}
       initialStep={initialStep}
       initialData={userData}
@@ -175,6 +228,7 @@ export default async function RegisterPage({ searchParams }: Props) {
       preSelectedProId={
         preSelectedProId && !isNaN(preSelectedProId) ? preSelectedProId : null
       }
+      showAuthFooter={!cameFromBookingFlow}
     />
   );
 }

@@ -139,7 +139,7 @@ export default async function ProProfilePage({ params }: Props) {
             <div className="mt-4 flex flex-wrap gap-3">
               {pro.bookingEnabled && (
                 <Link
-                  href={`/member/book/${slug}`}
+                  href={`/book/${slug}`}
                   className="inline-block rounded-md bg-gold-600 px-5 py-2.5 text-sm font-medium text-white transition-colors hover:bg-gold-500"
                 >
                   {t("proBrowse.bookALesson", locale)}

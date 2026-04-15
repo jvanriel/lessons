@@ -14,6 +14,9 @@ import Link from "next/link";
 import type { Locale } from "@/lib/i18n";
 import { LOCALE_LABELS } from "@/lib/i18n";
 import { t } from "@/lib/i18n/translations";
+import PhoneField, { isValidPhoneNumber } from "@/components/PhoneField";
+
+const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 const STEP_KEYS = [
   "onboarding.language",
@@ -193,6 +196,7 @@ function AccountStep({
   onConfirmChange,
   onGenerate,
   locale,
+  showAuthFooter,
 }: {
   data: ProfileData;
   onChange: (d: Partial<ProfileData>) => void;
@@ -205,6 +209,10 @@ function AccountStep({
   onConfirmChange: (v: string) => void;
   onGenerate: () => void;
   locale: Locale;
+  /** Show the "Already have an account? Login · I'm a golf pro" links.
+   * Only true when the user landed on /register from the header
+   * Register CTA; false for the public-booking-flow claim path. */
+  showAuthFooter: boolean;
 }) {
   const [showPw, setShowPw] = useState(false);
   const [copied, setCopied] = useState(false);
@@ -280,15 +288,18 @@ function AccountStep({
       </div>
       <div>
         <label className="block text-sm font-medium text-green-800">
-          {t("onboarding.phone", locale)}
+          {t("onboarding.phone", locale)}{" "}
+          <span className="text-red-500">*</span>
         </label>
-        <input
-          type="tel"
-          value={data.phone}
-          onChange={(e) => onChange({ phone: e.target.value })}
-          placeholder="+32 4XX XX XX XX"
-          className={inputClass}
-        />
+        <div className="mt-1">
+          <PhoneField
+            value={data.phone}
+            onChange={(v) => onChange({ phone: v })}
+            placeholder="+32 4XX XX XX XX"
+            showError
+            errorLabel={t("publicBook.err.invalidPhone", locale)}
+          />
+        </div>
       </div>
 
       {!isAuthenticated && (
@@ -369,7 +380,7 @@ function AccountStep({
         </>
       )}
 
-      {!isAuthenticated && (
+      {!isAuthenticated && showAuthFooter && (
         <p className="text-sm text-green-500">
           {t("auth.hasAccount", locale)}{" "}
           <Link href="/login" className="text-gold-600 hover:text-gold-500">
@@ -572,7 +583,21 @@ function SchedulingStep({ prefs, onChange, locale }: { prefs: SchedulingPref[]; 
 
 // ─── Step 5: Payment (Skippable) ───────────────────────
 
-function PaymentForm({ onSuccess, locale }: { onSuccess: () => void; locale: Locale }) {
+interface BillingDefaults {
+  name?: string;
+  email?: string;
+  phone?: string;
+}
+
+function PaymentForm({
+  onSuccess,
+  locale,
+  billing,
+}: {
+  onSuccess: () => void;
+  locale: Locale;
+  billing: BillingDefaults;
+}) {
   const stripe = useStripe();
   const elements = useElements();
   const [loading, setLoading] = useState(false);
@@ -591,14 +616,37 @@ function PaymentForm({ onSuccess, locale }: { onSuccess: () => void; locale: Loc
 
   return (
     <form onSubmit={handleSubmit}>
-      <div className="rounded-lg border border-green-100 bg-green-50/30 p-4"><PaymentElement options={{ layout: "tabs" }} /></div>
+      <div className="rounded-lg border border-green-100 bg-green-50/30 p-4">
+        <PaymentElement
+          options={{
+            layout: "tabs",
+            defaultValues: {
+              billingDetails: {
+                name: billing.name || undefined,
+                email: billing.email || undefined,
+                phone: billing.phone || undefined,
+              },
+            },
+          }}
+        />
+      </div>
       {error && <div className="mt-4 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">{error}</div>}
       <Button type="submit" disabled={!stripe || loading} className="mt-6 w-full bg-gold-600 py-3 text-base font-medium text-white hover:bg-gold-500">{loading ? t("onboarding.paymentSaving", locale) : t("onboarding.savePayment", locale)}</Button>
     </form>
   );
 }
 
-function PaymentStep({ onSuccess, onSkip, locale }: { onSuccess: () => void; onSkip: () => void; locale: Locale }) {
+function PaymentStep({
+  onSuccess,
+  onSkip,
+  locale,
+  billing,
+}: {
+  onSuccess: () => void;
+  onSkip: () => void;
+  locale: Locale;
+  billing: BillingDefaults;
+}) {
   const [clientSecret, setClientSecret] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -619,7 +667,7 @@ function PaymentStep({ onSuccess, onSkip, locale }: { onSuccess: () => void; onS
       <div className="space-y-4">
         <p className="text-sm text-green-600">{t("onboarding.paymentSecure", locale)}</p>
         <Elements stripe={getStripe()} options={{ clientSecret, appearance: { theme: "stripe", variables: { colorPrimary: "#091a12", colorBackground: "#faf7f0", colorText: "#091a12", fontFamily: "Outfit, system-ui, sans-serif", borderRadius: "8px" } } }}>
-          <PaymentForm onSuccess={onSuccess} locale={locale} />
+          <PaymentForm onSuccess={onSuccess} locale={locale} billing={billing} />
         </Elements>
         <button type="button" onClick={onSkip} className="mt-2 w-full text-center text-sm text-green-500 hover:text-green-700">{t("onboarding.skipPayment", locale)}</button>
       </div>
@@ -651,6 +699,7 @@ export default function StudentOnboardingWizard({
   existingProIds,
   existingRelationships,
   preSelectedProId,
+  showAuthFooter,
 }: {
   locale: Locale;
   isAuthenticated: boolean;
@@ -669,6 +718,7 @@ export default function StudentOnboardingWizard({
     preferredInterval: string | null;
   }>;
   preSelectedProId: number | null;
+  showAuthFooter: boolean;
 }) {
   const router = useRouter();
   const [isAuthenticated, setIsAuthenticated] = useState(initialAuth);
@@ -731,11 +781,32 @@ export default function StudentOnboardingWizard({
 
   async function saveStep(stepName: string, stepData: Record<string, unknown>) {
     setSaving(true); setError(null);
-    const res = await fetch("/api/member/onboarding", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ step: stepName, data: stepData }) });
-    const result = await res.json();
-    setSaving(false);
-    if (!res.ok) { setError(result.error || "Failed to save"); return null; }
-    return result;
+    try {
+      const res = await fetch("/api/member/onboarding", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ step: stepName, data: stepData }),
+      });
+      // Parse JSON defensively — 5xx pages are HTML and would throw.
+      const result = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        setError(result.error || `Failed to save (HTTP ${res.status})`);
+        return null;
+      }
+      return result;
+    } catch (err) {
+      // Network-level failure (server not responding, mid-HMR compile,
+      // connection aborted). Surface it instead of bubbling up.
+      console.error("saveStep fetch error:", err);
+      setError(
+        err instanceof Error && err.message
+          ? err.message
+          : "Network error — please try again."
+      );
+      return null;
+    } finally {
+      setSaving(false);
+    }
   }
 
   async function handleNext() {
@@ -822,28 +893,34 @@ export default function StudentOnboardingWizard({
     switch (step) {
       case 2:
         result = await saveStep("golf-profile", { handicap: data.handicap || null, golfGoals: data.golfGoals, golfGoalsOther: data.golfGoalsOther || null });
-        if (result) setStep(3);
+        if (!result) break;
+        // Skip step 3 (Choose Pros) entirely when the student arrived
+        // from a booking with a pre-selected pro — the pro_students row
+        // was already upserted by createPublicBooking and scheduling
+        // prefs are learned silently from booking history, so there's
+        // nothing left to ask.
+        if (preSelectedProId) {
+          const choose = await saveStep("choose-pros", {
+            proProfileIds: [preSelectedProId],
+          });
+          if (choose) setStep(5);
+          break;
+        }
+        setStep(3);
         break;
       case 3: {
+        // Explicit pro picker — non-booking-flow arrivals. After saving
+        // we jump straight to payment; scheduling prefs are learned
+        // silently from the student's bookings going forward.
         const proIds = Array.from(selectedPros);
         if (proIds.length === 0) { setError(t("onboarding.selectAtLeastOne", loc)); return; }
         result = await saveStep("choose-pros", { proProfileIds: proIds });
-        if (result) {
-          const apiPS = (result.proStudents || []) as ProStudentData[];
-          const apiLocs = (result.proLocations || []) as ProLocationData[];
-          setSchedulingPrefs(apiPS.map((ps) => {
-            const pro = pros.find((p) => p.id === ps.proProfileId);
-            const proLocs = apiLocs.find((pl) => pl.proProfileId === ps.proProfileId)?.locations || [];
-            return { proStudentId: ps.proStudentId, proProfileId: ps.proProfileId, proName: ps.displayName || pro?.displayName || "Pro", lessonDurations: ps.lessonDurations || pro?.lessonDurations || [60], locations: proLocs, preferredLocationId: ps.preferredLocationId, preferredDuration: ps.preferredDuration, preferredDayOfWeek: ps.preferredDayOfWeek, preferredTime: ps.preferredTime, preferredInterval: ps.preferredInterval };
-          }));
-          setStep(4);
-        }
-        break;
-      }
-      case 4:
-        result = await saveStep("scheduling", { preferences: schedulingPrefs.map((p) => ({ proStudentId: p.proStudentId, preferredLocationId: p.preferredLocationId, preferredDuration: p.preferredDuration, preferredDayOfWeek: p.preferredDayOfWeek, preferredTime: p.preferredTime, preferredInterval: p.preferredInterval })) });
         if (result) setStep(5);
         break;
+      }
+      // step 4 (explicit Scheduling) is intentionally removed — prefs
+      // are learned from booking activity by
+      // `updateBookingPreferences` in src/lib/booking-preferences.ts.
     }
   }
 
@@ -865,7 +942,7 @@ export default function StudentOnboardingWizard({
           <h1 className="font-display text-4xl font-semibold text-green-900">{t("onboarding.done", loc)}</h1>
           <p className="mt-3 text-lg text-green-700">{t("onboarding.doneDesc", loc)}</p>
           <p className="mt-2 text-sm text-green-500">{t("onboarding.doneProfileHint", loc)}</p>
-          <Button onClick={() => router.push("/member/dashboard")} className="mt-8 bg-gold-600 px-8 py-3 text-base font-medium text-white hover:bg-gold-500">{t("onboarding.goToDashboard", loc)}</Button>
+          <Button onClick={() => window.location.assign("/member/dashboard")} className="mt-8 bg-gold-600 px-8 py-3 text-base font-medium text-white hover:bg-gold-500">{t("onboarding.goToDashboard", loc)}</Button>
         </div>
       </div>
     );
@@ -873,8 +950,33 @@ export default function StudentOnboardingWizard({
 
   const stepTitle = step === 1 && isAuthenticated ? t("onboarding.profile", loc) : t(STEP_KEYS[step], loc);
   // Steps shown in progress bar: skip step 0 (language), show steps 1-5
-  const progressSteps = STEP_KEYS.length - 1; // 5
-  const progressCurrent = step - 1; // -1 for language step
+  // Progress bar waypoints after removing the explicit Scheduling step.
+  // Visible steps are: Account (1), Golf Profile (2), Choose Pros (3),
+  // Payment (5). Booking-flow arrivals also skip Choose Pros (3), so
+  // their waypoints become: 1, 2, 5.
+  const visibleSteps = preSelectedProId ? [1, 2, 5] : [1, 2, 3, 5];
+  const progressSteps = visibleSteps.length;
+  const progressCurrent = Math.max(
+    0,
+    visibleSteps.indexOf(step)
+  );
+
+  // Step 1 validity: all fields must be filled in, email must match the
+  // format, phone must parse as a valid international number. If the
+  // user is unauthenticated (creating an account) they also need a
+  // password ≥ 8 chars matching the confirm field. The Next button is
+  // disabled until all this holds.
+  const step1Valid = (() => {
+    if (!data.firstName.trim() || !data.lastName.trim()) return false;
+    if (!EMAIL_RE.test(data.email.trim())) return false;
+    if (!data.phone || !isValidPhoneNumber(data.phone)) return false;
+    if (!isAuthenticated) {
+      if (password.length < 8) return false;
+      if (password !== confirmPassword) return false;
+    }
+    return true;
+  })();
+  const nextDisabled = saving || (step === 1 && !step1Valid);
 
   async function handleMaybeLater() {
     if (!isAuthenticated) {
@@ -929,16 +1031,34 @@ export default function StudentOnboardingWizard({
           {error && <div className="mb-4 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">{error}</div>}
 
           {step === 0 && <LanguageStep selected={data.preferredLocale} onChange={(v) => updateData({ preferredLocale: v })} />}
-          {step === 1 && <AccountStep data={data} onChange={updateData} isAuthenticated={isAuthenticated} emailLocked={emailLocked} originalEmail={originalEmail} password={password} confirmPassword={confirmPassword} onPasswordChange={setPassword} onConfirmChange={setConfirmPassword} onGenerate={() => setPasswordGenerated(true)} locale={loc} />}
+          {step === 1 && <AccountStep data={data} onChange={updateData} isAuthenticated={isAuthenticated} emailLocked={emailLocked} originalEmail={originalEmail} password={password} confirmPassword={confirmPassword} onPasswordChange={setPassword} onConfirmChange={setConfirmPassword} onGenerate={() => setPasswordGenerated(true)} locale={loc} showAuthFooter={showAuthFooter} />}
           {step === 2 && <GolfProfileStep data={data} onChange={updateData} locale={loc} />}
           {step === 3 && <ChooseProsStep pros={pros} selected={selectedPros} onToggle={togglePro} locale={loc} />}
-          {step === 4 && <SchedulingStep prefs={schedulingPrefs} onChange={updateSchedulingPref} locale={loc} />}
-          {step === 5 && <PaymentStep onSuccess={completeOnboarding} onSkip={completeOnboarding} locale={loc} />}
+          {/* step 4 (Scheduling) removed — prefs are learned silently from bookings */}
+          {step === 5 && (
+            <PaymentStep
+              onSuccess={completeOnboarding}
+              onSkip={completeOnboarding}
+              locale={loc}
+              billing={{
+                name: `${data.firstName} ${data.lastName}`.trim(),
+                email: data.email,
+                phone: data.phone,
+              }}
+            />
+          )}
 
           {step < 5 && (
             <div className="mt-8 flex justify-between">
-              <Button type="button" variant="outline" onClick={() => setStep(Math.max(0, step - 1))} disabled={(step === 0) || saving} className="border-green-200 text-green-700 hover:bg-green-50">{t("onboarding.back", loc)}</Button>
-              <Button onClick={handleNext} disabled={saving} className="bg-gold-600 text-white hover:bg-gold-500">{saving ? t("onboarding.saving", loc) : step === 1 && !isAuthenticated ? t("onboarding.createAccount", loc) : t("onboarding.continue", loc)}</Button>
+              <Button type="button" variant="outline" onClick={() => {
+                // Step 4 (Scheduling) is removed. From Payment (step 5)
+                // Back goes to either step 3 (Choose Pros) for normal
+                // arrivals, or step 2 (Golf Profile) for booking-flow
+                // arrivals where step 3 was also skipped.
+                if (step === 5) { setStep(preSelectedProId ? 2 : 3); return; }
+                setStep(Math.max(0, step - 1));
+              }} disabled={(step === 0) || saving} className="border-green-200 text-green-700 hover:bg-green-50">{t("onboarding.back", loc)}</Button>
+              <Button onClick={handleNext} disabled={nextDisabled} className="bg-gold-600 text-white hover:bg-gold-500">{saving ? t("onboarding.saving", loc) : t("onboarding.continue", loc)}</Button>
             </div>
           )}
         </div>

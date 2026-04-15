@@ -48,7 +48,7 @@ export async function POST(request: Request) {
   }
 
   const [existing] = await db
-    .select({ id: users.id, roles: users.roles })
+    .select({ id: users.id, roles: users.roles, password: users.password })
     .from(users)
     .where(and(eq(users.email, email), isNull(users.deletedAt)))
     .limit(1);
@@ -57,7 +57,17 @@ export async function POST(request: Request) {
   const preferredLocale = resolveLocale(preferredLocaleRaw);
   let userId: number;
 
-  if (existing && (!existing.roles || existing.roles.trim() === "")) {
+  // An existing row is "claimable" if it has no password set — that's
+  // a stub user created by the public booking flow, or a legacy empty-
+  // roles row. In either case the user now wants to attach a password
+  // and become a full member.
+  const claimable =
+    existing &&
+    (!existing.password ||
+      !existing.roles ||
+      existing.roles.trim() === "");
+
+  if (claimable) {
     await db.update(users).set({ firstName, lastName, phone, password: hashed, roles: "member", preferredLocale }).where(eq(users.id, existing.id));
     userId = existing.id;
   } else if (existing) {

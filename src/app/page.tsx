@@ -28,12 +28,9 @@ export default async function Home() {
       <section className="mx-auto max-w-6xl px-6 py-24 text-center">
         <CmsBlock page={PAGE} block="hero.title" content={cms["hero.title"]} fallback={t("home.hero.title", locale)} as="h1" className="font-display text-5xl font-semibold tracking-tight text-green-900 sm:text-6xl" />
         <CmsBlock page={PAGE} block="hero.subtitle" content={cms["hero.subtitle"]} fallback={t("home.hero.subtitle", locale)} as="p" className="mx-auto mt-6 max-w-2xl text-lg text-green-700" />
-        <div className="mt-10 flex items-center justify-center gap-4">
-          <Link href="/register" className="rounded-md bg-gold-600 px-6 py-3 text-sm font-medium text-white transition-colors hover:bg-gold-500">
+        <div className="mt-10 flex items-center justify-center">
+          <Link href="/book" className="rounded-md bg-gold-600 px-6 py-3 text-sm font-medium text-white transition-colors hover:bg-gold-500">
             <CmsBlock page={PAGE} block="hero.cta" content={cms["hero.cta"]} fallback={t("home.hero.cta", locale)} />
-          </Link>
-          <Link href="/contact" className="rounded-md border border-green-300 px-6 py-3 text-sm font-medium text-green-700 transition-colors hover:border-green-400 hover:bg-green-50">
-            <CmsBlock page={PAGE} block="hero.contact" content={cms["hero.contact"]} fallback={t("home.hero.contact", locale)} />
           </Link>
         </div>
       </section>
