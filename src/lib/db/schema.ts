@@ -16,7 +16,9 @@ export const users = pgTable("users", {
   id: serial("id").primaryKey(),
   firstName: varchar("first_name", { length: 255 }).notNull(),
   lastName: varchar("last_name", { length: 255 }).notNull(),
-  email: varchar("email", { length: 255 }).notNull().unique(),
+  // Uniqueness enforced by functional index `users_email_lower_idx`
+  // on LOWER(email) — see scripts/migrate-email-lower-unique.ts.
+  email: varchar("email", { length: 255 }).notNull(),
   phone: varchar("phone", { length: 50 }),
   password: varchar("password", { length: 255 }),
   roles: varchar("roles", { length: 255 }).default(""),
@@ -39,7 +41,9 @@ export const userEmails = pgTable("user_emails", {
   userId: integer("user_id")
     .references(() => users.id, { onDelete: "cascade" })
     .notNull(),
-  email: varchar("email", { length: 255 }).notNull().unique(),
+  // Uniqueness enforced by functional index `user_emails_email_lower_idx`
+  // on LOWER(email) — see scripts/migrate-email-lower-unique.ts.
+  email: varchar("email", { length: 255 }).notNull(),
   label: varchar("label", { length: 50 }),
   isPrimary: boolean("is_primary").notNull().default(false),
   createdAt: timestamp("created_at").defaultNow().notNull(),

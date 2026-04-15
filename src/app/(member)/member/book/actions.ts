@@ -363,7 +363,7 @@ export async function createBooking(formData: FormData) {
   const notes = (formData.get("notes") as string) || null;
   const firstName = formData.get("firstName") as string;
   const lastName = formData.get("lastName") as string;
-  const email = formData.get("email") as string;
+  const email = ((formData.get("email") as string) || "").trim().toLowerCase();
   const phone = (formData.get("phone") as string) || null;
   const duration = Number(formData.get("duration"));
 
