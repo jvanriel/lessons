@@ -1,0 +1,7 @@
+docs/
+scripts/
+src/lib/__tests__/
+vitest.config.ts
+vitest.setup.ts
+*.test.ts
+*.spec.ts
