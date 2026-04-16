@@ -43,8 +43,11 @@ export async function verifyRecaptcha(
     return { ok: false, reason: "reCAPTCHA not configured" };
   }
 
+  // No token means the client couldn't load the reCAPTCHA script (content
+  // blocker, slow mobile, privacy browser). Allow the request through —
+  // rate limiting is the primary protection; reCAPTCHA is defence in depth.
   if (!token) {
-    return { ok: false, reason: "missing token" };
+    return { ok: true, score: 0 };
   }
 
   try {
