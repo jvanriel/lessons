@@ -53,18 +53,27 @@ export async function resetPasswordWithToken(
 
   // Check user exists
   const [user] = await db
-    .select({ id: users.id, email: users.email, roles: users.roles })
+    .select({
+      id: users.id,
+      email: users.email,
+      roles: users.roles,
+      emailVerifiedAt: users.emailVerifiedAt,
+    })
     .from(users)
     .where(eq(users.id, payload.userId))
     .limit(1);
 
   if (!user) return { error: t("authErr.userNotFound", locale) };
 
-  // Update password
+  // Update password — and verify email if not already verified.
+  // Clicking a link sent to their email proves ownership.
   const hashed = await hashPassword(password);
   await db
     .update(users)
-    .set({ password: hashed })
+    .set({
+      password: hashed,
+      ...(!user.emailVerifiedAt ? { emailVerifiedAt: new Date() } : {}),
+    })
     .where(eq(users.id, user.id));
 
   // Log them in

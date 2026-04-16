@@ -719,5 +719,5 @@ export async function createPublicBooking(formData: FormData) {
     startTime
   ).catch(() => {});
 
-  return { success: true, bookingId: booking.id };
+  return { success: true, bookingId: booking.id, branch };
 }

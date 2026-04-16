@@ -37,6 +37,7 @@ export default async function ProBookingsPage() {
         studentLastName: users.lastName,
         studentEmail: users.email,
         studentPhone: users.phone,
+        studentEmailVerified: users.emailVerifiedAt,
         locationName: locations.name,
         locationCity: locations.city,
         proLocationId: lessonBookings.proLocationId,

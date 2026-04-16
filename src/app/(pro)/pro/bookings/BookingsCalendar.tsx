@@ -21,6 +21,7 @@ interface Booking {
   studentLastName: string | null;
   studentEmail: string;
   studentPhone: string | null;
+  studentEmailVerified: Date | null;
   locationName: string;
   locationCity: string | null;
   proLocationId: number;
@@ -328,6 +329,11 @@ export function BookingsCalendar({ bookings, availability, locale }: Props) {
               <div>
                 <h3 className="font-display text-lg font-medium text-green-900">
                   {booking.studentFirstName} {booking.studentLastName}
+                  {!booking.studentEmailVerified && (
+                    <span className="ml-2 inline-flex items-center rounded-full bg-amber-100 px-2 py-0.5 align-middle text-[10px] font-medium text-amber-700">
+                      {t("proBookingsView.emailUnverified", locale)}
+                    </span>
+                  )}
                 </h3>
                 <p className="mt-0.5 text-sm text-green-600">
                   {formatDateLocale(booking.date, locale)}

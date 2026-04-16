@@ -86,6 +86,7 @@ export default function PublicBookingWizard({
   const [honeypot, setHoneypot] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState(false);
+  const [branch, setBranch] = useState<"new" | "unverified" | "verified" | null>(null);
   const [pending, startTransition] = useTransition();
 
   // When the user picks a pro, reset all downstream state and apply the
@@ -187,6 +188,7 @@ export default function PublicBookingWizard({
         setError(result.error);
       } else {
         setSuccess(true);
+        if ("branch" in result && result.branch) setBranch(result.branch);
       }
     });
   }
@@ -212,39 +214,53 @@ export default function PublicBookingWizard({
           </p>
         </div>
 
-        {/* Register invite (optional upsell) */}
-        <div className="mt-6 rounded-xl border border-gold-200 bg-gold-50/60 p-6">
-          <h2 className="font-display text-lg font-semibold text-green-900">
-            {t("booked.registerHeading", locale)}
-          </h2>
-          <p className="mt-1 text-sm text-green-700">
-            {t("booked.registerIntro", locale)}
-          </p>
-          <ul className="mt-4 space-y-2 text-sm text-green-800">
-            <li className="flex items-start gap-2">
-              <span className="mt-1 text-gold-600">•</span>
-              <span>{t("booked.perk.autoPay", locale)}</span>
-            </li>
-            <li className="flex items-start gap-2">
-              <span className="mt-1 text-gold-600">•</span>
-              <span>{t("booked.perk.chat", locale)}</span>
-            </li>
-            <li className="flex items-start gap-2">
-              <span className="mt-1 text-gold-600">•</span>
-              <span>{t("booked.perk.quickBook", locale)}</span>
-            </li>
-            <li className="flex items-start gap-2">
-              <span className="mt-1 text-gold-600">•</span>
-              <span>{t("booked.perk.manage", locale)}</span>
-            </li>
-          </ul>
-          <a
-            href={registerHref}
-            className="mt-5 inline-flex items-center justify-center rounded-md border border-gold-400 bg-white px-5 py-2.5 text-sm font-medium text-green-900 transition-colors hover:bg-gold-50"
-          >
-            {t("booked.registerCta", locale)}
-          </a>
-        </div>
+        {/* Verified user → login link; new/unverified → register upsell */}
+        {branch === "verified" ? (
+          <div className="mt-6 rounded-xl border border-gold-200 bg-gold-50/60 p-6 text-center">
+            <p className="text-sm text-green-700">
+              {t("booked.loginIntro", locale)}
+            </p>
+            <a
+              href={`/login?email=${encodeURIComponent(email)}`}
+              className="mt-4 inline-flex items-center justify-center rounded-md bg-gold-600 px-5 py-2.5 text-sm font-medium text-white transition-colors hover:bg-gold-500"
+            >
+              {t("booked.loginCta", locale)}
+            </a>
+          </div>
+        ) : (
+          <div className="mt-6 rounded-xl border border-gold-200 bg-gold-50/60 p-6">
+            <h2 className="font-display text-lg font-semibold text-green-900">
+              {t("booked.registerHeading", locale)}
+            </h2>
+            <p className="mt-1 text-sm text-green-700">
+              {t("booked.registerIntro", locale)}
+            </p>
+            <ul className="mt-4 space-y-2 text-sm text-green-800">
+              <li className="flex items-start gap-2">
+                <span className="mt-1 text-gold-600">•</span>
+                <span>{t("booked.perk.autoPay", locale)}</span>
+              </li>
+              <li className="flex items-start gap-2">
+                <span className="mt-1 text-gold-600">•</span>
+                <span>{t("booked.perk.chat", locale)}</span>
+              </li>
+              <li className="flex items-start gap-2">
+                <span className="mt-1 text-gold-600">•</span>
+                <span>{t("booked.perk.quickBook", locale)}</span>
+              </li>
+              <li className="flex items-start gap-2">
+                <span className="mt-1 text-gold-600">•</span>
+                <span>{t("booked.perk.manage", locale)}</span>
+              </li>
+            </ul>
+            <a
+              href={registerHref}
+              className="mt-5 inline-flex items-center justify-center rounded-md border border-gold-400 bg-white px-5 py-2.5 text-sm font-medium text-green-900 transition-colors hover:bg-gold-50"
+            >
+              {t("booked.registerCta", locale)}
+            </a>
+          </div>
+        )}
       </section>
     );
   }

@@ -18,6 +18,7 @@ interface Booking {
   studentLastName: string | null;
   studentEmail: string;
   studentPhone: string | null;
+  studentEmailVerified: Date | null;
   locationName: string;
   locationCity: string | null;
   proLocationId: number;
@@ -80,6 +81,11 @@ function BookingsList({ bookings, locale }: { bookings: Booking[]; locale: Local
                   <div>
                     <p className="text-sm text-green-800">
                       {b.studentFirstName} {b.studentLastName}
+                      {!b.studentEmailVerified && (
+                        <span className="ml-2 inline-flex items-center rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-medium text-amber-700" title={t("proBookingsView.emailUnverified", locale)}>
+                          {t("proBookingsView.emailUnverified", locale)}
+                        </span>
+                      )}
                     </p>
                     <p className="text-xs text-green-500">
                       {b.locationName}

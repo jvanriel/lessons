@@ -2,9 +2,8 @@ import { NextRequest, NextResponse } from "next/server";
 import { jwtVerify } from "jose";
 import * as Sentry from "@sentry/nextjs";
 import { db } from "@/lib/db";
-import { users } from "@/lib/db/schema";
+import { users, lessonBookings } from "@/lib/db/schema";
 import { eq } from "drizzle-orm";
-import { parseRoles, setSessionCookie } from "@/lib/auth";
 
 function getSecret() {
   return new TextEncoder().encode(
@@ -16,11 +15,12 @@ function getSecret() {
  * GET /api/auth/claim-booking?token=...
  *
  * Single-purpose link sent to the student in their booking confirmation
- * email. Verifies the JWT, marks the email as verified, issues a session
- * cookie for the user, and redirects to the booking detail page.
+ * email. Verifies the JWT and marks the email as verified.
  *
- * The link replaces traditional registration — there is no password to
- * set. The student can add one later from /member/profile if they want.
+ * Does NOT create a session — the student must register (set a password)
+ * before they can log in and manage bookings. Redirects to the token-based
+ * read-only booking page at /booked/t/[manageToken] with a ?verified=1
+ * banner so the student knows their email was confirmed.
  */
 export async function GET(request: NextRequest) {
   const token = request.nextUrl.searchParams.get("token");
@@ -43,8 +43,6 @@ export async function GET(request: NextRequest) {
     const [user] = await db
       .select({
         id: users.id,
-        email: users.email,
-        roles: users.roles,
         emailVerifiedAt: users.emailVerifiedAt,
       })
       .from(users)
@@ -60,22 +58,27 @@ export async function GET(request: NextRequest) {
         .where(eq(users.id, user.id));
     }
 
-    await setSessionCookie({
-      userId: user.id,
-      email: user.email,
-      roles: parseRoles(user.roles),
-    });
+    // Look up the manage token for the booking so we can redirect to
+    // the public read-only confirmation page.
+    const bookingId =
+      typeof payload.bookingId === "number" ? payload.bookingId : null;
 
-    const bookingId = typeof payload.bookingId === "number"
-      ? payload.bookingId
-      : null;
-    // Land on the standalone confirmation page rather than /member/*.
-    // The latter triggers the middleware onboarding guard and forces
-    // the student into the full registration wizard — which is exactly
-    // what the public flow is trying to avoid.
-    const redirectTo = bookingId ? `/booked/${bookingId}` : "/booked";
+    if (bookingId) {
+      const [booking] = await db
+        .select({ manageToken: lessonBookings.manageToken })
+        .from(lessonBookings)
+        .where(eq(lessonBookings.id, bookingId))
+        .limit(1);
 
-    return NextResponse.redirect(new URL(redirectTo, request.url));
+      if (booking?.manageToken) {
+        return NextResponse.redirect(
+          new URL(`/booked/t/${booking.manageToken}?verified=1`, request.url)
+        );
+      }
+    }
+
+    // Fallback: no booking found — send to home page
+    return NextResponse.redirect(new URL("/?verified=1", request.url));
   } catch (err) {
     Sentry.captureException(err, { tags: { area: "claim-booking" } });
     return NextResponse.redirect(new URL("/login?claim=error", request.url));
