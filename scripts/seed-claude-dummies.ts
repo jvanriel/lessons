@@ -177,7 +177,71 @@ async function main() {
       endTime: s.end,
     });
   }
-  console.log(`  Availability: ${slots.length} weekly blocks created`);
+  console.log(`  Availability (Claude Test Club): ${slots.length} weekly blocks`);
+
+  // ─── Second location: Royal Golf Club ─────────────
+  let location2Id: number;
+  const [existingLoc2] = await db
+    .select({ id: schema.locations.id })
+    .from(schema.locations)
+    .where(eq(schema.locations.name, "Royal Golf Club"))
+    .limit(1);
+
+  if (existingLoc2) {
+    location2Id = existingLoc2.id;
+  } else {
+    const [inserted] = await db
+      .insert(schema.locations)
+      .values({
+        name: "Royal Golf Club",
+        city: "Brussels",
+        country: "Belgium",
+      })
+      .returning({ id: schema.locations.id });
+    location2Id = inserted.id;
+  }
+
+  const [existingLink2] = await db
+    .select({ id: schema.proLocations.id })
+    .from(schema.proLocations)
+    .where(
+      and(
+        eq(schema.proLocations.proProfileId, proProfile.id),
+        eq(schema.proLocations.locationId, location2Id)
+      )
+    )
+    .limit(1);
+
+  let proLocation2Id: number;
+  if (existingLink2) {
+    proLocation2Id = existingLink2.id;
+  } else {
+    const [inserted] = await db
+      .insert(schema.proLocations)
+      .values({ proProfileId: proProfile.id, locationId: location2Id })
+      .returning({ id: schema.proLocations.id });
+    proLocation2Id = inserted.id;
+  }
+
+  const slots2 = [
+    { day: 1, start: "09:00", end: "12:00" }, // Tuesday
+    { day: 3, start: "14:00", end: "18:00" }, // Thursday afternoon
+    { day: 4, start: "09:00", end: "13:00" }, // Friday
+  ];
+
+  for (const s of slots2) {
+    await db.insert(schema.proAvailability).values({
+      proProfileId: proProfile.id,
+      proLocationId: proLocation2Id,
+      dayOfWeek: s.day,
+      startTime: s.start,
+      endTime: s.end,
+    });
+  }
+  console.log(
+    `  Location 2: Royal Golf Club, Brussels (id=${proLocation2Id})`
+  );
+  console.log(`  Availability (Royal Golf Club): ${slots2.length} weekly blocks`);
 
   // Email alias row
   const [existingEmail] = await db

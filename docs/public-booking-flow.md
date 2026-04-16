@@ -8,11 +8,26 @@ Students can book a lesson without creating an account first. The system creates
 
 ### How it works
 
-1. Student fills in name, email, phone and picks a slot
-2. Booking is **immediately confirmed** (no payment required in Phase A)
-3. Student receives a confirmation email with a **verify link**
-4. Clicking the verify link confirms the email and shows the booking (read-only, no login)
-5. From there the student can **register** (set a password) to get full account access
+1. Student picks a location (if the pro has more than one), duration, date, and time slot
+2. Student fills in name, email, phone
+3. Booking is **immediately confirmed** (no payment required in Phase A)
+4. Student receives a confirmation email with a **verify link**
+5. Clicking the verify link confirms the email and shows the booking (read-only, no login)
+6. From there the student can **register** (set a password) to get full account access
+
+### Wizard step logic
+
+The booking wizard adapts based on the pro's configuration:
+
+| Step | Shown when | Auto-skipped when |
+|------|-----------|------------------|
+| Location | Pro has 2+ active locations | Pro has exactly 1 location |
+| Duration | Pro has 2+ lesson durations | Pro has exactly 1 duration |
+| Date | Always | Never |
+| Time | Always (after date selected) | Never |
+| Contact form | Always (after time selected) | Never |
+
+When a step is auto-skipped, the value is pre-selected and the wizard advances to the next step. Available dates and time slots are filtered to the selected location's availability.
 
 ### Branch logic
 
@@ -30,7 +45,7 @@ The booking appears on the pro's bookings page **immediately**, regardless of wh
 
 - **Pro notification email** includes an "email not yet verified" badge for new/unverified students
 - **Pro in-app notification** includes "(email not yet verified)" text
-- **Pro bookings page** (`/pro/bookings`) shows the booking — currently does not indicate verification status
+- **Pro bookings page** (`/pro/bookings`) shows an amber "email unverified" badge next to the student name (list and calendar views)
 
 ## Test accounts
 
@@ -44,8 +59,9 @@ Both are Google Workspace aliases routing to the same `it.admin` inbox. Emails a
 The pro account is pre-configured with:
 - Slug: `claude-test-pro`
 - Durations: 30 min (EUR 35) / 60 min (EUR 65)
-- Location: Claude Test Club
-- Availability: Mon-Sat with morning and afternoon blocks
+- Locations:
+  - **Claude Test Club** (Testville) — Mon-Sat, morning + afternoon blocks
+  - **Royal Golf Club** (Brussels) — Tue, Thu afternoon, Fri
 - Booking notice: 1 hour
 
 **Setup:** Run `npx tsx scripts/seed-claude-dummies.ts` to create the pro and reset the student.
@@ -262,6 +278,36 @@ The student booked before but never verified. They book again.
 
 ---
 
+## Scenario 10 — Pro with multiple locations
+
+**Precondition:** Pro has 2+ active locations (e.g. Claude Test Club + Royal Golf Club).
+
+### Steps
+
+1. Open `/book/claude-test-pro`
+2. Observe that the **location step** is shown (not skipped)
+3. Pick "Royal Golf Club" (Brussels)
+4. Pick a duration, date, time slot
+5. Fill contact form and submit
+
+### Expected results
+
+- Location picker shows all active locations with name and city
+- After selecting a location, only dates with availability at **that location** appear in the calendar
+- Time slots are filtered to the selected location's schedule
+- Booking record has the correct `pro_location_id` (Royal Golf Club, not Claude Test Club)
+- Pro notification email shows the correct location name
+- Preferences are updated with the selected location
+
+### Switching locations
+
+If the student goes back and picks a different location:
+- The date and time selections are reset
+- Available dates reload for the new location
+- The calendar may show different available days (each location has its own schedule)
+
+---
+
 ## Student lifecycle summary
 
 ```
@@ -310,7 +356,7 @@ Their email is verified but they have no password, so they cannot log in. They c
 
 ### What if someone books with someone else's email?
 
-The booking goes through (zero friction is the goal), but the email owner gets the verification email. If they don't recognise it, they simply ignore it. The booking remains confirmed but the email stays unverified. The pro sees the "email unverified" badge and can follow up by phone.
+The booking goes through (zero friction is the goal), but the email owner gets the verification email. If they don't recognize it, they simply ignore it. The booking remains confirmed but the email stays unverified. The pro sees the "email unverified" badge and can follow up by phone.
 
 ### What if the same email books with different pros?
 
@@ -333,6 +379,10 @@ If the student is logged in and visits `/book/[slug]`, the booking flow is the s
 ### What if the student uses forgot password before ever verifying?
 
 The forgot-password flow sends a reset link to the email address. Clicking the link and setting a password also marks the email as verified. After reset, the student is logged in with a full account. This is a valid recovery path for students who lost or ignored the original verify email.
+
+### What if a pro has multiple locations?
+
+The wizard shows a location picker as the first step. Available dates and time slots are filtered to the selected location's availability schedule. Each location can have different days/times. The booking records which location was selected, and the student's preferred location is updated for Quick Book.
 
 ### What happens to booking preferences?
 
