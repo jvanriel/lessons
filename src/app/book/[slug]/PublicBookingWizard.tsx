@@ -178,18 +178,22 @@ export default function PublicBookingWizard({
       setError(t("publicBook.err.invalidPhone", locale));
       return;
     }
-    // Get reCAPTCHA v3 token (invisible, no user interaction)
+    // Get reCAPTCHA v3 token (invisible, no user interaction).
+    // Timeout after 3s so a slow/blocked script never stalls the booking.
     let recaptchaToken = "";
     if (RECAPTCHA_SITE_KEY && window.grecaptcha) {
       try {
-        recaptchaToken = await new Promise<string>((resolve) => {
-          window.grecaptcha!.ready(() => {
-            window
-              .grecaptcha!.execute(RECAPTCHA_SITE_KEY, { action: "book_lesson" })
-              .then(resolve)
-              .catch(() => resolve(""));
-          });
-        });
+        recaptchaToken = await Promise.race([
+          new Promise<string>((resolve) => {
+            window.grecaptcha!.ready(() => {
+              window
+                .grecaptcha!.execute(RECAPTCHA_SITE_KEY, { action: "book_lesson" })
+                .then(resolve)
+                .catch(() => resolve(""));
+            });
+          }),
+          new Promise<string>((resolve) => setTimeout(() => resolve(""), 3000)),
+        ]);
       } catch {
         // Don't block booking if reCAPTCHA fails to load
       }
