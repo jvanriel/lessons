@@ -47,6 +47,8 @@ import { resolveLocale, type Locale } from "@/lib/i18n";
 import { t } from "@/lib/i18n/translations";
 import { getLocale } from "@/lib/locale";
 import { updateBookingPreferences } from "@/lib/booking-preferences";
+import { limitByKey, publicBookingLimiter, getClientIp } from "@/lib/rate-limit";
+import { verifyRecaptcha } from "@/lib/recaptcha";
 
 function getSecret() {
   return new TextEncoder().encode(
@@ -400,6 +402,21 @@ export async function createPublicBooking(formData: FormData) {
   // Honeypot — legitimate browsers leave this hidden field empty.
   if (honeypot) {
     return { success: true, bookingId: 0 };
+  }
+
+  // Rate limit — 5 bookings per hour per IP+email combination.
+  const ip = await getClientIp();
+  const rateKey = `${ip}:${email || "anon"}`;
+  const limit = await limitByKey(publicBookingLimiter, rateKey);
+  if (!limit.ok) {
+    return { error: t("publicBook.err.tooManyAttempts", uiLocale) };
+  }
+
+  // reCAPTCHA v3 — verify the token if configured.
+  const recaptchaToken = (formData.get("recaptchaToken") as string) || null;
+  const captcha = await verifyRecaptcha(recaptchaToken, "book_lesson");
+  if (!captcha.ok) {
+    return { error: t("publicBook.err.captchaFailed", uiLocale) };
   }
 
   if (

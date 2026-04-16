@@ -48,6 +48,13 @@ export const verifyEmailLimiter = new Ratelimit({
   analytics: true,
 });
 
+export const publicBookingLimiter = new Ratelimit({
+  redis,
+  limiter: Ratelimit.slidingWindow(5, "1 h"),
+  prefix: "rl:public-booking",
+  analytics: true,
+});
+
 /**
  * Get the client IP from request headers. Returns "unknown" if none present
  * (e.g. local dev). Vercel sets x-forwarded-for; x-real-ip is a fallback.

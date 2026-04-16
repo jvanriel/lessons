@@ -1,6 +1,7 @@
 "use client";
 
-import { useEffect, useMemo, useState, useTransition } from "react";
+import { useEffect, useMemo, useState, useTransition, useCallback } from "react";
+import Script from "next/script";
 import { Button } from "@/components/ui/button";
 import type { Locale } from "@/lib/i18n";
 import { t } from "@/lib/i18n/translations";
@@ -14,6 +15,16 @@ import {
 } from "./actions";
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+const RECAPTCHA_SITE_KEY = process.env.NEXT_PUBLIC_RECAPTCHA_SITE_KEY || "";
+
+declare global {
+  interface Window {
+    grecaptcha?: {
+      ready: (cb: () => void) => void;
+      execute: (siteKey: string, opts: { action: string }) => Promise<string>;
+    };
+  }
+}
 
 interface Location {
   id: number;
@@ -167,6 +178,23 @@ export default function PublicBookingWizard({
       setError(t("publicBook.err.invalidPhone", locale));
       return;
     }
+    // Get reCAPTCHA v3 token (invisible, no user interaction)
+    let recaptchaToken = "";
+    if (RECAPTCHA_SITE_KEY && window.grecaptcha) {
+      try {
+        recaptchaToken = await new Promise<string>((resolve) => {
+          window.grecaptcha!.ready(() => {
+            window
+              .grecaptcha!.execute(RECAPTCHA_SITE_KEY, { action: "book_lesson" })
+              .then(resolve)
+              .catch(() => resolve(""));
+          });
+        });
+      } catch {
+        // Don't block booking if reCAPTCHA fails to load
+      }
+    }
+
     const formData = new FormData();
     formData.set("slug", pro.slug);
     formData.set("proLocationId", String(locationId));
@@ -181,6 +209,7 @@ export default function PublicBookingWizard({
     formData.set("phone", phone);
     if (notes) formData.set("notes", notes);
     formData.set("website", honeypot);
+    if (recaptchaToken) formData.set("recaptchaToken", recaptchaToken);
 
     startTransition(async () => {
       const result = await createPublicBooking(formData);
@@ -329,6 +358,12 @@ export default function PublicBookingWizard({
 
   return (
     <section className="mx-auto max-w-2xl px-6 py-12">
+      {RECAPTCHA_SITE_KEY && (
+        <Script
+          src={`https://www.google.com/recaptcha/api.js?render=${RECAPTCHA_SITE_KEY}`}
+          strategy="lazyOnload"
+        />
+      )}
       {/* Pro header */}
       <div className="flex items-center gap-4">
         {pro.photoUrl ? (
