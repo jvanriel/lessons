@@ -65,7 +65,6 @@ export default async function RegisterPage({ searchParams }: Props) {
   let publishedPros: Array<{
     id: number;
     displayName: string;
-    slug: string;
     photoUrl: string | null;
     specialties: string | null;
     bio: string | null;
@@ -115,7 +114,6 @@ export default async function RegisterPage({ searchParams }: Props) {
         .select({
           id: proProfiles.id,
           displayName: proProfiles.displayName,
-          slug: proProfiles.slug,
           photoUrl: proProfiles.photoUrl,
           specialties: proProfiles.specialties,
           bio: proProfiles.bio,

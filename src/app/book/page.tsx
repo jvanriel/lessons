@@ -1,6 +1,6 @@
 import { getLocale } from "@/lib/locale";
-import { getAllBookablePros } from "./[slug]/actions";
-import PublicBookingWizard from "./[slug]/PublicBookingWizard";
+import { getAllBookablePros } from "./[proId]/actions";
+import PublicBookingWizard from "./[proId]/PublicBookingWizard";
 
 export const metadata = { title: "Book a lesson — Golf Lessons" };
 
@@ -10,7 +10,6 @@ export default async function PublicBookEntryPage() {
 
   const allPros = pros.map((p) => ({
     id: p.id,
-    slug: p.slug,
     displayName: p.displayName,
     photoUrl: p.photoUrl,
     specialties: p.specialties,

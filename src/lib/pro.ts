@@ -1,6 +1,6 @@
 import { db } from "@/lib/db";
 import { proProfiles } from "@/lib/db/schema";
-import { eq, and, isNull, like } from "drizzle-orm";
+import { eq, and, isNull } from "drizzle-orm";
 import { getSession, hasRole } from "@/lib/auth";
 import { redirect } from "next/navigation";
 
@@ -17,39 +17,6 @@ export async function requireProProfile() {
     .limit(1);
 
   return { session, profile: profile ?? null };
-}
-
-/**
- * Lowercase, strip diacritics, replace non-alphanumerics with dashes.
- * Used for pro profile slugs in the public URL (/pros/[slug]).
- */
-export function slugifyProName(input: string): string {
-  return input
-    .toLowerCase()
-    .normalize("NFD")
-    .replace(/[\u0300-\u036f]/g, "")
-    .replace(/[^a-z0-9]+/g, "-")
-    .replace(/^-+|-+$/g, "")
-    .slice(0, 80);
-}
-
-/**
- * Find a unique slug for a new pro profile, given a base. Adds -2, -3, ...
- * suffixes on collision; falls back to a timestamp suffix after 1000 tries.
- */
-export async function pickUniqueProSlug(base: string): Promise<string> {
-  const cleanBase = slugifyProName(base) || "pro";
-  const existing = await db
-    .select({ slug: proProfiles.slug })
-    .from(proProfiles)
-    .where(like(proProfiles.slug, `${cleanBase}%`));
-  const taken = new Set(existing.map((r) => r.slug));
-  if (!taken.has(cleanBase)) return cleanBase;
-  for (let i = 2; i < 1000; i++) {
-    const candidate = `${cleanBase}-${i}`;
-    if (!taken.has(candidate)) return candidate;
-  }
-  return `${cleanBase}-${Date.now()}`;
 }
 
 /**
@@ -71,10 +38,8 @@ export async function ensureProProfile(opts: {
   if (existing) return;
 
   const displayName = `${opts.firstName} ${opts.lastName}`.trim() || "Pro";
-  const slug = await pickUniqueProSlug(displayName);
   await db.insert(proProfiles).values({
     userId: opts.userId,
-    slug,
     displayName,
     published: false,
   });

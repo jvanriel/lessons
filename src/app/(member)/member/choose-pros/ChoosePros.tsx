@@ -9,7 +9,6 @@ import { t } from "@/lib/i18n/translations";
 interface Pro {
   id: number;
   displayName: string;
-  slug: string;
   photoUrl: string | null;
   specialties: string | null;
   bio: string | null;

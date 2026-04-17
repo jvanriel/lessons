@@ -6,6 +6,7 @@ import { cn } from "@/lib/utils";
 import { formatDate as formatDateLocale } from "@/lib/format-date";
 import type { Locale } from "@/lib/i18n";
 import { t } from "@/lib/i18n/translations";
+import { getPaymentBadge } from "@/lib/payment-status";
 
 // ─── Types ──────────────────────────────────────────
 
@@ -17,6 +18,7 @@ interface Booking {
   status: string;
   participantCount: number;
   notes: string | null;
+  paymentStatus: string;
   studentFirstName: string | null;
   studentLastName: string | null;
   studentEmail: string;
@@ -308,6 +310,31 @@ export function BookingsCalendar({ bookings, availability, locale }: Props) {
                             {booking.locationName}
                           </div>
                         )}
+                        {(() => {
+                          // Tiny corner indicator: ✓ for paid, € for cash,
+                          // ! for failed/incomplete. Tooltip carries the
+                          // localized full label.
+                          const pb = getPaymentBadge(booking.paymentStatus);
+                          if (!pb) return null;
+                          const glyph =
+                            booking.paymentStatus === "paid"
+                              ? "✓"
+                              : booking.paymentStatus === "manual"
+                                ? "€"
+                                : booking.paymentStatus === "refunded"
+                                  ? "↩"
+                                  : "!";
+                          const label = t(pb.labelKey, locale);
+                          return (
+                            <span
+                              className="absolute right-1 top-0.5 inline-flex h-3.5 w-3.5 items-center justify-center rounded-full bg-white/90 text-[9px] font-bold leading-none text-green-900"
+                              title={label}
+                              aria-label={label}
+                            >
+                              {glyph}
+                            </span>
+                          );
+                        })()}
                       </div>
                     );
                   })}
@@ -329,6 +356,18 @@ export function BookingsCalendar({ bookings, availability, locale }: Props) {
               <div>
                 <h3 className="font-display text-lg font-medium text-green-900">
                   {booking.studentFirstName} {booking.studentLastName}
+                  {(() => {
+                    const pb = getPaymentBadge(booking.paymentStatus);
+                    if (!pb) return null;
+                    const label = t(pb.labelKey, locale);
+                    return (
+                      <span
+                        className={`ml-2 inline-flex items-center rounded-full ${pb.bg} px-2 py-0.5 align-middle text-[10px] font-medium ${pb.fg}`}
+                      >
+                        {label}
+                      </span>
+                    );
+                  })()}
                   {!booking.studentEmailVerified && (
                     <span className="ml-2 inline-flex items-center rounded-full bg-amber-100 px-2 py-0.5 align-middle text-[10px] font-medium text-amber-700">
                       {t("proBookingsView.emailUnverified", locale)}

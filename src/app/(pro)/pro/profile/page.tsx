@@ -33,6 +33,7 @@ export default async function ProProfilePage() {
         <ProProfileEditor
           locale={locale}
           profile={{
+            id: profile.id,
             displayName: profile.displayName,
             bio: profile.bio,
             specialties: profile.specialties,
@@ -51,7 +52,6 @@ export default async function ProProfilePage() {
             cancellationHours: profile.cancellationHours,
             allowBookingWithoutPayment: profile.allowBookingWithoutPayment,
             published: profile.published,
-            slug: profile.slug,
           }}
         />
       </div>

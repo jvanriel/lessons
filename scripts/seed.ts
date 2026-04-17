@@ -64,7 +64,6 @@ async function seed() {
       .insert(schema.proProfiles)
       .values({
         userId: jan.id,
-        slug: "jan-van-riel",
         displayName: "Jan Van Riel",
         bio: "Test pro account for development purposes. Not a real golf professional.",
         specialties: "Platform testing",

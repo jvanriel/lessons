@@ -42,7 +42,6 @@ async function main() {
     .insert(schema.proProfiles)
     .values({
       userId: proUser.id,
-      slug: "dummy-pro",
       displayName: "Dummy Pro",
       bio: "Test pro account for automated testing.",
       specialties: "Testing",

@@ -18,7 +18,7 @@ import { t } from "@/lib/i18n/translations";
 
 interface Props {
   data: QuickBookData;
-  proSlug: string;
+  proId: number;
   hasPaymentMethod?: boolean;
   allowBookingWithoutPayment?: boolean;
   locale: Locale;
@@ -47,7 +47,7 @@ function makeDateFormatters(locale: Locale) {
   };
 }
 
-export function QuickBook({ data, proSlug, hasPaymentMethod = true, allowBookingWithoutPayment = false, locale }: Props) {
+export function QuickBook({ data, proId, hasPaymentMethod = true, allowBookingWithoutPayment = false, locale }: Props) {
   const fd = makeDateFormatters(locale);
   const formatShortDate = fd.short;
   const formatDatePillDay = fd.pillDay;
@@ -419,7 +419,7 @@ export function QuickBook({ data, proSlug, hasPaymentMethod = true, allowBooking
               ))}
             </div>
             <Link
-              href={`/member/book/${proSlug}?full=1`}
+              href={`/member/book/${proId}?full=1`}
               className="text-xs text-green-500 hover:text-green-700"
             >
               {t("memberQB.moreOptions", locale)}

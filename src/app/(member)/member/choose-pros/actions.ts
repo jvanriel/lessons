@@ -16,7 +16,6 @@ export async function getPublishedPros() {
     .select({
       id: proProfiles.id,
       displayName: proProfiles.displayName,
-      slug: proProfiles.slug,
       photoUrl: proProfiles.photoUrl,
       specialties: proProfiles.specialties,
       bio: proProfiles.bio,

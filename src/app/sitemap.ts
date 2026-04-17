@@ -17,12 +17,12 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   ];
 
   const pros = await db
-    .select({ slug: proProfiles.slug, updatedAt: proProfiles.updatedAt })
+    .select({ id: proProfiles.id, updatedAt: proProfiles.updatedAt })
     .from(proProfiles)
     .where(and(eq(proProfiles.published, true), isNull(proProfiles.deletedAt)));
 
   const proRoutes: MetadataRoute.Sitemap = pros.map((p) => ({
-    url: `${SITE_URL}/pros/${p.slug}`,
+    url: `${SITE_URL}/pros/${p.id}`,
     lastModified: p.updatedAt,
     changeFrequency: "weekly",
     priority: 0.7,

@@ -35,7 +35,6 @@ const inputClass =
 interface Pro {
   id: number;
   displayName: string;
-  slug: string;
   photoUrl: string | null;
   specialties: string | null;
   bio: string | null;

@@ -545,18 +545,11 @@ export async function activateAsPro(
     .limit(1);
 
   if (!existingProfile) {
-    // Insert with temporary slug, then update with the generated ID
-    const [inserted] = await db.insert(proProfiles).values({
+    await db.insert(proProfiles).values({
       userId,
-      slug: `temp-${userId}`,
       displayName: `${user.firstName} ${user.lastName}`,
       published: false,
-    }).returning({ id: proProfiles.id });
-
-    await db
-      .update(proProfiles)
-      .set({ slug: String(inserted.id) })
-      .where(eq(proProfiles.id, inserted.id));
+    });
   }
 
   // Send activation email

@@ -14,6 +14,7 @@ import { BookingsView } from "./BookingsView";
 import { BookingRefreshListener } from "@/components/BookingRefreshListener";
 import { getLocale } from "@/lib/locale";
 import { t } from "@/lib/i18n/translations";
+import { getPaymentBadge } from "@/lib/payment-status";
 
 export const metadata = { title: "Bookings — Golf Lessons" };
 
@@ -33,6 +34,7 @@ export default async function ProBookingsPage() {
         status: lessonBookings.status,
         participantCount: lessonBookings.participantCount,
         notes: lessonBookings.notes,
+        paymentStatus: lessonBookings.paymentStatus,
         studentFirstName: users.firstName,
         studentLastName: users.lastName,
         studentEmail: users.email,
@@ -113,6 +115,18 @@ export default async function ProBookingsPage() {
                       <span className="ml-2 text-sm text-green-600">
                         {booking.studentFirstName} {booking.studentLastName}
                       </span>
+                      {(() => {
+                        const pb = getPaymentBadge(booking.paymentStatus);
+                        if (!pb) return null;
+                        const label = t(pb.labelKey, locale);
+                        return (
+                          <span
+                            className={`ml-2 inline-flex items-center rounded-full ${pb.bg} px-2 py-0.5 text-[10px] font-medium ${pb.fg}`}
+                          >
+                            {label}
+                          </span>
+                        );
+                      })()}
                     </div>
                     <span
                       className={

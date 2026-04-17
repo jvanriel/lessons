@@ -68,7 +68,6 @@ export async function getBookablePros() {
   const rows = await db
     .select({
       id: proProfiles.id,
-      slug: proProfiles.slug,
       displayName: proProfiles.displayName,
       photoUrl: proProfiles.photoUrl,
       specialties: proProfiles.specialties,
@@ -701,12 +700,31 @@ export async function createBooking(formData: FormData) {
     : "";
 
   if (pro) {
+    // Re-read paymentStatus — the PI flow above may have flipped it from
+    // "pending" to "paid" / "failed" / "requires_action" since the initial
+    // insert. Used by both the in-app notification and the pro email.
+    const [latestBooking] = await db
+      .select({ paymentStatus: lessonBookings.paymentStatus })
+      .from(lessonBookings)
+      .where(eq(lessonBookings.id, booking.id))
+      .limit(1);
+    const currentPaymentStatus =
+      latestBooking?.paymentStatus ?? initialPaymentStatus;
+
+    const PAYMENT_HINT: Record<string, string> = {
+      paid: " — Prepaid",
+      manual: " — Cash on the day",
+      failed: " — Online payment failed, please follow up",
+      requires_action: " — Payment incomplete (3DS pending)",
+    };
+    const hint = PAYMENT_HINT[currentPaymentStatus] ?? "";
+
     await createNotification({
       type: "new_booking",
       priority: "high",
       targetUserId: pro.userId,
       title: "New lesson booking",
-      message: `${firstName} ${lastName} booked a lesson on ${date} at ${startTime}.`,
+      message: `${firstName} ${lastName} booked a lesson on ${date} at ${startTime}.${hint}`,
       actionUrl: "/pro/bookings",
       actionLabel: "View bookings",
     });
@@ -768,6 +786,7 @@ export async function createBooking(formData: FormData) {
         participantCount,
         notes,
         locale: proLocale,
+        paymentStatus: currentPaymentStatus,
       }),
       attachments: [icsAttachment],
     }).catch(() => {});

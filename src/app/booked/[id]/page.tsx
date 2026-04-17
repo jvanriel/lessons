@@ -42,7 +42,6 @@ export default async function BookingConfirmedPage({ params }: Props) {
       paymentStatus: lessonBookings.paymentStatus,
       proProfileId: proProfiles.id,
       proDisplayName: proProfiles.displayName,
-      proSlug: proProfiles.slug,
       locationName: locations.name,
       locationCity: locations.city,
       userOnboardedAt: users.onboardingCompletedAt,

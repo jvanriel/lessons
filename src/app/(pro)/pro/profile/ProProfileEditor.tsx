@@ -7,6 +7,7 @@ import { t } from "@/lib/i18n/translations";
 import type { Locale } from "@/lib/i18n";
 
 interface ProfileData {
+  id: number;
   displayName: string;
   bio: string | null;
   specialties: string | null;
@@ -21,7 +22,6 @@ interface ProfileData {
   cancellationHours: number;
   allowBookingWithoutPayment: boolean;
   published: boolean;
-  slug: string;
 }
 
 const inputClass =
@@ -105,7 +105,7 @@ export default function ProProfileEditor({
         </div>
         {profile.published && (
           <Link
-            href={`/pros/${profile.slug}`}
+            href={`/pros/${profile.id}`}
             className="text-xs text-gold-600 hover:text-gold-500"
             target="_blank"
           >

@@ -1,6 +1,6 @@
 # Gap Analysis — Pre-Launch
 
-Last updated: 2026-04-13 (evening)
+Last updated: 2026-04-17
 
 Living document tracking what's left before golflessons.be can go live.
 Cross-reference for sprint planning and Nadine's testing feedback.
@@ -61,10 +61,11 @@ to adjust without code.
 ### 1. Pre-launch site password hardcoded
 
 - `src/middleware.ts:12` — `SITE_PASSWORD = "prolessons"`. Rotate or remove gate before public launch.
+- **Coupled with the new public booking flow**: `/book/[slug]` and `/booked/t/[token]` are not in the middleware bypass matcher (`src/middleware.ts:84-87`), so they sit behind the password gate today. Removing the gate at launch automatically opens them. If we want public booking to go live earlier, either add `book` and `booked` to the matcher exclusion, or rotate the password and share with early-access pros.
 
-### 2. DNS Belgium registrant fix
+### ~~2. DNS Belgium registrant fix~~ — **resolved 2026-04-17**
 
-- Deadline ~**2026-04-24** (10 days out). Vercel needs to handle. See memory `project_dns_belgium`.
+Registrant info corrected via Vercel before the 2026-04-24 deadline.
 
 ### 3. Pro-authored content + translations + CMS architecture review
 
@@ -90,7 +91,31 @@ The platform CMS (`cms_blocks`) has per-locale rows but is operated by the platf
 
 ## 🟡 Should-fix before launch
 
-- **`db.transaction()` wrapping in `createBooking()`** — multi-step inserts (booking + participant + relationship) can leave partial state on failure. **Blocked**: the current `drizzle-orm/neon-http` driver doesn't support multi-statement transactions. Move to `neon-serverless` (WebSocket) or `pg` first, then re-introduce. Initial attempt in commit `ea60e63` broke the booking flow (Nadine's task #12) and was reverted in `b95dc35`. The proper fix is a driver migration — see Open Questions #4.
+- **`db.transaction()` wrapping in `createBooking()`** — multi-step inserts (booking + participant + relationship) can leave partial state on failure. **Blocked**: the current `drizzle-orm/neon-http` driver doesn't support multi-statement transactions. Move to `neon-serverless` (WebSocket) or `pg` first, then re-introduce. Initial attempt in commit `ea60e63` broke the booking flow (Nadine's task #12) and was reverted in `b95dc35`. The proper fix is a driver migration — see Open Questions #4. **Note**: the public booking action `/book/[slug]/actions.ts` has the same multi-row insert pattern (user + booking + participant + pro_students) and inherits this gap.
+
+### Pro slug → ID migration — run on production
+
+Drop `pro_profiles.slug` on the production DB before deploying the slug-refactor code; otherwise the deployed code will reference a non-existent column and every pro insert will fail (slug was `NOT NULL UNIQUE` and the new code doesn't supply it). Already applied to preview.
+
+```bash
+POSTGRES_URL="postgres://prod-..." pnpm tsx scripts/drop-pro-slug-column.ts
+```
+
+The script is idempotent (it noop's if the column is already gone). After this runs, the existing pro rows keep their `id` and the new URL pattern (`/book/24`, `/pros/24`, `/member/book/24`) takes effect on next deploy. No redirect table for old slugs — pre-launch only, no real student traffic depended on them.
+
+### Public booking flow — production readiness
+
+Shipped 2026-04-15 → 04-17 (see Recently shipped). Items to verify before flipping the password gate:
+
+- **Production env vars not in `.env.example`.** The new flow needs four vars in Vercel `production` env:
+  - `NEXT_PUBLIC_RECAPTCHA_SITE_KEY` (client) and `RECAPTCHA_SECRET_KEY` (server) — Google reCAPTCHA v3
+  - `KV_REST_API_URL` and `KV_REST_API_TOKEN` — Upstash Redis (rate limiter backend)
+
+  Verify all four are set in Vercel (`vercel env ls --environment=production`). Without Upstash the rate limiter throws (does NOT fail open) and bookings break; without reCAPTCHA the verifier returns score 0 and bookings still go through (intentional graceful degrade). Add all four to `.env.example` so the next dev knows.
+- **No password validation surface on register-from-claim.** The post-claim register flow at `/register?email=…&pro=…` should enforce minimum strength on the password field. Verify the `/api/register` POST already validates (it should from earlier work) and that the wizard surfaces the error inline.
+- **Token enumeration on `/booked/t/[token]`.** Endpoint has no rate limit. Token entropy is high (32 bytes) so practical risk is low, but worth a per-IP soft cap once we see real traffic.
+- **Upstash failover not handled.** If KV is unreachable the rate limiter throws and the booking action fails. Acceptable given Upstash's SLA, but worth a Sentry alert on `tags.area = "rate-limit"` so we notice quickly.
+- **Test suite preconditions are implicit.** `src/lib/__tests__/public-booking-flow.test.ts` requires `DUMMY_PRO` and `DUMMY_STUDENT` env vars + a valid Gmail service account; failures are quiet if either is missing. Document in CI setup before wiring tests into a pipeline.
 
 ### Sprint B follow-ups (payment flow)
 
@@ -128,7 +153,23 @@ The platform CMS (`cms_blocks`) has per-locale rows but is operated by the platf
   - Embedded `/pros` browser in onboarding instead of flat list.
   - Re-enabling email field after registration (requires verify-new-email flow). **Note**: shipped as a typo-fix-only path in commit 66125d2 (task #23). A full email-change-after-verification flow is still post-launch.
 
-## Recently shipped (last big sweep — 2026-04-13)
+## Recently shipped (sweep — 2026-04-17, ID-based pro URLs)
+
+- **Vanity slugs replaced with sequence-number URLs** — `pro_profiles.slug` column dropped; route directories renamed from `[slug]` to `[proId]` for `/book/`, `/pros/`, `/(member)/member/book/`. URLs go from `/book/claude-test-pro` to `/book/24`. `pickUniqueProSlug` and `slugifyProName` helpers in `src/lib/pro.ts` deleted. Sitemap, internal Link refs, onboarding, profile editor, register, choose-pros, dashboard quick-rebook, ProPagesList, JoinButton, both seed scripts, and both integration test suites all updated. Migration: `scripts/drop-pro-slug-column.ts` (idempotent). **Run on production before deploy** — see should-fix.
+
+## Recently shipped (sweep — 2026-04-15 → 2026-04-17, public booking flow)
+
+- **Public booking at `/book/[slug]`** — zero-friction wizard, no account required. Multi-location pros get a location step (auto-skipped for single-location); single-duration pros skip the duration step. Phone field uses `libphonenumber-js` (Belgium default, E.164 storage). Bookings confirmed immediately, `paymentStatus="manual"` (Phase A — payment integration on the public path is post-launch).
+- **Claim flow at `/api/auth/claim-booking`** — email-verify-only token (7-day JWT, no auto-login). Verified students land on a token-based read-only booking page `/booked/t/[token]` with a register CTA.
+- **Pre-fill registration from booking** — `/register` wizard pre-populates name/email/phone from the booking row; scheduling step dropped.
+- **Pro-side "email unverified" badge** — surfaces on `/pro/bookings` (list + calendar), in-app notification, and the pro confirmation email when the student hasn't verified.
+- **reCAPTCHA v3 + Upstash rate limit** — `book_lesson` action with 0.5 score threshold; 5 bookings/hour per IP+email via `Ratelimit.slidingWindow`. Both fail-tolerant: 3s timeout on `grecaptcha.ready()` (mobile / content blockers), missing token treated as score 0.
+- **Case-insensitive email uniqueness** — functional `UNIQUE INDEX on LOWER(email)` on `users` and `user_emails`. One-shot migration `scripts/migrate-email-lower-unique.ts`, applied to preview + prod.
+- **Public-booking test suite** — 185 cases in `src/lib/__tests__/public-booking-flow.test.ts` covering scenarios 1-9 (new/unverified/verified branches, honeypot, double-booking, multi-location), with Gmail API integration for end-to-end email verification. Seed via `pnpm tsx scripts/seed-claude-dummies.ts` (creates `dummy-pro-claude@golflessons.be` + `dummy-student-claude@golflessons.be` with 2 locations).
+- **Build perf** — removed `lucide-react` (-38 MB) and 3 dead mockup pages (`booking`, `pro-profile`, `student-page`); added `.vercelignore` to skip `docs/`, `scripts/`, and `src/lib/__tests__/` during Vercel upload.
+- **Docs**: `docs/public-booking-flow.md` (10 scenarios + FAQ + email checklist + multi-location), `docs/money-flows.md` (full payment flows for student + pro + cash-only paths).
+
+## Recently shipped (sweep — 2026-04-13)
 
 - Four-pass i18n audit — every user-visible string in member/* and pro/* translated in EN / NL / FR, including app shell (sidebar, bottom nav, install-guide dialog), full booking wizard, all pro-side editors (profile, locations, availability, students incl. help dialog, quick book, cancel booking), `/pro/billing`, `/pro/earnings`, `/pro/bookings` (list + calendar + detail), `/pro/pages`, `/pro/mailings`, `/pro/tasks` chrome, `/pro/onboarding` wizard, `/pro/subscribe`, `/pro/register`, `/member/dashboard` + help dialog + quick rebook, `/member/bookings`, `/member/coaching`, `/member/choose-pros`, `/pros/[slug]`, error boundaries.
 - Welcome-as-pro email — 4-step onboarding guide (verify → subscribe → profile → publish) wired into `/pro/register`. Three email locale call-site bugs fixed (old register action, pro-invites-student, pro-resets-student-password).

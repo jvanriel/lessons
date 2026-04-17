@@ -124,7 +124,8 @@ export const proProfiles = pgTable("pro_profiles", {
     .references(() => users.id, { onDelete: "cascade" })
     .notNull()
     .unique(),
-  slug: varchar("slug", { length: 100 }).notNull().unique(),
+  // Vanity slug removed 2026-04-17 — pro URLs are now `/book/{id}`,
+  // `/pros/{id}`, `/member/book/{id}` keyed off this row's serial id.
   displayName: varchar("display_name", { length: 255 }).notNull(),
   bio: text("bio"),
   specialties: varchar("specialties", { length: 500 }),

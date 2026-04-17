@@ -5,6 +5,7 @@ import { BookingsCalendar } from "./BookingsCalendar";
 import { formatDate as formatDateHelper } from "@/lib/format-date";
 import type { Locale } from "@/lib/i18n";
 import { t } from "@/lib/i18n/translations";
+import { getPaymentBadge } from "@/lib/payment-status";
 
 interface Booking {
   id: number;
@@ -14,6 +15,7 @@ interface Booking {
   status: string;
   participantCount: number;
   notes: string | null;
+  paymentStatus: string;
   studentFirstName: string | null;
   studentLastName: string | null;
   studentEmail: string;
@@ -81,6 +83,19 @@ function BookingsList({ bookings, locale }: { bookings: Booking[]; locale: Local
                   <div>
                     <p className="text-sm text-green-800">
                       {b.studentFirstName} {b.studentLastName}
+                      {(() => {
+                        const pb = getPaymentBadge(b.paymentStatus);
+                        if (!pb) return null;
+                        const label = t(pb.labelKey, locale);
+                        return (
+                          <span
+                            className={`ml-2 inline-flex items-center rounded-full ${pb.bg} px-2 py-0.5 text-[10px] font-medium ${pb.fg}`}
+                            title={label}
+                          >
+                            {label}
+                          </span>
+                        );
+                      })()}
                       {!b.studentEmailVerified && (
                         <span className="ml-2 inline-flex items-center rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-medium text-amber-700" title={t("proBookingsView.emailUnverified", locale)}>
                           {t("proBookingsView.emailUnverified", locale)}

@@ -16,7 +16,6 @@ export default async function ProsPage() {
   const pros = await db
     .select({
       id: proProfiles.id,
-      slug: proProfiles.slug,
       displayName: proProfiles.displayName,
       bio: proProfiles.bio,
       specialties: proProfiles.specialties,
@@ -66,7 +65,7 @@ export default async function ProsPage() {
               return (
                 <Link
                   key={pro.id}
-                  href={`/pros/${pro.slug}`}
+                  href={`/pros/${pro.id}`}
                   className="group rounded-xl border border-green-200 bg-white p-6 transition-colors hover:border-green-300"
                 >
                   <div className="flex items-start gap-4">

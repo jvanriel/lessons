@@ -37,7 +37,7 @@ export default async function MemberBookingsPage() {
       participantCount: lessonBookings.participantCount,
       notes: lessonBookings.notes,
       proName: proProfiles.displayName,
-      proSlug: proProfiles.slug,
+      proId: proProfiles.id,
       locationName: locations.name,
       locationCity: locations.city,
       cancellationHours: proProfiles.cancellationHours,

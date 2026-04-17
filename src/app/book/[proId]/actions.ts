@@ -73,7 +73,6 @@ export async function getAllBookablePros() {
   const pros = await db
     .select({
       id: proProfiles.id,
-      slug: proProfiles.slug,
       displayName: proProfiles.displayName,
       photoUrl: proProfiles.photoUrl,
       bio: proProfiles.bio,
@@ -140,11 +139,12 @@ export async function getAllBookablePros() {
     .filter((p) => p.locations.length > 0);
 }
 
-export async function getPublicPro(slug: string) {
+export async function getPublicPro(proIdStr: string) {
+  const id = Number.parseInt(proIdStr, 10);
+  if (!Number.isFinite(id)) return null;
   const [pro] = await db
     .select({
       id: proProfiles.id,
-      slug: proProfiles.slug,
       displayName: proProfiles.displayName,
       photoUrl: proProfiles.photoUrl,
       bio: proProfiles.bio,
@@ -159,7 +159,7 @@ export async function getPublicPro(slug: string) {
     .from(proProfiles)
     .where(
       and(
-        eq(proProfiles.slug, slug),
+        eq(proProfiles.id, id),
         eq(proProfiles.published, true),
         eq(proProfiles.bookingEnabled, true),
         isNull(proProfiles.deletedAt)
@@ -383,7 +383,7 @@ export async function getPublicAvailableDates(
 export async function createPublicBooking(formData: FormData) {
   const uiLocale = await getLocale();
 
-  const slug = (formData.get("slug") as string) || "";
+  const proIdStr = (formData.get("proId") as string) || "";
   const proLocationId = Number(formData.get("proLocationId"));
   const date = formData.get("date") as string;
   const startTime = formData.get("startTime") as string;
@@ -420,7 +420,7 @@ export async function createPublicBooking(formData: FormData) {
   }
 
   if (
-    !slug ||
+    !proIdStr ||
     !proLocationId ||
     !date ||
     !startTime ||
@@ -451,7 +451,7 @@ export async function createPublicBooking(formData: FormData) {
   }
 
   // Load pro (public view — same guards as getPublicPro).
-  const pro = await getPublicPro(slug);
+  const pro = await getPublicPro(proIdStr);
   if (!pro) return { error: t("publicBook.err.proNotFound", uiLocale) };
 
   // Verify slot is still free. This is the same integrity check the
@@ -692,7 +692,7 @@ export async function createPublicBooking(formData: FormData) {
       priority: "high",
       targetUserId: proUser.userId,
       title: "New lesson booking",
-      message: `${firstName} ${lastName} booked a lesson on ${date} at ${startTime}.${branch !== "verified" ? " (email not yet verified)" : ""}`,
+      message: `${firstName} ${lastName} booked a lesson on ${date} at ${startTime}. — Cash on the day${branch !== "verified" ? " (email not yet verified)" : ""}`,
       actionUrl: "/pro/bookings",
       actionLabel: "View bookings",
     });
@@ -718,6 +718,8 @@ export async function createPublicBooking(formData: FormData) {
         notes,
         locale: proLocale,
         emailUnverified: branch !== "verified",
+        // Public booking is Phase A: zero-friction, no online charge.
+        paymentStatus: "manual",
       }),
       attachments: [icsAttachment],
     }).catch(() => {});

@@ -44,7 +44,6 @@ async function main() {
     .insert(schema.proProfiles)
     .values({
       userId: thibautUser.id,
-      slug: "thibaut-leys",
       displayName: "Thibaut Leys",
       bio: "Thibaut is a passionate golf professional with years of experience helping players of all levels improve their game. His patient teaching style and deep understanding of swing mechanics make him a favorite among both beginners and experienced golfers looking to take their game to the next level.\n\nWith a focus on building solid fundamentals and developing a repeatable, consistent swing, Thibaut ensures every student leaves each lesson with clear takeaways and a personalized practice plan.",
       specialties: "Swing mechanics, short game, course management",
@@ -90,7 +89,6 @@ async function main() {
     .insert(schema.proProfiles)
     .values({
       userId: olivierUser.id,
-      slug: "olivier-philips",
       displayName: "Olivier Philips",
       bio: "Olivier grew up with golf — he started at age ten at Drie Eycken in Edegem and knew early on that he wanted to make the game his profession. After a career as teaching professional at The National Golf Brussels, he now works from Kempense Golf in Mol, where he coaches golfers of every level.\n\nOlivier's approach is personal and long-term. He follows each student's development season after season, adapting his coaching to their individual game. No one-off clinics, but an ongoing collaboration that ensures real, lasting improvement.",
       specialties: "Full swing, putting, player development",
@@ -187,7 +185,7 @@ async function main() {
       metaDescription: "Book golf lessons with Thibaut Leys. Expert coaching in swing mechanics, short game, and course management.",
       intro: "Welcome! I'm Thibaut, a golf professional dedicated to helping you improve your game. Whether you're picking up a club for the first time or looking to shave strokes off your handicap, I'm here to guide you with personalized coaching tailored to your goals.\n\nI believe in building solid fundamentals and developing a swing you can trust under pressure. Every lesson comes with a clear practice plan so you keep improving between sessions.",
       ctaLabel: "Book a Lesson",
-      ctaUrl: "/member/book/thibaut-leys",
+      ctaUrl: `/member/book/${thibautProfile.id}`,
       published: true,
     },
     {
@@ -198,7 +196,7 @@ async function main() {
       metaDescription: "Book golf lessons with Olivier Philips at Kempense Golf, Mol. Experienced coaching for all levels.",
       intro: "Golf has been my life since I was ten years old. After years as a teaching professional at The National Golf Brussels, I now coach from Kempense Golf in Mol.\n\nMy approach is simple: I get to know your game, set clear goals, and work with you over time to achieve real, lasting improvement. I combine technical instruction with on-course strategy, and I use video analysis to give you visual feedback on your progress.\n\nI look forward to working with you — whether it's your first lesson or your hundredth.",
       ctaLabel: "Book a Lesson",
-      ctaUrl: "/member/book/olivier-philips",
+      ctaUrl: `/member/book/${olivierProfile.id}`,
       published: true,
     },
   ];

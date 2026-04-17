@@ -11,8 +11,8 @@
     "db:studio": "drizzle-kit studio",
     "db:seed": "tsx scripts/seed.ts",
     "test:backup": "tsx scripts/test-backup-restore.ts",
-    "test": "vitest",
-    "test:run": "vitest run"
+    "test": "vitest --no-file-parallelism",
+    "test:run": "vitest run --no-file-parallelism"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.82.0",

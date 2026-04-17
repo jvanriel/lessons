@@ -15,15 +15,17 @@ import { getLocale } from "@/lib/locale";
 import { t } from "@/lib/i18n/translations";
 
 interface Props {
-  params: Promise<{ slug: string }>;
+  params: Promise<{ proId: string }>;
 }
 
 export async function generateMetadata({ params }: Props) {
-  const { slug } = await params;
+  const { proId } = await params;
+  const id = Number.parseInt(proId, 10);
+  if (!Number.isFinite(id)) return { title: "Pro not found" };
   const [pro] = await db
     .select({ displayName: proProfiles.displayName, bio: proProfiles.bio })
     .from(proProfiles)
-    .where(and(eq(proProfiles.slug, slug), eq(proProfiles.published, true), isNull(proProfiles.deletedAt)))
+    .where(and(eq(proProfiles.id, id), eq(proProfiles.published, true), isNull(proProfiles.deletedAt)))
     .limit(1);
 
   if (!pro) return { title: "Pro not found" };
@@ -34,8 +36,10 @@ export async function generateMetadata({ params }: Props) {
 }
 
 export default async function ProProfilePage({ params }: Props) {
-  const { slug } = await params;
+  const { proId } = await params;
   const locale = await getLocale();
+  const id = Number.parseInt(proId, 10);
+  if (!Number.isFinite(id)) notFound();
 
   const [pro] = await db
     .select({
@@ -52,7 +56,7 @@ export default async function ProProfilePage({ params }: Props) {
     })
     .from(proProfiles)
     .innerJoin(users, eq(proProfiles.userId, users.id))
-    .where(and(eq(proProfiles.slug, slug), eq(proProfiles.published, true), isNull(proProfiles.deletedAt)))
+    .where(and(eq(proProfiles.id, id), eq(proProfiles.published, true), isNull(proProfiles.deletedAt)))
     .limit(1);
 
   if (!pro) notFound();
@@ -139,7 +143,7 @@ export default async function ProProfilePage({ params }: Props) {
             <div className="mt-4 flex flex-wrap gap-3">
               {pro.bookingEnabled && (
                 <Link
-                  href={`/book/${slug}`}
+                  href={`/book/${pro.id}`}
                   className="inline-block rounded-md bg-gold-600 px-5 py-2.5 text-sm font-medium text-white transition-colors hover:bg-gold-500"
                 >
                   {t("proBrowse.bookALesson", locale)}
@@ -147,7 +151,6 @@ export default async function ProProfilePage({ params }: Props) {
               )}
               <JoinButton
                 proProfileId={pro.id}
-                slug={slug}
                 isLoggedIn={relationship.isLoggedIn}
                 isStudent={relationship.isStudent}
               />
@@ -215,7 +218,7 @@ export default async function ProProfilePage({ params }: Props) {
               {flyerPages.map((page) => (
                 <Link
                   key={page.slug}
-                  href={`/pros/${slug}/${page.slug}`}
+                  href={`/pros/${pro.id}/${page.slug}`}
                   className="flex items-center justify-between rounded-lg bg-green-50 p-4 transition-colors hover:bg-green-100"
                 >
                   <div>

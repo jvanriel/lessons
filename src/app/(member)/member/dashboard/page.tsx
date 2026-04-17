@@ -44,7 +44,7 @@ export default async function MemberDashboard() {
       startTime: lessonBookings.startTime,
       endTime: lessonBookings.endTime,
       proName: proProfiles.displayName,
-      proSlug: proProfiles.slug,
+      proId: proProfiles.id,
       locationName: locations.name,
     })
     .from(lessonBookings)
@@ -89,7 +89,6 @@ export default async function MemberDashboard() {
     .select({
       proStudentId: proStudents.id,
       proProfileId: proStudents.proProfileId,
-      slug: proProfiles.slug,
       displayName: proProfiles.displayName,
       photoUrl: proProfiles.photoUrl,
       specialties: proProfiles.specialties,
@@ -208,7 +207,7 @@ export default async function MemberDashboard() {
                   </Link>
                   {pro.bookingEnabled && !quickBookMap[pro.proStudentId] && (
                     <Link
-                      href={`/member/book/${pro.slug}`}
+                      href={`/member/book/${pro.proProfileId}`}
                       className="flex flex-1 items-center justify-center rounded-md bg-gold-600 px-3 py-1.5 text-xs font-medium text-white transition-colors hover:bg-gold-500"
                     >
                       {t("memberDash.bookLesson", locale)}
@@ -218,7 +217,7 @@ export default async function MemberDashboard() {
                 {quickBookMap[pro.proStudentId] && (
                   <QuickBook
                     data={quickBookMap[pro.proStudentId]}
-                    proSlug={pro.slug}
+                    proId={pro.proProfileId}
                     hasPaymentMethod={hasPaymentMethod}
                     allowBookingWithoutPayment={pro.allowBookingWithoutPayment}
                     locale={locale}

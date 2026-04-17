@@ -21,11 +21,11 @@ interface ProPage {
 
 export default function ProPagesList({
   pages,
-  proSlug,
+  proId,
   locale,
 }: {
   pages: ProPage[];
-  proSlug: string;
+  proId: number;
   locale: Locale;
 }) {
   const [createState, createAction, createPending] = useActionState(
@@ -108,7 +108,7 @@ export default function ProPagesList({
               <div className="flex items-center gap-2">
                 {page.published && (
                   <Link
-                    href={`/pros/${proSlug}/${page.slug}`}
+                    href={`/pros/${proId}/${page.slug}`}
                     className="text-xs text-gold-600 hover:text-gold-500"
                     target="_blank"
                   >

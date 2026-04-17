@@ -37,7 +37,6 @@ interface Location {
 
 interface Pro {
   id: number;
-  slug: string;
   displayName: string;
   photoUrl: string | null;
   specialties?: string | null;
@@ -200,7 +199,7 @@ export default function PublicBookingWizard({
     }
 
     const formData = new FormData();
-    formData.set("slug", pro.slug);
+    formData.set("proId", String(pro.id));
     formData.set("proLocationId", String(locationId));
     formData.set("date", date);
     formData.set("startTime", slot.startTime);

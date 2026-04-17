@@ -11,13 +11,17 @@ import { getLocale } from "@/lib/locale";
 export async function generateMetadata({
   params,
 }: {
-  params: Promise<{ slug: string }>;
+  params: Promise<{ proId: string }>;
 }) {
-  const { slug } = await params;
+  const { proId } = await params;
+  const id = Number.parseInt(proId, 10);
+  if (!Number.isFinite(id)) {
+    return { title: "Book a Lesson — Golf Lessons" };
+  }
   const [pro] = await db
     .select({ displayName: proProfiles.displayName })
     .from(proProfiles)
-    .where(and(eq(proProfiles.slug, slug), isNull(proProfiles.deletedAt)))
+    .where(and(eq(proProfiles.id, id), isNull(proProfiles.deletedAt)))
     .limit(1);
 
   return {
@@ -31,17 +35,18 @@ export default async function BookingPage({
   params,
   searchParams,
 }: {
-  params: Promise<{ slug: string }>;
+  params: Promise<{ proId: string }>;
   searchParams: Promise<{ full?: string }>;
 }) {
-  const { slug } = await params;
+  const { proId } = await params;
   const { full } = await searchParams;
   const locale = await getLocale();
+  const id = Number.parseInt(proId, 10);
+  if (!Number.isFinite(id)) notFound();
 
   const [pro] = await db
     .select({
       id: proProfiles.id,
-      slug: proProfiles.slug,
       displayName: proProfiles.displayName,
       photoUrl: proProfiles.photoUrl,
       specialties: proProfiles.specialties,
@@ -55,7 +60,7 @@ export default async function BookingPage({
     })
     .from(proProfiles)
     .where(
-      and(eq(proProfiles.slug, slug), eq(proProfiles.published, true), isNull(proProfiles.deletedAt))
+      and(eq(proProfiles.id, id), eq(proProfiles.published, true), isNull(proProfiles.deletedAt))
     )
     .limit(1);
 
@@ -128,7 +133,6 @@ export default async function BookingPage({
       <BookingWizard
         pro={{
           id: pro.id,
-          slug: pro.slug,
           displayName: pro.displayName,
           photoUrl: pro.photoUrl,
           specialties: pro.specialties,

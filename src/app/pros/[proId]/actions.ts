@@ -1,12 +1,12 @@
 "use server";
 
 import { db } from "@/lib/db";
-import { proStudents, proProfiles } from "@/lib/db/schema";
+import { proStudents } from "@/lib/db/schema";
 import { eq, and } from "drizzle-orm";
 import { getSession, hasRole } from "@/lib/auth";
 import { revalidatePath } from "next/cache";
 
-export async function joinAsStudent(proProfileId: number, slug: string) {
+export async function joinAsStudent(proProfileId: number) {
   const session = await getSession();
   if (!session || !hasRole(session, "member")) {
     return { error: "You must be logged in to join." };
@@ -42,7 +42,7 @@ export async function joinAsStudent(proProfileId: number, slug: string) {
     });
   }
 
-  revalidatePath(`/pros/${slug}`);
+  revalidatePath(`/pros/${proProfileId}`);
   return { success: true };
 }
 

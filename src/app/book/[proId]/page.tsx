@@ -4,21 +4,21 @@ import { getPublicPro, getPublicLocations } from "./actions";
 import PublicBookingWizard from "./PublicBookingWizard";
 
 interface Props {
-  params: Promise<{ slug: string }>;
+  params: Promise<{ proId: string }>;
 }
 
 export async function generateMetadata({ params }: Props) {
-  const { slug } = await params;
-  const pro = await getPublicPro(slug);
+  const { proId } = await params;
+  const pro = await getPublicPro(proId);
   if (!pro) return { title: "Not found" };
   return { title: `Book with ${pro.displayName} — Golf Lessons` };
 }
 
 export default async function PublicBookingPage({ params }: Props) {
-  const { slug } = await params;
+  const { proId } = await params;
   const locale = await getLocale();
 
-  const pro = await getPublicPro(slug);
+  const pro = await getPublicPro(proId);
   if (!pro) notFound();
 
   const proLocs = await getPublicLocations(pro.id);
@@ -29,7 +29,6 @@ export default async function PublicBookingPage({ params }: Props) {
       <PublicBookingWizard
         initialPro={{
           id: pro.id,
-          slug: pro.slug,
           displayName: pro.displayName,
           photoUrl: pro.photoUrl,
           specialties: pro.specialties,

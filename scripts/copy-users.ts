@@ -79,7 +79,6 @@ async function main() {
           .insert(schema.proProfiles)
           .values({
             userId: user.id,
-            slug: "olivier-philips",
             displayName: `${r.first_name} ${r.last_name}`,
             published: false, // Will publish when profile is filled out
           })

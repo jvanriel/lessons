@@ -847,6 +847,13 @@ const BOOKING_PRO_STRINGS: Record<Locale, {
   notes: string;
   cta: string;
   unverifiedBadge: string;
+  paymentNotice: {
+    paid: string;
+    manual: string;
+    failed: string;
+    requires_action: string;
+    refunded: string;
+  };
 }> = {
   en: {
     subject: (s) => `New lesson booking from ${s}`,
@@ -866,6 +873,13 @@ const BOOKING_PRO_STRINGS: Record<Locale, {
     cta: "Open in dashboard",
     unverifiedBadge:
       "Heads up: the student hasn't verified their email yet. They'll be prompted to do so when they click the link in their confirmation email.",
+    paymentNotice: {
+      paid: "Prepaid online — funds collected. You'll see this in your next payout.",
+      manual: "Cash on the day — please collect payment from the student at the lesson.",
+      failed: "Online payment failed. Please contact the student to arrange payment before the lesson.",
+      requires_action: "Payment is awaiting student authentication (3D Secure). The student will be prompted to complete it.",
+      refunded: "This booking was refunded — the lesson is cancelled.",
+    },
   },
   nl: {
     subject: (s) => `Nieuwe lesboeking van ${s}`,
@@ -885,6 +899,13 @@ const BOOKING_PRO_STRINGS: Record<Locale, {
     cta: "Openen in dashboard",
     unverifiedBadge:
       "Let op: de leerling heeft zijn e-mailadres nog niet bevestigd. Dat gebeurt zodra hij op de link in zijn bevestigingsmail klikt.",
+    paymentNotice: {
+      paid: "Online vooruitbetaald — geld ontvangen. Je ziet het op je volgende uitbetaling.",
+      manual: "Contant op de dag — gelieve de betaling van de leerling tijdens de les te ontvangen.",
+      failed: "Online betaling mislukt. Neem contact op met de leerling om de betaling vóór de les te regelen.",
+      requires_action: "Betaling wacht op verificatie van de leerling (3D Secure). De leerling krijgt een melding om dit af te ronden.",
+      refunded: "Deze boeking is terugbetaald — de les is geannuleerd.",
+    },
   },
   fr: {
     subject: (s) => `Nouvelle réservation de ${s}`,
@@ -904,6 +925,13 @@ const BOOKING_PRO_STRINGS: Record<Locale, {
     cta: "Ouvrir dans le tableau de bord",
     unverifiedBadge:
       "Attention : l'élève n'a pas encore vérifié son adresse e-mail. Il le fera en cliquant sur le lien dans son e-mail de confirmation.",
+    paymentNotice: {
+      paid: "Prépayé en ligne — paiement reçu. Vous le verrez sur votre prochain versement.",
+      manual: "Espèces le jour même — veuillez encaisser le paiement auprès de l'élève au cours de la leçon.",
+      failed: "Le paiement en ligne a échoué. Veuillez contacter l'élève pour organiser le paiement avant le cours.",
+      requires_action: "Le paiement attend l'authentification de l'élève (3D Secure). L'élève sera invité à la compléter.",
+      refunded: "Cette réservation a été remboursée — le cours est annulé.",
+    },
   },
 };
 
@@ -922,6 +950,7 @@ export function buildProBookingNotificationEmail(opts: {
   notes: string | null;
   locale: Locale;
   emailUnverified?: boolean;
+  paymentStatus?: string;
 }): string {
   const s = BOOKING_PRO_STRINGS[opts.locale] ?? BOOKING_PRO_STRINGS.en;
   const studentFullName = `${opts.studentFirstName} ${opts.studentLastName}`;
@@ -945,11 +974,33 @@ export function buildProBookingNotificationEmail(opts: {
     ? `<div style="background:#fef3c7;border:1px solid #fbbf24;border-radius:6px;padding:12px 16px;margin:0 0 16px 0;font-size:13px;color:#92400e;">${s.unverifiedBadge}</div>`
     : "";
 
+  // Payment-state notice (prepaid / cash / failed / etc.). Mirrors the
+  // colour palette of the in-app badges from src/lib/payment-status.ts.
+  const PAYMENT_PALETTE: Record<
+    string,
+    { bg: string; fg: string; border: string }
+  > = {
+    paid: { bg: "#dcfce7", fg: "#15803d", border: "#86efac" },
+    manual: { bg: "#fef3c7", fg: "#92400e", border: "#fbbf24" },
+    failed: { bg: "#fee2e2", fg: "#b91c1c", border: "#fca5a5" },
+    requires_action: { bg: "#ffedd5", fg: "#c2410c", border: "#fdba74" },
+    refunded: { bg: "#f5f5f4", fg: "#57534e", border: "#d6d3d1" },
+  };
+  const paymentNotice = (() => {
+    if (!opts.paymentStatus) return "";
+    const palette = PAYMENT_PALETTE[opts.paymentStatus];
+    const message =
+      s.paymentNotice[opts.paymentStatus as keyof typeof s.paymentNotice];
+    if (!palette || !message) return "";
+    return `<div style="background:${palette.bg};border:1px solid ${palette.border};border-radius:6px;padding:12px 16px;margin:0 0 16px 0;font-size:13px;color:${palette.fg};">${message}</div>`;
+  })();
+
   const body = `
     <h2 style="font-family:Georgia,'Times New Roman',serif;font-size:22px;color:${COLORS.green950};margin:0 0 16px 0;font-weight:normal;">
       ${s.greeting} ${opts.proFirstName},
     </h2>
     <p style="margin:0 0 20px 0;">${s.body(studentFullName)}</p>
+    ${paymentNotice}
     ${unverifiedNotice}
     ${detailsTable(rows)}
     <p style="margin:0 0 24px 0;">

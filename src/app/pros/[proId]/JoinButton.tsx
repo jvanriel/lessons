@@ -6,12 +6,10 @@ import { joinAsStudent } from "./actions";
 
 export default function JoinButton({
   proProfileId,
-  slug,
   isLoggedIn,
   isStudent,
 }: {
   proProfileId: number;
-  slug: string;
   isLoggedIn: boolean;
   isStudent: boolean;
 }) {
@@ -44,7 +42,7 @@ export default function JoinButton({
   function handleJoin() {
     setError(null);
     startTransition(async () => {
-      const result = await joinAsStudent(proProfileId, slug);
+      const result = await joinAsStudent(proProfileId);
       if (result.error) {
         setError(result.error);
       } else {

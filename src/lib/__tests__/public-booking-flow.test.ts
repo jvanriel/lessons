@@ -313,7 +313,7 @@ async function getNextAvailableDate(
 // ─── Core booking function (mirrors createPublicBooking) ─
 
 async function createBookingDirect(opts: {
-  slug: string;
+  proId: number;
   proLocationId: number;
   date: string;
   startTime: string;
@@ -336,7 +336,7 @@ async function createBookingDirect(opts: {
 
   // Validate required fields
   if (
-    !opts.slug ||
+    !opts.proId ||
     !opts.proLocationId ||
     !opts.date ||
     !opts.startTime ||
@@ -361,7 +361,6 @@ async function createBookingDirect(opts: {
   const [pro] = await db
     .select({
       id: proProfiles.id,
-      slug: proProfiles.slug,
       displayName: proProfiles.displayName,
       lessonDurations: proProfiles.lessonDurations,
       lessonPricing: proProfiles.lessonPricing,
@@ -373,7 +372,7 @@ async function createBookingDirect(opts: {
     .from(proProfiles)
     .where(
       and(
-        eq(proProfiles.slug, opts.slug),
+        eq(proProfiles.id, opts.proId),
         eq(proProfiles.published, true),
         eq(proProfiles.bookingEnabled, true)
       )
@@ -777,7 +776,7 @@ describe("Phase 1: New student booking (branch=new)", () => {
   it("creates booking successfully", async () => {
     emailSentAt = Date.now();
     const result = await createBookingDirect({
-      slug: "claude-test-pro",
+      proId: PRO_PROFILE_ID,
       proLocationId: PRO_LOCATION_ID,
       date: bookingDate,
       startTime: bookingStartTime,
@@ -992,7 +991,7 @@ describe("Phase 2: Verified student rebooking (branch=verified)", () => {
 
     emailSentAt2 = Date.now();
     const result = await createBookingDirect({
-      slug: "claude-test-pro",
+      proId: PRO_PROFILE_ID,
       proLocationId: PRO_LOCATION_ID,
       date: bookingDate2,
       startTime: bookingStartTime2,
@@ -1089,7 +1088,7 @@ describe("Phase 3: Unverified returning student (branch=unverified)", () => {
 
     emailSentAt3 = Date.now();
     const result = await createBookingDirect({
-      slug: "claude-test-pro",
+      proId: PRO_PROFILE_ID,
       proLocationId: PRO_LOCATION_ID,
       date,
       startTime: slot.startTime,
@@ -1155,7 +1154,7 @@ describe("Phase 3: Unverified returning student (branch=unverified)", () => {
 describe("Phase 4: Edge cases", () => {
   it("honeypot triggers silent discard", async () => {
     const result = await createBookingDirect({
-      slug: "claude-test-pro",
+      proId: PRO_PROFILE_ID,
       proLocationId: PRO_LOCATION_ID,
       date: "2026-05-01",
       startTime: "10:00",
@@ -1182,7 +1181,7 @@ describe("Phase 4: Edge cases", () => {
 
   it("rejects booking with missing required fields", async () => {
     const result = await createBookingDirect({
-      slug: "claude-test-pro",
+      proId: PRO_PROFILE_ID,
       proLocationId: PRO_LOCATION_ID,
       date: "2026-05-01",
       startTime: "10:00",
@@ -1199,7 +1198,7 @@ describe("Phase 4: Edge cases", () => {
 
   it("rejects booking with invalid email format", async () => {
     const result = await createBookingDirect({
-      slug: "claude-test-pro",
+      proId: PRO_PROFILE_ID,
       proLocationId: PRO_LOCATION_ID,
       date: "2026-05-01",
       startTime: "10:00",
@@ -1216,7 +1215,7 @@ describe("Phase 4: Edge cases", () => {
 
   it("rejects booking with invalid phone format", async () => {
     const result = await createBookingDirect({
-      slug: "claude-test-pro",
+      proId: PRO_PROFILE_ID,
       proLocationId: PRO_LOCATION_ID,
       date: "2026-05-01",
       startTime: "10:00",
@@ -1231,9 +1230,9 @@ describe("Phase 4: Edge cases", () => {
     expect(result).toHaveProperty("error");
   });
 
-  it("rejects booking for non-existent pro slug", async () => {
+  it("rejects booking for non-existent pro id", async () => {
     const result = await createBookingDirect({
-      slug: "nonexistent-pro-slug-xyz",
+      proId: 999999, // never assigned
       proLocationId: PRO_LOCATION_ID,
       date: "2026-05-01",
       startTime: "10:00",
@@ -1270,7 +1269,7 @@ describe("Phase 4: Edge cases", () => {
 
     // Book it once
     const result1 = await createBookingDirect({
-      slug: "claude-test-pro",
+      proId: PRO_PROFILE_ID,
       proLocationId: PRO_LOCATION_ID,
       date,
       startTime: slot.startTime,
@@ -1287,7 +1286,7 @@ describe("Phase 4: Edge cases", () => {
 
     // Try to book the same slot again
     const result2 = await createBookingDirect({
-      slug: "claude-test-pro",
+      proId: PRO_PROFILE_ID,
       proLocationId: PRO_LOCATION_ID,
       date,
       startTime: slot.startTime,

@@ -70,7 +70,6 @@ async function main() {
     .insert(schema.proProfiles)
     .values({
       userId: proUser.id,
-      slug: "claude-test-pro",
       displayName: "Claude Test Pro",
       bio: "Automated testing pro. Do not book real lessons here.",
       specialties: "Testing, QA",
@@ -87,7 +86,6 @@ async function main() {
     .onConflictDoUpdate({
       target: schema.proProfiles.userId,
       set: {
-        slug: "claude-test-pro",
         displayName: "Claude Test Pro",
         lessonDurations: [30, 60],
         lessonPricing: { "30": 3500, "60": 6500 },
@@ -299,7 +297,7 @@ async function main() {
 
   console.log("\n─── Summary ───");
   console.log(`  Pro:     ${PRO_EMAIL}`);
-  console.log(`  Profile: /book/claude-test-pro`);
+  console.log(`  Profile: /book/${proProfile.id}`);
   console.log(`  Student: ${STUDENT_EMAIL} (does NOT exist — ready for Phase 1)`);
   console.log(`  Inbox:   it.admin (both emails alias here)`);
   console.log("\nDone!");

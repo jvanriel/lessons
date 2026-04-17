@@ -8,16 +8,18 @@ import { getLocale } from "@/lib/locale";
 import { t } from "@/lib/i18n/translations";
 
 interface Props {
-  params: Promise<{ slug: string; pageSlug: string }>;
+  params: Promise<{ proId: string; pageSlug: string }>;
 }
 
 export async function generateMetadata({ params }: Props) {
-  const { slug, pageSlug } = await params;
+  const { proId, pageSlug } = await params;
+  const id = Number.parseInt(proId, 10);
+  if (!Number.isFinite(id)) return { title: "Not found" };
 
   const [pro] = await db
     .select({ id: proProfiles.id, displayName: proProfiles.displayName })
     .from(proProfiles)
-    .where(and(eq(proProfiles.slug, slug), eq(proProfiles.published, true), isNull(proProfiles.deletedAt)))
+    .where(and(eq(proProfiles.id, id), eq(proProfiles.published, true), isNull(proProfiles.deletedAt)))
     .limit(1);
 
   if (!pro) return { title: "Not found" };
@@ -43,18 +45,19 @@ export async function generateMetadata({ params }: Props) {
 }
 
 export default async function ProFlyerPage({ params }: Props) {
-  const { slug, pageSlug } = await params;
+  const { proId, pageSlug } = await params;
   const locale = await getLocale();
+  const id = Number.parseInt(proId, 10);
+  if (!Number.isFinite(id)) notFound();
 
   const [pro] = await db
     .select({
       id: proProfiles.id,
       displayName: proProfiles.displayName,
       photoUrl: proProfiles.photoUrl,
-      slug: proProfiles.slug,
     })
     .from(proProfiles)
-    .where(and(eq(proProfiles.slug, slug), eq(proProfiles.published, true), isNull(proProfiles.deletedAt)))
+    .where(and(eq(proProfiles.id, id), eq(proProfiles.published, true), isNull(proProfiles.deletedAt)))
     .limit(1);
 
   if (!pro) notFound();
@@ -93,7 +96,7 @@ export default async function ProFlyerPage({ params }: Props) {
           className={`relative mx-auto max-w-4xl px-6 ${page.heroImage ? "pb-12 pt-20" : "py-16"}`}
         >
           <Link
-            href={`/pros/${pro.slug}`}
+            href={`/pros/${pro.id}`}
             className="mb-4 inline-flex items-center gap-2 text-sm text-green-100/60 hover:text-gold-200"
           >
             <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>

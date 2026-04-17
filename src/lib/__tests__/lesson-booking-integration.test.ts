@@ -86,7 +86,6 @@ beforeAll(async () => {
     .insert(proProfiles)
     .values({
       userId: TEST_PRO_USER_ID,
-      slug: `test-pro-${TEST_SUFFIX}`,
       displayName: "Test Pro",
       lessonDurations: [30, 60, 90],
       bookingNotice: 24,
@@ -222,9 +221,9 @@ async function getAvailableSlotsFromDb(proProfileId: number, proLocationId: numb
 
 describe("database connectivity", () => {
   it("can connect and read test pro profile", async () => {
-    const [profile] = await db.select({ id: proProfiles.id, slug: proProfiles.slug }).from(proProfiles).where(eq(proProfiles.id, TEST_PRO_PROFILE_ID)).limit(1);
+    const [profile] = await db.select({ id: proProfiles.id }).from(proProfiles).where(eq(proProfiles.id, TEST_PRO_PROFILE_ID)).limit(1);
     expect(profile).toBeDefined();
-    expect(profile.slug).toContain("test-pro-");
+    expect(profile.id).toBe(TEST_PRO_PROFILE_ID);
   });
 
   it("can read test student user", async () => {

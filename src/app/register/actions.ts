@@ -127,8 +127,6 @@ export async function register(
 
   // For pro registrations: create pro profile and redirect to onboarding
   if (accountType === "pro") {
-    const slug = `${firstName}-${lastName}`.toLowerCase().replace(/[^a-z0-9-]/g, "-").replace(/-+/g, "-");
-
     // Check if profile already exists (e.g. account upgrade)
     const [existingProfile] = await db
       .select({ id: proProfiles.id })
@@ -139,7 +137,6 @@ export async function register(
     if (!existingProfile) {
       await db.insert(proProfiles).values({
         userId,
-        slug: `${slug}-${userId}`,
         displayName: `${firstName} ${lastName}`,
       });
     }

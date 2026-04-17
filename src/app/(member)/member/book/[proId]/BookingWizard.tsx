@@ -18,7 +18,6 @@ import { formatPrice } from "@/lib/pricing";
 
 interface ProInfo {
   id: number;
-  slug: string;
   displayName: string;
   photoUrl: string | null;
   specialties: string | null;

@@ -33,7 +33,7 @@ export default async function ProPagesPage() {
       <p className="mt-2 text-sm text-green-600">
         {t("proPages.pageSubtitle", locale)}
       </p>
-      <ProPagesList pages={pages} proSlug={profile.slug} locale={locale} />
+      <ProPagesList pages={pages} proId={profile.id} locale={locale} />
     </div>
   );
 }
