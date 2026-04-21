@@ -13,6 +13,7 @@ import {
   createPublicBooking,
   getPublicSlots,
   getPublicAvailableDates,
+  resendBookingConfirmation,
 } from "./actions";
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -98,6 +99,9 @@ export default function PublicBookingWizard({
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState(false);
   const [branch, setBranch] = useState<"new" | "unverified" | "verified" | null>(null);
+  const [manageToken, setManageToken] = useState<string | null>(null);
+  const [resendState, setResendState] = useState<"idle" | "pending" | "sent" | "error">("idle");
+  const [resendError, setResendError] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
 
   // When the user picks a pro, reset all downstream state and apply the
@@ -222,8 +226,24 @@ export default function PublicBookingWizard({
       } else {
         setSuccess(true);
         if ("branch" in result && result.branch) setBranch(result.branch);
+        if ("manageToken" in result && result.manageToken) {
+          setManageToken(result.manageToken);
+        }
       }
     });
+  }
+
+  async function handleResend() {
+    if (!manageToken || resendState === "pending") return;
+    setResendState("pending");
+    setResendError(null);
+    const result = await resendBookingConfirmation(manageToken);
+    if ("error" in result && result.error) {
+      setResendState("error");
+      setResendError(result.error);
+    } else {
+      setResendState("sent");
+    }
   }
 
   if (success) {
@@ -242,9 +262,46 @@ export default function PublicBookingWizard({
           <p className="mt-3 text-green-700">
             {t("publicBook.success.body", locale).replace("{email}", email)}
           </p>
-          <p className="mt-6 text-sm text-green-600">
-            {t("publicBook.success.checkSpam", locale)}
-          </p>
+
+          {/* Fallback if the email didn't arrive. Only shown for the
+              new/unverified branches — verified users got a
+              login-style email and can just sign in. */}
+          {manageToken && branch !== "verified" && (
+            <div className="mt-6 border-t border-green-100 pt-6 text-sm">
+              <p className="text-green-600">
+                {t("publicBook.success.checkSpam", locale)}
+              </p>
+              <p className="mt-2 text-green-600">
+                {t("publicBook.success.stillNothing", locale)}{" "}
+                {resendState === "sent" ? (
+                  <span className="font-medium text-green-800">
+                    {t("publicBook.success.resent", locale)}
+                  </span>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={handleResend}
+                    disabled={resendState === "pending"}
+                    className="font-medium text-gold-700 underline underline-offset-2 transition-colors hover:text-gold-800 disabled:cursor-not-allowed disabled:opacity-60"
+                  >
+                    {t("publicBook.success.resendCta", locale)}
+                  </button>
+                )}
+              </p>
+              {resendState === "error" && resendError && (
+                <p className="mt-2 text-xs text-red-600">
+                  {resendError ||
+                    t("publicBook.success.resendError", locale)}
+                </p>
+              )}
+            </div>
+          )}
+
+          {!manageToken && (
+            <p className="mt-6 text-sm text-green-600">
+              {t("publicBook.success.checkSpam", locale)}
+            </p>
+          )}
         </div>
 
         {/* Verified user → login link; new/unverified → register upsell */}

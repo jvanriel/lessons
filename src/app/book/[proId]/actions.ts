@@ -49,7 +49,12 @@ import { getLocale } from "@/lib/locale";
 import { addDaysToDateString, todayInTZ } from "@/lib/local-date";
 import { getProLocationTimezone } from "@/lib/pro";
 import { updateBookingPreferences } from "@/lib/booking-preferences";
-import { limitByKey, publicBookingLimiter, getClientIp } from "@/lib/rate-limit";
+import {
+  limitByKey,
+  publicBookingLimiter,
+  resendClaimLimiter,
+  getClientIp,
+} from "@/lib/rate-limit";
 import { verifyRecaptcha } from "@/lib/recaptcha";
 
 function getSecret() {
@@ -742,5 +747,143 @@ export async function createPublicBooking(formData: FormData) {
     startTime
   ).catch(() => {});
 
-  return { success: true, bookingId: booking.id, branch };
+  return {
+    success: true,
+    bookingId: booking.id,
+    branch,
+    // Returned only to the caller (browser) so they can hit the
+    // resend-confirmation action without us handing it to anyone else.
+    // Never logged or exposed on subsequent pages.
+    manageToken: branch !== "verified" ? manageToken : null,
+  };
+}
+
+/**
+ * Resend the claim-and-verify confirmation email for a booking the
+ * caller just made. Authenticated purely by the `manageToken` they
+ * hold — same capability that gates /booked/t/[token]. Rate-limited
+ * via `resendClaimLimiter` to 3 per hour per booking.
+ *
+ * Called from the success screen's "didn't receive it?" fallback
+ * (task 51). Only works for unverified-branch bookings; verified
+ * users already have an account and got the login-style email.
+ */
+export async function resendBookingConfirmation(manageToken: string) {
+  if (!manageToken || typeof manageToken !== "string") {
+    return { error: "Invalid token" };
+  }
+
+  const limit = await limitByKey(resendClaimLimiter, manageToken);
+  if (!limit.ok) {
+    return {
+      error: `Even geduld — probeer opnieuw over ${limit.retryAfter}s.`,
+    };
+  }
+
+  const [booking] = await db
+    .select({
+      id: lessonBookings.id,
+      proProfileId: lessonBookings.proProfileId,
+      proLocationId: lessonBookings.proLocationId,
+      bookedById: lessonBookings.bookedById,
+      date: lessonBookings.date,
+      startTime: lessonBookings.startTime,
+      endTime: lessonBookings.endTime,
+    })
+    .from(lessonBookings)
+    .where(eq(lessonBookings.manageToken, manageToken))
+    .limit(1);
+
+  if (!booking) return { error: "Booking not found" };
+
+  const [student] = await db
+    .select({
+      id: users.id,
+      firstName: users.firstName,
+      lastName: users.lastName,
+      email: users.email,
+      phone: users.phone,
+      emailVerifiedAt: users.emailVerifiedAt,
+      preferredLocale: users.preferredLocale,
+    })
+    .from(users)
+    .where(eq(users.id, booking.bookedById))
+    .limit(1);
+
+  if (!student) return { error: "Student not found" };
+  if (student.emailVerifiedAt) {
+    // Already verified — they should log in, not re-verify. Return a
+    // soft ok so the UI doesn't look broken.
+    return { success: true, alreadyVerified: true };
+  }
+
+  const [proRow] = await db
+    .select({
+      displayName: proProfiles.displayName,
+    })
+    .from(proProfiles)
+    .where(eq(proProfiles.id, booking.proProfileId))
+    .limit(1);
+
+  const [loc] = await db
+    .select({ name: locations.name, city: locations.city })
+    .from(proLocations)
+    .innerJoin(locations, eq(proLocations.locationId, locations.id))
+    .where(eq(proLocations.id, booking.proLocationId))
+    .limit(1);
+  const locationName = loc
+    ? loc.city
+      ? `${loc.name}, ${loc.city}`
+      : loc.name
+    : "";
+
+  const recipientLocale = resolveLocale(student.preferredLocale);
+
+  const duration = minutesBetween(booking.startTime, booking.endTime);
+
+  const token = await new SignJWT({
+    userId: student.id,
+    purpose: "claim-booking",
+    bookingId: booking.id,
+  })
+    .setProtectedHeader({ alg: "HS256" })
+    .setIssuedAt()
+    .setExpirationTime("7d")
+    .sign(getSecret());
+  const claimUrl = `${getBaseUrl()}/api/auth/claim-booking?token=${token}`;
+  const registerUrl =
+    `${getBaseUrl()}/register?firstName=${encodeURIComponent(student.firstName)}` +
+    `&lastName=${encodeURIComponent(student.lastName)}` +
+    `&email=${encodeURIComponent(student.email)}` +
+    `&phone=${encodeURIComponent(student.phone ?? "")}` +
+    `&pro=${booking.proProfileId}`;
+
+  await sendEmail({
+    to: student.email,
+    subject: getClaimBookingSubject(proRow?.displayName ?? "", recipientLocale),
+    html: buildClaimAndVerifyBookingEmail({
+      firstName: student.firstName,
+      proName: proRow?.displayName ?? "",
+      locationName,
+      date: booking.date,
+      startTime: booking.startTime,
+      endTime: booking.endTime,
+      duration,
+      claimUrl,
+      registerUrl,
+      locale: recipientLocale,
+    }),
+  }).catch(() => {
+    // Email delivery is best-effort; swallow the error to avoid
+    // revealing infra details. A user who really doesn't get the mail
+    // can hit the button again (rate-limit permitting).
+  });
+
+  return { success: true };
+}
+
+function minutesBetween(startTime: string, endTime: string): number {
+  const [sh, sm] = startTime.split(":").map(Number);
+  const [eh, em] = endTime.split(":").map(Number);
+  return eh * 60 + em - (sh * 60 + sm);
 }

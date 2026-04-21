@@ -55,6 +55,18 @@ export const publicBookingLimiter = new Ratelimit({
   analytics: true,
 });
 
+// Resend of the claim-and-verify confirmation email for a specific
+// booking. Keyed by the booking's manageToken so abusers can't flood
+// arbitrary inboxes — only the person who made the booking has the
+// token (it's in the success screen state and never leaves the
+// browser). 3 per hour is plenty for "didn't receive it" scenarios.
+export const resendClaimLimiter = new Ratelimit({
+  redis,
+  limiter: Ratelimit.slidingWindow(3, "1 h"),
+  prefix: "rl:resend-claim",
+  analytics: true,
+});
+
 /**
  * Get the client IP from request headers. Returns "unknown" if none present
  * (e.g. local dev). Vercel sets x-forwarded-for; x-real-ip is a fallback.
