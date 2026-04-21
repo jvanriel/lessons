@@ -1,5 +1,6 @@
-import { notFound } from "next/navigation";
+import { notFound, redirect } from "next/navigation";
 import { getLocale } from "@/lib/locale";
+import { getSession, hasRole } from "@/lib/auth";
 import { getPublicPro, getPublicLocations } from "./actions";
 import PublicBookingWizard from "./PublicBookingWizard";
 
@@ -17,6 +18,16 @@ export async function generateMetadata({ params }: Props) {
 export default async function PublicBookingPage({ params }: Props) {
   const { proId } = await params;
   const locale = await getLocale();
+
+  // Logged-in members belong in the registered flow — same visual layout
+  // after the task 57 refactor, but skips re-asking name/email/phone and
+  // suppresses the register/login upsell (task 54). We check role
+  // rather than just session so pros/admins keep using the public flow
+  // for ad-hoc testing.
+  const session = await getSession();
+  if (session && hasRole(session, "member")) {
+    redirect(`/member/book/${proId}`);
+  }
 
   const pro = await getPublicPro(proId);
   if (!pro) notFound();
