@@ -111,11 +111,16 @@ export async function register(
     .update(users)
     .set({ preferredLocale: locale })
     .where(eq(users.id, userId));
-  sendEmail({
-    to: email,
-    subject: getWelcomeSubject(acctType, locale),
-    html: buildWelcomeEmail({ firstName, accountType: acctType, locale }),
-  }).catch(() => {});
+  // Pro welcome has a 4-step setup guide they need; student welcome is
+  // skipped because the post-onboarding confirmation already doubles as
+  // the registration acknowledgement (task 56 — avoid double-mailing).
+  if (acctType === "pro") {
+    sendEmail({
+      to: email,
+      subject: getWelcomeSubject(acctType, locale),
+      html: buildWelcomeEmail({ firstName, accountType: acctType, locale }),
+    }).catch(() => {});
+  }
 
   const sessionRoles = accountType === "pro" ? ["member", "pro"] : ["member"];
 

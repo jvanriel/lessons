@@ -6,7 +6,7 @@ import { eq, and, isNull } from "drizzle-orm";
 import { hashPassword, setSessionCookie } from "@/lib/auth";
 import { createNotification } from "@/lib/notifications";
 import { sendEmail } from "@/lib/mail";
-import { buildWelcomeEmail, getWelcomeSubject, emailLayout } from "@/lib/email-templates";
+import { emailLayout } from "@/lib/email-templates";
 import { resolveLocale } from "@/lib/i18n";
 import { limitByIp, registerLimiter } from "@/lib/rate-limit";
 
@@ -89,11 +89,10 @@ export async function POST(request: Request) {
   }).catch(() => {});
 
   const locale = preferredLocale;
-  sendEmail({
-    to: email,
-    subject: getWelcomeSubject("student", locale),
-    html: buildWelcomeEmail({ firstName, accountType: "student", locale }),
-  }).catch(() => {});
+  // Welcome email deliberately skipped for students — the richer
+  // post-onboarding confirmation (see api/member/onboarding) doubles as
+  // the registration acknowledgement. Sending both made students receive
+  // two near-identical mails (task 56).
 
   // Send email verification link
   const verifyToken = await new SignJWT({

@@ -459,7 +459,7 @@ const CONFIRMATION_STRINGS: Record<Locale, {
 }> = {
   en: {
     subject: "Your Golf Lessons account is ready",
-    greeting: "Hi", intro: "Your account is set up and ready to go. Here's a summary of your choices:",
+    greeting: "Hi", intro: "Thank you for signing up. Your account is set up and ready to go. Here's a summary of your choices:",
     profileSection: "Golf Profile", handicapLabel: "Handicap", goalsLabel: "Goals", noHandicap: "Not set",
     prosSection: "Your Pros", schedulingSection: "Lesson Preferences",
     durationLabel: "Duration", dayLabel: "Day", timeLabel: "Time", intervalLabel: "Frequency",
@@ -469,7 +469,7 @@ const CONFIRMATION_STRINGS: Record<Locale, {
   },
   nl: {
     subject: "Je Golf Lessons account is klaar",
-    greeting: "Hallo", intro: "Je account is ingesteld en klaar voor gebruik. Hier is een overzicht van je keuzes:",
+    greeting: "Hallo", intro: "Bedankt voor je registratie. Je account is ingesteld en klaar voor gebruik. Hier is een overzicht van je keuzes:",
     profileSection: "Golfprofiel", handicapLabel: "Handicap", goalsLabel: "Doelen", noHandicap: "Niet ingesteld",
     prosSection: "Je pro's", schedulingSection: "Lesvoorkeuren",
     durationLabel: "Duur", dayLabel: "Dag", timeLabel: "Tijd", intervalLabel: "Frequentie",
@@ -479,7 +479,7 @@ const CONFIRMATION_STRINGS: Record<Locale, {
   },
   fr: {
     subject: "Votre compte Golf Lessons est prêt",
-    greeting: "Bonjour", intro: "Votre compte est configuré et prêt à l'emploi. Voici un résumé de vos choix :",
+    greeting: "Bonjour", intro: "Merci de vous être inscrit. Votre compte est configuré et prêt à l'emploi. Voici un résumé de vos choix :",
     profileSection: "Profil Golf", handicapLabel: "Handicap", goalsLabel: "Objectifs", noHandicap: "Non défini",
     prosSection: "Vos pros", schedulingSection: "Préférences de cours",
     durationLabel: "Durée", dayLabel: "Jour", timeLabel: "Heure", intervalLabel: "Fréquence",
