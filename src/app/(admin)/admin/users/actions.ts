@@ -9,6 +9,7 @@ import { sendEmail } from "@/lib/mail";
 import { buildInviteEmail, buildPasswordResetEmail, getEmailStrings } from "@/lib/email-templates";
 import { resolveLocale } from "@/lib/i18n";
 import { ensureProProfile, normalizeRoles } from "@/lib/pro";
+import { formatLocalDate } from "@/lib/local-date";
 
 async function requireAdmin() {
   const session = await getSession();
@@ -156,7 +157,7 @@ export async function deleteUser(userId: number) {
   }
 
   const now = new Date();
-  const today = now.toISOString().split("T")[0];
+  const today = formatLocalDate(now);
 
   // Cancel all future confirmed bookings (frees up slots)
   await db
@@ -234,7 +235,7 @@ export async function deleteUser(userId: number) {
  */
 async function purgeUserInternal(userId: number): Promise<{ success: boolean } | { error: string }> {
   const now = new Date();
-  const today = now.toISOString().split("T")[0];
+  const today = formatLocalDate(now);
 
   // Cancel future bookings first (so slots are freed)
   await db

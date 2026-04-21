@@ -20,6 +20,7 @@ import { hashPassword } from "@/lib/auth";
 import { sendEmail } from "@/lib/mail";
 import { buildInviteEmail, getEmailStrings } from "@/lib/email-templates";
 import { getLocale } from "@/lib/locale";
+import { formatLocalDate } from "@/lib/local-date";
 import { resolveLocale } from "@/lib/i18n";
 import { createNotification } from "@/lib/notifications";
 import {
@@ -362,8 +363,8 @@ export async function getProAllAvailableDates(
 
   const horizonEnd = new Date(now);
   horizonEnd.setDate(horizonEnd.getDate() + proSettings.bookingHorizon);
-  const todayStr = now.toISOString().split("T")[0];
-  const horizonStr = horizonEnd.toISOString().split("T")[0];
+  const todayStr = formatLocalDate(now);
+  const horizonStr = formatLocalDate(horizonEnd);
 
   const [templateRows, overrideRows, bookingRows] = await Promise.all([
     db
@@ -416,7 +417,7 @@ export async function getProAllAvailableDates(
   ]);
 
   function normalizeDate(d: string | Date): string {
-    if (d instanceof Date) return d.toISOString().split("T")[0];
+    if (d instanceof Date) return formatLocalDate(d);
     if (d.includes("T")) return d.split("T")[0];
     return d;
   }
@@ -426,7 +427,7 @@ export async function getProAllAvailableDates(
   cursor.setHours(0, 0, 0, 0);
 
   while (cursor <= horizonEnd) {
-    const dateStr = cursor.toISOString().split("T")[0];
+    const dateStr = formatLocalDate(cursor);
     const dateOverrides = overrideRows.filter(
       (o) =>
         normalizeDate(o.date as string | Date) === dateStr &&
@@ -580,7 +581,7 @@ function computeSuggestedDate(
 
   const start = new Date(today);
   start.setDate(start.getDate() + minDaysAhead);
-  return start.toISOString().split("T")[0];
+  return formatLocalDate(start);
 }
 
 export interface ProQuickBookData {
@@ -676,7 +677,7 @@ export async function getProQuickBookData(
   const windowStart = suggestedDate;
   const windowEndDate = new Date(suggestedDate + "T00:00:00");
   windowEndDate.setDate(windowEndDate.getDate() + 28);
-  const windowEnd = windowEndDate.toISOString().split("T")[0];
+  const windowEnd = formatLocalDate(windowEndDate);
 
   const [proSettings, templateRows, overrideRows, bookingRows] =
     await Promise.all([
@@ -735,7 +736,7 @@ export async function getProQuickBookData(
     ]);
 
   function normalizeDate(d: string | Date): string {
-    if (d instanceof Date) return d.toISOString().split("T")[0];
+    if (d instanceof Date) return formatLocalDate(d);
     if (d.includes("T")) return d.split("T")[0];
     return d;
   }
@@ -768,7 +769,7 @@ export async function getProQuickBookData(
 
   for (let i = 0; i < 28 && alternativeDates.length < 4; i++) {
     cursor.setDate(cursor.getDate() + 1);
-    const dateStr = cursor.toISOString().split("T")[0];
+    const dateStr = formatLocalDate(cursor);
     const daySlots = slotsForDate(dateStr);
     if (daySlots.length > 0) {
       alternativeDates.push(dateStr);
@@ -979,7 +980,7 @@ export async function getStudentBookings(proStudentId: number) {
   const { profile } = await requireProProfile();
   if (!profile) return [];
 
-  const today = new Date().toISOString().split("T")[0];
+  const today = formatLocalDate(new Date());
 
   // Get the student's userId from the proStudents relationship
   const [rel] = await db

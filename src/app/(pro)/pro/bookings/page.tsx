@@ -7,6 +7,7 @@ import {
   users,
 } from "@/lib/db/schema";
 import { eq, asc } from "drizzle-orm";
+import { todayLocal } from "@/lib/local-date";
 import { requireProProfile } from "@/lib/pro";
 import { redirect } from "next/navigation";
 import Link from "next/link";
@@ -66,7 +67,7 @@ export default async function ProBookingsPage() {
       .orderBy(proAvailability.dayOfWeek, proAvailability.startTime),
   ]);
 
-  const today = new Date().toISOString().split("T")[0];
+  const today = todayLocal();
   const past = bookings.filter(
     (b) => b.date < today || b.status !== "confirmed"
   );

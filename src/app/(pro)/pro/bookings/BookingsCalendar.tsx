@@ -4,6 +4,7 @@ import { useState, useMemo } from "react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { formatDate as formatDateLocale } from "@/lib/format-date";
+import { formatLocalDate, todayLocal } from "@/lib/local-date";
 import type { Locale } from "@/lib/i18n";
 import { t } from "@/lib/i18n/translations";
 import { getPaymentBadge } from "@/lib/payment-status";
@@ -79,15 +80,6 @@ function addDays(date: Date, days: number): Date {
   return d;
 }
 
-function formatDate(date: Date): string {
-  // Local YYYY-MM-DD. toISOString() would convert to UTC, shifting the date
-  // back a day in positive-offset timezones (e.g. Europe/Brussels).
-  const y = date.getFullYear();
-  const m = String(date.getMonth() + 1).padStart(2, "0");
-  const d = String(date.getDate()).padStart(2, "0");
-  return `${y}-${m}-${d}`;
-}
-
 function timeToMinutes(time: string): number {
   const [h, m] = time.split(":").map(Number);
   return h * 60 + m;
@@ -108,7 +100,7 @@ export function BookingsCalendar({ bookings, availability, locale }: Props) {
     return Array.from({ length: 7 }, (_, i) => addDays(weekStart, i));
   }, [weekStart]);
 
-  const today = formatDate(new Date());
+  const today = todayLocal();
 
   // Group bookings by date
   const bookingsByDate = useMemo(() => {
@@ -185,7 +177,7 @@ export function BookingsCalendar({ bookings, availability, locale }: Props) {
           <div className="sticky top-0 z-10 grid grid-cols-[60px_repeat(7,1fr)] border-b border-green-200 bg-white">
             <div className="border-r border-green-100 px-2 py-2" />
             {weekDates.map((date, i) => {
-              const dateStr = formatDate(date);
+              const dateStr = formatLocalDate(date);
               const isToday = dateStr === today;
               return (
                 <div
@@ -229,7 +221,7 @@ export function BookingsCalendar({ bookings, availability, locale }: Props) {
 
             {/* Day columns */}
             {weekDates.map((date, dayIdx) => {
-              const dateStr = formatDate(date);
+              const dateStr = formatLocalDate(date);
               const isToday = dateStr === today;
               const dayBookings = bookingsByDate.get(dateStr) ?? [];
               const dayAvail = availByDay.get(dayIdx) ?? [];

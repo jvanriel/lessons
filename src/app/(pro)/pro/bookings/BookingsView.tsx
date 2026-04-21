@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { BookingsCalendar } from "./BookingsCalendar";
 import { formatDate as formatDateHelper } from "@/lib/format-date";
+import { todayLocal } from "@/lib/local-date";
 import type { Locale } from "@/lib/i18n";
 import { t } from "@/lib/i18n/translations";
 import { getPaymentBadge } from "@/lib/payment-status";
@@ -42,7 +43,7 @@ function BookingsList({ bookings, locale }: { bookings: Booking[]; locale: Local
       year: "numeric",
     });
 
-  const today = new Date().toISOString().split("T")[0];
+  const today = todayLocal();
   const upcoming = bookings.filter(
     (b) => b.date >= today && b.status === "confirmed"
   );

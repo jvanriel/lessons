@@ -11,6 +11,7 @@ import { eq, and, gte, asc, isNull } from "drizzle-orm";
 import { getSession, hasRole } from "@/lib/auth";
 import { getLocale } from "@/lib/locale";
 import { formatDate } from "@/lib/format-date";
+import { todayLocal } from "@/lib/local-date";
 import { t } from "@/lib/i18n/translations";
 import { redirect } from "next/navigation";
 import Link from "next/link";
@@ -34,7 +35,7 @@ export default async function MemberDashboard() {
   }
   const locale = await getLocale();
 
-  const today = new Date().toISOString().split("T")[0];
+  const today = todayLocal();
 
   // Fetch upcoming bookings
   const upcomingBookings = await db

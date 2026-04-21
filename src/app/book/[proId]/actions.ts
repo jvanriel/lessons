@@ -46,6 +46,7 @@ import {
 import { resolveLocale, type Locale } from "@/lib/i18n";
 import { t } from "@/lib/i18n/translations";
 import { getLocale } from "@/lib/locale";
+import { formatLocalDate } from "@/lib/local-date";
 import { updateBookingPreferences } from "@/lib/booking-preferences";
 import { limitByKey, publicBookingLimiter, getClientIp } from "@/lib/rate-limit";
 import { verifyRecaptcha } from "@/lib/recaptcha";
@@ -284,8 +285,8 @@ export async function getPublicAvailableDates(
   const now = new Date();
   const horizonEnd = new Date(now);
   horizonEnd.setDate(horizonEnd.getDate() + pro.bookingHorizon);
-  const todayStr = now.toISOString().split("T")[0];
-  const horizonStr = horizonEnd.toISOString().split("T")[0];
+  const todayStr = formatLocalDate(now);
+  const horizonStr = formatLocalDate(horizonEnd);
 
   const [templates, overrides, bookings] = await Promise.all([
     db
@@ -341,7 +342,7 @@ export async function getPublicAvailableDates(
   const cursor = new Date(now);
   cursor.setHours(0, 0, 0, 0);
   while (cursor <= horizonEnd) {
-    const dateStr = cursor.toISOString().split("T")[0];
+    const dateStr = formatLocalDate(cursor);
     const dateOverrides = overrides.filter(
       (o) =>
         o.date === dateStr &&

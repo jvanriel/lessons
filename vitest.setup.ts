@@ -1,6 +1,13 @@
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 
+// Lock tests to the production timezone. Without this, date-key bugs that
+// only manifest in positive-offset zones (like task 46, where Thursday
+// bookings rendered under the Friday column in Europe/Brussels) would pass
+// on CI runners that default to UTC. Node reads `process.env.TZ` lazily,
+// so setting it here before any Date construction is sufficient.
+process.env.TZ = "Europe/Brussels";
+
 // Load .env.local for integration tests that need database credentials
 const envPath = resolve(__dirname, ".env.local");
 try {

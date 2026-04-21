@@ -36,6 +36,7 @@ import {
 import { resolveLocale, type Locale } from "@/lib/i18n";
 import { t } from "@/lib/i18n/translations";
 import { getLocale } from "@/lib/locale";
+import { formatLocalDate } from "@/lib/local-date";
 import { updateBookingPreferences } from "@/lib/booking-preferences";
 
 /**
@@ -148,8 +149,8 @@ export async function getAvailableDates(
     );
 
   // Get overrides in the window
-  const todayStr = now.toISOString().split("T")[0];
-  const horizonStr = horizonEnd.toISOString().split("T")[0];
+  const todayStr = formatLocalDate(now);
+  const horizonStr = formatLocalDate(horizonEnd);
 
   const overrides = await db
     .select({
@@ -192,7 +193,7 @@ export async function getAvailableDates(
   cursor.setHours(0, 0, 0, 0);
 
   while (cursor <= horizonEnd) {
-    const dateStr = cursor.toISOString().split("T")[0];
+    const dateStr = formatLocalDate(cursor);
 
     const dateOverrides = overrides.filter(
       (o) =>
@@ -852,7 +853,7 @@ function computeSuggestedDate(
     // If preferred day is today, diff = 0 → show today
     const next = new Date(today);
     next.setDate(next.getDate() + diff);
-    return next.toISOString().split("T")[0];
+    return formatLocalDate(next);
   }
 
   // Minimum days ahead based on interval
@@ -869,7 +870,7 @@ function computeSuggestedDate(
   if (diff < 0) diff += 7;
   earliest.setDate(earliest.getDate() + diff);
 
-  return earliest.toISOString().split("T")[0];
+  return formatLocalDate(earliest);
 }
 
 /**
@@ -945,7 +946,7 @@ export async function getQuickBookData(
   const windowStart = suggestedDate;
   const windowEndDate = new Date(suggestedDate + "T00:00:00");
   windowEndDate.setDate(windowEndDate.getDate() + 28);
-  const windowEnd = windowEndDate.toISOString().split("T")[0];
+  const windowEnd = formatLocalDate(windowEndDate);
 
   const [proSettings, templateRows, overrideRows, bookingRows] =
     await Promise.all([
@@ -1007,7 +1008,7 @@ export async function getQuickBookData(
 
   // Normalize date values from DB (may be Date objects or timezone-shifted strings)
   function normalizeDate(d: string | Date): string {
-    if (d instanceof Date) return d.toISOString().split("T")[0];
+    if (d instanceof Date) return formatLocalDate(d);
     if (d.includes("T")) return d.split("T")[0];
     return d;
   }
@@ -1041,7 +1042,7 @@ export async function getQuickBookData(
 
   for (let i = 0; i < 28 && alternativeDates.length < 4; i++) {
     cursor.setDate(cursor.getDate() + 1);
-    const dateStr = cursor.toISOString().split("T")[0];
+    const dateStr = formatLocalDate(cursor);
     const daySlots = slotsForDate(dateStr);
     if (daySlots.length > 0) {
       alternativeDates.push(dateStr);
@@ -1271,7 +1272,7 @@ export async function explainDateSlots(
   let noticeFilteredBefore: string | null = null;
 
   if (!byPro && bookingNotice > 0) {
-    const todayStr = now.toISOString().split("T")[0];
+    const todayStr = formatLocalDate(now);
     if (date <= todayStr) {
       const { formatInTimeZone } = await import("date-fns-tz");
       const cutoff = formatInTimeZone(threshold, "Europe/Brussels", "HH:mm");
@@ -1326,7 +1327,7 @@ export async function explainDateSlots(
 
       const cursor = new Date(today);
       while (cursor < targetDate && skippedDays.length < 14) {
-        const curDateStr = cursor.toISOString().split("T")[0];
+        const curDateStr = formatLocalDate(cursor);
         const curJsDay = cursor.getDay();
         const curIsoDay = curJsDay === 0 ? 6 : curJsDay - 1;
         const curDayName = dayNames[curIsoDay];

@@ -14,6 +14,7 @@ import { redirect } from "next/navigation";
 import AvailabilityEditor from "./AvailabilityEditor";
 import { BookingRefreshListener } from "@/components/BookingRefreshListener";
 import { getLocale } from "@/lib/locale";
+import { formatLocalDate } from "@/lib/local-date";
 import { t } from "@/lib/i18n/translations";
 import type {
   SerializedAvailability,
@@ -41,8 +42,8 @@ export default async function AvailabilityPage() {
   const rangeEnd = new Date(rangeStart);
   rangeEnd.setDate(rangeEnd.getDate() + 35);
 
-  const startStr = rangeStart.toISOString().split("T")[0];
-  const endStr = rangeEnd.toISOString().split("T")[0];
+  const startStr = formatLocalDate(rangeStart);
+  const endStr = formatLocalDate(rangeEnd);
 
   const [proLocs, templates, overrides, bookings, profileData] =
     await Promise.all([

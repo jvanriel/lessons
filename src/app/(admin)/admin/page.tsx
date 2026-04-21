@@ -2,11 +2,12 @@ import Link from "next/link";
 import { db } from "@/lib/db";
 import { users, proProfiles, lessonBookings, tasks } from "@/lib/db/schema";
 import { eq, isNull, gte, and, ne } from "drizzle-orm";
+import { todayLocal } from "@/lib/local-date";
 
 export const metadata = { title: "Admin — Golf Lessons" };
 
 export default async function AdminDashboard() {
-  const today = new Date().toISOString().split("T")[0];
+  const today = todayLocal();
 
   const [totalUsers, memberCount, proCount, bookingCount, openTaskCount] = await Promise.all([
     db.select({ id: users.id }).from(users).where(isNull(users.deletedAt)).then((r) => r.length),

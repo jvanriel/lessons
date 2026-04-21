@@ -5,7 +5,7 @@ export default defineConfig({
   test: {
     setupFiles: ["./vitest.setup.ts"],
     environment: "node",
-    exclude: ["**/node_modules/**", "**/reference/**"],
+    exclude: ["**/node_modules/**", "**/reference/**", "**/e2e/**"],
   },
   resolve: {
     alias: {

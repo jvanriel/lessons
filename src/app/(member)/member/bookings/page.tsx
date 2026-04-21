@@ -13,6 +13,7 @@ import { CancelBookingButton } from "./CancelBookingButton";
 import { BookingRefreshListener } from "@/components/BookingRefreshListener";
 import { getLocale } from "@/lib/locale";
 import { formatDate } from "@/lib/format-date";
+import { todayLocal } from "@/lib/local-date";
 import { t } from "@/lib/i18n/translations";
 
 export const metadata = { title: "My Bookings — Golf Lessons" };
@@ -25,7 +26,7 @@ export default async function MemberBookingsPage() {
 
   const locale = await getLocale();
 
-  const today = new Date().toISOString().split("T")[0];
+  const today = todayLocal();
 
   const allBookings = await db
     .select({
