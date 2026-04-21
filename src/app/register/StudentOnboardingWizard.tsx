@@ -664,10 +664,27 @@ function PaymentStep({
   if (clientSecret) {
     return (
       <div className="space-y-4">
-        <p className="text-sm text-green-600">{t("onboarding.paymentSecure", locale)}</p>
+        {/* The "Je kaart wordt veilig bewaard" helper is intentionally
+            omitted here — Stripe's PaymentElement renders its own
+            mandate/consent text below the card form, so showing both
+            felt redundant (task 55). We add an explicit Terms link
+            below so "hun voorwaarden" has a concrete target even when
+            Stripe's own mandate doesn't linkify it. */}
         <Elements stripe={getStripe()} options={{ clientSecret, appearance: { theme: "stripe", variables: { colorPrimary: "#091a12", colorBackground: "#faf7f0", colorText: "#091a12", fontFamily: "Outfit, system-ui, sans-serif", borderRadius: "8px" } } }}>
           <PaymentForm onSuccess={onSuccess} locale={locale} billing={billing} />
         </Elements>
+        <p className="text-xs text-green-500">
+          {t("onboarding.paymentTermsPrefix", locale)}{" "}
+          <a
+            href="/terms"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="underline hover:text-green-700"
+          >
+            {t("onboarding.paymentTermsLink", locale)}
+          </a>
+          {t("onboarding.paymentTermsSuffix", locale)}
+        </p>
         <button type="button" onClick={onSkip} className="mt-2 w-full text-center text-sm text-green-500 hover:text-green-700">{t("onboarding.skipPayment", locale)}</button>
       </div>
     );

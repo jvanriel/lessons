@@ -649,9 +649,9 @@ function PaymentStep({
   if (clientSecret) {
     return (
       <div className="space-y-4">
-        <p className="text-sm text-green-600">
-          Your card will be saved securely for future lesson payments.
-        </p>
+        {/* Stripe's PaymentElement renders its own mandate/consent text
+            for saving a card off-session — we no longer add a redundant
+            "your card will be saved" line above it (task 55). */}
         <Elements
           stripe={getStripe()}
           options={{
@@ -670,6 +670,18 @@ function PaymentStep({
         >
           <PaymentForm onSuccess={onSuccess} />
         </Elements>
+        <p className="text-xs text-green-500">
+          By saving your card you agree to our{" "}
+          <a
+            href="/terms"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="underline hover:text-green-700"
+          >
+            Terms of Use
+          </a>
+          .
+        </p>
         <button
           type="button"
           onClick={onSkip}
