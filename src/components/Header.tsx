@@ -46,8 +46,8 @@ export default async function Header() {
       ? [
           { href: "/admin/users", label: "Users" },
           { href: "/admin/tasks", label: "Tasks" },
-          { href: "/admin/bookings", label: "Bookings" },
-          { href: "/admin/pros", label: "Pros" },
+          { href: "/admin/cms", label: "CMS" },
+          { href: "/admin/payouts", label: "Payouts" },
         ]
       : [];
 
