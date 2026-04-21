@@ -1,48 +1,77 @@
-import { test, expect } from "@playwright/test";
+import { test, expect } from "./fixtures/auth";
+import {
+  createDummyBooking,
+  deleteDummyBookings,
+  thursdayOfCurrentWeek,
+} from "./fixtures/db";
 
 /**
  * E2E regression for task 46 — Thursday bookings must render under the
  * Thursday column in the pro weekly calendar (not Friday).
  *
- * This test is currently `.skip`'d because it requires:
+ * Flow:
+ *   1. Seed a confirmed booking for Dummy Pro on this week's Thursday.
+ *   2. Log in as Dummy Pro via the real `/login` form.
+ *   3. Navigate to `/pro/bookings` and open the calendar view.
+ *   4. Assert the booking's time-range text appears in the Thursday
+ *      day-column, not in Monday or Friday.
+ *   5. Delete the booking in afterAll.
  *
- *   1. A seeded Dummy Pro account with a known booking on a known
- *      Thursday in the current week (or controllable from the test).
- *   2. A way to authenticate the test browser as that Dummy Pro —
- *      either via an API endpoint that sets a session cookie, or via
- *      the full login form.
- *
- * Once those pieces exist (see `docs/design.md` "test infra" section),
- * enable this test.
- *
- * The complementary vitest component test in
- * `src/app/(pro)/pro/bookings/__tests__/BookingsCalendar.test.tsx`
- * already covers the pure rendering invariant. This E2E test covers
- * the round-trip: real DB → real server action → real browser render.
+ * Covers the full stack: DB → server action → cookie → rendered grid.
+ * Complements the pure-component regression test at
+ * `src/app/(pro)/pro/bookings/__tests__/BookingsCalendar.test.tsx`.
  */
-test.describe("Pro weekly calendar — day-column alignment", () => {
-  test.skip(true, "Needs dummy-pro auth fixture — see e2e/README.md TODO");
 
-  test("Thursday booking appears under Thursday column", async ({ page }) => {
-    // TODO: log in as Dummy Pro via test-only auth endpoint.
-    await page.goto("/pro/bookings");
+const DATE = thursdayOfCurrentWeek();
+const START = "14:00";
+const END = "15:00";
 
-    // The booking block inside the Thursday column has its weekday
-    // rendered in the header row, and a booking block with the
-    // time-range text inside the same day column.
-    const thursdayColumn = page.locator('[data-testid="day-col-thu"]');
-    await expect(thursdayColumn).toContainText("14:00 - 15:00");
+let bookingIds: number[] = [];
 
-    const fridayColumn = page.locator('[data-testid="day-col-fri"]');
-    await expect(fridayColumn).not.toContainText("14:00 - 15:00");
+test.beforeAll(async () => {
+  const id = await createDummyBooking({
+    date: DATE,
+    startTime: START,
+    endTime: END,
   });
+  bookingIds.push(id);
 });
 
-/**
- * Smoke test: the dev server boots and the public booking page renders.
- * Proves the Playwright infrastructure works end-to-end on this repo.
- */
-test("smoke: homepage loads", async ({ page }) => {
-  await page.goto("/");
-  await expect(page).toHaveURL(/\/$|\/[a-z]{2}\/?$/);
+test.afterAll(async () => {
+  await deleteDummyBookings(bookingIds);
+  bookingIds = [];
+});
+
+test("Thursday booking appears in Thursday column, not Friday", async ({
+  proPage,
+}) => {
+  await proPage.goto("/pro/bookings");
+
+  // Ensure the calendar view is active (default is calendar, but
+  // localStorage may have sticked to "list" from a prior session).
+  const calendarToggle = proPage.getByRole("button", {
+    name: /kalender|calendar|calendrier/i,
+  });
+  if (await calendarToggle.isVisible()) {
+    await calendarToggle.click();
+  }
+
+  // The calendar grid is `grid-cols-[60px_repeat(7,1fr)]`. The body
+  // grid is the second element with that class; its children are
+  // [hour-gutter, Mon, Tue, Wed, Thu, Fri, Sat, Sun].
+  const bodyGrid = proPage
+    .locator('div[class*="grid-cols-[60px_repeat(7,1fr)]"]')
+    .last();
+  const columns = bodyGrid.locator(":scope > div");
+
+  // Indexes after the hour gutter: 1=Mon, 2=Tue, 3=Wed, 4=Thu, 5=Fri
+  const thursdayCol = columns.nth(4);
+  const fridayCol = columns.nth(5);
+  const mondayCol = columns.nth(1);
+
+  const timeRange = `${START} - ${END}`;
+
+  await expect(thursdayCol).toContainText(timeRange);
+  await expect(fridayCol).not.toContainText(timeRange);
+  await expect(mondayCol).not.toContainText(timeRange);
 });
