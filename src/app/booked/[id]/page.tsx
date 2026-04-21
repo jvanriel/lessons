@@ -156,30 +156,12 @@ export default async function BookingConfirmedPage({ params }: Props) {
             <h2 className="font-display text-lg font-semibold text-green-900">
               {t("booked.registerHeading", locale)}
             </h2>
-            <p className="mt-1 text-sm text-green-700">
+            <p className="mt-2 text-sm text-green-700">
               {t("booked.registerIntro", locale)}
             </p>
-            <ul className="mt-4 space-y-2 text-sm text-green-800">
-              <li className="flex items-start gap-2">
-                <span className="mt-1 text-gold-600">•</span>
-                <span>{t("booked.perk.autoPay", locale)}</span>
-              </li>
-              <li className="flex items-start gap-2">
-                <span className="mt-1 text-gold-600">•</span>
-                <span>{t("booked.perk.chat", locale)}</span>
-              </li>
-              <li className="flex items-start gap-2">
-                <span className="mt-1 text-gold-600">•</span>
-                <span>{t("booked.perk.quickBook", locale)}</span>
-              </li>
-              <li className="flex items-start gap-2">
-                <span className="mt-1 text-gold-600">•</span>
-                <span>{t("booked.perk.manage", locale)}</span>
-              </li>
-            </ul>
             <Link
               href={`/register?pro=${row.proProfileId}`}
-              className="mt-5 inline-flex items-center justify-center rounded-md border border-gold-400 bg-white px-5 py-2.5 text-sm font-medium text-green-900 transition-colors hover:bg-gold-50"
+              className="mt-4 inline-flex items-center justify-center rounded-md border border-gold-400 bg-white px-5 py-2.5 text-sm font-medium text-green-900 transition-colors hover:bg-gold-50"
             >
               {t("booked.registerCta", locale)}
             </Link>
