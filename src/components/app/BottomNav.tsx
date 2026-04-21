@@ -62,11 +62,50 @@ const proTabs: TabItem[] = [
   },
 ];
 
+// Icon for switching the bottom-bar between pro and member mode.
+// Two arrows swap — intentionally non-destinationy so it reads as
+// "switch" rather than a new page.
+const switchIcon =
+  "M7.5 21 3 16.5m0 0L7.5 12M3 16.5h13.5m0-13.5L21 7.5m0 0L16.5 12M21 7.5H7.5";
+
 export default function BottomNav({ roles, locale }: BottomNavProps) {
   const pathname = usePathname();
 
-  // Determine which tabs to show: pro tabs take priority if user has pro role
-  const tabs = roles.includes("pro") ? proTabs : memberTabs;
+  const isPro = roles.includes("pro");
+  const isMember = roles.includes("member");
+  const inProArea = pathname.startsWith("/pro/");
+
+  // A pro who's also a member (every pro is seeded with both roles)
+  // needs to be able to flip into their own student-side to see their
+  // bookings with another pro — on mobile the bottom bar is the only
+  // nav, so add an explicit "switch mode" tab that links to the other
+  // side's dashboard (task 47).
+  let tabs: TabItem[];
+  if (isPro && isMember) {
+    if (inProArea) {
+      tabs = [
+        ...proTabs,
+        {
+          href: "/member/dashboard",
+          labelKey: "appNav.section.myLessons",
+          icon: switchIcon,
+        },
+      ];
+    } else {
+      tabs = [
+        ...memberTabs,
+        {
+          href: "/pro/dashboard",
+          labelKey: "appNav.section.pro",
+          icon: switchIcon,
+        },
+      ];
+    }
+  } else if (isPro) {
+    tabs = proTabs;
+  } else {
+    tabs = memberTabs;
+  }
 
   return (
     <nav className="fixed bottom-0 left-0 right-0 z-30 flex h-14 items-center justify-around border-t border-green-200 bg-white md:hidden">
