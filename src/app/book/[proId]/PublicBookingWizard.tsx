@@ -580,51 +580,80 @@ export default function PublicBookingWizard({
           </p>
 
           <div className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-2">
+            <div>
+              <label className="mb-1 block text-xs font-medium text-green-700">
+                {t("publicBook.firstName", locale)}{" "}
+                <span aria-hidden="true" className="text-red-500">*</span>
+              </label>
+              <input
+                type="text"
+                required
+                aria-required="true"
+                value={firstName}
+                onChange={(e) => setFirstName(e.target.value)}
+                className="w-full rounded-md border border-green-200 bg-white px-3 py-2 text-sm text-green-900 focus:border-green-400 focus:outline-none focus:ring-1 focus:ring-green-400"
+              />
+            </div>
+            <div>
+              <label className="mb-1 block text-xs font-medium text-green-700">
+                {t("publicBook.lastName", locale)}{" "}
+                <span aria-hidden="true" className="text-red-500">*</span>
+              </label>
+              <input
+                type="text"
+                required
+                aria-required="true"
+                value={lastName}
+                onChange={(e) => setLastName(e.target.value)}
+                className="w-full rounded-md border border-green-200 bg-white px-3 py-2 text-sm text-green-900 focus:border-green-400 focus:outline-none focus:ring-1 focus:ring-green-400"
+              />
+            </div>
+          </div>
+
+          <div className="mt-3">
+            <label className="mb-1 block text-xs font-medium text-green-700">
+              {t("publicBook.email", locale)}{" "}
+              <span aria-hidden="true" className="text-red-500">*</span>
+            </label>
             <input
-              type="text"
+              type="email"
               required
-              value={firstName}
-              onChange={(e) => setFirstName(e.target.value)}
-              placeholder={t("publicBook.firstName", locale)}
-              className="rounded-md border border-green-200 bg-white px-3 py-2 text-sm text-green-900 focus:border-green-400 focus:outline-none focus:ring-1 focus:ring-green-400"
-            />
-            <input
-              type="text"
-              required
-              value={lastName}
-              onChange={(e) => setLastName(e.target.value)}
-              placeholder={t("publicBook.lastName", locale)}
-              className="rounded-md border border-green-200 bg-white px-3 py-2 text-sm text-green-900 focus:border-green-400 focus:outline-none focus:ring-1 focus:ring-green-400"
+              aria-required="true"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              className="w-full rounded-md border border-green-200 bg-white px-3 py-2 text-sm text-green-900 focus:border-green-400 focus:outline-none focus:ring-1 focus:ring-green-400"
             />
           </div>
 
-          <input
-            type="email"
-            required
-            value={email}
-            onChange={(e) => setEmail(e.target.value)}
-            placeholder={t("publicBook.email", locale)}
-            className="mt-3 w-full rounded-md border border-green-200 bg-white px-3 py-2 text-sm text-green-900 focus:border-green-400 focus:outline-none focus:ring-1 focus:ring-green-400"
-          />
-
           <div className="mt-3">
+            <label className="mb-1 block text-xs font-medium text-green-700">
+              {t("publicBook.phone", locale)}{" "}
+              <span aria-hidden="true" className="text-red-500">*</span>
+            </label>
             <PhoneField
               value={phone}
               onChange={setPhone}
               required
-              placeholder={t("publicBook.phone", locale)}
               showError
               errorLabel={t("publicBook.err.invalidPhone", locale)}
             />
+            <p className="mt-1 text-[11px] text-green-500">
+              {t("publicBook.phoneHint", locale)}
+            </p>
           </div>
 
-          <textarea
-            value={notes}
-            onChange={(e) => setNotes(e.target.value)}
-            placeholder={t("publicBook.notes", locale)}
-            rows={2}
-            className="mt-3 w-full rounded-md border border-green-200 bg-white px-3 py-2 text-sm text-green-900 focus:border-green-400 focus:outline-none focus:ring-1 focus:ring-green-400"
-          />
+          <div className="mt-3">
+            <label className="mb-1 block text-xs font-medium text-green-700">
+              {t("publicBook.notes", locale)}
+            </label>
+            <textarea
+              value={notes}
+              onChange={(e) => setNotes(e.target.value)}
+              placeholder={t("publicBook.notesPlaceholder", locale)}
+              rows={2}
+              className="w-full rounded-md border border-green-200 bg-white px-3 py-2 text-sm text-green-900 focus:border-green-400 focus:outline-none focus:ring-1 focus:ring-green-400"
+            />
+          </div>
 
           {/* Honeypot — hidden from real users, bots fill it in. */}
           <input

@@ -406,16 +406,22 @@ export function BookingsCalendar({
               </div>
               <div>
                 <span className="text-green-500">{t("proBookingsCal.email", locale)}</span>{" "}
-                <span className="font-medium text-green-900">
+                <a
+                  href={`mailto:${booking.studentEmail}`}
+                  className="font-medium text-green-900 underline-offset-2 hover:underline"
+                >
                   {booking.studentEmail}
-                </span>
+                </a>
               </div>
               {booking.studentPhone && (
                 <div>
                   <span className="text-green-500">{t("proBookingsCal.phone", locale)}</span>{" "}
-                  <span className="font-medium text-green-900">
+                  <a
+                    href={`tel:${booking.studentPhone.replace(/\s+/g, "")}`}
+                    className="font-medium text-green-900 underline-offset-2 hover:underline"
+                  >
                     {booking.studentPhone}
-                  </span>
+                  </a>
                 </div>
               )}
               {booking.participantCount > 1 && (

@@ -761,18 +761,30 @@ function formatLessonDate(date: string, locale: Locale): string {
   }).format(new Date(date + "T00:00:00"));
 }
 
-function detailsTable(rows: Array<[string, string]>): string {
+/**
+ * Row shape: [label, display value, optional href].
+ * When href is provided the value is wrapped in an <a> so the reader's
+ * email client turns it into a tap-to-call / tap-to-email target.
+ */
+type DetailRow = [string, string] | [string, string, string];
+
+function detailsTable(rows: Array<DetailRow>): string {
   return `
     <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:${COLORS.green100};border:1px solid #b4d6c1;border-radius:8px;margin:0 0 24px 0;">
       <tr><td style="padding:16px 20px;">
         ${rows
-          .map(
-            ([k, v]) => `
+          .map((row) => {
+            const [k, v] = row;
+            const href = row[2];
+            const value = href
+              ? `<a href="${href}" style="color:#3d6b4f;text-decoration:underline;">${v}</a>`
+              : `<span style="color:#3d6b4f;">${v}</span>`;
+            return `
           <p style="margin:0 0 8px 0;font-size:14px;">
             <strong style="color:${COLORS.green950};">${k}:</strong>
-            <span style="color:#3d6b4f;">${v}</span>
-          </p>`
-          )
+            ${value}
+          </p>`;
+          })
           .join("")}
       </td></tr>
     </table>
@@ -954,11 +966,19 @@ export function buildProBookingNotificationEmail(opts: {
 }): string {
   const s = BOOKING_PRO_STRINGS[opts.locale] ?? BOOKING_PRO_STRINGS.en;
   const studentFullName = `${opts.studentFirstName} ${opts.studentLastName}`;
-  const rows: Array<[string, string]> = [
+  const rows: Array<DetailRow> = [
     [s.student, studentFullName],
-    [s.studentEmail, opts.studentEmail],
+    [s.studentEmail, opts.studentEmail, `mailto:${opts.studentEmail}`],
   ];
-  if (opts.studentPhone) rows.push([s.studentPhone, opts.studentPhone]);
+  if (opts.studentPhone) {
+    // Strip spaces from tel: href so clients parse the whole number as
+    // one target; keep spaces in the display value for readability.
+    rows.push([
+      s.studentPhone,
+      opts.studentPhone,
+      `tel:${opts.studentPhone.replace(/\s+/g, "")}`,
+    ]);
+  }
   rows.push(
     [s.location, opts.locationName],
     [s.date, formatLessonDate(opts.date, opts.locale)],
