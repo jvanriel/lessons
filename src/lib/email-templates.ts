@@ -1146,10 +1146,6 @@ const CLAIM_BOOKING_STRINGS: Record<
     loginButton: string;
     registerHeading: string;
     registerIntro: string;
-    perkAutoPay: string;
-    perkChat: string;
-    perkQuickBook: string;
-    perkManage: string;
     registerButton: string;
   }
 > = {
@@ -1169,14 +1165,10 @@ const CLAIM_BOOKING_STRINGS: Record<
     alreadyIntro: (pro) =>
       `We just added a new lesson with ${pro} to your account.`,
     loginButton: "View booking",
-    registerHeading: "Optional: finish setting up your account",
+    registerHeading: "Want to manage everything in one place?",
     registerIntro:
-      "You don't have to, but completing your registration (about one minute) unlocks a few extras:",
-    perkAutoPay: "Save a card for one-tap payments on future bookings",
-    perkChat: "Chat directly with your pro between lessons",
-    perkQuickBook: "Quick-rebook — your preferences are remembered",
-    perkManage: "View, reschedule, and cancel lessons from your dashboard",
-    registerButton: "Set up my account",
+      "Finish your registration in a minute and manage your payments, chats with your pro, and bookings from one place.",
+    registerButton: "Register",
   },
   nl: {
     subject: (pro) => `Je les bij ${pro} is geboekt`,
@@ -1194,16 +1186,10 @@ const CLAIM_BOOKING_STRINGS: Record<
     alreadyIntro: (pro) =>
       `We hebben zojuist een nieuwe les bij ${pro} aan je account toegevoegd.`,
     loginButton: "Boeking bekijken",
-    registerHeading: "Optioneel: maak je account verder af",
+    registerHeading: "Wil je alles eenvoudig beheren?",
     registerIntro:
-      "Hoeft niet, maar je registratie afronden (ongeveer een minuut) geeft je een paar extra's:",
-    perkAutoPay:
-      "Sla een kaart op voor een-tap-betalingen bij volgende boekingen",
-    perkChat: "Chat rechtstreeks met je pro tussen lessen door",
-    perkQuickBook: "Snel herboeken — je voorkeuren worden onthouden",
-    perkManage:
-      "Bekijk, verplaats en annuleer lessen vanuit je dashboard",
-    registerButton: "Mijn account instellen",
+      "Voltooi je registratie in een minuutje en beheer op één plek je betalingen, chats met je pro en je reserveringen.",
+    registerButton: "Registreer",
   },
   fr: {
     subject: (pro) => `Votre cours avec ${pro} est réservé`,
@@ -1221,17 +1207,10 @@ const CLAIM_BOOKING_STRINGS: Record<
     alreadyIntro: (pro) =>
       `Nous venons d'ajouter un nouveau cours avec ${pro} à votre compte.`,
     loginButton: "Voir la réservation",
-    registerHeading: "Optionnel : finalisez votre compte",
+    registerHeading: "Envie de tout gérer au même endroit ?",
     registerIntro:
-      "Ce n'est pas obligatoire, mais finaliser votre inscription (environ une minute) débloque quelques avantages :",
-    perkAutoPay:
-      "Enregistrez une carte pour des paiements en un clic",
-    perkChat: "Discutez directement avec votre pro entre les cours",
-    perkQuickBook:
-      "Réservation rapide — vos préférences sont mémorisées",
-    perkManage:
-      "Consultez, reportez et annulez vos cours depuis votre tableau de bord",
-    registerButton: "Configurer mon compte",
+      "Finalisez votre inscription en une minute et gérez au même endroit vos paiements, vos conversations avec votre pro et vos réservations.",
+    registerButton: "S'inscrire",
   },
 };
 
@@ -1278,15 +1257,9 @@ export function buildClaimAndVerifyBookingEmail(opts: {
           <p style="margin:0 0 8px 0;font-family:Georgia,'Times New Roman',serif;font-size:16px;color:${COLORS.green950};font-weight:normal;">
             ${s.registerHeading}
           </p>
-          <p style="margin:0 0 12px 0;font-size:13px;color:${COLORS.green800};">
+          <p style="margin:0 0 14px 0;font-size:13px;color:${COLORS.green800};">
             ${s.registerIntro}
           </p>
-          <ul style="margin:0 0 16px 0;padding:0 0 0 18px;font-size:13px;color:${COLORS.green800};line-height:1.7;">
-            <li>${s.perkAutoPay}</li>
-            <li>${s.perkChat}</li>
-            <li>${s.perkQuickBook}</li>
-            <li>${s.perkManage}</li>
-          </ul>
           <p style="margin:0;">
             <a href="${opts.registerUrl}" style="display:inline-block;background:#ffffff;border:1px solid #c4a035;color:${COLORS.green950};padding:10px 22px;border-radius:6px;text-decoration:none;font-weight:500;font-size:13px;">
               ${s.registerButton}
