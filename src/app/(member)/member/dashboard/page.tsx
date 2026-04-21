@@ -215,7 +215,7 @@ export default async function MemberDashboard() {
                     </Link>
                   )}
                 </div>
-                {quickBookMap[pro.proStudentId] && (
+                {quickBookMap[pro.proStudentId] ? (
                   <QuickBook
                     data={quickBookMap[pro.proStudentId]}
                     proId={pro.proProfileId}
@@ -223,6 +223,12 @@ export default async function MemberDashboard() {
                     allowBookingWithoutPayment={pro.allowBookingWithoutPayment}
                     locale={locale}
                   />
+                ) : (
+                  pro.bookingEnabled && (
+                    <p className="mt-3 text-[11px] leading-snug text-green-500/80">
+                      {t("memberDash.quickBookHint", locale)}
+                    </p>
+                  )
                 )}
               </div>
             ))}
