@@ -437,30 +437,37 @@ export default function PublicBookingWizard({
         )}
       </div>
 
-      {/* Step 1: Location */}
-      {pro.locations.length > 1 && (
+      {/* Step 1: Location — always shown so a single-location pro's
+          address is visible to the student too (task 49). */}
+      {pro.locations.length > 0 && (
         <div className="mt-8">
           <label className="block text-sm font-medium text-green-800">
             {t("publicBook.location", locale)}
           </label>
           <div className="mt-2 grid gap-2">
-            {pro.locations.map((l) => (
-              <button
-                key={l.id}
-                type="button"
-                onClick={() => setLocationId(l.id)}
-                className={`rounded-lg border px-4 py-3 text-left text-sm transition-colors ${
-                  locationId === l.id
-                    ? "border-gold-400 bg-gold-50 text-green-900"
-                    : "border-green-200 bg-white text-green-800 hover:border-green-300"
-                }`}
-              >
-                <div className="font-medium">{l.name}</div>
-                {l.city && (
-                  <div className="text-xs text-green-600">{l.city}</div>
-                )}
-              </button>
-            ))}
+            {pro.locations.map((l) => {
+              const single = pro.locations.length === 1;
+              const selected = locationId === l.id;
+              return (
+                <button
+                  key={l.id}
+                  type="button"
+                  onClick={() => setLocationId(l.id)}
+                  disabled={single}
+                  aria-pressed={selected}
+                  className={`rounded-lg border px-4 py-3 text-left text-sm transition-colors ${
+                    selected
+                      ? "border-gold-400 bg-gold-50 text-green-900"
+                      : "border-green-200 bg-white text-green-800 hover:border-green-300"
+                  } ${single ? "cursor-default" : ""}`}
+                >
+                  <div className="font-medium">{l.name}</div>
+                  {l.city && (
+                    <div className="text-xs text-green-600">{l.city}</div>
+                  )}
+                </button>
+              );
+            })}
           </div>
         </div>
       )}

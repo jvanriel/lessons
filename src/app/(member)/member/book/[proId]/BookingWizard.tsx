@@ -203,46 +203,54 @@ export function BookingWizard({
         </div>
       </div>
 
-      {/* Location picker — only shown when there are ≥2 locations, or
-          when the caller forced `showAllSteps`. */}
-      {locations.length > 1 && (
+      {/* Location — always shown so a single-location pro's address
+          is visible to the student too (task 49). Single-location is
+          rendered as a passive chip. */}
+      {locations.length > 0 && (
         <div className="mt-8">
           <label className="block text-sm font-medium text-green-800">
             {t("publicBook.location", locale)}
           </label>
           <div className="mt-2 grid gap-2">
-            {locations.map((l) => (
-              <button
-                key={l.id}
-                type="button"
-                onClick={() => {
-                  setLocationId(l.id);
-                  if (pro.lessonDurations.length === 1) {
-                    setDuration(pro.lessonDurations[0]);
-                  } else {
-                    setDuration(null);
-                  }
-                  setDate(null);
-                  setSlot(null);
-                }}
-                className={`rounded-lg border px-4 py-3 text-left text-sm transition-colors ${
-                  locationId === l.id
-                    ? "border-gold-400 bg-gold-50 text-green-900"
-                    : "border-green-200 bg-white text-green-800 hover:border-green-300"
-                }`}
-              >
-                <div className="font-medium">{l.name}</div>
-                {l.city && (
-                  <div className="text-xs text-green-600">{l.city}</div>
-                )}
-              </button>
-            ))}
+            {locations.map((l) => {
+              const single = locations.length === 1;
+              const selected = locationId === l.id;
+              return (
+                <button
+                  key={l.id}
+                  type="button"
+                  disabled={single}
+                  aria-pressed={selected}
+                  onClick={() => {
+                    setLocationId(l.id);
+                    if (pro.lessonDurations.length === 1) {
+                      setDuration(pro.lessonDurations[0]);
+                    } else {
+                      setDuration(null);
+                    }
+                    setDate(null);
+                    setSlot(null);
+                  }}
+                  className={`rounded-lg border px-4 py-3 text-left text-sm transition-colors ${
+                    selected
+                      ? "border-gold-400 bg-gold-50 text-green-900"
+                      : "border-green-200 bg-white text-green-800 hover:border-green-300"
+                  } ${single ? "cursor-default" : ""}`}
+                >
+                  <div className="font-medium">{l.name}</div>
+                  {l.city && (
+                    <div className="text-xs text-green-600">{l.city}</div>
+                  )}
+                </button>
+              );
+            })}
           </div>
         </div>
       )}
 
-      {/* Duration picker — only shown when there are ≥2 durations. */}
-      {locationId && pro.lessonDurations.length > 1 && (
+      {/* Duration — always shown; single-duration renders as a single
+          passive chip for symmetry with the location row. */}
+      {locationId && pro.lessonDurations.length > 0 && (
         <div className="mt-6">
           <label className="block text-sm font-medium text-green-800">
             {t("publicBook.duration", locale)}
@@ -250,16 +258,20 @@ export function BookingWizard({
           <div className="mt-2 flex flex-wrap gap-2">
             {pro.lessonDurations.map((d) => {
               const p = pro.lessonPricing[String(d)];
+              const single = pro.lessonDurations.length === 1;
+              const selected = duration === d;
               return (
                 <button
                   key={d}
                   type="button"
+                  disabled={single}
+                  aria-pressed={selected}
                   onClick={() => setDuration(d)}
                   className={`rounded-full border px-4 py-2 text-sm transition-colors ${
-                    duration === d
+                    selected
                       ? "border-gold-400 bg-gold-50 text-green-900"
                       : "border-green-200 bg-white text-green-800 hover:border-green-300"
-                  }`}
+                  } ${single ? "cursor-default" : ""}`}
                 >
                   {d} {t("publicBook.minShort", locale)}
                   {typeof p === "number" && p > 0 && (
