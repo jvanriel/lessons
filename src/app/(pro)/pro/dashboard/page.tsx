@@ -7,7 +7,7 @@ import Link from "next/link";
 import { BookingRefreshListener } from "@/components/BookingRefreshListener";
 import { QRLoginButton } from "@/app/(member)/member/dashboard/QRLoginDialog";
 import { getLocale } from "@/lib/locale";
-import { todayLocal } from "@/lib/local-date";
+import { todayInTZ } from "@/lib/local-date";
 import { t } from "@/lib/i18n/translations";
 
 export const metadata = { title: "Pro Dashboard — Golf Lessons" };
@@ -18,7 +18,7 @@ export default async function ProDashboard() {
 
   const locale = await getLocale();
 
-  const today = todayLocal();
+  const today = todayInTZ(profile.defaultTimezone ?? "Europe/Brussels");
 
   // Count upcoming bookings
   const [upcomingResult] = await db

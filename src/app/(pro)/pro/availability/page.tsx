@@ -14,7 +14,11 @@ import { redirect } from "next/navigation";
 import AvailabilityEditor from "./AvailabilityEditor";
 import { BookingRefreshListener } from "@/components/BookingRefreshListener";
 import { getLocale } from "@/lib/locale";
-import { formatLocalDate } from "@/lib/local-date";
+import {
+  addDaysToDateString,
+  formatLocalDateInTZ,
+  getMondayInTZ,
+} from "@/lib/local-date";
 import { t } from "@/lib/i18n/translations";
 import type {
   SerializedAvailability,
@@ -32,18 +36,13 @@ export default async function AvailabilityPage() {
 
   const proId = profile.id;
 
-  // Date range: Monday of this week through 5 weeks ahead
-  const today = new Date();
-  const rangeStart = new Date(today);
-  const dayOfWeek = rangeStart.getDay();
-  rangeStart.setDate(
-    rangeStart.getDate() - (dayOfWeek === 0 ? 6 : dayOfWeek - 1)
-  );
-  const rangeEnd = new Date(rangeStart);
-  rangeEnd.setDate(rangeEnd.getDate() + 35);
-
-  const startStr = formatLocalDate(rangeStart);
-  const endStr = formatLocalDate(rangeEnd);
+  // Date range: Monday of this week through 5 weeks ahead, in the
+  // pro's operational timezone so the availability editor lines up
+  // with the pro's calendar view.
+  const tz = profile.defaultTimezone ?? "Europe/Brussels";
+  const monday = getMondayInTZ(new Date(), tz);
+  const startStr = formatLocalDateInTZ(monday, tz);
+  const endStr = addDaysToDateString(startStr, 35);
 
   const [proLocs, templates, overrides, bookings, profileData] =
     await Promise.all([

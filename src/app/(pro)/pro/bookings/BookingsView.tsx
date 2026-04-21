@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { BookingsCalendar } from "./BookingsCalendar";
 import { formatDate as formatDateHelper } from "@/lib/format-date";
-import { todayLocal } from "@/lib/local-date";
+import { todayInTZ } from "@/lib/local-date";
 import type { Locale } from "@/lib/i18n";
 import { t } from "@/lib/i18n/translations";
 import { getPaymentBadge } from "@/lib/payment-status";
@@ -34,7 +34,15 @@ interface AvailabilitySlot {
   proLocationId: number;
 }
 
-function BookingsList({ bookings, locale }: { bookings: Booking[]; locale: Locale }) {
+function BookingsList({
+  bookings,
+  locale,
+  timezone,
+}: {
+  bookings: Booking[];
+  locale: Locale;
+  timezone: string;
+}) {
   const formatDate = (dateStr: string) =>
     formatDateHelper(dateStr, locale, {
       weekday: "short",
@@ -43,7 +51,7 @@ function BookingsList({ bookings, locale }: { bookings: Booking[]; locale: Local
       year: "numeric",
     });
 
-  const today = todayLocal();
+  const today = todayInTZ(timezone);
   const upcoming = bookings.filter(
     (b) => b.date >= today && b.status === "confirmed"
   );
@@ -137,10 +145,12 @@ export function BookingsView({
   bookings,
   availability,
   locale,
+  timezone,
 }: {
   bookings: Booking[];
   availability: AvailabilitySlot[];
   locale: Locale;
+  timezone: string;
 }) {
   const [view, setView] = useState<"calendar" | "list">(() => {
     if (typeof window !== "undefined") {
@@ -190,9 +200,9 @@ export function BookingsView({
       </div>
 
       {view === "calendar" ? (
-        <BookingsCalendar bookings={bookings} availability={availability} locale={locale} />
+        <BookingsCalendar bookings={bookings} availability={availability} locale={locale} timezone={timezone} />
       ) : (
-        <BookingsList bookings={bookings} locale={locale} />
+        <BookingsList bookings={bookings} locale={locale} timezone={timezone} />
       )}
     </div>
   );

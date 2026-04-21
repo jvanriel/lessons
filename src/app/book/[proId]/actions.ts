@@ -46,7 +46,8 @@ import {
 import { resolveLocale, type Locale } from "@/lib/i18n";
 import { t } from "@/lib/i18n/translations";
 import { getLocale } from "@/lib/locale";
-import { formatLocalDate } from "@/lib/local-date";
+import { addDaysToDateString, todayInTZ } from "@/lib/local-date";
+import { getProLocationTimezone } from "@/lib/pro";
 import { updateBookingPreferences } from "@/lib/booking-preferences";
 import { limitByKey, publicBookingLimiter, getClientIp } from "@/lib/rate-limit";
 import { verifyRecaptcha } from "@/lib/recaptcha";
@@ -204,6 +205,8 @@ export async function getPublicSlots(
     .limit(1);
   if (!pro) return [];
 
+  const tz = await getProLocationTimezone(locationId);
+
   const [templates, overrides, bookings] = await Promise.all([
     db
       .select({
@@ -263,7 +266,9 @@ export async function getPublicSlots(
     dateOverrides as AvailabilityOverride[],
     bookings as ExistingBooking[],
     pro.bookingNotice,
-    duration
+    duration,
+    undefined,
+    tz,
   );
 }
 
@@ -282,11 +287,10 @@ export async function getPublicAvailableDates(
     .limit(1);
   if (!pro) return [];
 
+  const tz = await getProLocationTimezone(locationId);
   const now = new Date();
-  const horizonEnd = new Date(now);
-  horizonEnd.setDate(horizonEnd.getDate() + pro.bookingHorizon);
-  const todayStr = formatLocalDate(now);
-  const horizonStr = formatLocalDate(horizonEnd);
+  const todayStr = todayInTZ(tz);
+  const horizonStr = addDaysToDateString(todayStr, pro.bookingHorizon);
 
   const [templates, overrides, bookings] = await Promise.all([
     db
@@ -339,10 +343,8 @@ export async function getPublicAvailableDates(
   ]);
 
   const out: string[] = [];
-  const cursor = new Date(now);
-  cursor.setHours(0, 0, 0, 0);
-  while (cursor <= horizonEnd) {
-    const dateStr = formatLocalDate(cursor);
+  let dateStr = todayStr;
+  while (dateStr <= horizonStr) {
     const dateOverrides = overrides.filter(
       (o) =>
         o.date === dateStr &&
@@ -356,10 +358,11 @@ export async function getPublicAvailableDates(
       dateBookings as ExistingBooking[],
       pro.bookingNotice,
       duration,
-      now
+      now,
+      tz,
     );
     if (slots.length > 0) out.push(dateStr);
-    cursor.setDate(cursor.getDate() + 1);
+    dateStr = addDaysToDateString(dateStr, 1);
   }
   return out;
 }

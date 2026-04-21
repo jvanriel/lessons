@@ -4,7 +4,12 @@ import { useState, useMemo } from "react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { formatDate as formatDateLocale } from "@/lib/format-date";
-import { formatLocalDate, todayLocal } from "@/lib/local-date";
+import {
+  addDaysInTZ,
+  formatLocalDateInTZ,
+  getMondayInTZ,
+  todayInTZ,
+} from "@/lib/local-date";
 import type { Locale } from "@/lib/i18n";
 import { t } from "@/lib/i18n/translations";
 import { getPaymentBadge } from "@/lib/payment-status";
@@ -41,6 +46,13 @@ interface Props {
   bookings: Booking[];
   availability: AvailabilitySlot[];
   locale: Locale;
+  /**
+   * IANA timezone the calendar renders in — typically the pro's
+   * `defaultTimezone`. Drives "today" highlighting and the Monday-
+   * start boundary of the week grid. Defaults to Europe/Brussels for
+   * safety if not passed.
+   */
+  timezone?: string;
 }
 
 // ─── Constants ──────────────────────────────────────
@@ -64,22 +76,6 @@ const DAY_KEYS = [
 
 // ─── Helpers ────────────────────────────────────────
 
-function getMonday(date: Date): Date {
-  const d = new Date(date);
-  const day = d.getDay();
-  // getDay: 0=Sun, 1=Mon ... 6=Sat
-  const diff = day === 0 ? -6 : 1 - day;
-  d.setDate(d.getDate() + diff);
-  d.setHours(0, 0, 0, 0);
-  return d;
-}
-
-function addDays(date: Date, days: number): Date {
-  const d = new Date(date);
-  d.setDate(d.getDate() + days);
-  return d;
-}
-
 function timeToMinutes(time: string): number {
   const [h, m] = time.split(":").map(Number);
   return h * 60 + m;
@@ -92,15 +88,24 @@ function timeToGridRow(time: string): number {
 
 // ─── Component ──────────────────────────────────────
 
-export function BookingsCalendar({ bookings, availability, locale }: Props) {
-  const [weekStart, setWeekStart] = useState(() => getMonday(new Date()));
+export function BookingsCalendar({
+  bookings,
+  availability,
+  locale,
+  timezone = "Europe/Brussels",
+}: Props) {
+  const [weekStart, setWeekStart] = useState(() =>
+    getMondayInTZ(new Date(), timezone),
+  );
   const [expandedBookingId, setExpandedBookingId] = useState<number | null>(null);
 
   const weekDates = useMemo(() => {
-    return Array.from({ length: 7 }, (_, i) => addDays(weekStart, i));
-  }, [weekStart]);
+    return Array.from({ length: 7 }, (_, i) =>
+      addDaysInTZ(weekStart, i, timezone),
+    );
+  }, [weekStart, timezone]);
 
-  const today = todayLocal();
+  const today = todayInTZ(timezone);
 
   // Group bookings by date
   const bookingsByDate = useMemo(() => {
@@ -126,19 +131,19 @@ export function BookingsCalendar({ bookings, availability, locale }: Props) {
 
   // Navigation
   function goToPrevWeek() {
-    setWeekStart((prev) => addDays(prev, -7));
+    setWeekStart((prev) => addDaysInTZ(prev, -7, timezone));
   }
   function goToNextWeek() {
-    setWeekStart((prev) => addDays(prev, 7));
+    setWeekStart((prev) => addDaysInTZ(prev, 7, timezone));
   }
   function goToToday() {
-    setWeekStart(getMonday(new Date()));
+    setWeekStart(getMondayInTZ(new Date(), timezone));
   }
 
   const totalMinutes = (END_HOUR - START_HOUR) * 60;
 
   // Format week range for header
-  const weekLabel = `${formatDateLocale(weekDates[0], locale, { month: "short", day: "numeric" })} - ${formatDateLocale(weekDates[6], locale, { month: "short", day: "numeric", year: "numeric" })}`;
+  const weekLabel = `${formatDateLocale(weekDates[0], locale, { month: "short", day: "numeric", timeZone: timezone })} - ${formatDateLocale(weekDates[6], locale, { month: "short", day: "numeric", year: "numeric", timeZone: timezone })}`;
 
   return (
     <div>
@@ -177,7 +182,7 @@ export function BookingsCalendar({ bookings, availability, locale }: Props) {
           <div className="sticky top-0 z-10 grid grid-cols-[60px_repeat(7,1fr)] border-b border-green-200 bg-white">
             <div className="border-r border-green-100 px-2 py-2" />
             {weekDates.map((date, i) => {
-              const dateStr = formatLocalDate(date);
+              const dateStr = formatLocalDateInTZ(date, timezone);
               const isToday = dateStr === today;
               return (
                 <div
@@ -198,7 +203,7 @@ export function BookingsCalendar({ bookings, availability, locale }: Props) {
                         : "text-green-500"
                     )}
                   >
-                    {date.getDate()}
+                    {Number(dateStr.slice(-2))}
                   </div>
                 </div>
               );
@@ -221,7 +226,7 @@ export function BookingsCalendar({ bookings, availability, locale }: Props) {
 
             {/* Day columns */}
             {weekDates.map((date, dayIdx) => {
-              const dateStr = formatLocalDate(date);
+              const dateStr = formatLocalDateInTZ(date, timezone);
               const isToday = dateStr === today;
               const dayBookings = bookingsByDate.get(dateStr) ?? [];
               const dayAvail = availByDay.get(dayIdx) ?? [];

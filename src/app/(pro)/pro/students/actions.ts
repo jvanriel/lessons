@@ -20,7 +20,12 @@ import { hashPassword } from "@/lib/auth";
 import { sendEmail } from "@/lib/mail";
 import { buildInviteEmail, getEmailStrings } from "@/lib/email-templates";
 import { getLocale } from "@/lib/locale";
-import { formatLocalDate } from "@/lib/local-date";
+import {
+  addDaysToDateString,
+  formatLocalDate,
+  todayInTZ,
+} from "@/lib/local-date";
+import { getProLocationTimezone } from "@/lib/pro";
 import { resolveLocale } from "@/lib/i18n";
 import { createNotification } from "@/lib/notifications";
 import {
@@ -361,10 +366,9 @@ export async function getProAllAvailableDates(
 
   if (!proSettings) return [];
 
-  const horizonEnd = new Date(now);
-  horizonEnd.setDate(horizonEnd.getDate() + proSettings.bookingHorizon);
-  const todayStr = formatLocalDate(now);
-  const horizonStr = formatLocalDate(horizonEnd);
+  const tz = await getProLocationTimezone(locationId);
+  const todayStr = todayInTZ(tz);
+  const horizonStr = addDaysToDateString(todayStr, proSettings.bookingHorizon);
 
   const [templateRows, overrideRows, bookingRows] = await Promise.all([
     db
@@ -417,17 +421,20 @@ export async function getProAllAvailableDates(
   ]);
 
   function normalizeDate(d: string | Date): string {
-    if (d instanceof Date) return formatLocalDate(d);
+    if (d instanceof Date) {
+      const y = d.getUTCFullYear();
+      const m = String(d.getUTCMonth() + 1).padStart(2, "0");
+      const dd = String(d.getUTCDate()).padStart(2, "0");
+      return `${y}-${m}-${dd}`;
+    }
     if (d.includes("T")) return d.split("T")[0];
     return d;
   }
 
   const availableDates: string[] = [];
-  const cursor = new Date(now);
-  cursor.setHours(0, 0, 0, 0);
+  let dateStr = todayStr;
 
-  while (cursor <= horizonEnd) {
-    const dateStr = formatLocalDate(cursor);
+  while (dateStr <= horizonStr) {
     const dateOverrides = overrideRows.filter(
       (o) =>
         normalizeDate(o.date as string | Date) === dateStr &&
@@ -443,10 +450,11 @@ export async function getProAllAvailableDates(
       dateBookings as ExistingBooking[],
       0, // Pro overrides their own booking notice
       duration,
-      now
+      now,
+      tz,
     );
     if (slots.length > 0) availableDates.push(dateStr);
-    cursor.setDate(cursor.getDate() + 1);
+    dateStr = addDaysToDateString(dateStr, 1);
   }
 
   return availableDates;
@@ -467,6 +475,8 @@ async function fetchAvailableSlots(
     .limit(1);
 
   if (!pro) return [];
+
+  const tz = await getProLocationTimezone(locationId);
 
   const templates = await db
     .select({
@@ -527,7 +537,9 @@ async function fetchAvailableSlots(
     dateOverrides as AvailabilityOverride[],
     bookings as ExistingBooking[],
     0, // Pro overrides their own booking notice
-    duration
+    duration,
+    undefined,
+    tz,
   );
 }
 
@@ -673,11 +685,10 @@ export async function getProQuickBookData(
   );
 
   // Batch-fetch availability data once for the 4-week window
+  const tz = await getProLocationTimezone(rel.preferredLocationId);
   const now = new Date();
   const windowStart = suggestedDate;
-  const windowEndDate = new Date(suggestedDate + "T00:00:00");
-  windowEndDate.setDate(windowEndDate.getDate() + 28);
-  const windowEnd = formatLocalDate(windowEndDate);
+  const windowEnd = addDaysToDateString(suggestedDate, 28);
 
   const [proSettings, templateRows, overrideRows, bookingRows] =
     await Promise.all([
@@ -736,7 +747,12 @@ export async function getProQuickBookData(
     ]);
 
   function normalizeDate(d: string | Date): string {
-    if (d instanceof Date) return formatLocalDate(d);
+    if (d instanceof Date) {
+      const y = d.getUTCFullYear();
+      const m = String(d.getUTCMonth() + 1).padStart(2, "0");
+      const dd = String(d.getUTCDate()).padStart(2, "0");
+      return `${y}-${m}-${dd}`;
+    }
     if (d.includes("T")) return d.split("T")[0];
     return d;
   }
@@ -758,18 +774,18 @@ export async function getProQuickBookData(
       dateBookings as ExistingBooking[],
       0, // Pro overrides their own booking notice
       rel.preferredDuration!,
-      now
+      now,
+      tz,
     );
   }
 
   let bestDate = suggestedDate;
   let bestSlots = slotsForDate(suggestedDate);
   const alternativeDates: string[] = [];
-  const cursor = new Date(suggestedDate + "T00:00:00");
+  let dateStr = suggestedDate;
 
   for (let i = 0; i < 28 && alternativeDates.length < 4; i++) {
-    cursor.setDate(cursor.getDate() + 1);
-    const dateStr = formatLocalDate(cursor);
+    dateStr = addDaysToDateString(dateStr, 1);
     const daySlots = slotsForDate(dateStr);
     if (daySlots.length > 0) {
       alternativeDates.push(dateStr);
@@ -980,7 +996,7 @@ export async function getStudentBookings(proStudentId: number) {
   const { profile } = await requireProProfile();
   if (!profile) return [];
 
-  const today = formatLocalDate(new Date());
+  const today = todayInTZ(profile.defaultTimezone ?? "Europe/Brussels");
 
   // Get the student's userId from the proStudents relationship
   const [rel] = await db

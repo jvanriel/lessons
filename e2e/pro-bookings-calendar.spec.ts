@@ -2,7 +2,8 @@ import { test, expect } from "./fixtures/auth";
 import {
   createDummyBooking,
   deleteDummyBookings,
-  thursdayOfCurrentWeek,
+  getDummyProIds,
+  thursdayOfCurrentWeekInTZ,
 } from "./fixtures/db";
 
 /**
@@ -22,13 +23,15 @@ import {
  * `src/app/(pro)/pro/bookings/__tests__/BookingsCalendar.test.tsx`.
  */
 
-const DATE = thursdayOfCurrentWeek();
 const START = "14:00";
 const END = "15:00";
 
 let bookingIds: number[] = [];
+let DATE = "";
 
 test.beforeAll(async () => {
+  const pro = await getDummyProIds();
+  DATE = thursdayOfCurrentWeekInTZ(pro.defaultTimezone);
   const id = await createDummyBooking({
     date: DATE,
     startTime: START,

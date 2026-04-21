@@ -4,6 +4,7 @@ import { and, eq, inArray } from "drizzle-orm";
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { randomBytes } from "node:crypto";
+import { formatInTimeZone } from "date-fns-tz";
 import * as schema from "../../src/lib/db/schema";
 
 const {
@@ -53,6 +54,7 @@ export async function getDummyProIds(): Promise<{
   userId: number;
   proProfileId: number;
   proLocationId: number;
+  defaultTimezone: string;
 }> {
   const db = getDb();
   const [user] = await db
@@ -66,7 +68,7 @@ export async function getDummyProIds(): Promise<{
     );
   }
   const [profile] = await db
-    .select({ id: proProfiles.id })
+    .select({ id: proProfiles.id, defaultTimezone: proProfiles.defaultTimezone })
     .from(proProfiles)
     .where(eq(proProfiles.userId, user.id))
     .limit(1);
@@ -77,27 +79,34 @@ export async function getDummyProIds(): Promise<{
     .where(eq(proLocations.proProfileId, profile.id))
     .limit(1);
   if (!loc) throw new Error("Dummy Pro location missing");
-  return { userId: user.id, proProfileId: profile.id, proLocationId: loc.id };
+  return {
+    userId: user.id,
+    proProfileId: profile.id,
+    proLocationId: loc.id,
+    defaultTimezone: profile.defaultTimezone,
+  };
 }
 
 /**
- * Local-date YYYY-MM-DD for the upcoming (or current) Thursday in this
- * week's view. Matches what the pro weekly calendar renders by default.
+ * Local-date YYYY-MM-DD for Thursday of the current week **in the
+ * given timezone**. Matches what the pro weekly calendar renders when
+ * its `timezone` prop is that TZ.
  */
-export function thursdayOfCurrentWeek(): string {
+export function thursdayOfCurrentWeekInTZ(tz: string): string {
   const now = new Date();
-  const day = now.getDay(); // 0=Sun..6=Sat
-  // Monday-based offset: diff from Monday
-  const diffMon = day === 0 ? -6 : 1 - day;
-  const monday = new Date(now);
-  monday.setDate(monday.getDate() + diffMon);
-  monday.setHours(0, 0, 0, 0);
-  const thursday = new Date(monday);
-  thursday.setDate(thursday.getDate() + 3);
-  const y = thursday.getFullYear();
-  const m = String(thursday.getMonth() + 1).padStart(2, "0");
-  const d = String(thursday.getDate()).padStart(2, "0");
-  return `${y}-${m}-${d}`;
+  // ISO day-of-week in the TZ: 1=Mon..7=Sun
+  const isoDow = Number(formatInTimeZone(now, tz, "i"));
+  const todayStr = formatInTimeZone(now, tz, "yyyy-MM-dd");
+  const [y, m, d] = todayStr.split("-").map(Number);
+  // Days to shift from today to Thursday (day 4). If today is past
+  // Thursday, we deliberately target Thursday of THIS week (not next)
+  // so the seed renders inside the currently-visible calendar week.
+  const delta = 4 - isoDow;
+  const thursday = new Date(Date.UTC(y, m - 1, d + delta));
+  const ty = thursday.getUTCFullYear();
+  const tm = String(thursday.getUTCMonth() + 1).padStart(2, "0");
+  const td = String(thursday.getUTCDate()).padStart(2, "0");
+  return `${ty}-${tm}-${td}`;
 }
 
 /**

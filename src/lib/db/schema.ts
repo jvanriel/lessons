@@ -151,6 +151,12 @@ export const proProfiles = pgTable("pro_profiles", {
     .$type<Record<string, number>>()
     .notNull()
     .default({}),
+  // Operational timezone: the TZ the pro teaches in. Drives "today",
+  // "this week", and the week-grid boundaries in /pro/bookings. Also
+  // used as the fallback TZ when a location doesn't declare one.
+  // Lessons are still anchored to their location's TZ for slot math;
+  // this is the pro's own display/query TZ.
+  defaultTimezone: varchar("default_timezone", { length: 50 }).notNull().default("Europe/Brussels"),
   bookingEnabled: boolean("booking_enabled").notNull().default(true),
   bookingNotice: integer("booking_notice").notNull().default(24),
   bookingHorizon: integer("booking_horizon").notNull().default(60),

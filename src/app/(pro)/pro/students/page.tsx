@@ -10,7 +10,7 @@ import { eq, and, gte, asc } from "drizzle-orm";
 import { getMyStudents, getProQuickBookData, type ProQuickBookData } from "./actions";
 import StudentManager from "./StudentManager";
 import { getLocale } from "@/lib/locale";
-import { formatLocalDate } from "@/lib/local-date";
+import { todayInTZ } from "@/lib/local-date";
 
 export const metadata = { title: "Students — Golf Lessons" };
 
@@ -28,8 +28,8 @@ export default async function ProStudentsPage() {
   } | null = null;
 
   if (profile) {
-    const now = new Date();
-    const today = formatLocalDate(now);
+    const tz = profile.defaultTimezone ?? "Europe/Brussels";
+    const today = todayInTZ(tz);
 
     const [nextLesson] = await db
       .select({

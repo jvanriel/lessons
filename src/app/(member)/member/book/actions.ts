@@ -36,7 +36,12 @@ import {
 import { resolveLocale, type Locale } from "@/lib/i18n";
 import { t } from "@/lib/i18n/translations";
 import { getLocale } from "@/lib/locale";
-import { formatLocalDate } from "@/lib/local-date";
+import {
+  addDaysToDateString,
+  formatLocalDate,
+  todayInTZ,
+} from "@/lib/local-date";
+import { getProLocationTimezone } from "@/lib/pro";
 import { updateBookingPreferences } from "@/lib/booking-preferences";
 
 /**
@@ -127,9 +132,8 @@ export async function getAvailableDates(
 
   if (!pro) return [];
 
+  const tz = await getProLocationTimezone(locationId);
   const now = new Date();
-  const horizonEnd = new Date(now);
-  horizonEnd.setDate(horizonEnd.getDate() + pro.bookingHorizon);
 
   // Get templates for this location
   const templates = await db
@@ -148,9 +152,9 @@ export async function getAvailableDates(
       )
     );
 
-  // Get overrides in the window
-  const todayStr = formatLocalDate(now);
-  const horizonStr = formatLocalDate(horizonEnd);
+  // Get overrides in the window (local-date window in the location's TZ)
+  const todayStr = todayInTZ(tz);
+  const horizonStr = addDaysToDateString(todayStr, pro.bookingHorizon);
 
   const overrides = await db
     .select({
@@ -187,14 +191,10 @@ export async function getAvailableDates(
       )
     );
 
-  // Check each date
+  // Check each date in the location's local timezone
   const availableDates: string[] = [];
-  const cursor = new Date(now);
-  cursor.setHours(0, 0, 0, 0);
-
-  while (cursor <= horizonEnd) {
-    const dateStr = formatLocalDate(cursor);
-
+  let dateStr = todayStr;
+  while (dateStr <= horizonStr) {
     const dateOverrides = overrides.filter(
       (o) =>
         o.date === dateStr &&
@@ -209,14 +209,15 @@ export async function getAvailableDates(
       dateBookings as ExistingBooking[],
       pro.bookingNotice,
       duration,
-      now
+      now,
+      tz,
     );
 
     if (slots.length > 0) {
       availableDates.push(dateStr);
     }
 
-    cursor.setDate(cursor.getDate() + 1);
+    dateStr = addDaysToDateString(dateStr, 1);
   }
 
   return availableDates;
@@ -237,6 +238,8 @@ export async function getAvailableSlots(
     .limit(1);
 
   if (!pro) return [];
+
+  const tz = await getProLocationTimezone(locationId);
 
   const templates = await db
     .select({
@@ -297,7 +300,9 @@ export async function getAvailableSlots(
     dateOverrides as AvailabilityOverride[],
     bookings as ExistingBooking[],
     pro.bookingNotice,
-    duration
+    duration,
+    undefined,
+    tz,
   );
 }
 
@@ -942,11 +947,10 @@ export async function getQuickBookData(
 
   // Batch-fetch availability data once for the full 4-week window,
   // then compute slots in-memory per date (avoids N+1 DB round-trips)
+  const tz = await getProLocationTimezone(rel.preferredLocationId);
   const now = new Date();
   const windowStart = suggestedDate;
-  const windowEndDate = new Date(suggestedDate + "T00:00:00");
-  windowEndDate.setDate(windowEndDate.getDate() + 28);
-  const windowEnd = formatLocalDate(windowEndDate);
+  const windowEnd = addDaysToDateString(suggestedDate, 28);
 
   const [proSettings, templateRows, overrideRows, bookingRows] =
     await Promise.all([
@@ -1006,9 +1010,16 @@ export async function getQuickBookData(
 
   const bookingNotice = proSettings[0]?.bookingNotice ?? 0;
 
-  // Normalize date values from DB (may be Date objects or timezone-shifted strings)
+  // Normalize date values from DB (may be Date objects — driver anchors
+  // `date` columns to UTC midnight — or timezone-shifted ISO strings).
+  // Reading UTC fields keeps the answer stable across server TZs.
   function normalizeDate(d: string | Date): string {
-    if (d instanceof Date) return formatLocalDate(d);
+    if (d instanceof Date) {
+      const y = d.getUTCFullYear();
+      const m = String(d.getUTCMonth() + 1).padStart(2, "0");
+      const dd = String(d.getUTCDate()).padStart(2, "0");
+      return `${y}-${m}-${dd}`;
+    }
     if (d.includes("T")) return d.split("T")[0];
     return d;
   }
@@ -1030,7 +1041,8 @@ export async function getQuickBookData(
       dateBookings as ExistingBooking[],
       bookingNotice,
       rel.preferredDuration!,
-      now
+      now,
+      tz,
     );
   }
 
@@ -1038,11 +1050,10 @@ export async function getQuickBookData(
   let bestDate = suggestedDate;
   let bestSlots = slotsForDate(suggestedDate);
   const alternativeDates: string[] = [];
-  const cursor = new Date(suggestedDate + "T00:00:00");
+  let dateStr = suggestedDate;
 
   for (let i = 0; i < 28 && alternativeDates.length < 4; i++) {
-    cursor.setDate(cursor.getDate() + 1);
-    const dateStr = formatLocalDate(cursor);
+    dateStr = addDaysToDateString(dateStr, 1);
     const daySlots = slotsForDate(dateStr);
     if (daySlots.length > 0) {
       alternativeDates.push(dateStr);
@@ -1265,17 +1276,18 @@ export async function explainDateSlots(
     .innerJoin(users, eq(lessonBookings.bookedById, users.id))
     .where(and(eq(lessonBookings.proProfileId, proProfileId), eq(lessonBookings.proLocationId, proLocationId), eq(lessonBookings.date, date), eq(lessonBookings.status, "confirmed")));
 
-  // Compute notice cutoff in Brussels time
+  // Compute notice cutoff in the location's timezone
+  const tz = await getProLocationTimezone(proLocationId);
   const now = new Date();
   const thresholdMs = now.getTime() + bookingNotice * 60 * 60 * 1000;
   const threshold = new Date(thresholdMs);
   let noticeFilteredBefore: string | null = null;
 
   if (!byPro && bookingNotice > 0) {
-    const todayStr = formatLocalDate(now);
+    const todayStr = todayInTZ(tz);
     if (date <= todayStr) {
       const { formatInTimeZone } = await import("date-fns-tz");
-      const cutoff = formatInTimeZone(threshold, "Europe/Brussels", "HH:mm");
+      const cutoff = formatInTimeZone(threshold, tz, "HH:mm");
       noticeFilteredBefore = cutoff;
     }
   }
@@ -1302,6 +1314,8 @@ export async function explainDateSlots(
       bkgs as ExistingBooking[],
       bookingNotice, // 0 for pro, actual notice for student
       duration,
+      undefined,
+      tz,
     );
   }
 
@@ -1311,11 +1325,9 @@ export async function explainDateSlots(
   // Explain why earlier dates were skipped (only for the first date)
   let skippedDays: SlotExplanation["skippedDays"] | undefined;
   if (isFirstDate) {
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-    const targetDate = new Date(date + "T00:00:00");
+    const todayStr = todayInTZ(tz);
 
-    if (targetDate > today) {
+    if (date > todayStr) {
       skippedDays = [];
 
       // Get all templates for this pro+location
@@ -1325,10 +1337,10 @@ export async function explainDateSlots(
         .where(and(eq(proAvailability.proProfileId, proProfileId), eq(proAvailability.proLocationId, proLocationId)));
       const templateDaySet = new Set(allTemplates.map((t) => t.dayOfWeek));
 
-      const cursor = new Date(today);
-      while (cursor < targetDate && skippedDays.length < 14) {
-        const curDateStr = formatLocalDate(cursor);
-        const curJsDay = cursor.getDay();
+      let curDateStr = todayStr;
+      while (curDateStr < date && skippedDays.length < 14) {
+        const [cy, cm, cd] = curDateStr.split("-").map(Number);
+        const curJsDay = new Date(Date.UTC(cy, cm - 1, cd)).getUTCDay();
         const curIsoDay = curJsDay === 0 ? 6 : curJsDay - 1;
         const curDayName = dayNames[curIsoDay];
 
@@ -1353,7 +1365,7 @@ export async function explainDateSlots(
             }
           }
         }
-        cursor.setDate(cursor.getDate() + 1);
+        curDateStr = addDaysToDateString(curDateStr, 1);
       }
     }
   }

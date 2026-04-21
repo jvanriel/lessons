@@ -7,7 +7,7 @@ import {
   users,
 } from "@/lib/db/schema";
 import { eq, asc } from "drizzle-orm";
-import { todayLocal } from "@/lib/local-date";
+import { todayInTZ } from "@/lib/local-date";
 import { requireProProfile } from "@/lib/pro";
 import { redirect } from "next/navigation";
 import Link from "next/link";
@@ -67,7 +67,8 @@ export default async function ProBookingsPage() {
       .orderBy(proAvailability.dayOfWeek, proAvailability.startTime),
   ]);
 
-  const today = todayLocal();
+  const tz = profile.defaultTimezone ?? "Europe/Brussels";
+  const today = todayInTZ(tz);
   const past = bookings.filter(
     (b) => b.date < today || b.status !== "confirmed"
   );
@@ -89,7 +90,7 @@ export default async function ProBookingsPage() {
 
       {/* Bookings view (calendar or list) */}
       <section className="mb-10">
-        <BookingsView bookings={bookings} availability={availability} locale={locale} />
+        <BookingsView bookings={bookings} availability={availability} locale={locale} timezone={tz} />
       </section>
 
       {/* Past & cancelled */}
