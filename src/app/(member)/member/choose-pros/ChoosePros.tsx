@@ -1,10 +1,11 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useMemo, useRef, useState, useTransition } from "react";
 import Link from "next/link";
 import { selectPros } from "./actions";
 import type { Locale } from "@/lib/i18n";
 import { t } from "@/lib/i18n/translations";
+import { formatDate } from "@/lib/format-date";
 
 interface Pro {
   id: number;
@@ -15,15 +16,24 @@ interface Pro {
   cities: (string | null)[];
 }
 
+interface UpcomingBooking {
+  id: number;
+  date: string;
+  startTime: string;
+  endTime: string;
+}
+
 export default function ChoosePros({
   pros,
   preSelectedId,
   existingProIds,
+  upcomingBookingsByPro,
   locale,
 }: {
   pros: Pro[];
   preSelectedId: number | null;
   existingProIds: number[];
+  upcomingBookingsByPro: Record<number, UpcomingBooking[]>;
   locale: Locale;
 }) {
   const [selected, setSelected] = useState<Set<number>>(() => {
@@ -34,6 +44,32 @@ export default function ChoosePros({
     return initial;
   });
   const [isPending, startTransition] = useTransition();
+  const [confirmOpen, setConfirmOpen] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const backdropRef = useRef<HTMLDivElement>(null);
+
+  const prosById = useMemo(
+    () => new Map(pros.map((p) => [p.id, p])),
+    [pros]
+  );
+
+  // Pros that are currently active but will be deactivated by submission.
+  const deselected = useMemo(
+    () => existingProIds.filter((id) => !selected.has(id)),
+    [existingProIds, selected]
+  );
+
+  // Subset of the above that have lessons booked in the future.
+  const deselectedWithBookings = useMemo(
+    () =>
+      deselected
+        .map((id) => ({
+          pro: prosById.get(id),
+          bookings: upcomingBookingsByPro[id] ?? [],
+        }))
+        .filter((x) => x.pro && x.bookings.length > 0),
+    [deselected, prosById, upcomingBookingsByPro]
+  );
 
   function toggle(id: number) {
     setSelected((prev) => {
@@ -47,9 +83,22 @@ export default function ChoosePros({
     });
   }
 
-  function handleContinue() {
+  function handleSaveClick() {
+    setError(null);
+    if (deselectedWithBookings.length > 0) {
+      setConfirmOpen(true);
+      return;
+    }
+    save();
+  }
+
+  function save() {
+    setConfirmOpen(false);
     startTransition(async () => {
-      await selectPros(Array.from(selected));
+      const result = await selectPros(Array.from(selected));
+      if (result && "error" in result && result.error) {
+        setError(result.error);
+      }
     });
   }
 
@@ -143,6 +192,12 @@ export default function ChoosePros({
             })}
           </div>
 
+          {error && (
+            <div className="mt-6 rounded-md border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+              {error}
+            </div>
+          )}
+
           <div className="mt-8 flex items-center justify-between">
             <Link
               href="/member/dashboard"
@@ -152,8 +207,8 @@ export default function ChoosePros({
             </Link>
             <button
               type="button"
-              onClick={handleContinue}
-              disabled={isPending || selected.size === 0}
+              onClick={handleSaveClick}
+              disabled={isPending}
               className="rounded-md bg-gold-600 px-6 py-2.5 text-sm font-medium text-white transition-colors hover:bg-gold-500 disabled:opacity-50 disabled:cursor-not-allowed"
             >
               {isPending
@@ -167,6 +222,70 @@ export default function ChoosePros({
             </button>
           </div>
         </>
+      )}
+
+      {confirmOpen && (
+        <div
+          ref={backdropRef}
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 px-4"
+          onClick={(e) => {
+            if (e.target === backdropRef.current) setConfirmOpen(false);
+          }}
+        >
+          <div className="w-full max-w-md rounded-xl border border-green-200 bg-white p-6 shadow-2xl">
+            <h3 className="font-display text-lg font-semibold text-green-900">
+              {t("choosePros.deactivate.title", locale)}
+            </h3>
+            <p className="mt-2 text-sm text-green-600">
+              {t("choosePros.deactivate.body", locale)}
+            </p>
+
+            <ul className="mt-4 space-y-3 max-h-64 overflow-y-auto">
+              {deselectedWithBookings.map(({ pro, bookings }) => (
+                <li
+                  key={pro!.id}
+                  className="rounded-lg border border-green-200 bg-green-50/40 p-3"
+                >
+                  <p className="text-sm font-medium text-green-900">
+                    {pro!.displayName}
+                  </p>
+                  <ul className="mt-1 space-y-0.5 text-xs text-green-700">
+                    {bookings.map((b) => (
+                      <li key={b.id}>
+                        {formatDate(b.date, locale, {
+                          weekday: "short",
+                          day: "numeric",
+                          month: "long",
+                        })}{" "}
+                        · {b.startTime}–{b.endTime}
+                      </li>
+                    ))}
+                  </ul>
+                </li>
+              ))}
+            </ul>
+
+            <div className="mt-5 flex gap-3">
+              <button
+                type="button"
+                onClick={() => setConfirmOpen(false)}
+                className="flex-1 rounded-md border border-green-200 px-4 py-2 text-sm font-medium text-green-700 transition-colors hover:bg-green-50"
+              >
+                {t("choosePros.deactivate.cancel", locale)}
+              </button>
+              <button
+                type="button"
+                onClick={save}
+                disabled={isPending}
+                className="flex-1 rounded-md bg-red-600 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-red-500 disabled:opacity-50"
+              >
+                {isPending
+                  ? t("choosePros.saving", locale)
+                  : t("choosePros.deactivate.confirm", locale)}
+              </button>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );

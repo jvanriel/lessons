@@ -1,6 +1,10 @@
 import { redirect } from "next/navigation";
 import { getSession, hasRole } from "@/lib/auth";
-import { getPublishedPros, getExistingProRelationships } from "./actions";
+import {
+  getPublishedPros,
+  getExistingProRelationships,
+  getUpcomingBookingsByPro,
+} from "./actions";
 import ChoosePros from "./ChoosePros";
 import { getLocale } from "@/lib/locale";
 
@@ -19,17 +23,20 @@ export default async function ChooseProsPage({ searchParams }: Props) {
   const { pro } = await searchParams;
   const preSelectedId = pro ? parseInt(pro) : null;
 
-  const [pros, existingProIds, locale] = await Promise.all([
-    getPublishedPros(),
-    getExistingProRelationships(),
-    getLocale(),
-  ]);
+  const [pros, existingProIds, upcomingBookingsByPro, locale] =
+    await Promise.all([
+      getPublishedPros(),
+      getExistingProRelationships(),
+      getUpcomingBookingsByPro(),
+      getLocale(),
+    ]);
 
   return (
     <ChoosePros
       pros={pros}
       preSelectedId={preSelectedId && !isNaN(preSelectedId) ? preSelectedId : null}
       existingProIds={existingProIds}
+      upcomingBookingsByPro={upcomingBookingsByPro}
       locale={locale}
     />
   );
