@@ -200,57 +200,6 @@ export async function POST(request: Request) {
       });
     }
 
-    case "scheduling": {
-      const { preferences } = data as {
-        preferences: Array<{
-          proStudentId: number;
-          preferredLocationId: number | null;
-          preferredDuration: number | null;
-          preferredDayOfWeek: number | null;
-          preferredTime: string | null;
-          preferredInterval: string | null;
-        }>;
-      };
-
-      if (!preferences || preferences.length === 0) {
-        return NextResponse.json(
-          { error: "Scheduling preferences are required" },
-          { status: 400 }
-        );
-      }
-
-      // Verify all proStudents belong to this user
-      const userProStudents = await db
-        .select({ id: proStudents.id })
-        .from(proStudents)
-        .where(
-          and(
-            eq(proStudents.userId, session.userId),
-            inArray(
-              proStudents.id,
-              preferences.map((p) => p.proStudentId)
-            )
-          )
-        );
-      const validPsIds = new Set(userProStudents.map((ps) => ps.id));
-
-      for (const pref of preferences) {
-        if (!validPsIds.has(pref.proStudentId)) continue;
-
-        await db
-          .update(proStudents)
-          .set({
-            preferredLocationId: pref.preferredLocationId,
-            preferredDuration: pref.preferredDuration,
-            preferredDayOfWeek: pref.preferredDayOfWeek,
-            preferredTime: pref.preferredTime,
-            preferredInterval: pref.preferredInterval,
-          })
-          .where(eq(proStudents.id, pref.proStudentId));
-      }
-      break;
-    }
-
     case "complete": {
       const { generatedPassword } = data as { generatedPassword: string | null };
 

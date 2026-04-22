@@ -1,11 +1,10 @@
-import { getSession, hasRole } from "@/lib/auth";
+import { getSession } from "@/lib/auth";
 import { db } from "@/lib/db";
-import { users, proStudents, proProfiles } from "@/lib/db/schema";
-import { eq, and } from "drizzle-orm";
+import { users } from "@/lib/db/schema";
+import { eq } from "drizzle-orm";
 import { getLocale } from "@/lib/locale";
 import { t } from "@/lib/i18n/translations";
 import ProfileForm, { ChangePasswordForm } from "./ProfileForm";
-import { BookingPreferences } from "./BookingPreferences";
 import { PaymentMethodSection } from "./PaymentMethodSection";
 import { GolfProfileSection } from "./GolfProfileSection";
 import { getStripe } from "@/lib/stripe";
@@ -60,35 +59,6 @@ export default async function ProfilePage() {
     }
   }
 
-  // Fetch booking preferences per pro (for members)
-  const isMember = hasRole(session, "member");
-  let proPrefs: {
-    proStudentId: number;
-    proName: string;
-    preferredDuration: number | null;
-    preferredDayOfWeek: number | null;
-    preferredTime: string | null;
-  }[] = [];
-
-  if (isMember) {
-    proPrefs = await db
-      .select({
-        proStudentId: proStudents.id,
-        proName: proProfiles.displayName,
-        preferredDuration: proStudents.preferredDuration,
-        preferredDayOfWeek: proStudents.preferredDayOfWeek,
-        preferredTime: proStudents.preferredTime,
-      })
-      .from(proStudents)
-      .innerJoin(proProfiles, eq(proStudents.proProfileId, proProfiles.id))
-      .where(
-        and(
-          eq(proStudents.userId, session.userId),
-          eq(proStudents.status, "active")
-        )
-      );
-  }
-
   return (
     <section className="mx-auto max-w-2xl px-6 py-16">
       <h1 className="font-display text-3xl font-semibold text-green-950">
@@ -125,12 +95,6 @@ export default async function ProfilePage() {
           locale={locale}
         />
       </div>
-
-      {proPrefs.length > 0 && (
-        <div className="mt-8 rounded-xl border border-green-200 bg-white p-8">
-          <BookingPreferences pros={proPrefs} locale={locale} />
-        </div>
-      )}
 
       <div className="mt-8">
         <InstallPwaSection />

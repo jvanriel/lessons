@@ -72,15 +72,7 @@ export default async function RegisterPage({ searchParams }: Props) {
     cities: (string | null)[];
     locations: Array<{ proLocationId: number; name: string; city: string | null }>;
   }> = [];
-  let existingRelationships: Array<{
-    proStudentId: number;
-    proProfileId: number;
-    preferredLocationId: number | null;
-    preferredDuration: number | null;
-    preferredDayOfWeek: number | null;
-    preferredTime: string | null;
-    preferredInterval: string | null;
-  }> = [];
+  let existingProRelationships: Array<{ proProfileId: number }> = [];
 
   // A signed-in member row that has no password is a stub created by
   // the public booking flow. The wizard should treat them as "needs to
@@ -143,16 +135,8 @@ export default async function RegisterPage({ searchParams }: Props) {
         })
       );
 
-      existingRelationships = await db
-        .select({
-          proStudentId: proStudents.id,
-          proProfileId: proStudents.proProfileId,
-          preferredLocationId: proStudents.preferredLocationId,
-          preferredDuration: proStudents.preferredDuration,
-          preferredDayOfWeek: proStudents.preferredDayOfWeek,
-          preferredTime: proStudents.preferredTime,
-          preferredInterval: proStudents.preferredInterval,
-        })
+      existingProRelationships = await db
+        .select({ proProfileId: proStudents.proProfileId })
         .from(proStudents)
         .where(
           and(
@@ -180,7 +164,7 @@ export default async function RegisterPage({ searchParams }: Props) {
     };
   }
 
-  // Determine initial step (0=language, 1=account, 2=golf, 3=pros, 4=scheduling, 5=payment)
+  // Determine initial step (0=language, 1=account, 2=golf, 3=pros, 4=payment)
   let initialStep = 0; // language selection
   // Unauthenticated pre-fill from the booking flow OR a signed-in stub
   // user that still needs a password: land directly on the account
@@ -191,13 +175,9 @@ export default async function RegisterPage({ searchParams }: Props) {
     initialStep = 2;
     const hasGolfProfile =
       userData.handicap || userData.golfGoals.length > 0;
-    const hasPros = existingRelationships.length > 0;
-    const hasScheduling = existingRelationships.some(
-      (r) => r.preferredDuration !== null
-    );
+    const hasPros = existingProRelationships.length > 0;
     if (hasGolfProfile) initialStep = 3;
     if (hasGolfProfile && hasPros) initialStep = 4;
-    if (hasGolfProfile && hasPros && hasScheduling) initialStep = 5;
   }
 
   // The "Already have an account?" footer only makes sense for users
@@ -221,8 +201,7 @@ export default async function RegisterPage({ searchParams }: Props) {
       initialStep={initialStep}
       initialData={userData}
       pros={publishedPros}
-      existingProIds={existingRelationships.map((r) => r.proProfileId)}
-      existingRelationships={existingRelationships}
+      existingProIds={existingProRelationships.map((r) => r.proProfileId)}
       preSelectedProId={
         preSelectedProId && !isNaN(preSelectedProId) ? preSelectedProId : null
       }

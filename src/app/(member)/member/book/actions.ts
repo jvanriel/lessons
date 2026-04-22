@@ -1411,35 +1411,3 @@ export async function updatePreferredInterval(
   return { success: true };
 }
 
-/**
- * Update all booking preferences for a specific pro.
- * Used from the member profile preferences section.
- */
-export async function updateMemberBookingPrefs(
-  proStudentId: number,
-  prefs: {
-    preferredDuration: number | null;
-    preferredInterval: string | null;
-    preferredDayOfWeek: number | null;
-    preferredTime: string | null;
-  }
-) {
-  const session = await requireMember();
-
-  await db
-    .update(proStudents)
-    .set({
-      preferredDuration: prefs.preferredDuration,
-      preferredInterval: prefs.preferredInterval,
-      preferredDayOfWeek: prefs.preferredDayOfWeek,
-      preferredTime: prefs.preferredTime,
-    })
-    .where(
-      and(
-        eq(proStudents.id, proStudentId),
-        eq(proStudents.userId, session.userId)
-      )
-    );
-
-  return { success: true };
-}

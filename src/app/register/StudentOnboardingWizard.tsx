@@ -23,7 +23,6 @@ const STEP_KEYS = [
   "onboarding.profile",
   "onboarding.golfProfile",
   "onboarding.choosePros",
-  "onboarding.scheduling",
   "onboarding.payment",
 ];
 
@@ -47,27 +46,6 @@ interface Pro {
   }>;
 }
 
-interface ProStudentData {
-  proStudentId: number;
-  proProfileId: number;
-  displayName?: string;
-  lessonDurations?: number[];
-  preferredLocationId: number | null;
-  preferredDuration: number | null;
-  preferredDayOfWeek: number | null;
-  preferredTime: string | null;
-  preferredInterval: string | null;
-}
-
-interface ProLocationData {
-  proProfileId: number;
-  locations: Array<{
-    proLocationId: number;
-    name: string;
-    city: string | null;
-  }>;
-}
-
 interface ProfileData {
   firstName: string;
   lastName: string;
@@ -77,23 +55,6 @@ interface ProfileData {
   handicap: string;
   golfGoals: string[];
   golfGoalsOther: string;
-}
-
-interface SchedulingPref {
-  proStudentId: number;
-  proProfileId: number;
-  proName: string;
-  lessonDurations: number[];
-  locations: Array<{
-    proLocationId: number;
-    name: string;
-    city: string | null;
-  }>;
-  preferredLocationId: number | null;
-  preferredDuration: number | null;
-  preferredDayOfWeek: number | null;
-  preferredTime: string | null;
-  preferredInterval: string | null;
 }
 
 // ─── Progress Bar ──────────────────────────────────────
@@ -530,57 +491,7 @@ function ChooseProsStep({ pros, selected, onToggle, locale }: { pros: Pro[]; sel
   );
 }
 
-// ─── Step 4: Scheduling ────────────────────────────────
-
-const DAY_KEYS = ["mon", "tue", "wed", "thu", "fri", "sat", "sun"] as const;
-const TIME_KEYS = ["morning", "afternoon", "evening"] as const;
-function SchedulingStep({ prefs, onChange, locale }: { prefs: SchedulingPref[]; onChange: (i: number, u: Partial<SchedulingPref>) => void; locale: Locale }) {
-  return (
-    <div className="space-y-6">
-      <p className="text-sm text-green-600">{t("onboarding.schedulingDesc", locale)}</p>
-      {prefs.map((pref, i) => (
-        <div key={pref.proStudentId} className="rounded-xl border border-green-200 bg-green-50/30 p-5 space-y-4">
-          <h3 className="font-medium text-green-900">{pref.proName}</h3>
-          <div>
-            <label className="block text-xs font-medium text-green-700">{t("onboarding.duration", locale)}</label>
-            <div className="mt-1.5 flex flex-wrap gap-1.5">
-              {pref.lessonDurations.map((d) => (
-                <button key={d} type="button" onClick={() => onChange(i, { preferredDuration: d })} className={`rounded-md border px-3 py-1.5 text-xs font-medium transition-colors ${pref.preferredDuration === d ? "border-green-700 bg-green-700 text-white" : "border-green-200 bg-white text-green-700 hover:border-green-400"}`}>{d} min</button>
-              ))}
-            </div>
-          </div>
-          <div>
-            <label className="block text-xs font-medium text-green-700">{t("onboarding.preferredDay", locale)}</label>
-            <div className="mt-1.5 flex flex-wrap gap-1.5">
-              {DAY_KEYS.map((dayKey, dayIdx) => (
-                <button key={dayIdx} type="button" onClick={() => onChange(i, { preferredDayOfWeek: dayIdx })} className={`rounded-md border px-3 py-1.5 text-xs font-medium transition-colors ${pref.preferredDayOfWeek === dayIdx ? "border-green-700 bg-green-700 text-white" : "border-green-200 bg-white text-green-700 hover:border-green-400"}`}>{t(`onboarding.day.${dayKey}`, locale).slice(0, 3)}</button>
-              ))}
-            </div>
-          </div>
-          <div>
-            <label className="block text-xs font-medium text-green-700">{t("onboarding.preferredTime", locale)}</label>
-            <div className="mt-1.5 flex flex-wrap gap-1.5">
-              {TIME_KEYS.map((timeKey) => (
-                <button key={timeKey} type="button" onClick={() => onChange(i, { preferredTime: timeKey })} className={`rounded-md border px-3 py-1.5 text-xs font-medium transition-colors ${pref.preferredTime === timeKey ? "border-green-700 bg-green-700 text-white" : "border-green-200 bg-white text-green-700 hover:border-green-400"}`}>{t(`onboarding.${timeKey}`, locale)}</button>
-              ))}
-            </div>
-          </div>
-          {pref.locations.length > 1 && (
-            <div>
-              <label className="block text-xs font-medium text-green-700">{t("onboarding.preferredLocation", locale)}</label>
-              <select value={pref.preferredLocationId || ""} onChange={(e) => onChange(i, { preferredLocationId: e.target.value ? Number(e.target.value) : null })} className={inputClass + " max-w-xs"}>
-                <option value="">{t("onboarding.noPreference", locale)}</option>
-                {pref.locations.map((loc) => <option key={loc.proLocationId} value={loc.proLocationId}>{loc.name}{loc.city ? ` (${loc.city})` : ""}</option>)}
-              </select>
-            </div>
-          )}
-        </div>
-      ))}
-    </div>
-  );
-}
-
-// ─── Step 5: Payment (Skippable) ───────────────────────
+// ─── Step 4: Payment (Skippable) ───────────────────────
 
 interface BillingDefaults {
   name?: string;
@@ -713,7 +624,6 @@ export default function StudentOnboardingWizard({
   initialData,
   pros,
   existingProIds,
-  existingRelationships,
   preSelectedProId,
   showAuthFooter,
 }: {
@@ -724,15 +634,6 @@ export default function StudentOnboardingWizard({
   initialData: ProfileData | null;
   pros: Pro[];
   existingProIds: number[];
-  existingRelationships: Array<{
-    proStudentId: number;
-    proProfileId: number;
-    preferredLocationId: number | null;
-    preferredDuration: number | null;
-    preferredDayOfWeek: number | null;
-    preferredTime: string | null;
-    preferredInterval: string | null;
-  }>;
   preSelectedProId: number | null;
   showAuthFooter: boolean;
 }) {
@@ -765,18 +666,6 @@ export default function StudentOnboardingWizard({
     if (preSelectedProId) initial.add(preSelectedProId);
     return initial;
   });
-  const [schedulingPrefs, setSchedulingPrefs] = useState<SchedulingPref[]>(() =>
-    existingRelationships.map((r) => {
-      const pro = pros.find((p) => p.id === r.proProfileId);
-      return {
-        proStudentId: r.proStudentId, proProfileId: r.proProfileId,
-        proName: pro?.displayName || "Pro", lessonDurations: pro?.lessonDurations || [60],
-        locations: pro?.locations || [], preferredLocationId: r.preferredLocationId,
-        preferredDuration: r.preferredDuration, preferredDayOfWeek: r.preferredDayOfWeek,
-        preferredTime: r.preferredTime, preferredInterval: r.preferredInterval,
-      };
-    })
-  );
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -790,10 +679,6 @@ export default function StudentOnboardingWizard({
 
   // Derived locale for t() — updates live as user changes language
   const loc = data.preferredLocale as Locale;
-
-  function updateSchedulingPref(index: number, updates: Partial<SchedulingPref>) {
-    setSchedulingPrefs((prev) => prev.map((p, i) => (i === index ? { ...p, ...updates } : p)));
-  }
 
   async function saveStep(stepName: string, stepData: Record<string, unknown>) {
     setSaving(true); setError(null);
@@ -919,7 +804,7 @@ export default function StudentOnboardingWizard({
           const choose = await saveStep("choose-pros", {
             proProfileIds: [preSelectedProId],
           });
-          if (choose) setStep(5);
+          if (choose) setStep(4);
           break;
         }
         setStep(3);
@@ -931,12 +816,9 @@ export default function StudentOnboardingWizard({
         const proIds = Array.from(selectedPros);
         if (proIds.length === 0) { setError(t("onboarding.selectAtLeastOne", loc)); return; }
         result = await saveStep("choose-pros", { proProfileIds: proIds });
-        if (result) setStep(5);
+        if (result) setStep(4);
         break;
       }
-      // step 4 (explicit Scheduling) is intentionally removed — prefs
-      // are learned from booking activity by
-      // `updateBookingPreferences` in src/lib/booking-preferences.ts.
     }
   }
 
@@ -970,7 +852,7 @@ export default function StudentOnboardingWizard({
   // Visible steps are: Account (1), Golf Profile (2), Choose Pros (3),
   // Payment (5). Booking-flow arrivals also skip Choose Pros (3), so
   // their waypoints become: 1, 2, 5.
-  const visibleSteps = preSelectedProId ? [1, 2, 5] : [1, 2, 3, 5];
+  const visibleSteps = preSelectedProId ? [1, 2, 4] : [1, 2, 3, 4];
   const progressSteps = visibleSteps.length;
   const progressCurrent = Math.max(
     0,
@@ -1050,8 +932,7 @@ export default function StudentOnboardingWizard({
           {step === 1 && <AccountStep data={data} onChange={updateData} isAuthenticated={isAuthenticated} emailLocked={emailLocked} originalEmail={originalEmail} password={password} confirmPassword={confirmPassword} onPasswordChange={setPassword} onConfirmChange={setConfirmPassword} onGenerate={() => setPasswordGenerated(true)} locale={loc} showAuthFooter={showAuthFooter} />}
           {step === 2 && <GolfProfileStep data={data} onChange={updateData} locale={loc} />}
           {step === 3 && <ChooseProsStep pros={pros} selected={selectedPros} onToggle={togglePro} locale={loc} />}
-          {/* step 4 (Scheduling) removed — prefs are learned silently from bookings */}
-          {step === 5 && (
+          {step === 4 && (
             <PaymentStep
               onSuccess={completeOnboarding}
               onSkip={completeOnboarding}
@@ -1064,14 +945,14 @@ export default function StudentOnboardingWizard({
             />
           )}
 
-          {step < 5 && (
+          {step < 4 && (
             <div className="mt-8 flex justify-between">
               <Button type="button" variant="outline" onClick={() => {
-                // Step 4 (Scheduling) is removed. From Payment (step 5)
-                // Back goes to either step 3 (Choose Pros) for normal
-                // arrivals, or step 2 (Golf Profile) for booking-flow
-                // arrivals where step 3 was also skipped.
-                if (step === 5) { setStep(preSelectedProId ? 2 : 3); return; }
+                // From Payment (step 4) Back goes to either step 3
+                // (Choose Pros) for normal arrivals, or step 2 (Golf
+                // Profile) for booking-flow arrivals where step 3 was
+                // also skipped.
+                if (step === 4) { setStep(preSelectedProId ? 2 : 3); return; }
                 setStep(Math.max(0, step - 1));
               }} disabled={(step === 0) || saving} className="border-green-200 text-green-700 hover:bg-green-50">{t("onboarding.back", loc)}</Button>
               <Button onClick={handleNext} disabled={nextDisabled} className="bg-gold-600 text-white hover:bg-gold-500">{saving ? t("onboarding.saving", loc) : t("onboarding.continue", loc)}</Button>
