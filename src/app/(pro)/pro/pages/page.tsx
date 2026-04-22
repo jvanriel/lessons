@@ -1,5 +1,5 @@
 import { requireProProfile } from "@/lib/pro";
-import { getProPages } from "./actions";
+import { getProPages, getOrCreateDefaultProPage } from "./actions";
 import ProPagesList from "./ProPagesList";
 import { getLocale } from "@/lib/locale";
 import { t } from "@/lib/i18n/translations";
@@ -23,6 +23,10 @@ export default async function ProPagesPage() {
     );
   }
 
+  // Make sure every pro has at least one editable page seeded from
+  // their profile — so first-time visitors land on something they
+  // can immediately tweak instead of an empty screen.
+  await getOrCreateDefaultProPage();
   const pages = await getProPages();
 
   return (

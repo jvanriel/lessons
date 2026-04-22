@@ -115,6 +115,12 @@ export default function ProPagesList({
                     {t("proPages.view", locale)}
                   </Link>
                 )}
+                <Link
+                  href={`/pro/pages/${page.id}`}
+                  className="rounded border border-green-300 bg-white px-3 py-1 text-xs font-medium text-green-700 hover:bg-green-50"
+                >
+                  {t("proPages.edit", locale)}
+                </Link>
                 <button
                   onClick={() =>
                     handleTogglePublish(page.id, page.published)
