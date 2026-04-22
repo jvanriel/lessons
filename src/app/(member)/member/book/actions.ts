@@ -77,7 +77,6 @@ export async function getBookablePros() {
       displayName: proProfiles.displayName,
       photoUrl: proProfiles.photoUrl,
       specialties: proProfiles.specialties,
-      pricePerHour: proProfiles.pricePerHour,
       lessonDurations: proProfiles.lessonDurations,
     })
     .from(proProfiles)
@@ -97,7 +96,6 @@ export async function getProLocations(proProfileId: number) {
       name: locations.name,
       city: locations.city,
       address: locations.address,
-      priceIndication: proLocations.priceIndication,
       lessonDuration: proLocations.lessonDuration,
     })
     .from(proLocations)

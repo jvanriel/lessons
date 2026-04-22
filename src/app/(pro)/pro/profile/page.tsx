@@ -38,13 +38,12 @@ export default async function ProProfilePage() {
             bio: profile.bio,
             specialties: profile.specialties,
             photoUrl: profile.photoUrl,
-            pricePerHour: profile.pricePerHour,
             lessonDurations: profile.lessonDurations as number[],
-            // Stored in cents; expose as whole euros to the editor.
+            // Stored in cents; expose as decimal euros to the editor.
             lessonPricing: Object.fromEntries(
               Object.entries(
                 (profile.lessonPricing as Record<string, number>) ?? {}
-              ).map(([k, cents]) => [k, Math.round(cents / 100)])
+              ).map(([k, cents]) => [k, cents / 100])
             ),
             maxGroupSize: profile.maxGroupSize,
             bookingEnabled: profile.bookingEnabled,

@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { t } from "@/lib/i18n/translations";
 import type { Locale } from "@/lib/i18n";
+import { formatPriceInput, parsePriceInput } from "@/lib/pricing";
 
 interface ProfileData {
   id: number;
@@ -13,9 +14,8 @@ interface ProfileData {
   bio: string | null;
   specialties: string | null;
   photoUrl: string | null;
-  pricePerHour: string | null;
   lessonDurations: number[];
-  /** Per-duration lesson price in EUR (whole euros). */
+  /** Per-duration lesson price in EUR (decimal). */
   lessonPricing: Record<string, number>;
   maxGroupSize: number;
   bookingEnabled: boolean;
@@ -110,10 +110,21 @@ export default function ProProfileEditor({
   }
 
   // Booking settings
-  const [pricePerHour, setPricePerHour] = useState(profile.pricePerHour ?? "");
   const [lessonDurations, setLessonDurations] = useState<number[]>(profile.lessonDurations);
+  // EUR (decimal) per duration. The editor keeps the pretty-printed
+  // string per row in parallel so we don't lose what the user typed
+  // (e.g. "60,5" mid-edit) to round-tripping through Number.
   const [lessonPricing, setLessonPricing] = useState<Record<string, number>>(
     profile.lessonPricing
+  );
+  const [lessonPriceInputs, setLessonPriceInputs] = useState<Record<string, string>>(
+    () =>
+      Object.fromEntries(
+        Object.entries(profile.lessonPricing).map(([k, v]) => [
+          k,
+          formatPriceInput(v, locale),
+        ]),
+      ),
   );
   const [maxGroupSize, setMaxGroupSize] = useState(profile.maxGroupSize);
   const [bookingEnabled, setBookingEnabled] = useState(profile.bookingEnabled);
@@ -131,7 +142,6 @@ export default function ProProfileEditor({
       formData.set("displayName", displayName);
       formData.set("specialties", specialties);
       formData.set("bio", bio);
-      formData.set("pricePerHour", pricePerHour);
       formData.set("maxGroupSize", String(maxGroupSize));
       formData.set("lessonDurations", JSON.stringify(lessonDurations));
       // Convert EUR → cents and only send entries for enabled durations.
@@ -304,18 +314,6 @@ export default function ProProfileEditor({
 
           <div>
             <label className="block text-sm font-medium text-green-800">
-              {t("proProfile.priceIndication", locale)}
-            </label>
-            <input
-              value={pricePerHour}
-              onChange={(e) => setPricePerHour(e.target.value)}
-              placeholder={t("proProfile.priceIndicationPlaceholder", locale)}
-              className={inputClass + " max-w-xs"}
-            />
-          </div>
-
-          <div>
-            <label className="block text-sm font-medium text-green-800">
               {t("proProfile.lessonDurations", locale)}
             </label>
             <div className="mt-2 flex flex-wrap gap-3">
@@ -336,10 +334,15 @@ export default function ProProfileEditor({
                         // from the 60-min baseline (or €50/h default).
                         if (lessonPricing[String(d)] == null) {
                           const baseline = lessonPricing["60"] ?? 50;
-                          setLessonPricing({
-                            ...lessonPricing,
-                            [String(d)]: Math.round((baseline * d) / 60),
-                          });
+                          const prefill = Math.round((baseline * d) / 60);
+                          setLessonPricing((prev) => ({
+                            ...prev,
+                            [String(d)]: prefill,
+                          }));
+                          setLessonPriceInputs((prev) => ({
+                            ...prev,
+                            [String(d)]: formatPriceInput(prefill, locale),
+                          }));
                         }
                       } else {
                         const next = lessonDurations.filter((v) => v !== d);
@@ -380,18 +383,36 @@ export default function ProProfileEditor({
                       €
                     </span>
                     <input
-                      type="number"
-                      min="0"
-                      step="5"
-                      value={lessonPricing[String(d)] ?? ""}
+                      type="text"
+                      inputMode="decimal"
+                      value={lessonPriceInputs[String(d)] ?? ""}
                       onChange={(e) => {
-                        const n = Number(e.target.value);
-                        if (!Number.isFinite(n) || n < 0) return;
-                        setLessonPricing({
-                          ...lessonPricing,
-                          [String(d)]: n,
+                        const raw = e.target.value;
+                        setLessonPriceInputs((prev) => ({
+                          ...prev,
+                          [String(d)]: raw,
+                        }));
+                        const parsed = parsePriceInput(raw);
+                        setLessonPricing((prev) => {
+                          const next = { ...prev };
+                          if (parsed === null) delete next[String(d)];
+                          else next[String(d)] = parsed;
+                          return next;
                         });
                       }}
+                      onBlur={() => {
+                        // Tidy the display on blur — "60,5" becomes
+                        // "60,50", "60" stays "60", trailing junk gets
+                        // normalised.
+                        const v = lessonPricing[String(d)];
+                        if (typeof v === "number") {
+                          setLessonPriceInputs((prev) => ({
+                            ...prev,
+                            [String(d)]: formatPriceInput(v, locale),
+                          }));
+                        }
+                      }}
+                      placeholder="0"
                       className={inputClass + " pl-7"}
                     />
                   </div>

@@ -82,22 +82,16 @@ export async function POST(request: Request) {
 
     case "lessons": {
       const {
-        pricePerHour,
         lessonDurations,
         lessonPricing,
         maxGroupSize,
         cancellationHours,
       } = data as {
-        pricePerHour: string;
         lessonDurations: number[];
         lessonPricing?: Record<string, number>;
         maxGroupSize: number;
         cancellationHours: number;
       };
-      const priceIndication = pricePerHour?.trim();
-      if (!priceIndication) {
-        return NextResponse.json({ error: "Price indication is required" }, { status: 400 });
-      }
 
       // Sanitise lessonPricing: only keep entries for enabled durations
       // with a positive cent value.
@@ -119,7 +113,6 @@ export async function POST(request: Request) {
       await db
         .update(proProfiles)
         .set({
-          pricePerHour: priceIndication,
           lessonDurations: lessonDurations?.length ? lessonDurations : [60],
           lessonPricing: cleanedPricing,
           maxGroupSize: maxGroupSize || 4,

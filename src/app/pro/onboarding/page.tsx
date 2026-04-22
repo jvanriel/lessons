@@ -38,7 +38,14 @@ export default async function OnboardingPage() {
     .limit(1);
   const hasLocations = existingLocations.length > 0;
 
-  const hasLessons = !!profile.pricePerHour;
+  // A pro has finished the lessons step once at least one per-duration
+  // price is set. Previously we checked pricePerHour (a free-text
+  // indicator); that field is gone now that we store real per-duration
+  // prices as the single source of truth.
+  const pricing = (profile.lessonPricing as Record<string, number>) ?? {};
+  const hasLessons = Object.values(pricing).some(
+    (v) => typeof v === "number" && v > 0,
+  );
   const hasBank = !!profile.bankIban;
 
   const locale = await getLocale();
@@ -58,14 +65,13 @@ export default async function OnboardingPage() {
         displayName: profile.displayName,
         bio: profile.bio ?? "",
         specialties: profile.specialties ?? "",
-        pricePerHour: profile.pricePerHour ?? "",
         lessonDurations: (profile.lessonDurations as number[]) ?? [60],
-        // lessonPricing is stored in cents on the DB; convert to EUR for the
-        // form (so the pro sees whole numbers in the input).
+        // lessonPricing is stored in cents on the DB; convert to decimal
+        // EUR for the form so the pro can type e.g. "60,50".
         lessonPricing: Object.fromEntries(
           Object.entries(
             (profile.lessonPricing as Record<string, number>) ?? {}
-          ).map(([k, cents]) => [k, Math.round(cents / 100)])
+          ).map(([k, cents]) => [k, cents / 100])
         ),
         maxGroupSize: profile.maxGroupSize,
         cancellationHours: profile.cancellationHours,

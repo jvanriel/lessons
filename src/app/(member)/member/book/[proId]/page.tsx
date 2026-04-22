@@ -50,7 +50,6 @@ export default async function BookingPage({
       displayName: proProfiles.displayName,
       photoUrl: proProfiles.photoUrl,
       specialties: proProfiles.specialties,
-      pricePerHour: proProfiles.pricePerHour,
       lessonDurations: proProfiles.lessonDurations,
       lessonPricing: proProfiles.lessonPricing,
       bookingEnabled: proProfiles.bookingEnabled,
@@ -114,7 +113,6 @@ export default async function BookingPage({
       name: locations.name,
       city: locations.city,
       address: locations.address,
-      priceIndication: proLocations.priceIndication,
       lessonDuration: proLocations.lessonDuration,
     })
     .from(proLocations)
@@ -136,7 +134,6 @@ export default async function BookingPage({
           displayName: pro.displayName,
           photoUrl: pro.photoUrl,
           specialties: pro.specialties,
-          pricePerHour: pro.pricePerHour,
           lessonDurations: pro.lessonDurations as number[],
           lessonPricing:
             (pro.lessonPricing as Record<string, number> | null) ?? {},

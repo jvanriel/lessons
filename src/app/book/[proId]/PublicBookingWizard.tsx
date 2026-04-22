@@ -33,7 +33,6 @@ interface Location {
   name: string;
   city: string | null;
   address: string | null;
-  priceIndication: string | null;
   lessonDuration: number | null;
 }
 

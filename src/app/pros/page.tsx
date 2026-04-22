@@ -4,6 +4,7 @@ import { proProfiles, users, proLocations, locations } from "@/lib/db/schema";
 import { eq, and, isNull } from "drizzle-orm";
 import { getLocale } from "@/lib/locale";
 import { t } from "@/lib/i18n/translations";
+import { cheapestLessonPrice } from "@/lib/pricing";
 
 export const metadata = {
   title: "Our Pros — Golf Lessons",
@@ -20,7 +21,7 @@ export default async function ProsPage() {
       bio: proProfiles.bio,
       specialties: proProfiles.specialties,
       photoUrl: proProfiles.photoUrl,
-      pricePerHour: proProfiles.pricePerHour,
+      lessonPricing: proProfiles.lessonPricing,
     })
     .from(proProfiles)
     .innerJoin(users, eq(proProfiles.userId, users.id))
@@ -105,11 +106,17 @@ export default async function ProsPage() {
                         {locs.length > 2 && ` +${locs.length - 2}`}
                       </span>
                     )}
-                    {pro.pricePerHour && (
-                      <span className="text-xs font-medium text-green-700">
-                        {pro.pricePerHour}
-                      </span>
-                    )}
+                    {(() => {
+                      const from = cheapestLessonPrice(
+                        pro.lessonPricing as Record<string, number> | null,
+                        locale,
+                      );
+                      return from ? (
+                        <span className="text-xs font-medium text-green-700">
+                          {t("proBrowse.fromPrice", locale).replace("{price}", from)}
+                        </span>
+                      ) : null;
+                    })()}
                   </div>
                 </Link>
               );

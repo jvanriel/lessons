@@ -16,7 +16,6 @@ interface ProLocation {
   address: string | null;
   city: string | null;
   country: string | null;
-  priceIndication: string | null;
   notes: string | null;
   sortOrder: number;
   active: boolean;
@@ -96,11 +95,6 @@ export default function LocationManager({
                         .join(", ")}
                     </p>
                   )}
-                  {loc.priceIndication && (
-                    <p className="mt-1 text-xs text-gold-600">
-                      {loc.priceIndication}
-                    </p>
-                  )}
                   {loc.notes && (
                     <p className="mt-1 text-xs text-green-500">{loc.notes}</p>
                   )}
@@ -177,16 +171,6 @@ export default function LocationManager({
                 <input
                   name="country"
                   defaultValue="Belgium"
-                  className={inputClass}
-                />
-              </div>
-              <div>
-                <label className="block text-xs font-medium text-green-700">
-                  {t("proLocations.priceIndication", locale)}
-                </label>
-                <input
-                  name="priceIndication"
-                  placeholder={t("proLocations.priceIndicationPlaceholder", locale)}
                   className={inputClass}
                 />
               </div>
@@ -282,27 +266,15 @@ function EditLocationForm({
           {t("proLocations.active", locale)}
         </label>
       </div>
-      <div className="grid gap-3 sm:grid-cols-2">
-        <div>
-          <label className="block text-xs font-medium text-green-700">
-            {t("proLocations.priceIndication", locale)}
-          </label>
-          <input
-            name="priceIndication"
-            defaultValue={location.priceIndication ?? ""}
-            className={inputClass}
-          />
-        </div>
-        <div>
-          <label className="block text-xs font-medium text-green-700">
-            {t("proLocations.notes", locale)}
-          </label>
-          <input
-            name="notes"
-            defaultValue={location.notes ?? ""}
-            className={inputClass}
-          />
-        </div>
+      <div>
+        <label className="block text-xs font-medium text-green-700">
+          {t("proLocations.notes", locale)}
+        </label>
+        <input
+          name="notes"
+          defaultValue={location.notes ?? ""}
+          className={inputClass}
+        />
       </div>
       {state?.error && (
         <p className="text-sm text-red-600">{state.error}</p>

@@ -393,6 +393,7 @@ const translations: Record<Locale, Record<string, string>> = {
     "proBrowse.newsOffers": "News & Offers",
     "proBrowse.maxPerGroup": "Max {n} per group",
     "proBrowse.bookALesson": "Book a Lesson",
+    "proBrowse.fromPrice": "from {price}",
     // Slot explanation dialog
     "slotExpl.preferredDayNote": "Your preferred day is {day}. Quick Book suggests dates starting from the next {day}. You can change this in your profile under Booking Preferences.",
     "slotExpl.intervalLabel.weekly": "In a week",
@@ -1615,6 +1616,7 @@ const translations: Record<Locale, Record<string, string>> = {
     "proBrowse.newsOffers": "Nieuws & aanbiedingen",
     "proBrowse.maxPerGroup": "Max {n} per groep",
     "proBrowse.bookALesson": "Les boeken",
+    "proBrowse.fromPrice": "vanaf {price}",
     "slotExpl.preferredDayNote": "Je voorkeursdag is {day}. Quick Book stelt datums voor vanaf de volgende {day}. Je kunt dit wijzigen in je profiel onder Boekingsvoorkeuren.",
     "slotExpl.intervalLabel.weekly": "Over een week",
     "slotExpl.intervalLabel.biweekly": "Over 2 weken",
@@ -2820,6 +2822,7 @@ const translations: Record<Locale, Record<string, string>> = {
     "proBrowse.newsOffers": "Actualités & offres",
     "proBrowse.maxPerGroup": "Max {n} par groupe",
     "proBrowse.bookALesson": "Réserver un cours",
+    "proBrowse.fromPrice": "à partir de {price}",
     "slotExpl.preferredDayNote": "Votre jour préféré est {day}. Quick Book propose des dates à partir du prochain {day}. Vous pouvez modifier cela dans votre profil sous Préférences de réservation.",
     "slotExpl.intervalLabel.weekly": "Dans une semaine",
     "slotExpl.intervalLabel.biweekly": "Dans 2 semaines",

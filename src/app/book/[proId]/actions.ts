@@ -111,7 +111,6 @@ export async function getAllBookablePros() {
       name: locations.name,
       city: locations.city,
       address: locations.address,
-      priceIndication: proLocations.priceIndication,
       lessonDuration: proLocations.lessonDuration,
       sortOrder: proLocations.sortOrder,
     })
@@ -183,7 +182,6 @@ export async function getPublicLocations(proProfileId: number) {
       name: locations.name,
       city: locations.city,
       address: locations.address,
-      priceIndication: proLocations.priceIndication,
       lessonDuration: proLocations.lessonDuration,
     })
     .from(proLocations)

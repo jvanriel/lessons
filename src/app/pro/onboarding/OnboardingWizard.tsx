@@ -13,6 +13,8 @@ import {
   ANNUAL_PRICE,
   ANNUAL_SAVINGS_PERCENT,
   formatPrice,
+  formatPriceInput,
+  parsePriceInput,
 } from "@/lib/pricing";
 
 const STEP_KEYS = [
@@ -31,7 +33,6 @@ interface InitialData {
   displayName: string;
   bio: string;
   specialties: string;
-  pricePerHour: string;
   lessonDurations: number[];
   /** Per-duration lesson price in EUR (user-facing, NOT cents). */
   lessonPricing: Record<string, number>;
@@ -267,8 +268,8 @@ function LessonsStep({
   }
 
   function updatePriceForDuration(d: number, value: string) {
-    const n = Number(value);
-    if (!Number.isFinite(n) || n < 0) return;
+    const n = parsePriceInput(value);
+    if (n === null) return;
     onChange({
       lessonPricing: { ...data.lessonPricing, [String(d)]: n },
     });
@@ -276,20 +277,6 @@ function LessonsStep({
 
   return (
     <div className="space-y-5">
-      <div>
-        <label className="block text-sm font-medium text-green-800">
-          {t("proOnb.lessons.priceLabel", locale)}
-        </label>
-        <input
-          type="text"
-          value={data.pricePerHour}
-          onChange={(e) => onChange({ pricePerHour: e.target.value })}
-          placeholder={t("proOnb.lessons.pricePlaceholder", locale)}
-          className={inputClass + " max-w-[280px]"}
-        />
-        <p className="mt-1 text-xs text-green-500">{t("proOnb.lessons.priceMin", locale)}</p>
-      </div>
-
       <div>
         <label className="block text-sm font-medium text-green-800">
           {t("proOnb.lessons.durations", locale)}
@@ -335,11 +322,15 @@ function LessonsStep({
                   €
                 </span>
                 <input
-                  type="number"
-                  min="0"
-                  step="5"
-                  value={data.lessonPricing[String(d)] ?? ""}
+                  type="text"
+                  inputMode="decimal"
+                  value={
+                    data.lessonPricing[String(d)] !== undefined
+                      ? formatPriceInput(data.lessonPricing[String(d)], locale)
+                      : ""
+                  }
                   onChange={(e) => updatePriceForDuration(d, e.target.value)}
+                  placeholder="0"
                   className={inputClass + " pl-7"}
                 />
               </div>
@@ -756,7 +747,6 @@ export default function OnboardingWizard({
           }
         }
         success = await saveStep("lessons", {
-          pricePerHour: data.pricePerHour,
           lessonDurations: data.lessonDurations,
           lessonPricing: lessonPricingCents,
           maxGroupSize: data.maxGroupSize,

@@ -13,6 +13,7 @@ import { checkStudentRelationship } from "./actions";
 import JoinButton from "./JoinButton";
 import { getLocale } from "@/lib/locale";
 import { t } from "@/lib/i18n/translations";
+import { cheapestLessonPrice } from "@/lib/pricing";
 
 interface Props {
   params: Promise<{ proId: string }>;
@@ -48,7 +49,7 @@ export default async function ProProfilePage({ params }: Props) {
       bio: proProfiles.bio,
       specialties: proProfiles.specialties,
       photoUrl: proProfiles.photoUrl,
-      pricePerHour: proProfiles.pricePerHour,
+      lessonPricing: proProfiles.lessonPricing,
       lessonDurations: proProfiles.lessonDurations,
       maxGroupSize: proProfiles.maxGroupSize,
       bookingEnabled: proProfiles.bookingEnabled,
@@ -66,7 +67,6 @@ export default async function ProProfilePage({ params }: Props) {
       name: locations.name,
       city: locations.city,
       address: locations.address,
-      priceIndication: proLocations.priceIndication,
       notes: proLocations.notes,
     })
     .from(proLocations)
@@ -123,11 +123,17 @@ export default async function ProProfilePage({ params }: Props) {
               </p>
             )}
             <div className="mt-3 flex flex-wrap gap-3 text-sm text-green-600">
-              {pro.pricePerHour && (
-                <span className="rounded-full bg-green-100 px-3 py-1 text-xs font-medium text-green-700">
-                  {pro.pricePerHour}
-                </span>
-              )}
+              {(() => {
+                const from = cheapestLessonPrice(
+                  pro.lessonPricing as Record<string, number> | null,
+                  locale,
+                );
+                return from ? (
+                  <span className="rounded-full bg-green-100 px-3 py-1 text-xs font-medium text-green-700">
+                    {t("proBrowse.fromPrice", locale).replace("{price}", from)}
+                  </span>
+                ) : null;
+              })()}
               {pro.lessonDurations && (
                 <span className="rounded-full bg-green-100 px-3 py-1 text-xs text-green-700">
                   {(pro.lessonDurations as number[]).join(", ")} min
@@ -197,11 +203,6 @@ export default async function ProProfilePage({ params }: Props) {
                       <p className="mt-1 text-xs text-green-500">{loc.notes}</p>
                     )}
                   </div>
-                  {loc.priceIndication && (
-                    <span className="text-sm font-medium text-green-700">
-                      {loc.priceIndication}
-                    </span>
-                  )}
                 </div>
               ))}
             </div>

@@ -47,3 +47,51 @@ export function formatPrice(amount: number, locale: Locale): string {
     }
   ).format(amount);
 }
+
+/**
+ * Parse a decimal-euro string that the user typed in an input.
+ * Accepts both comma and dot as decimal separator, optional spaces and
+ * euro sign. Returns EUR as a float, or null if the value can't be
+ * read as a non-negative number.
+ */
+export function parsePriceInput(value: string): number | null {
+  const cleaned = value.trim().replace(/[€\s]/g, "").replace(",", ".");
+  if (cleaned === "") return null;
+  const n = Number(cleaned);
+  if (!Number.isFinite(n) || n < 0) return null;
+  return n;
+}
+
+/**
+ * Render an EUR amount for a text input — no currency symbol, locale
+ * decimal separator, zero decimals for whole numbers, exactly two
+ * decimals otherwise.
+ */
+export function formatPriceInput(euros: number, locale: Locale): string {
+  if (!Number.isFinite(euros)) return "";
+  const opts: Intl.NumberFormatOptions = Number.isInteger(euros)
+    ? { minimumFractionDigits: 0, maximumFractionDigits: 0 }
+    : { minimumFractionDigits: 2, maximumFractionDigits: 2 };
+  return new Intl.NumberFormat(
+    locale === "en" ? "en-GB" : locale === "nl" ? "nl-BE" : "fr-BE",
+    opts,
+  ).format(euros);
+}
+
+/**
+ * Smallest per-duration lesson price formatted for display as
+ * "from €X" on public listings. `pricing` maps minutes → cents.
+ * Returns null when there are no valid entries.
+ */
+export function cheapestLessonPrice(
+  pricing: Record<string, number> | null | undefined,
+  locale: Locale,
+): string | null {
+  if (!pricing) return null;
+  const cents = Object.values(pricing).filter(
+    (v) => typeof v === "number" && v > 0,
+  );
+  if (cents.length === 0) return null;
+  const minCents = Math.min(...cents);
+  return formatPrice(minCents / 100, locale);
+}

@@ -21,7 +21,6 @@ interface ProInfo {
   displayName: string;
   photoUrl: string | null;
   specialties: string | null;
-  pricePerHour: string | null;
   lessonDurations: number[];
   /** Real charged prices in EUR cents, keyed by duration-in-minutes string. */
   lessonPricing: Record<string, number>;
@@ -33,7 +32,6 @@ interface LocationInfo {
   name: string;
   city: string | null;
   address: string | null;
-  priceIndication: string | null;
   lessonDuration: number | null;
 }
 

@@ -30,7 +30,6 @@ export async function getMyLocations() {
       address: locations.address,
       city: locations.city,
       country: locations.country,
-      priceIndication: proLocations.priceIndication,
       notes: proLocations.notes,
       sortOrder: proLocations.sortOrder,
       active: proLocations.active,
@@ -52,8 +51,6 @@ export async function createLocation(
   const address = (formData.get("address") as string)?.trim() || null;
   const city = (formData.get("city") as string)?.trim() || null;
   const country = (formData.get("country") as string)?.trim() || null;
-  const priceIndication =
-    (formData.get("priceIndication") as string)?.trim() || null;
   const notes = (formData.get("notes") as string)?.trim() || null;
 
   if (!name) return { error: "Location name is required." };
@@ -100,7 +97,6 @@ export async function createLocation(
   await db.insert(proLocations).values({
     proProfileId: proId,
     locationId,
-    priceIndication,
     notes,
     sortOrder: maxSort + 1,
   });
@@ -118,14 +114,12 @@ export async function updateProLocation(
   if (!proId) return { error: "Unauthorized" };
 
   const proLocationId = parseInt(formData.get("proLocationId") as string);
-  const priceIndication =
-    (formData.get("priceIndication") as string)?.trim() || null;
   const notes = (formData.get("notes") as string)?.trim() || null;
   const active = formData.get("active") === "true";
 
   await db
     .update(proLocations)
-    .set({ priceIndication, notes, active })
+    .set({ notes, active })
     .where(
       and(
         eq(proLocations.id, proLocationId),
