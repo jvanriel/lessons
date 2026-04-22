@@ -542,6 +542,22 @@ export default function BillingClient({
           </div>
         </div>
       )}
+
+      {/* Contact for billing questions */}
+      <div className="mt-6 rounded-xl border border-green-200 bg-white p-6 shadow-sm">
+        <h2 className="text-lg font-semibold text-green-900">
+          {t("proBilling.contactHeading", locale)}
+        </h2>
+        <p className="mt-1 text-sm text-green-600">
+          {t("proBilling.contactBody", locale)}
+        </p>
+        <a
+          href="mailto:info@golflessons.be"
+          className="mt-3 inline-flex items-center gap-1.5 text-sm font-medium text-gold-600 hover:text-gold-500"
+        >
+          {t("proBilling.contactCta", locale)} · info@golflessons.be
+        </a>
+      </div>
     </div>
   );
 }

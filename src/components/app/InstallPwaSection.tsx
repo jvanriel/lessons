@@ -1,13 +1,13 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import type { Locale } from "@/lib/i18n";
+import { t } from "@/lib/i18n/translations";
 
 interface BeforeInstallPromptEvent extends Event {
   prompt: () => Promise<void>;
   userChoice: Promise<{ outcome: "accepted" | "dismissed" }>;
 }
-
-const INSTALLED_KEY = "pwa-installed";
 
 function isIOS(): boolean {
   if (typeof navigator === "undefined") return false;
@@ -30,7 +30,7 @@ function isStandaloneNow(): boolean {
   return window.matchMedia("(display-mode: standalone)").matches;
 }
 
-export default function InstallPwaSection() {
+export default function InstallPwaSection({ locale }: { locale: Locale }) {
   const [prompt, setPrompt] = useState<BeforeInstallPromptEvent | null>(null);
   const [installed, setInstalled] = useState(false);
   const [platform, setPlatform] = useState<"ios" | "android" | "other">(
@@ -41,41 +41,31 @@ export default function InstallPwaSection() {
     if (isIOS()) setPlatform("ios");
     else if (isAndroid()) setPlatform("android");
 
-    // Already running as installed PWA
+    // Trust only live signals here — a stale `localStorage` "installed"
+    // flag would keep saying "App is installed" even after the user
+    // uninstalled (task 27 item 3d). The signals we trust:
+    //   - display-mode: standalone / navigator.standalone (running as PWA)
+    //   - getInstalledRelatedApps() (Chrome)
+    //   - appinstalled event while this page is open
     if (isStandaloneNow()) {
       setInstalled(true);
-      try {
-        localStorage.setItem(INSTALLED_KEY, "true");
-      } catch {}
       return;
     }
 
-    // Previously detected install (via appinstalled event)
-    try {
-      if (localStorage.getItem(INSTALLED_KEY) === "true") {
-        setInstalled(true);
-      }
-    } catch {}
-
-    // Chrome-only API for detecting installed related apps
     const nav = navigator as unknown as {
-      getInstalledRelatedApps?: () => Promise<Array<{ platform: string; url?: string }>>;
+      getInstalledRelatedApps?: () => Promise<
+        Array<{ platform: string; url?: string }>
+      >;
     };
     if (nav.getInstalledRelatedApps) {
       nav
         .getInstalledRelatedApps()
         .then((apps) => {
-          if (apps.length > 0) {
-            setInstalled(true);
-            try {
-              localStorage.setItem(INSTALLED_KEY, "true");
-            } catch {}
-          }
+          if (apps.length > 0) setInstalled(true);
         })
         .catch(() => {});
     }
 
-    // Read any already-captured deferred prompt
     const w = window as unknown as {
       __deferredInstallPrompt?: BeforeInstallPromptEvent | null;
     };
@@ -92,9 +82,6 @@ export default function InstallPwaSection() {
     function handleInstalled() {
       setInstalled(true);
       setPrompt(null);
-      try {
-        localStorage.setItem(INSTALLED_KEY, "true");
-      } catch {}
     }
 
     window.addEventListener("pwa-install-available", handleAvailable);
@@ -111,9 +98,6 @@ export default function InstallPwaSection() {
     const { outcome } = await prompt.userChoice;
     if (outcome === "accepted") {
       setInstalled(true);
-      try {
-        localStorage.setItem(INSTALLED_KEY, "true");
-      } catch {}
     }
     setPrompt(null);
     (window as unknown as { __deferredInstallPrompt?: null }).__deferredInstallPrompt = null;
@@ -122,10 +106,10 @@ export default function InstallPwaSection() {
   return (
     <div className="rounded-xl border border-green-200 bg-white p-8">
       <h2 className="font-display text-xl font-semibold text-green-950">
-        Install app
+        {t("install.title", locale)}
       </h2>
       <p className="mt-1 text-sm text-green-600">
-        Add Golf Lessons to your home screen for faster access.
+        {t("install.subtitle", locale)}
       </p>
 
       <div className="mt-4">
@@ -144,7 +128,7 @@ export default function InstallPwaSection() {
                 d="m4.5 12.75 6 6 9-13.5"
               />
             </svg>
-            <span>App is installed on this device.</span>
+            <span>{t("install.installed", locale)}</span>
           </div>
         ) : prompt ? (
           <button
@@ -164,23 +148,19 @@ export default function InstallPwaSection() {
                 d="M3 16.5v2.25A2.25 2.25 0 0 0 5.25 21h13.5A2.25 2.25 0 0 0 21 18.75V16.5M16.5 12 12 16.5m0 0L7.5 12m4.5 4.5V3"
               />
             </svg>
-            Install app
+            {t("install.button", locale)}
           </button>
         ) : platform === "ios" ? (
           <p className="text-sm text-green-700">
-            On iPhone, open this site in <b>Safari</b>, tap the Share button,
-            and choose <b>Add to Home Screen</b>. See the Help menu
-            (top right) for step-by-step instructions.
+            {t("install.ios", locale)}
           </p>
         ) : platform === "android" ? (
           <p className="text-sm text-green-700">
-            Open this site in <b>Chrome</b> and look for the install option in
-            the menu. See the Help menu (top right) for details.
+            {t("install.android", locale)}
           </p>
         ) : (
           <p className="text-sm text-green-700">
-            Install option not available in this browser. See the Help menu
-            (top right) for instructions.
+            {t("install.other", locale)}
           </p>
         )}
       </div>

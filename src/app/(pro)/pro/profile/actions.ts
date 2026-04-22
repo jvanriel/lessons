@@ -5,14 +5,17 @@ import { db } from "@/lib/db";
 import { proProfiles } from "@/lib/db/schema";
 import { eq } from "drizzle-orm";
 import { getSession, hasRole } from "@/lib/auth";
+import { getLocale } from "@/lib/locale";
+import { t } from "@/lib/i18n/translations";
 
 export async function updateProProfile(
   _prev: { error?: string; success?: boolean } | null,
   formData: FormData
 ) {
+  const locale = await getLocale();
   const session = await getSession();
   if (!session || (!hasRole(session, "pro") && !hasRole(session, "admin"))) {
-    return { error: "Unauthorized" };
+    return { error: t("proProfile.err.unauthorized", locale) };
   }
 
   const [profile] = await db
@@ -21,7 +24,7 @@ export async function updateProProfile(
     .where(eq(proProfiles.userId, session.userId))
     .limit(1);
 
-  if (!profile) return { error: "No pro profile found." };
+  if (!profile) return { error: t("proProfile.err.noProfile", locale) };
 
   const displayName = (formData.get("displayName") as string).trim();
   const bio = (formData.get("bio") as string)?.trim() || null;
@@ -59,11 +62,11 @@ export async function updateProProfile(
     }
   } catch {}
 
-  if (!displayName) return { error: "Display name is required." };
+  if (!displayName) {
+    return { error: t("proProfile.err.displayNameRequired", locale) };
+  }
   if (Object.keys(lessonPricing).length === 0) {
-    return {
-      error: "At least one selected lesson duration needs a price.",
-    };
+    return { error: t("proProfile.err.missingLessonPricing", locale) };
   }
 
   await db

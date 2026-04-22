@@ -7,6 +7,16 @@ import { t } from "@/lib/i18n/translations";
 import type { Locale } from "@/lib/i18n";
 import { MONTHLY_PRICE, ANNUAL_PRICE, formatPrice } from "@/lib/pricing";
 
+// Same env var the server uses in @/lib/stripe; the NEXT_PUBLIC_ prefix
+// makes it safe to read on the client. Defaults match the server fallback.
+const PLATFORM_FEE_PERCENT = (() => {
+  const raw = process.env.NEXT_PUBLIC_PLATFORM_FEE_PERCENT;
+  if (!raw) return 2.5;
+  const n = Number(raw);
+  if (!Number.isFinite(n) || n < 0 || n > 100) return 2.5;
+  return n;
+})();
+
 export default function RegisterProForm({ locale }: { locale: Locale }) {
   const [state, formAction, pending] = useActionState(registerPro, null);
   const [firstName, setFirstName] = useState("");
@@ -159,6 +169,12 @@ export default function RegisterProForm({ locale }: { locale: Locale }) {
             {t("proReg.nextStep", locale)
               .replace("{monthly}", formatPrice(MONTHLY_PRICE, locale))
               .replace("{annual}", formatPrice(ANNUAL_PRICE, locale))}
+          </p>
+          <p className="text-center text-xs text-green-500">
+            {t("proReg.feeNote", locale).replace(
+              "{rate}",
+              String(PLATFORM_FEE_PERCENT),
+            )}
           </p>
         </form>
 

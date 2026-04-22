@@ -97,18 +97,18 @@ export default async function ProfilePage() {
       </div>
 
       <div className="mt-8">
-        <InstallPwaSection />
+        <InstallPwaSection locale={locale} />
       </div>
 
       <div className="mt-8 rounded-xl border border-green-200 bg-white p-8">
         <h2 className="font-display text-xl font-semibold text-green-950">
-          Notifications
+          {t("notifications.title", locale)}
         </h2>
         <p className="mt-1 text-sm text-green-600">
-          Receive alerts for new messages and booking updates on this device.
+          {t("notifications.subtitle", locale)}
         </p>
         <div className="mt-4">
-          <EnablePushButton />
+          <EnablePushButton locale={locale} />
         </div>
       </div>
 

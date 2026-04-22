@@ -1,6 +1,8 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import type { Locale } from "@/lib/i18n";
+import { t } from "@/lib/i18n/translations";
 
 type Status = "unsupported" | "ios-install-required" | "idle" | "enabled" | "denied" | "pending";
 
@@ -16,9 +18,7 @@ function urlBase64ToUint8Array(base64String: string): ArrayBuffer {
 
 function isStandalone(): boolean {
   if (typeof window === "undefined") return false;
-  // iOS Safari
   if ("standalone" in navigator && (navigator as unknown as { standalone: boolean }).standalone) return true;
-  // Other browsers
   return window.matchMedia("(display-mode: standalone)").matches;
 }
 
@@ -27,13 +27,12 @@ function isIOS(): boolean {
   return /iPad|iPhone|iPod/.test(navigator.userAgent);
 }
 
-export default function EnablePushButton() {
+export default function EnablePushButton({ locale }: { locale: Locale }) {
   const [status, setStatus] = useState<Status>("idle");
 
   useEffect(() => {
     if (typeof window === "undefined") return;
     if (!("serviceWorker" in navigator) || !("PushManager" in window)) {
-      // iOS needs the PWA installed to home screen first
       if (isIOS() && !isStandalone()) {
         setStatus("ios-install-required");
       } else {
@@ -47,7 +46,6 @@ export default function EnablePushButton() {
       return;
     }
 
-    // Check if already subscribed
     navigator.serviceWorker.ready.then(async (reg) => {
       const sub = await reg.pushManager.getSubscription();
       if (sub) setStatus("enabled");
@@ -114,7 +112,7 @@ export default function EnablePushButton() {
   if (status === "unsupported") {
     return (
       <p className="text-xs text-green-600/60">
-        Push notifications are not supported in this browser.
+        {t("notifications.unsupported", locale)}
       </p>
     );
   }
@@ -122,8 +120,7 @@ export default function EnablePushButton() {
   if (status === "ios-install-required") {
     return (
       <div className="rounded-lg border border-green-200 bg-green-50 p-3 text-xs text-green-700">
-        To receive notifications on iPhone, add this app to your Home Screen first:
-        tap the Share button in Safari, then &ldquo;Add to Home Screen&rdquo;.
+        {t("notifications.iosInstallRequired", locale)}
       </div>
     );
   }
@@ -131,7 +128,7 @@ export default function EnablePushButton() {
   if (status === "denied") {
     return (
       <p className="text-xs text-red-600">
-        Notifications are blocked. Enable them in your browser settings.
+        {t("notifications.denied", locale)}
       </p>
     );
   }
@@ -143,9 +140,9 @@ export default function EnablePushButton() {
           onClick={disable}
           className="rounded-md border border-green-300 bg-white px-4 py-2 text-sm font-medium text-green-700 hover:bg-green-50"
         >
-          Notifications enabled · Turn off
+          {t("notifications.enabled", locale)}
         </button>
-        <TestPushButton />
+        <TestPushButton locale={locale} />
       </div>
     );
   }
@@ -156,12 +153,14 @@ export default function EnablePushButton() {
       disabled={status === "pending"}
       className="rounded-md bg-gold-600 px-4 py-2 text-sm font-medium text-white hover:bg-gold-500 disabled:opacity-50"
     >
-      {status === "pending" ? "Enabling..." : "Enable notifications"}
+      {status === "pending"
+        ? t("notifications.enabling", locale)
+        : t("notifications.enable", locale)}
     </button>
   );
 }
 
-function TestPushButton() {
+function TestPushButton({ locale }: { locale: Locale }) {
   const [state, setState] = useState<"idle" | "pending" | "ok" | "err">(
     "idle"
   );
@@ -176,11 +175,20 @@ function TestPushButton() {
       if (res.ok) {
         setState("ok");
         setMessage(
-          `Sent to ${data.subscriptionCount ?? 0} device(s). Check for the notification.`
+          t("notifications.testSent", locale).replace(
+            "{n}",
+            String(data.subscriptionCount ?? 0),
+          ),
         );
       } else {
         setState("err");
-        setMessage(data.error || `Failed (${res.status})`);
+        setMessage(
+          data.error ||
+            t("notifications.testFailed", locale).replace(
+              "{status}",
+              String(res.status),
+            ),
+        );
       }
     } catch (err) {
       setState("err");
@@ -195,7 +203,9 @@ function TestPushButton() {
         disabled={state === "pending"}
         className="rounded-md border border-green-300 bg-white px-4 py-2 text-sm font-medium text-green-700 hover:bg-green-50 disabled:opacity-50"
       >
-        {state === "pending" ? "Sending..." : "Send test notification"}
+        {state === "pending"
+          ? t("notifications.testSending", locale)
+          : t("notifications.test", locale)}
       </button>
       {message && (
         <p

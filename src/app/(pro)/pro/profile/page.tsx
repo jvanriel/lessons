@@ -57,7 +57,7 @@ export default async function ProProfilePage() {
       </div>
 
       <div className="mt-8">
-        <InstallPwaSection />
+        <InstallPwaSection locale={locale} />
       </div>
 
       <div className="mt-8 rounded-xl border border-green-200 bg-white p-8">
@@ -68,7 +68,7 @@ export default async function ProProfilePage() {
           {t("proProfile.notificationsDesc", locale)}
         </p>
         <div className="mt-4">
-          <EnablePushButton />
+          <EnablePushButton locale={locale} />
         </div>
       </div>
     </section>
