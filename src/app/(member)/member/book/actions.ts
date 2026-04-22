@@ -827,6 +827,7 @@ export interface QuickBookData {
   duration: number;
   interval: string | null;
   bookingNotice: number;
+  cancellationHours: number;
   suggestedDate: string;
   suggestedSlot: { startTime: string; endTime: string } | null;
   alternativeSlots: { startTime: string; endTime: string }[];
@@ -955,7 +956,10 @@ export async function getQuickBookData(
   const [proSettings, templateRows, overrideRows, bookingRows] =
     await Promise.all([
       db
-        .select({ bookingNotice: proProfiles.bookingNotice })
+        .select({
+          bookingNotice: proProfiles.bookingNotice,
+          cancellationHours: proProfiles.cancellationHours,
+        })
         .from(proProfiles)
         .where(eq(proProfiles.id, proProfileId))
         .limit(1),
@@ -1009,6 +1013,7 @@ export async function getQuickBookData(
     ]);
 
   const bookingNotice = proSettings[0]?.bookingNotice ?? 0;
+  const cancellationHours = proSettings[0]?.cancellationHours ?? 0;
 
   // Normalize date values from DB (may be Date objects — driver anchors
   // `date` columns to UTC midnight — or timezone-shifted ISO strings).
@@ -1080,6 +1085,7 @@ export async function getQuickBookData(
     duration: rel.preferredDuration,
     interval: rel.preferredInterval,
     bookingNotice: bookingNotice,
+    cancellationHours,
     suggestedDate: bestDate,
     suggestedSlot,
     alternativeSlots: bestSlots.filter(

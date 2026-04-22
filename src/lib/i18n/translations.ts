@@ -360,6 +360,7 @@ const translations: Record<Locale, Record<string, string>> = {
     // Member dashboard — QuickBook (student quick-book on pro cards)
     "memberQB.heading": "Quick Book",
     "memberQB.noticeLabel": "{n}h notice",
+    "memberQB.cancelLabel": "Free cancel up to {n}h before",
     "memberQB.blockedBody": "Add a payment method to enable Quick Book.",
     "memberQB.addPayment": "Add payment method",
     "memberQB.bookedAt": "Booked {date} at {time}",
@@ -1536,6 +1537,7 @@ const translations: Record<Locale, Record<string, string>> = {
     "memberDash.help.profileP1": "Tik op het persoonsicoon rechtsboven om je profiel te openen. Daar kun je je naam, handicap, doelen, betaalmethode, boekingsvoorkeuren, taal en wachtwoord bijwerken.",
     "memberQB.heading": "Quick Book",
     "memberQB.noticeLabel": "{n}u termijn",
+    "memberQB.cancelLabel": "Gratis annuleren tot {n}u vooraf",
     "memberQB.blockedBody": "Voeg een betaalmethode toe om Quick Book te gebruiken.",
     "memberQB.addPayment": "Betaalmethode toevoegen",
     "memberQB.bookedAt": "Geboekt op {date} om {time}",
@@ -2693,6 +2695,7 @@ const translations: Record<Locale, Record<string, string>> = {
     "memberDash.help.profileP1": "Touchez l'icône personne en haut à droite pour ouvrir votre profil. Vous pouvez y modifier votre nom, handicap, objectifs, moyen de paiement, préférences de réservation, langue et mot de passe.",
     "memberQB.heading": "Quick Book",
     "memberQB.noticeLabel": "{n}h de délai",
+    "memberQB.cancelLabel": "Annulation gratuite jusqu'à {n}h avant",
     "memberQB.blockedBody": "Ajoutez un moyen de paiement pour activer Quick Book.",
     "memberQB.addPayment": "Ajouter un moyen de paiement",
     "memberQB.bookedAt": "Réservé le {date} à {time}",

@@ -211,9 +211,12 @@ export function QuickBook({ data, proId, hasPaymentMethod = true, allowBookingWi
       {/* Header */}
       <div className="mb-3 flex items-baseline justify-between">
         <h3 className="text-sm font-medium text-green-900">{t("memberQB.heading", locale)}</h3>
-        {data.bookingNotice > 0 && (
+        {data.cancellationHours > 0 && (
           <span className="text-[10px] text-green-400">
-            {t("memberQB.noticeLabel", locale).replace("{n}", String(data.bookingNotice))}
+            {t("memberQB.cancelLabel", locale).replace(
+              "{n}",
+              String(data.cancellationHours),
+            )}
           </span>
         )}
       </div>
