@@ -13,6 +13,7 @@ import type { Locale } from "@/lib/i18n";
 import { LOCALES } from "@/lib/i18n";
 import type { ProPageSection, ProPageTranslation } from "@/lib/db/schema";
 import RichTextEditor from "@/components/RichTextEditor";
+import PagePreview from "./PagePreview";
 
 interface EditablePage {
   id: number;
@@ -63,6 +64,10 @@ export default function PageEditor({
   // source of truth; EN/FR edit the stored translation overrides.
   const [viewLocale, setViewLocale] = useState<Locale>(SOURCE_LOCALE);
   const [translatePending, setTranslatePending] = useState<Locale | null>(null);
+  // Bumps whenever the backing DB has been updated. The preview iframe
+  // keys off this so it only reloads once a change has landed in the
+  // store, not on every keystroke.
+  const [previewVersion, setPreviewVersion] = useState(0);
 
   const debounceRef = useRef<ReturnType<typeof setTimeout>>(undefined);
   const firstRunRef = useRef(true);
@@ -95,6 +100,7 @@ export default function PageEditor({
         setError(result.error);
       } else {
         setStatus("saved");
+        setPreviewVersion((v) => v + 1);
         setTimeout(() => setStatus("idle"), 1500);
       }
     }, 2000);
@@ -121,6 +127,7 @@ export default function PageEditor({
         setError(result.error);
       } else {
         setStatus("saved");
+        setPreviewVersion((v) => v + 1);
         setTimeout(() => setStatus("idle"), 1500);
       }
     }, 2000);
@@ -298,7 +305,7 @@ export default function PageEditor({
   }
 
   return (
-    <div className="mx-auto max-w-4xl px-6 py-10">
+    <div className="mx-auto max-w-[1400px] px-6 py-10">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
           <Link
@@ -356,6 +363,9 @@ export default function PageEditor({
           {error}
         </div>
       )}
+
+      <div className="mt-6 lg:grid lg:grid-cols-[1fr,minmax(0,520px)] lg:gap-6 lg:items-start">
+        <div className="min-w-0">
 
       {/* Locale tabs */}
       <div className="mt-6 flex flex-wrap items-center gap-2">
@@ -622,6 +632,16 @@ export default function PageEditor({
           </div>
         </div>
       </section>
+        </div>
+
+        <aside className="mt-6 min-w-0 lg:sticky lg:top-6 lg:mt-0 lg:h-[calc(100vh-3rem)]">
+          <PagePreview
+            previewUrl={`/pros/${proId}/${page.slug}`}
+            version={previewVersion}
+            locale={viewLocale}
+          />
+        </aside>
+      </div>
     </div>
   );
 }

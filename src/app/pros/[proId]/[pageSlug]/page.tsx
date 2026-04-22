@@ -3,15 +3,18 @@ import Link from "next/link";
 import { db } from "@/lib/db";
 import { proProfiles, proPages } from "@/lib/db/schema";
 import { eq, and, isNull } from "drizzle-orm";
+import { getSession, hasRole } from "@/lib/auth";
 import type { ProPageSection, ProPageTranslation } from "@/lib/db/schema";
 import { getLocale } from "@/lib/locale";
 import { t } from "@/lib/i18n/translations";
 import { sanitizeHtml } from "@/lib/sanitize-html";
+import { isLocale, type Locale } from "@/lib/i18n";
 
-const SOURCE_LOCALE = "nl";
+const SOURCE_LOCALE: Locale = "nl";
 
 interface Props {
   params: Promise<{ proId: string; pageSlug: string }>;
+  searchParams: Promise<{ preview?: string; __locale?: string }>;
 }
 
 // Styles for HTML rendered out of the TipTap editor. Tailwind
@@ -70,11 +73,32 @@ export async function generateMetadata({ params }: Props) {
   };
 }
 
-export default async function ProFlyerPage({ params }: Props) {
+export default async function ProFlyerPage({ params, searchParams }: Props) {
   const { proId, pageSlug } = await params;
-  const locale = await getLocale();
+  const { preview, __locale } = await searchParams;
+  // When the editor iframes us, it passes ?__locale=xx to mirror the
+  // locale tab the pro is currently editing — otherwise we fall back
+  // to the session cookie.
+  const locale: Locale =
+    __locale && isLocale(__locale) ? __locale : await getLocale();
   const id = Number.parseInt(proId, 10);
   if (!Number.isFinite(id)) notFound();
+
+  // Is the visitor the pro who owns this profile? Owners can see their
+  // own unpublished profile + pages via ?preview=1 so the editor's
+  // iframe preview works without forcing them to publish first.
+  let isOwner = false;
+  if (preview) {
+    const session = await getSession();
+    if (session && (hasRole(session, "pro") || hasRole(session, "admin"))) {
+      const [ownerMatch] = await db
+        .select({ id: proProfiles.id })
+        .from(proProfiles)
+        .where(and(eq(proProfiles.id, id), eq(proProfiles.userId, session.userId)))
+        .limit(1);
+      isOwner = !!ownerMatch || hasRole(session, "admin");
+    }
+  }
 
   const [pro] = await db
     .select({
@@ -83,7 +107,13 @@ export default async function ProFlyerPage({ params }: Props) {
       photoUrl: proProfiles.photoUrl,
     })
     .from(proProfiles)
-    .where(and(eq(proProfiles.id, id), eq(proProfiles.published, true), isNull(proProfiles.deletedAt)))
+    .where(
+      and(
+        eq(proProfiles.id, id),
+        isNull(proProfiles.deletedAt),
+        ...(isOwner ? [] : [eq(proProfiles.published, true)]),
+      ),
+    )
     .limit(1);
 
   if (!pro) notFound();
@@ -95,8 +125,8 @@ export default async function ProFlyerPage({ params }: Props) {
       and(
         eq(proPages.proProfileId, pro.id),
         eq(proPages.slug, pageSlug),
-        eq(proPages.published, true)
-      )
+        ...(isOwner ? [] : [eq(proPages.published, true)]),
+      ),
     )
     .limit(1);
 
