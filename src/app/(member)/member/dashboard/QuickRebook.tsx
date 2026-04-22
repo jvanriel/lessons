@@ -437,9 +437,22 @@ export function QuickBook({ data, proId, hasPaymentMethod = true, allowBookingWi
             </div>
             <Link
               href={`/member/book/${proId}?full=1`}
-              className="text-xs text-green-500 hover:text-green-700"
+              className="inline-flex items-center gap-1 rounded-md border border-green-200 bg-white px-2.5 py-1 text-xs font-medium text-green-700 transition-colors hover:border-green-300 hover:bg-green-50"
             >
               {t("memberQB.moreOptions", locale)}
+              <svg
+                className="h-3 w-3"
+                fill="none"
+                viewBox="0 0 24 24"
+                stroke="currentColor"
+                strokeWidth={2.5}
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  d="M9 5l7 7-7 7"
+                />
+              </svg>
             </Link>
           </div>
 
