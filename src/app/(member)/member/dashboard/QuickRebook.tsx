@@ -250,10 +250,24 @@ export function QuickBook({ data, proId, hasPaymentMethod = true, allowBookingWi
               onClick={() => {
                 const allDates = [data.suggestedDate, ...data.alternativeDates.filter((d) => d !== data.suggestedDate)];
                 const idx = allDates.indexOf(selectedDate);
-                if (idx > 0) switchDate(allDates[idx - 1]);
+                if (idx > 0) {
+                  switchDate(allDates[idx - 1]);
+                  return;
+                }
+                // First pill + active interval: treat left-arrow as "undo
+                // the forward jump" — clear the interval so the server
+                // recomputes a near-term suggestion that exposes earlier
+                // available dates (task 35).
+                if (interval) {
+                  setInterval(null);
+                  startTransition(async () => {
+                    await updatePreferredInterval(data.proStudentId, null);
+                    router.refresh();
+                  });
+                }
               }}
               className="shrink-0 rounded p-0.5 text-green-400 hover:text-green-700 disabled:opacity-30"
-              disabled={selectedDate === data.suggestedDate}
+              disabled={selectedDate === data.suggestedDate && !interval}
             >
               <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                 <path strokeLinecap="round" strokeLinejoin="round" d="M15 19l-7-7 7-7" />
