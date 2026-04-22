@@ -74,6 +74,11 @@ export function QuickBook({ data, proId, hasPaymentMethod = true, allowBookingWi
   const [interval, setInterval] = useState(data.interval);
   const [explanation, setExplanation] = useState<SlotExplanation | null>(null);
   const dateHoldTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  // Refs per rendered date pill so we can scroll the selected one
+  // into view when the user navigates with the arrows — otherwise
+  // the pill gets clipped behind overflow-hidden and Nadine can't
+  // see which date she's on (task 33).
+  const pillRefs = useRef<Map<string, HTMLButtonElement>>(new Map());
 
   // Sync state when server data changes (e.g. after booking or cancellation)
   useEffect(() => {
@@ -85,6 +90,14 @@ export function QuickBook({ data, proId, hasPaymentMethod = true, allowBookingWi
     );
     setInterval(data.interval);
   }, [data]);
+
+  // Keep the selected date pill visible whenever it changes — arrow
+  // navigation or a server refresh can land it off-screen inside the
+  // overflow container.
+  useEffect(() => {
+    const pill = pillRefs.current.get(selectedDate);
+    pill?.scrollIntoView({ block: "nearest", inline: "center" });
+  }, [selectedDate]);
 
   // Listen for booking changes (from notifications) and refresh the page
   useEffect(() => {
@@ -273,10 +286,14 @@ export function QuickBook({ data, proId, hasPaymentMethod = true, allowBookingWi
                 <path strokeLinecap="round" strokeLinejoin="round" d="M15 19l-7-7 7-7" />
               </svg>
             </button>
-            <div className="flex flex-1 gap-1.5 overflow-hidden">
+            <div className="flex flex-1 gap-1.5 overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
               {[data.suggestedDate, ...data.alternativeDates.filter((d) => d !== data.suggestedDate)].map((d, idx) => (
                 <button
                   key={d}
+                  ref={(el) => {
+                    if (el) pillRefs.current.set(d, el);
+                    else pillRefs.current.delete(d);
+                  }}
                   onPointerDown={() => {
                     dateHoldTimer.current = setTimeout(() => {
                       dateHoldTimer.current = null;
@@ -356,8 +373,12 @@ export function QuickBook({ data, proId, hasPaymentMethod = true, allowBookingWi
               {t("memberQB.noSlots", locale)}
             </p>
           ) : (
-            <div className="mb-3 flex flex-wrap gap-1.5">
-              {slots.map((slot) => {
+            <>
+              <p className="mb-1.5 text-[11px] italic text-green-500">
+                {t("memberQB.holdHint", locale)}
+              </p>
+              <div className="mb-3 flex flex-wrap gap-1.5">
+                {slots.map((slot) => {
                 const isHolding =
                   holdingSlot === slot.startTime && status === "holding";
                 const isBooking =
@@ -394,7 +415,8 @@ export function QuickBook({ data, proId, hasPaymentMethod = true, allowBookingWi
                   </button>
                 );
               })}
-            </div>
+              </div>
+            </>
           )}
 
           {/* Error */}
