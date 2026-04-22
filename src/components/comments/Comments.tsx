@@ -391,7 +391,10 @@ export default function Comments({
   // ─── Key Handler ───────────────────────────────────
 
   function handleKeyDown(e: React.KeyboardEvent<HTMLTextAreaElement>) {
-    if (e.key === "Enter" && !e.shiftKey) {
+    // Cmd/Ctrl+Enter sends; bare Enter inserts a newline like a normal
+    // textarea. Matches mobile-keyboard behaviour and avoids the
+    // surprise-send when composing multi-line messages.
+    if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) {
       e.preventDefault();
       handleSend();
     }
@@ -1033,9 +1036,12 @@ export default function Comments({
           </svg>
         </button>
         <button
+          type="button"
           onClick={handleSend}
           disabled={sending || !input.trim()}
-          className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-green-700 text-white transition-colors hover:bg-green-800 disabled:opacity-40"
+          title="Send (⌘/Ctrl + Enter)"
+          aria-label="Send message"
+          className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-green-700 text-white transition-colors hover:bg-green-800 disabled:bg-green-100 disabled:text-green-400"
         >
           <svg
             className="h-4 w-4"
