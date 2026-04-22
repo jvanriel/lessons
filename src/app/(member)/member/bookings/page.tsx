@@ -136,6 +136,7 @@ export default async function MemberBookingsPage() {
                     date={booking.date}
                     startTime={booking.startTime}
                     cancellationHours={booking.cancellationHours}
+                    locale={locale}
                   />
                 </div>
               </div>

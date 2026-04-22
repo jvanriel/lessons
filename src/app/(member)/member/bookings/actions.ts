@@ -162,86 +162,86 @@ export async function cancelBooking(bookingId: number) {
     booking.status
   );
 
-  if (!check.canCancel) {
+  // Refusing the cancel is narrower than the full cancellation-policy
+  // check: the student is still allowed to cancel *past* the deadline —
+  // they just won't be refunded. We only block when the booking is no
+  // longer confirmed (already cancelled/completed) or the lesson has
+  // already started/ended.
+  const lessonStart = new Date(`${booking.date}T${booking.startTime}:00`);
+  if (booking.status !== "confirmed" || lessonStart.getTime() <= Date.now()) {
     const locale = await getLocale();
-    const deadline = formatDateLocale(check.deadline, locale, {
-      weekday: "long",
-      day: "numeric",
-      month: "long",
-      year: "numeric",
-      hour: "2-digit",
-      minute: "2-digit",
-    });
     return {
-      error: t("memberBookings.cancelTooLate", locale).replace(
-        "{deadline}",
-        deadline
-      ),
+      error: t("memberBookings.cancelLessonStarted", locale),
     };
   }
 
-  // Auto-refund if the booking was paid online and we're within the
-  // cancellation window. Cash-only (paymentStatus="manual") follows the
-  // inverse path below — we void the pending commission invoice item so
-  // the pro isn't billed for a booking that didn't actually happen.
+  // Auto-refund if the booking was paid online and we're still within
+  // the cancellation window. Cash-only (paymentStatus="manual") follows
+  // the inverse path below — we void the pending commission invoice
+  // item so the pro isn't billed for a booking that didn't happen. Both
+  // branches are skipped on late cancels: past the deadline the
+  // student forfeits the refund and the pro keeps the commission.
   let refundedCents: number | null = null;
-  if (
-    booking.paymentStatus === "paid" &&
-    booking.stripePaymentIntentId &&
-    booking.priceCents &&
-    booking.priceCents > 0
-  ) {
-    try {
-      const stripe = getStripe();
-      await stripe.refunds.create(
-        {
-          payment_intent: booking.stripePaymentIntentId,
-          metadata: {
-            bookingId: String(bookingId),
-            cancelledBy: "student",
+  if (check.canCancel) {
+    if (
+      booking.paymentStatus === "paid" &&
+      booking.stripePaymentIntentId &&
+      booking.priceCents &&
+      booking.priceCents > 0
+    ) {
+      try {
+        const stripe = getStripe();
+        await stripe.refunds.create(
+          {
+            payment_intent: booking.stripePaymentIntentId,
+            metadata: {
+              bookingId: String(bookingId),
+              cancelledBy: "student",
+            },
           },
-        },
-        { idempotencyKey: `refund-${bookingId}-v1` }
-      );
-      refundedCents = booking.priceCents;
-      await db
-        .update(lessonBookings)
-        .set({
-          paymentStatus: "refunded",
-          refundedAt: new Date(),
-        })
-        .where(eq(lessonBookings.id, bookingId));
-    } catch (err) {
-      console.error("Refund failed for booking", bookingId, err);
-      // Don't block the cancel — the booking still gets cancelled, refund
-      // will need manual reconciliation via admin.
-    }
-  } else if (
-    booking.paymentStatus === "manual" &&
-    booking.stripeInvoiceItemId
-  ) {
-    // Cash-only booking: delete the pending commission invoice item from
-    // the pro's Stripe customer so they're not billed. Only works if the
-    // item hasn't been finalised onto an invoice yet (most cancels will
-    // happen soon after booking, before the next monthly invoice cycle).
-    try {
-      const stripe = getStripe();
-      await stripe.invoiceItems.del(booking.stripeInvoiceItemId);
-      await db
-        .update(lessonBookings)
-        .set({
-          stripeInvoiceItemId: null,
-          platformFeeCents: null,
-        })
-        .where(eq(lessonBookings.id, bookingId));
-    } catch (err) {
-      console.error(
-        "Invoice item reversal failed for booking",
-        bookingId,
-        err
-      );
-      // Don't block the cancel — item may already be on a finalised
-      // invoice and needs manual credit-note reconciliation.
+          { idempotencyKey: `refund-${bookingId}-v1` }
+        );
+        refundedCents = booking.priceCents;
+        await db
+          .update(lessonBookings)
+          .set({
+            paymentStatus: "refunded",
+            refundedAt: new Date(),
+          })
+          .where(eq(lessonBookings.id, bookingId));
+      } catch (err) {
+        console.error("Refund failed for booking", bookingId, err);
+        // Don't block the cancel — the booking still gets cancelled,
+        // refund will need manual reconciliation via admin.
+      }
+    } else if (
+      booking.paymentStatus === "manual" &&
+      booking.stripeInvoiceItemId
+    ) {
+      // Cash-only booking: delete the pending commission invoice item
+      // from the pro's Stripe customer so they're not billed. Only
+      // works if the item hasn't been finalised onto an invoice yet
+      // (most cancels will happen soon after booking, before the next
+      // monthly invoice cycle).
+      try {
+        const stripe = getStripe();
+        await stripe.invoiceItems.del(booking.stripeInvoiceItemId);
+        await db
+          .update(lessonBookings)
+          .set({
+            stripeInvoiceItemId: null,
+            platformFeeCents: null,
+          })
+          .where(eq(lessonBookings.id, bookingId));
+      } catch (err) {
+        console.error(
+          "Invoice item reversal failed for booking",
+          bookingId,
+          err
+        );
+        // Don't block the cancel — item may already be on a finalised
+        // invoice and needs manual credit-note reconciliation.
+      }
     }
   }
 
@@ -251,7 +251,9 @@ export async function cancelBooking(bookingId: number) {
     .set({
       status: "cancelled",
       cancelledAt: new Date(),
-      cancellationReason: "Cancelled by student",
+      cancellationReason: check.canCancel
+        ? "Cancelled by student"
+        : "Cancelled by student (late, no refund)",
       updatedAt: new Date(),
     })
     .where(eq(lessonBookings.id, bookingId));
