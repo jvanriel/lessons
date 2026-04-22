@@ -712,8 +712,38 @@ function PreviewBlockingGrid({
     }
   }
 
+  // Second-click-on-same-cell within 300ms is treated as "double-click"
+  // and opens the reason popover instead of toggling the cell back off
+  // (task 27, 1-extra). The native onDoubleClick fires too late — the
+  // second click has already undone the first click's block.
+  const lastClickRef = useRef<{
+    dayIdx: number;
+    row: number;
+    time: number;
+  } | null>(null);
+
   function handlePointerDown(dayIdx: number, row: number, e: React.PointerEvent) {
     if (days[dayIdx].isPast || fullDayBlocked[dayIdx]) return;
+
+    const now = Date.now();
+    const last = lastClickRef.current;
+    const isSecondClick =
+      !!last &&
+      last.dayIdx === dayIdx &&
+      last.row === row &&
+      now - last.time < 300;
+
+    if (isSecondClick && blockedCells[dayIdx][row]) {
+      // The first click blocked this cell. Treat the second quick click
+      // as "open reason" rather than "toggle off".
+      lastClickRef.current = null;
+      e.preventDefault();
+      const key = `${dayIdx}-${findBlockStart(blockedCells, dayIdx, row)}`;
+      setEditPopover({ key, x: e.clientX, y: e.clientY });
+      return;
+    }
+
+    lastClickRef.current = { dayIdx, row, time: now };
 
     if (e.shiftKey && e.pointerType === "mouse" && anchorRef2.current) {
       const a = anchorRef2.current;
@@ -971,11 +1001,26 @@ function PreviewBlockingGrid({
           {days.map((day) => {
             const isToday = day.date === todayStr;
             return (
-              <div key={day.date} className="flex flex-col items-center gap-0.5 pb-1">
+              <div
+                key={day.date}
+                className={`flex flex-col items-center gap-0.5 pb-1 ${
+                  day.isBeyondHorizon ? "opacity-60" : ""
+                }`}
+                title={
+                  day.isBeyondHorizon
+                    ? t("proAvail.beyondHorizonHelp", locale)
+                    : undefined
+                }
+              >
                 <div className={`text-xs font-medium ${isToday ? "text-gold-700" : "text-green-700/60"}`}>
                   {t(DAY_KEYS[day.dayOfWeek], locale)}
                 </div>
                 <div className="text-[10px] text-green-700/40">{formatDateShort(day.date, locale)}</div>
+                {day.isBeyondHorizon && (
+                  <span className="mt-0.5 rounded bg-gray-100 px-1.5 py-0.5 text-[9px] font-medium uppercase tracking-wide text-gray-500">
+                    {t("proAvail.beyondHorizonBadge", locale)}
+                  </span>
+                )}
               </div>
             );
           })}
@@ -1036,6 +1081,13 @@ function PreviewBlockingGrid({
                   cellClass += " bg-gray-50/50";
                 } else {
                   cellClass += " cursor-pointer";
+                  // Beyond the booking horizon: subtle fade so the pro
+                  // can tell at a glance that students can't yet book
+                  // here, even though edits are still allowed (task 27,
+                  // item 1c).
+                  if (day.isBeyondHorizon) {
+                    cellStyle.opacity = 0.55;
+                  }
 
                   // Template availability as base background color
                   if (hasTemplate) {
@@ -1160,6 +1212,15 @@ function PreviewBlockingGrid({
         <div className="flex items-center gap-1.5">
           <div className="h-3 w-5 rounded-sm" style={{ backgroundColor: "rgba(239, 68, 68, 0.45)" }} />
           <span className="text-[10px] text-green-700/60">{t("proAvail.blocked", locale)}</span>
+        </div>
+        <div className="flex items-center gap-1.5">
+          <div
+            className="h-3 w-5 rounded-sm"
+            style={{ backgroundColor: "#e5e7eb", opacity: 0.55 }}
+          />
+          <span className="text-[10px] text-green-700/60">
+            {t("proAvail.beyondHorizonLegend", locale)}
+          </span>
         </div>
       </div>
 

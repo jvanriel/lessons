@@ -1,7 +1,8 @@
 "use client";
 
 import { useState, useTransition } from "react";
-import { updateProProfile } from "./actions";
+import { updateProProfile, toggleProProfilePublished } from "./actions";
+import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { t } from "@/lib/i18n/translations";
 import type { Locale } from "@/lib/i18n";
@@ -11,6 +12,7 @@ interface ProfileData {
   displayName: string;
   bio: string | null;
   specialties: string | null;
+  photoUrl: string | null;
   pricePerHour: string | null;
   lessonDurations: number[];
   /** Per-duration lesson price in EUR (whole euros). */
@@ -34,14 +36,78 @@ export default function ProProfileEditor({
   profile: ProfileData;
   locale: Locale;
 }) {
+  const router = useRouter();
   const [pending, startTransition] = useTransition();
+  const [publishPending, startPublishTransition] = useTransition();
   const [saved, setSaved] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  function handleTogglePublish() {
+    setError(null);
+    setSaved(false);
+    startPublishTransition(async () => {
+      const result = await toggleProProfilePublished(!profile.published);
+      if (result?.error) {
+        setError(result.error);
+      } else {
+        router.refresh();
+      }
+    });
+  }
 
   // Profile fields
   const [displayName, setDisplayName] = useState(profile.displayName);
   const [specialties, setSpecialties] = useState(profile.specialties ?? "");
   const [bio, setBio] = useState(profile.bio ?? "");
+
+  // Photo upload
+  const [photoUrl, setPhotoUrl] = useState(profile.photoUrl);
+  const [photoPending, setPhotoPending] = useState(false);
+  const [photoError, setPhotoError] = useState<string | null>(null);
+
+  async function handlePhotoChange(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    e.target.value = "";
+    if (!file) return;
+    setPhotoPending(true);
+    setPhotoError(null);
+    try {
+      const form = new FormData();
+      form.append("file", file);
+      const res = await fetch("/api/pro/profile/upload-photo", {
+        method: "POST",
+        body: form,
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Upload failed");
+      setPhotoUrl(data.url);
+      router.refresh();
+    } catch (err) {
+      setPhotoError((err as Error).message);
+    } finally {
+      setPhotoPending(false);
+    }
+  }
+
+  async function handlePhotoRemove() {
+    setPhotoPending(true);
+    setPhotoError(null);
+    try {
+      const res = await fetch("/api/pro/profile/upload-photo", {
+        method: "DELETE",
+      });
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        throw new Error(data.error || "Remove failed");
+      }
+      setPhotoUrl(null);
+      router.refresh();
+    } catch (err) {
+      setPhotoError((err as Error).message);
+    } finally {
+      setPhotoPending(false);
+    }
+  }
 
   // Booking settings
   const [pricePerHour, setPricePerHour] = useState(profile.pricePerHour ?? "");
@@ -91,8 +157,8 @@ export default function ProProfileEditor({
 
   return (
     <div className="space-y-8">
-      <div className="flex items-center justify-between">
-        <div>
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <div className="flex items-center gap-3">
           <span
             className={`rounded-full px-2.5 py-0.5 text-xs font-medium ${
               profile.published
@@ -102,6 +168,27 @@ export default function ProProfileEditor({
           >
             {profile.published ? t("proProfile.published", locale) : t("proProfile.draft", locale)}
           </span>
+          <button
+            type="button"
+            onClick={handleTogglePublish}
+            disabled={publishPending}
+            className={`rounded-md border px-3 py-1 text-xs font-medium transition-colors disabled:opacity-50 ${
+              profile.published
+                ? "border-amber-300 bg-white text-amber-700 hover:bg-amber-50"
+                : "border-green-600 bg-green-600 text-white hover:bg-green-500"
+            }`}
+          >
+            {publishPending
+              ? t("proProfile.publishSaving", locale)
+              : profile.published
+                ? t("proProfile.unpublish", locale)
+                : t("proProfile.publish", locale)}
+          </button>
+          <p className="text-[11px] text-green-600/70">
+            {profile.published
+              ? t("proProfile.publishedHint", locale)
+              : t("proProfile.draftHint", locale)}
+          </p>
         </div>
         {profile.published && (
           <Link
@@ -120,6 +207,60 @@ export default function ProProfileEditor({
           <h2 className="font-display text-lg font-semibold text-green-950">
             {t("proProfile.section.profile", locale)}
           </h2>
+
+          {/* Profile photo */}
+          <div>
+            <label className="block text-sm font-medium text-green-800">
+              {t("proProfile.photo", locale)}
+            </label>
+            <div className="mt-2 flex items-center gap-4">
+              {photoUrl ? (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img
+                  src={photoUrl}
+                  alt=""
+                  className="h-20 w-20 rounded-full object-cover ring-1 ring-green-200"
+                />
+              ) : (
+                <div className="flex h-20 w-20 items-center justify-center rounded-full bg-green-100 text-2xl font-medium text-green-600">
+                  {(displayName[0] || "?").toUpperCase()}
+                </div>
+              )}
+              <div className="flex flex-col gap-2">
+                <label className="inline-flex cursor-pointer items-center gap-2 rounded-md border border-green-300 bg-white px-3 py-1.5 text-xs font-medium text-green-700 hover:bg-green-50">
+                  {photoPending
+                    ? t("proProfile.photoUploading", locale)
+                    : photoUrl
+                      ? t("proProfile.photoReplace", locale)
+                      : t("proProfile.photoUpload", locale)}
+                  <input
+                    type="file"
+                    accept="image/jpeg,image/png,image/webp"
+                    className="hidden"
+                    disabled={photoPending}
+                    onChange={handlePhotoChange}
+                  />
+                </label>
+                {photoUrl && (
+                  <button
+                    type="button"
+                    onClick={handlePhotoRemove}
+                    disabled={photoPending}
+                    className="text-xs text-red-500 hover:text-red-600 disabled:opacity-50"
+                  >
+                    {t("proProfile.photoRemove", locale)}
+                  </button>
+                )}
+                <p className="text-[11px] text-green-500">
+                  {t("proProfile.photoHint", locale)}
+                </p>
+              </div>
+            </div>
+            {photoError && (
+              <p className="mt-2 text-xs text-red-600">{photoError}</p>
+            )}
+          </div>
+
           <div>
             <label className="block text-sm font-medium text-green-800">
               {t("proProfile.displayName", locale)}

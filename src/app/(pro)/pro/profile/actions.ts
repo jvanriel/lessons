@@ -92,3 +92,29 @@ export async function updateProProfile(
   revalidatePath("/pro/availability");
   return { success: true };
 }
+
+export async function toggleProProfilePublished(published: boolean) {
+  const locale = await getLocale();
+  const session = await getSession();
+  if (!session || (!hasRole(session, "pro") && !hasRole(session, "admin"))) {
+    return { error: t("proProfile.err.unauthorized", locale) };
+  }
+
+  const [profile] = await db
+    .select({ id: proProfiles.id })
+    .from(proProfiles)
+    .where(eq(proProfiles.userId, session.userId))
+    .limit(1);
+
+  if (!profile) return { error: t("proProfile.err.noProfile", locale) };
+
+  await db
+    .update(proProfiles)
+    .set({ published, updatedAt: new Date() })
+    .where(eq(proProfiles.id, profile.id));
+
+  revalidatePath("/pro/profile");
+  revalidatePath("/pros");
+  revalidatePath(`/pros/${profile.id}`);
+  return { success: true };
+}
