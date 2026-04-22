@@ -4,6 +4,7 @@ import { useState, useCallback } from "react";
 import { Button } from "@/components/ui/button";
 import { Elements, PaymentElement, useStripe, useElements } from "@stripe/react-stripe-js";
 import { getStripe } from "@/lib/stripe-client";
+import { stripeElementsOptions } from "@/lib/stripe-appearance";
 import { useRouter } from "next/navigation";
 import type { Locale } from "@/lib/i18n";
 import { t } from "@/lib/i18n/translations";
@@ -589,19 +590,7 @@ function SubscriptionStep({ onSuccess, locale }: { onSuccess: () => void; locale
         </div>
         <Elements
           stripe={getStripe()}
-          options={{
-            clientSecret,
-            appearance: {
-              theme: "stripe",
-              variables: {
-                colorPrimary: "#091a12",
-                colorBackground: "#faf7f0",
-                colorText: "#091a12",
-                fontFamily: "Outfit, system-ui, sans-serif",
-                borderRadius: "8px",
-              },
-            },
-          }}
+          options={{ clientSecret, ...stripeElementsOptions }}
         >
           <SubscriptionPaymentForm plan={plan} onSuccess={onSuccess} locale={locale} />
         </Elements>

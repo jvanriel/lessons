@@ -8,6 +8,7 @@ import {
   useElements,
 } from "@stripe/react-stripe-js";
 import { getStripe } from "@/lib/stripe-client";
+import { stripeElementsOptions } from "@/lib/stripe-appearance";
 import { useRouter, useSearchParams } from "next/navigation";
 import { t } from "@/lib/i18n/translations";
 import type { Locale } from "@/lib/i18n";
@@ -224,19 +225,7 @@ export function PaymentMethodSection({
         <div className="mt-6">
           <Elements
             stripe={getStripe()}
-            options={{
-              clientSecret,
-              appearance: {
-                theme: "stripe",
-                variables: {
-                  colorPrimary: "#091a12",
-                  colorBackground: "#faf7f0",
-                  colorText: "#091a12",
-                  fontFamily: "Outfit, system-ui, sans-serif",
-                  borderRadius: "8px",
-                },
-              },
-            }}
+            options={{ clientSecret, ...stripeElementsOptions }}
           >
             <PaymentForm
               onSuccess={handleSuccess}

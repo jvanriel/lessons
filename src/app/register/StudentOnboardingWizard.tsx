@@ -9,6 +9,7 @@ import {
   useElements,
 } from "@stripe/react-stripe-js";
 import { getStripe } from "@/lib/stripe-client";
+import { stripeElementsOptions } from "@/lib/stripe-appearance";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import type { Locale } from "@/lib/i18n";
@@ -606,7 +607,7 @@ function PaymentStep({
             felt redundant (task 55). We add an explicit Terms link
             below so "hun voorwaarden" has a concrete target even when
             Stripe's own mandate doesn't linkify it. */}
-        <Elements stripe={getStripe()} options={{ clientSecret, appearance: { theme: "stripe", variables: { colorPrimary: "#091a12", colorBackground: "#faf7f0", colorText: "#091a12", fontFamily: "Outfit, system-ui, sans-serif", borderRadius: "8px" } } }}>
+        <Elements stripe={getStripe()} options={{ clientSecret, ...stripeElementsOptions }}>
           <PaymentForm onSuccess={onSuccess} locale={locale} billing={billing} />
         </Elements>
         <p className="text-xs text-green-500">
