@@ -31,6 +31,9 @@ yarn-error.log*
 # vercel
 .vercel
 
+# direnv (per-directory env, holds VERCEL_TOKEN)
+.envrc
+
 # typescript
 *.tsbuildinfo
 next-env.d.ts
