@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useCallback } from "react";
+import { useEffect, useState, useCallback } from "react";
 import { Button } from "@/components/ui/button";
 import {
   Elements,
@@ -347,9 +347,34 @@ function AccountStep({
             {t("auth.login", locale)}
           </Link>
           {" · "}
-          <Link href="/pro/register" className="text-gold-600 hover:text-gold-500">
+          <a
+            href="/pro/register"
+            onClick={(e) => {
+              // Stash whatever the student already typed so the pro
+              // register form can pre-fill and they don't have to
+              // retype (task 17 follow-up). sessionStorage avoids
+              // leaking the password through the URL / referer.
+              try {
+                sessionStorage.setItem(
+                  "pro-register-prefill",
+                  JSON.stringify({
+                    firstName: data.firstName,
+                    lastName: data.lastName,
+                    email: data.email,
+                    password,
+                    confirmPassword,
+                  }),
+                );
+              } catch {
+                // Quota / private mode — fall through to a normal nav.
+              }
+              // Let the default navigation proceed.
+              void e;
+            }}
+            className="text-gold-600 hover:text-gold-500"
+          >
             {t("auth.imAGolfPro", locale)}
-          </Link>
+          </a>
         </p>
       )}
     </div>
@@ -676,6 +701,17 @@ export default function StudentOnboardingWizard({
   function togglePro(id: number) {
     setSelectedPros((prev) => { const next = new Set(prev); if (next.has(id)) next.delete(id); else next.add(id); return next; });
   }
+
+  // Keep the wizard's language in sync with the header language
+  // switcher (sets the cookie + router.refresh(), which gives us a
+  // fresh `locale` prop). Without this, data.preferredLocale is a
+  // one-shot snapshot and labels like "Inschrijven" keep using the
+  // old language until a full reload (task 17 follow-up).
+  useEffect(() => {
+    setData((prev) =>
+      prev.preferredLocale === locale ? prev : { ...prev, preferredLocale: locale },
+    );
+  }, [locale]);
 
   // Derived locale for t() — updates live as user changes language
   const loc = data.preferredLocale as Locale;

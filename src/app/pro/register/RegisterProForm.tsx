@@ -1,6 +1,6 @@
 "use client";
 
-import { useActionState } from "react";
+import { useActionState, useEffect, useState } from "react";
 import Link from "next/link";
 import { registerPro } from "./actions";
 import { t } from "@/lib/i18n/translations";
@@ -9,6 +9,35 @@ import { MONTHLY_PRICE, ANNUAL_PRICE, formatPrice } from "@/lib/pricing";
 
 export default function RegisterProForm({ locale }: { locale: Locale }) {
   const [state, formAction, pending] = useActionState(registerPro, null);
+  const [firstName, setFirstName] = useState("");
+  const [lastName, setLastName] = useState("");
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
+
+  // Student-register page stashes typed fields here before sending us
+  // "I'm a golf pro" nav, so the pro doesn't have to retype everything.
+  useEffect(() => {
+    try {
+      const raw = sessionStorage.getItem("pro-register-prefill");
+      if (!raw) return;
+      sessionStorage.removeItem("pro-register-prefill");
+      const parsed = JSON.parse(raw) as {
+        firstName?: string;
+        lastName?: string;
+        email?: string;
+        password?: string;
+        confirmPassword?: string;
+      };
+      if (parsed.firstName) setFirstName(parsed.firstName);
+      if (parsed.lastName) setLastName(parsed.lastName);
+      if (parsed.email) setEmail(parsed.email);
+      if (parsed.password) setPassword(parsed.password);
+      if (parsed.confirmPassword) setConfirmPassword(parsed.confirmPassword);
+    } catch {
+      // Corrupt or missing — start blank.
+    }
+  }, []);
 
   return (
     <div className="bg-cream">
@@ -40,6 +69,8 @@ export default function RegisterProForm({ locale }: { locale: Locale }) {
                 type="text"
                 name="firstName"
                 required
+                value={firstName}
+                onChange={(e) => setFirstName(e.target.value)}
                 className="mt-1 w-full rounded-lg border border-green-300 px-3 py-2 text-sm focus:border-gold-500 focus:outline-none focus:ring-1 focus:ring-gold-500"
               />
             </div>
@@ -51,6 +82,8 @@ export default function RegisterProForm({ locale }: { locale: Locale }) {
                 type="text"
                 name="lastName"
                 required
+                value={lastName}
+                onChange={(e) => setLastName(e.target.value)}
                 className="mt-1 w-full rounded-lg border border-green-300 px-3 py-2 text-sm focus:border-gold-500 focus:outline-none focus:ring-1 focus:ring-gold-500"
               />
             </div>
@@ -65,6 +98,8 @@ export default function RegisterProForm({ locale }: { locale: Locale }) {
               name="email"
               required
               autoComplete="email"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
               className="mt-1 w-full rounded-lg border border-green-300 px-3 py-2 text-sm focus:border-gold-500 focus:outline-none focus:ring-1 focus:ring-gold-500"
             />
           </div>
@@ -79,6 +114,8 @@ export default function RegisterProForm({ locale }: { locale: Locale }) {
               required
               minLength={8}
               autoComplete="new-password"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
               className="mt-1 w-full rounded-lg border border-green-300 px-3 py-2 text-sm focus:border-gold-500 focus:outline-none focus:ring-1 focus:ring-gold-500"
             />
             <p className="mt-1 text-xs text-green-500">
@@ -96,6 +133,8 @@ export default function RegisterProForm({ locale }: { locale: Locale }) {
               required
               minLength={8}
               autoComplete="new-password"
+              value={confirmPassword}
+              onChange={(e) => setConfirmPassword(e.target.value)}
               className="mt-1 w-full rounded-lg border border-green-300 px-3 py-2 text-sm focus:border-gold-500 focus:outline-none focus:ring-1 focus:ring-gold-500"
             />
           </div>
