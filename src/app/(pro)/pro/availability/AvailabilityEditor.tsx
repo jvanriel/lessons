@@ -235,11 +235,6 @@ function WeeklyTemplateGrid({
   const CELL_H = useCellHeight();
   const [dirtyLocations, setDirtyLocations] = useState<Set<number>>(new Set());
   const [saveStatus, setSaveStatus] = useState<"idle" | "saving" | "saved">("idle");
-  const dragRef = useRef<{ active: boolean; adding: boolean; day: number }>({
-    active: false,
-    adding: false,
-    day: -1,
-  });
   const debounceRef = useRef<ReturnType<typeof setTimeout>>(undefined);
 
   // Auto-save dirty locations after 2s of inactivity
@@ -284,58 +279,45 @@ function WeeklyTemplateGrid({
     setSaveStatus("idle");
   }, [activeLocationId, grid, onGridChange]);
 
-  const holdTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const [paintingMode, setPaintingMode] = useState(false);
+  // Anchor for Shift+click range selection on desktop. Stores the last
+  // deliberately clicked cell plus the value the click produced, so a
+  // subsequent shift-click fills the rectangle between the two with
+  // that same value. One click / tap toggles a single cell; mobile has
+  // no shift modifier so it's tap-per-cell (task 27, 1a/1b).
+  const anchorRef = useRef<{ day: number; row: number; adding: boolean } | null>(
+    null,
+  );
 
-  function startPaint(day: number, row: number) {
-    const isActive = grid[day][row].has(activeLocationId);
-    dragRef.current = { active: true, adding: !isActive, day };
-    updateCell(day, row, !isActive);
-    setPaintingMode(true);
+  function applyRange(
+    d0: number,
+    d1: number,
+    r0: number,
+    r1: number,
+    adding: boolean,
+  ) {
+    const dMin = Math.min(d0, d1);
+    const dMax = Math.max(d0, d1);
+    const rMin = Math.min(r0, r1);
+    const rMax = Math.max(r0, r1);
+    for (let d = dMin; d <= dMax; d++) {
+      for (let r = rMin; r <= rMax; r++) {
+        updateCell(d, r, adding);
+      }
+    }
   }
 
   function handlePointerDown(day: number, row: number, e: React.PointerEvent) {
-    if (e.pointerType === "mouse") {
-      // Desktop: immediate paint on click
-      startPaint(day, row);
-    } else {
-      // Touch: hold to enter painting mode
-      holdTimerRef.current = setTimeout(() => {
-        holdTimerRef.current = null;
-        if (navigator.vibrate) navigator.vibrate(30);
-        startPaint(day, row);
-      }, 400);
+    if (e.shiftKey && e.pointerType === "mouse" && anchorRef.current) {
+      const a = anchorRef.current;
+      applyRange(a.day, day, a.row, row, a.adding);
+      anchorRef.current = { day, row, adding: a.adding };
+      return;
     }
-  }
 
-  const lastPaintedCell = useRef<string | null>(null);
-
-  function handlePointerEnter(day: number, row: number) {
-    if (dragRef.current.active) {
-      updateCell(day, row, dragRef.current.adding);
-    }
-  }
-
-  function handlePointerMove(e: React.PointerEvent) {
-    if (!dragRef.current.active || e.pointerType === "mouse") return;
-    // Touch: find cell under finger using elementFromPoint
-    const el = document.elementFromPoint(e.clientX, e.clientY);
-    if (!el) return;
-    const cellKey = el.getAttribute("data-cell");
-    if (!cellKey || cellKey === lastPaintedCell.current) return;
-    lastPaintedCell.current = cellKey;
-    const [d, r] = cellKey.split("-").map(Number);
-    updateCell(d, r, dragRef.current.adding);
-  }
-
-  function handlePointerUp() {
-    if (holdTimerRef.current) {
-      clearTimeout(holdTimerRef.current);
-      holdTimerRef.current = null;
-    }
-    dragRef.current.active = false;
-    setPaintingMode(false);
-    lastPaintedCell.current = null;
+    const isActive = grid[day][row].has(activeLocationId);
+    const adding = !isActive;
+    updateCell(day, row, adding);
+    anchorRef.current = { day, row, adding };
   }
 
   return (
@@ -384,29 +366,15 @@ function WeeklyTemplateGrid({
         })}
       </div>
 
-      {/* Painting mode indicator */}
-      {paintingMode && (
-        <div className="mt-2 flex items-center gap-2 rounded-md bg-gold-50 px-3 py-1.5 text-xs font-medium text-gold-700">
-          <div className="h-2 w-2 animate-pulse rounded-full bg-gold-500" />
-          {t("proAvail.painting", locale)}
-        </div>
-      )}
-
-      {/* Instruction for mobile */}
-      <p className="mt-2 text-[10px] text-green-400 sm:hidden">
-        {t("proAvail.holdToPaint", locale)}
+      <p className="mt-2 text-[10px] italic text-green-500">
+        {t("proAvail.clickHint", locale)}
       </p>
       <p className="mt-1 text-[10px] italic text-green-500 md:hidden">
         {t("proAvail.scrollHint", locale)}
       </p>
 
       {/* Grid */}
-      <div
-        className={`mt-4 select-none overflow-x-auto ${paintingMode ? "touch-none" : ""}`}
-        onPointerUp={handlePointerUp}
-        onPointerLeave={handlePointerUp}
-        onPointerMove={handlePointerMove}
-      >
+      <div className="mt-4 select-none overflow-x-auto">
         <div className="grid" style={{
           gridTemplateColumns: `48px repeat(7, minmax(0, 1fr))`,
           minWidth: 480,
@@ -471,7 +439,6 @@ function WeeklyTemplateGrid({
                       e.preventDefault();
                       handlePointerDown(day, row, e);
                     }}
-                    onPointerEnter={() => handlePointerEnter(day, row)}
                     onContextMenu={(e) => e.preventDefault()}
                     className={cellClass}
                     style={cellStyle}
@@ -672,11 +639,6 @@ function PreviewBlockingGrid({
   }, [days, templateGrid, bookings]);
 
   // ─── Paint handlers ───────────────────────────────
-  const dragRef = useRef<{ active: boolean; adding: boolean; day: number }>({
-    active: false,
-    adding: false,
-    day: -1,
-  });
 
   const paintCell = useCallback(
     (dayIdx: number, row: number, adding: boolean) => {
@@ -717,64 +679,52 @@ function PreviewBlockingGrid({
     [brush],
   );
 
-  const holdTimerRef2 = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const [paintingMode2, setPaintingMode2] = useState(false);
+  // Click = toggle one cell; Shift+click (desktop) = fill rectangle
+  // from the last click to this cell with the anchor's value. Mobile
+  // taps each cell — no drag (task 27, 1a/1b).
+  const anchorRef2 = useRef<{
+    day: number;
+    row: number;
+    adding: boolean;
+  } | null>(null);
 
-  function startPaint2(dayIdx: number, row: number) {
-    if (days[dayIdx].isPast || fullDayBlocked[dayIdx]) return;
-    let isActive: boolean;
-    if (brush.mode === "blocked") {
-      isActive = blockedCells[dayIdx][row];
-    } else {
-      isActive = extraAvailCells[dayIdx][row].has(brush.locationId);
+  function currentState(dayIdx: number, row: number): boolean {
+    if (brush.mode === "blocked") return blockedCells[dayIdx][row];
+    return extraAvailCells[dayIdx][row].has(brush.locationId);
+  }
+
+  function applyRange2(
+    d0: number,
+    d1: number,
+    r0: number,
+    r1: number,
+    adding: boolean,
+  ) {
+    const dMin = Math.min(d0, d1);
+    const dMax = Math.max(d0, d1);
+    const rMin = Math.min(r0, r1);
+    const rMax = Math.max(r0, r1);
+    for (let d = dMin; d <= dMax; d++) {
+      if (days[d]?.isPast || fullDayBlocked[d]) continue;
+      for (let r = rMin; r <= rMax; r++) {
+        paintCell(d, r, adding);
+      }
     }
-    dragRef.current = { active: true, adding: !isActive, day: dayIdx };
-    paintCell(dayIdx, row, !isActive);
-    setPaintingMode2(true);
   }
 
   function handlePointerDown(dayIdx: number, row: number, e: React.PointerEvent) {
     if (days[dayIdx].isPast || fullDayBlocked[dayIdx]) return;
-    if (e.pointerType === "mouse") {
-      startPaint2(dayIdx, row);
-    } else {
-      holdTimerRef2.current = setTimeout(() => {
-        holdTimerRef2.current = null;
-        if (navigator.vibrate) navigator.vibrate(30);
-        startPaint2(dayIdx, row);
-      }, 400);
-    }
-  }
 
-  const lastPaintedCell2 = useRef<string | null>(null);
-
-  function handlePointerEnter(dayIdx: number, row: number) {
-    if (dragRef.current.active && !fullDayBlocked[dayIdx]) {
-      paintCell(dayIdx, row, dragRef.current.adding);
+    if (e.shiftKey && e.pointerType === "mouse" && anchorRef2.current) {
+      const a = anchorRef2.current;
+      applyRange2(a.day, dayIdx, a.row, row, a.adding);
+      anchorRef2.current = { day: dayIdx, row, adding: a.adding };
+      return;
     }
-  }
 
-  function handlePointerMove2(e: React.PointerEvent) {
-    if (!dragRef.current.active || e.pointerType === "mouse") return;
-    const el = document.elementFromPoint(e.clientX, e.clientY);
-    if (!el) return;
-    const cellKey = el.getAttribute("data-cell");
-    if (!cellKey || cellKey === lastPaintedCell2.current) return;
-    lastPaintedCell2.current = cellKey;
-    const [d, r] = cellKey.split("-").map(Number);
-    if (!fullDayBlocked[d]) {
-      paintCell(d, r, dragRef.current.adding);
-    }
-  }
-
-  function handlePointerUp() {
-    if (holdTimerRef2.current) {
-      clearTimeout(holdTimerRef2.current);
-      holdTimerRef2.current = null;
-    }
-    dragRef.current.active = false;
-    setPaintingMode2(false);
-    lastPaintedCell2.current = null;
+    const adding = !currentState(dayIdx, row);
+    paintCell(dayIdx, row, adding);
+    anchorRef2.current = { day: dayIdx, row, adding };
   }
 
   function toggleFullDay(dayIdx: number) {
@@ -1003,25 +953,15 @@ function PreviewBlockingGrid({
         })}
       </div>
 
-      {/* Painting mode indicator */}
-      {paintingMode2 && (
-        <div className="mt-2 flex items-center gap-2 rounded-md bg-gold-50 px-3 py-1.5 text-xs font-medium text-gold-700">
-          <div className="h-2 w-2 animate-pulse rounded-full bg-gold-500" />
-          {t("proAvail.painting", locale)}
-        </div>
-      )}
-
-      <p className="mt-2 text-[10px] italic text-green-500 md:hidden">
+      <p className="mt-2 text-[10px] italic text-green-500">
+        {t("proAvail.clickHint", locale)}
+      </p>
+      <p className="mt-1 text-[10px] italic text-green-500 md:hidden">
         {t("proAvail.scrollHint", locale)}
       </p>
 
       {/* Grid */}
-      <div
-        className={`mt-4 select-none overflow-x-auto ${paintingMode2 ? "touch-none" : ""}`}
-        onPointerUp={handlePointerUp}
-        onPointerLeave={handlePointerUp}
-        onPointerMove={handlePointerMove2}
-      >
+      <div className="mt-4 select-none overflow-x-auto">
         <div
           className="grid"
           style={{ gridTemplateColumns: "48px repeat(7, minmax(0, 1fr))", minWidth: 480 }}
@@ -1169,7 +1109,6 @@ function PreviewBlockingGrid({
                       e.preventDefault();
                       handlePointerDown(dayIdx, row, e);
                     }}
-                    onPointerEnter={() => handlePointerEnter(dayIdx, row)}
                     onContextMenu={(e) => e.preventDefault()}
                     onDoubleClick={(e) => handleDoubleClick(dayIdx, row, e)}
                     className={cellClass}
