@@ -8,7 +8,7 @@ import {
   useElements,
 } from "@stripe/react-stripe-js";
 import { getStripe } from "@/lib/stripe-client";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { t } from "@/lib/i18n/translations";
 import type { Locale } from "@/lib/i18n";
 
@@ -23,9 +23,11 @@ interface PaymentMethodInfo {
 function PaymentForm({
   onSuccess,
   locale,
+  returnTo,
 }: {
   onSuccess: () => void;
   locale: Locale;
+  returnTo: string | null;
 }) {
   const stripe = useStripe();
   const elements = useElements();
@@ -39,10 +41,13 @@ function PaymentForm({
     setLoading(true);
     setError(null);
 
+    const stripeReturnUrl = returnTo
+      ? `${window.location.origin}/member/profile?returnTo=${encodeURIComponent(returnTo)}`
+      : `${window.location.origin}/member/profile`;
     const result = await stripe.confirmSetup({
       elements,
       confirmParams: {
-        return_url: `${window.location.origin}/member/profile`,
+        return_url: stripeReturnUrl,
       },
       redirect: "if_required",
     });
@@ -106,6 +111,15 @@ export function PaymentMethodSection({
   locale: Locale;
 }) {
   const router = useRouter();
+  const searchParams = useSearchParams();
+  // Set by the booking wizard when it sends the student here to add a
+  // payment method. Restricted to same-origin relative paths to avoid
+  // turning this into an open-redirect.
+  const rawReturnTo = searchParams.get("returnTo");
+  const returnTo =
+    rawReturnTo && rawReturnTo.startsWith("/") && !rawReturnTo.startsWith("//")
+      ? rawReturnTo
+      : null;
   const [showForm, setShowForm] = useState(false);
   const [clientSecret, setClientSecret] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
@@ -137,6 +151,10 @@ export function PaymentMethodSection({
     setSaved(true);
     setShowForm(false);
     setClientSecret(null);
+    if (returnTo) {
+      router.push(returnTo);
+      return;
+    }
     router.refresh();
   }
 
@@ -220,7 +238,11 @@ export function PaymentMethodSection({
               },
             }}
           >
-            <PaymentForm onSuccess={handleSuccess} locale={locale} />
+            <PaymentForm
+              onSuccess={handleSuccess}
+              locale={locale}
+              returnTo={returnTo}
+            />
           </Elements>
           <button
             type="button"

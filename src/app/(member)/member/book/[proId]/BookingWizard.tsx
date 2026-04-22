@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState, useTransition } from "react";
+import { useEffect, useMemo, useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { BookingCalendar } from "@/components/BookingCalendar";
@@ -103,6 +103,48 @@ export function BookingWizard({
   const [error, setError] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
 
+  // sessionStorage draft so a detour to /member/profile (to add a payment
+  // method) doesn't throw away the student's in-progress selections.
+  // Keyed by pro id so switching pro doesn't cross-leak state.
+  const draftKey = `booking-draft:pro:${pro.id}`;
+  const restoreRef = useRef<{
+    date: string | null;
+    slotStartTime: string | null;
+  } | null>(null);
+  const restoredRef = useRef(false);
+
+  // One-shot mount restore. useState initialisers can't read
+  // sessionStorage (SSR), so we do it here. Date + slot are deferred
+  // into a ref because the fetch effects below null them before the
+  // async fetch lands.
+  useEffect(() => {
+    if (restoredRef.current) return;
+    restoredRef.current = true;
+    try {
+      const raw = sessionStorage.getItem(draftKey);
+      if (!raw) return;
+      const d = JSON.parse(raw) as {
+        locationId?: number | null;
+        duration?: number | null;
+        date?: string | null;
+        slotStartTime?: string | null;
+        notes?: string;
+        participantCount?: number;
+      };
+      if (typeof d.locationId === "number") setLocationId(d.locationId);
+      if (typeof d.duration === "number") setDuration(d.duration);
+      if (typeof d.notes === "string") setNotes(d.notes);
+      if (typeof d.participantCount === "number")
+        setParticipantCount(d.participantCount);
+      restoreRef.current = {
+        date: d.date ?? null,
+        slotStartTime: d.slotStartTime ?? null,
+      };
+    } catch {
+      // Corrupt draft — ignore and start fresh.
+    }
+  }, [draftKey]);
+
   // Fetch available dates when location + duration are both set.
   useEffect(() => {
     if (!locationId || !duration) return;
@@ -112,7 +154,17 @@ export function BookingWizard({
     setSlot(null);
     setSlots([]);
     getAvailableDates(pro.id, locationId, duration)
-      .then((d) => setAvailableDates(d))
+      .then((d) => {
+        setAvailableDates(d);
+        // Re-apply the saved date if it's still available; drop it
+        // otherwise so the student picks a fresh one.
+        const saved = restoreRef.current?.date;
+        if (saved && d.includes(saved)) {
+          setDate(saved);
+        } else if (restoreRef.current) {
+          restoreRef.current = null;
+        }
+      })
       .finally(() => setLoadingDates(false));
   }, [pro.id, locationId, duration]);
 
@@ -123,9 +175,38 @@ export function BookingWizard({
     setSlots([]);
     setSlot(null);
     getAvailableSlots(pro.id, locationId, date, duration)
-      .then((s) => setSlots(s))
+      .then((s) => {
+        setSlots(s);
+        const wanted = restoreRef.current?.slotStartTime;
+        if (wanted) {
+          const match = s.find((x) => x.startTime === wanted);
+          if (match) setSlot(match);
+          restoreRef.current = null;
+        }
+      })
       .finally(() => setLoadingSlots(false));
   }, [pro.id, locationId, duration, date]);
+
+  // Persist the live draft on every relevant change. Skipped until the
+  // initial restore pass has run so we don't wipe storage on mount.
+  useEffect(() => {
+    if (!restoredRef.current) return;
+    try {
+      sessionStorage.setItem(
+        draftKey,
+        JSON.stringify({
+          locationId,
+          duration,
+          date,
+          slotStartTime: slot?.startTime ?? null,
+          notes,
+          participantCount,
+        })
+      );
+    } catch {
+      // Quota / private-mode — best effort, no user impact.
+    }
+  }, [draftKey, locationId, duration, date, slot, notes, participantCount]);
 
   const priceCents = useMemo(() => {
     if (!duration) return null;
@@ -170,6 +251,11 @@ export function BookingWizard({
       if (result.error) {
         setError(result.error);
       } else {
+        try {
+          sessionStorage.removeItem(draftKey);
+        } catch {
+          // ignore
+        }
         router.push("/member/bookings");
       }
     });
@@ -412,7 +498,9 @@ export function BookingWizard({
             <div className="mt-4 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
               {t("book.paymentRequired", locale)}{" "}
               <a
-                href="/member/profile"
+                href={`/member/profile?returnTo=${encodeURIComponent(
+                  `/member/book/${pro.id}`
+                )}`}
                 className="font-medium underline hover:text-red-900"
               >
                 {t("book.addInProfile", locale)}
@@ -423,7 +511,9 @@ export function BookingWizard({
             <div className="mt-4 rounded-lg border border-gold-200 bg-gold-50 px-4 py-3 text-sm text-gold-800">
               {t("book.paymentOptional", locale)}{" "}
               <a
-                href="/member/profile"
+                href={`/member/profile?returnTo=${encodeURIComponent(
+                  `/member/book/${pro.id}`
+                )}`}
                 className="font-medium underline hover:text-gold-900"
               >
                 {t("book.addInProfile", locale)}
