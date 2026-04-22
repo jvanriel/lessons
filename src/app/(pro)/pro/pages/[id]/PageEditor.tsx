@@ -4,9 +4,15 @@ import { useCallback, useEffect, useRef, useState, useTransition } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { saveProPage, togglePublishProPage } from "../actions";
+import {
+  translateProPage,
+  saveProPageTranslation,
+} from "../translate-actions";
 import { t } from "@/lib/i18n/translations";
 import type { Locale } from "@/lib/i18n";
-import type { ProPageSection } from "@/lib/db/schema";
+import { LOCALES } from "@/lib/i18n";
+import type { ProPageSection, ProPageTranslation } from "@/lib/db/schema";
+import RichTextEditor from "@/components/RichTextEditor";
 
 interface EditablePage {
   id: number;
@@ -19,8 +25,11 @@ interface EditablePage {
   ctaLabel: string | null;
   ctaUrl: string | null;
   ctaEmail: string | null;
+  translations: Record<string, ProPageTranslation>;
   published: boolean;
 }
+
+const SOURCE_LOCALE: Locale = "nl";
 
 type SaveStatus = "idle" | "saving" | "saved" | "error";
 
@@ -43,15 +52,24 @@ export default function PageEditor({
 }) {
   const router = useRouter();
   const [page, setPage] = useState<EditablePage>(initialPage);
+  const [translations, setTranslations] = useState<
+    Record<string, ProPageTranslation>
+  >(initialPage.translations ?? {});
   const [status, setStatus] = useState<SaveStatus>("idle");
   const [error, setError] = useState<string | null>(null);
   const [publishPending, startPublishTransition] = useTransition();
 
+  // Which locale the editor is currently showing. NL is always the
+  // source of truth; EN/FR edit the stored translation overrides.
+  const [viewLocale, setViewLocale] = useState<Locale>(SOURCE_LOCALE);
+  const [translatePending, setTranslatePending] = useState<Locale | null>(null);
+
   const debounceRef = useRef<ReturnType<typeof setTimeout>>(undefined);
   const firstRunRef = useRef(true);
+  const translationDebounceRef = useRef<ReturnType<typeof setTimeout>>(undefined);
+  const translationFirstRunRef = useRef(true);
 
-  // Debounced auto-save. Skips the very first mount so we don't
-  // write back exactly what the server gave us.
+  // Debounced auto-save for the source (NL) fields. Skips first mount.
   useEffect(() => {
     if (firstRunRef.current) {
       firstRunRef.current = false;
@@ -83,6 +101,36 @@ export default function PageEditor({
     return () => clearTimeout(debounceRef.current);
   }, [page]);
 
+  // Debounced auto-save for translations. Writes whichever locale the
+  // editor is currently showing — the user only edits one at a time.
+  useEffect(() => {
+    if (translationFirstRunRef.current) {
+      translationFirstRunRef.current = false;
+      return;
+    }
+    if (viewLocale === SOURCE_LOCALE) return;
+    clearTimeout(translationDebounceRef.current);
+    const snapshot = translations[viewLocale] ?? {};
+    const locale = viewLocale;
+    translationDebounceRef.current = setTimeout(async () => {
+      setStatus("saving");
+      setError(null);
+      const result = await saveProPageTranslation(page.id, locale, snapshot);
+      if (result.error) {
+        setStatus("error");
+        setError(result.error);
+      } else {
+        setStatus("saved");
+        setTimeout(() => setStatus("idle"), 1500);
+      }
+    }, 2000);
+    return () => clearTimeout(translationDebounceRef.current);
+  }, [translations, viewLocale, page.id]);
+
+  const isTranslating = viewLocale !== SOURCE_LOCALE;
+  const currentTranslation: ProPageTranslation =
+    translations[viewLocale] ?? {};
+
   const update = useCallback(
     <K extends keyof EditablePage>(key: K, value: EditablePage[K]) => {
       setPage((prev) => ({ ...prev, [key]: value }));
@@ -101,6 +149,79 @@ export default function PageEditor({
     },
     [],
   );
+
+  // ─── Translation helpers ──────────────────────────
+  type TranslatableField = "title" | "metaDescription" | "intro" | "ctaLabel";
+
+  function displayField(key: TranslatableField): string {
+    const source = (page[key] ?? "") as string;
+    if (!isTranslating) return source;
+    return currentTranslation[key] ?? "";
+  }
+
+  function setField(key: TranslatableField, value: string) {
+    if (!isTranslating) {
+      update(key, value as EditablePage[TranslatableField]);
+      return;
+    }
+    setTranslations((prev) => ({
+      ...prev,
+      [viewLocale]: { ...(prev[viewLocale] ?? {}), [key]: value },
+    }));
+  }
+
+  function displaySectionField(
+    sectionId: string,
+    field: "title" | "content",
+    sourceValue: string,
+  ): string {
+    if (!isTranslating) return sourceValue;
+    return currentTranslation.sections?.[sectionId]?.[field] ?? "";
+  }
+
+  function setSectionField(
+    sectionId: string,
+    field: "title" | "content",
+    value: string,
+  ) {
+    if (!isTranslating) {
+      updateSection(sectionId, { [field]: value });
+      return;
+    }
+    setTranslations((prev) => {
+      const loc: ProPageTranslation = { ...(prev[viewLocale] ?? {}) };
+      const secs = { ...(loc.sections ?? {}) };
+      secs[sectionId] = { ...(secs[sectionId] ?? {}), [field]: value };
+      loc.sections = secs;
+      return { ...prev, [viewLocale]: loc };
+    });
+  }
+
+  async function handleTranslate() {
+    if (!isTranslating) return;
+    setTranslatePending(viewLocale);
+    setError(null);
+    // Make sure any unsaved source edits are persisted before Claude
+    // reads from the DB.
+    await saveProPage({
+      pageId: page.id,
+      title: page.title,
+      metaDescription: page.metaDescription,
+      heroImage: page.heroImage,
+      intro: page.intro,
+      sections: page.sections,
+      ctaLabel: page.ctaLabel,
+      ctaUrl: page.ctaUrl,
+      ctaEmail: page.ctaEmail,
+    });
+    const result = await translateProPage(page.id, viewLocale);
+    setTranslatePending(null);
+    if (result.error) {
+      setError(result.error);
+      return;
+    }
+    router.refresh();
+  }
 
   const addSection = useCallback((type: ProPageSection["type"]) => {
     setPage((prev) => ({
@@ -236,8 +357,48 @@ export default function PageEditor({
         </div>
       )}
 
+      {/* Locale tabs */}
+      <div className="mt-6 flex flex-wrap items-center gap-2">
+        {LOCALES.map((l) => {
+          const isActive = l === viewLocale;
+          return (
+            <button
+              key={l}
+              type="button"
+              onClick={() => setViewLocale(l)}
+              className={`rounded-full px-3 py-1 text-xs font-medium transition-colors ${
+                isActive
+                  ? "bg-green-800 text-white"
+                  : "bg-green-50 text-green-600 hover:bg-green-100"
+              }`}
+            >
+              {l === SOURCE_LOCALE
+                ? `${l.toUpperCase()} · ${t("proPages.source", locale)}`
+                : l.toUpperCase()}
+            </button>
+          );
+        })}
+        {isTranslating && (
+          <button
+            type="button"
+            onClick={handleTranslate}
+            disabled={translatePending === viewLocale}
+            className="ml-auto rounded-md border border-gold-300 bg-gold-50 px-3 py-1 text-xs font-medium text-gold-700 hover:bg-gold-100 disabled:opacity-50"
+          >
+            {translatePending === viewLocale
+              ? t("proPages.translating", locale)
+              : t("proPages.translateFromNl", locale)}
+          </button>
+        )}
+      </div>
+      {isTranslating && (
+        <p className="mt-2 text-xs text-green-500">
+          {t("proPages.translationHint", locale)}
+        </p>
+      )}
+
       {/* ── Basics ─────────────────────────────────── */}
-      <section className="mt-8 rounded-xl border border-green-200 bg-white p-6">
+      <section className="mt-6 rounded-xl border border-green-200 bg-white p-6">
         <h2 className="font-display text-lg font-medium text-green-900">
           {t("proPages.sectionBasics", locale)}
         </h2>
@@ -248,9 +409,10 @@ export default function PageEditor({
               {t("proPages.titleLabel", locale)}
             </label>
             <input
-              value={page.title}
-              onChange={(e) => update("title", e.target.value)}
+              value={displayField("title")}
+              onChange={(e) => setField("title", e.target.value)}
               className={fieldClass}
+              placeholder={isTranslating ? page.title : undefined}
             />
           </div>
           <div>
@@ -258,30 +420,35 @@ export default function PageEditor({
               {t("proPages.metaLabel", locale)}
             </label>
             <input
-              value={page.metaDescription ?? ""}
-              onChange={(e) => update("metaDescription", e.target.value)}
+              value={displayField("metaDescription")}
+              onChange={(e) => setField("metaDescription", e.target.value)}
               maxLength={300}
-              placeholder={t("proPages.metaPlaceholder", locale)}
+              placeholder={
+                isTranslating
+                  ? page.metaDescription ?? t("proPages.metaPlaceholder", locale)
+                  : t("proPages.metaPlaceholder", locale)
+              }
               className={fieldClass}
             />
           </div>
         </div>
 
         <div className="mt-4">
-          <label className="block text-xs font-medium text-green-700">
+          <label className="mb-1 block text-xs font-medium text-green-700">
             {t("proPages.introLabel", locale)}
           </label>
-          <textarea
-            value={page.intro ?? ""}
-            onChange={(e) => update("intro", e.target.value)}
-            rows={4}
+          <RichTextEditor
+            key={`intro-${viewLocale}`}
+            content={displayField("intro")}
+            onChange={(html) => setField("intro", html)}
             placeholder={t("proPages.introPlaceholder", locale)}
-            className={textareaClass + " resize-y"}
+            minHeight={100}
           />
         </div>
 
-        {/* Hero image */}
-        <div className="mt-4">
+        {/* Hero image — media is shared across locales, only editable
+            in the source view. */}
+        <div className={`mt-4 ${isTranslating ? "opacity-60 pointer-events-none" : ""}`}>
           <label className="block text-xs font-medium text-green-700">
             {t("proPages.heroLabel", locale)}
           </label>
@@ -356,6 +523,22 @@ export default function PageEditor({
               total={page.sections.length}
               pageId={page.id}
               locale={locale}
+              viewLocale={viewLocale}
+              isTranslating={isTranslating}
+              sectionTitleValue={displaySectionField(
+                section.id,
+                "title",
+                section.title ?? "",
+              )}
+              sectionContentValue={displaySectionField(
+                section.id,
+                "content",
+                section.content ?? "",
+              )}
+              onSectionTitleChange={(v) => setSectionField(section.id, "title", v)}
+              onSectionContentChange={(v) =>
+                setSectionField(section.id, "content", v)
+              }
               onUpdate={(patch) => updateSection(section.id, patch)}
               onRemove={() => removeSection(section.id)}
               onMove={(dir) => moveSection(section.id, dir)}
@@ -369,29 +552,31 @@ export default function PageEditor({
           )}
         </div>
 
-        <div className="mt-4 flex flex-wrap gap-2">
-          <button
-            type="button"
-            onClick={() => addSection("text")}
-            className="rounded-md border border-green-300 bg-white px-3 py-1.5 text-xs font-medium text-green-700 hover:bg-green-50"
-          >
-            + {t("proPages.addText", locale)}
-          </button>
-          <button
-            type="button"
-            onClick={() => addSection("gallery")}
-            className="rounded-md border border-green-300 bg-white px-3 py-1.5 text-xs font-medium text-green-700 hover:bg-green-50"
-          >
-            + {t("proPages.addGallery", locale)}
-          </button>
-          <button
-            type="button"
-            onClick={() => addSection("video")}
-            className="rounded-md border border-green-300 bg-white px-3 py-1.5 text-xs font-medium text-green-700 hover:bg-green-50"
-          >
-            + {t("proPages.addVideo", locale)}
-          </button>
-        </div>
+        {!isTranslating && (
+          <div className="mt-4 flex flex-wrap gap-2">
+            <button
+              type="button"
+              onClick={() => addSection("text")}
+              className="rounded-md border border-green-300 bg-white px-3 py-1.5 text-xs font-medium text-green-700 hover:bg-green-50"
+            >
+              + {t("proPages.addText", locale)}
+            </button>
+            <button
+              type="button"
+              onClick={() => addSection("gallery")}
+              className="rounded-md border border-green-300 bg-white px-3 py-1.5 text-xs font-medium text-green-700 hover:bg-green-50"
+            >
+              + {t("proPages.addGallery", locale)}
+            </button>
+            <button
+              type="button"
+              onClick={() => addSection("video")}
+              className="rounded-md border border-green-300 bg-white px-3 py-1.5 text-xs font-medium text-green-700 hover:bg-green-50"
+            >
+              + {t("proPages.addVideo", locale)}
+            </button>
+          </div>
+        )}
       </section>
 
       {/* ── CTA ─────────────────────────────────── */}
@@ -408,12 +593,13 @@ export default function PageEditor({
               {t("proPages.ctaLabelLabel", locale)}
             </label>
             <input
-              value={page.ctaLabel ?? ""}
-              onChange={(e) => update("ctaLabel", e.target.value)}
+              value={displayField("ctaLabel")}
+              onChange={(e) => setField("ctaLabel", e.target.value)}
+              placeholder={isTranslating ? page.ctaLabel ?? undefined : undefined}
               className={fieldClass}
             />
           </div>
-          <div>
+          <div className={isTranslating ? "opacity-60 pointer-events-none" : ""}>
             <label className="block text-xs font-medium text-green-700">
               {t("proPages.ctaUrlLabel", locale)}
             </label>
@@ -424,7 +610,7 @@ export default function PageEditor({
               className={fieldClass}
             />
           </div>
-          <div>
+          <div className={isTranslating ? "opacity-60 pointer-events-none" : ""}>
             <label className="block text-xs font-medium text-green-700">
               {t("proPages.ctaEmailLabel", locale)}
             </label>
@@ -463,6 +649,12 @@ function SectionRow({
   total,
   pageId,
   locale,
+  viewLocale,
+  isTranslating,
+  sectionTitleValue,
+  sectionContentValue,
+  onSectionTitleChange,
+  onSectionContentChange,
   onUpdate,
   onRemove,
   onMove,
@@ -473,6 +665,12 @@ function SectionRow({
   total: number;
   pageId: number;
   locale: Locale;
+  viewLocale: Locale;
+  isTranslating: boolean;
+  sectionTitleValue: string;
+  sectionContentValue: string;
+  onSectionTitleChange: (value: string) => void;
+  onSectionContentChange: (value: string) => void;
   onUpdate: (patch: Partial<ProPageSection>) => void;
   onRemove: () => void;
   onMove: (dir: -1 | 1) => void;
@@ -498,43 +696,47 @@ function SectionRow({
           <span className="rounded bg-green-200 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-green-800">
             {t(`proPages.type.${section.type}`, locale)}
           </span>
-          <label className="flex items-center gap-1 text-xs text-green-700">
-            <input
-              type="checkbox"
-              checked={section.visible}
-              onChange={(e) => onUpdate({ visible: e.target.checked })}
-              className="h-3.5 w-3.5 rounded border-green-300 accent-[#c4a035]"
-            />
-            {t("proPages.visible", locale)}
-          </label>
+          {!isTranslating && (
+            <label className="flex items-center gap-1 text-xs text-green-700">
+              <input
+                type="checkbox"
+                checked={section.visible}
+                onChange={(e) => onUpdate({ visible: e.target.checked })}
+                className="h-3.5 w-3.5 rounded border-green-300 accent-[#c4a035]"
+              />
+              {t("proPages.visible", locale)}
+            </label>
+          )}
         </div>
-        <div className="flex items-center gap-1">
-          <button
-            type="button"
-            onClick={() => onMove(-1)}
-            disabled={index === 0}
-            className="rounded border border-green-200 bg-white px-1.5 py-0.5 text-[11px] text-green-600 hover:bg-green-50 disabled:opacity-30"
-            title={t("proPages.moveUp", locale)}
-          >
-            ↑
-          </button>
-          <button
-            type="button"
-            onClick={() => onMove(1)}
-            disabled={index === total - 1}
-            className="rounded border border-green-200 bg-white px-1.5 py-0.5 text-[11px] text-green-600 hover:bg-green-50 disabled:opacity-30"
-            title={t("proPages.moveDown", locale)}
-          >
-            ↓
-          </button>
-          <button
-            type="button"
-            onClick={onRemove}
-            className="rounded border border-red-200 bg-white px-2 py-0.5 text-[11px] text-red-500 hover:bg-red-50"
-          >
-            {t("proPages.removeSection", locale)}
-          </button>
-        </div>
+        {!isTranslating && (
+          <div className="flex items-center gap-1">
+            <button
+              type="button"
+              onClick={() => onMove(-1)}
+              disabled={index === 0}
+              className="rounded border border-green-200 bg-white px-1.5 py-0.5 text-[11px] text-green-600 hover:bg-green-50 disabled:opacity-30"
+              title={t("proPages.moveUp", locale)}
+            >
+              ↑
+            </button>
+            <button
+              type="button"
+              onClick={() => onMove(1)}
+              disabled={index === total - 1}
+              className="rounded border border-green-200 bg-white px-1.5 py-0.5 text-[11px] text-green-600 hover:bg-green-50 disabled:opacity-30"
+              title={t("proPages.moveDown", locale)}
+            >
+              ↓
+            </button>
+            <button
+              type="button"
+              onClick={onRemove}
+              className="rounded border border-red-200 bg-white px-2 py-0.5 text-[11px] text-red-500 hover:bg-red-50"
+            >
+              {t("proPages.removeSection", locale)}
+            </button>
+          </div>
+        )}
       </div>
 
       <div className="mt-3">
@@ -542,39 +744,43 @@ function SectionRow({
           {t("proPages.sectionTitle", locale)}
         </label>
         <input
-          value={section.title ?? ""}
-          onChange={(e) => onUpdate({ title: e.target.value })}
+          value={sectionTitleValue}
+          onChange={(e) => onSectionTitleChange(e.target.value)}
+          placeholder={isTranslating ? section.title ?? "" : undefined}
           className={fieldClass}
         />
       </div>
 
-      {(section.type === "text" || section.type === "video") && (
+      {section.type === "text" && (
         <div className="mt-3">
-          <label className="block text-xs font-medium text-green-700">
-            {section.type === "text"
-              ? t("proPages.sectionContent", locale)
-              : t("proPages.videoUrlLabel", locale)}
+          <label className="mb-1 block text-xs font-medium text-green-700">
+            {t("proPages.sectionContent", locale)}
           </label>
-          {section.type === "text" ? (
-            <textarea
-              value={section.content ?? ""}
-              onChange={(e) => onUpdate({ content: e.target.value })}
-              rows={5}
-              className={textareaClass + " resize-y"}
-            />
-          ) : (
-            <input
-              value={section.media?.[0] ?? ""}
-              onChange={(e) => onUpdate({ media: [e.target.value] })}
-              placeholder="https://www.youtube.com/embed/..."
-              className={fieldClass}
-            />
-          )}
+          <RichTextEditor
+            key={`${section.id}-${viewLocale}`}
+            content={sectionContentValue}
+            onChange={(html) => onSectionContentChange(html)}
+            minHeight={120}
+          />
+        </div>
+      )}
+
+      {section.type === "video" && (
+        <div className={`mt-3 ${isTranslating ? "opacity-60 pointer-events-none" : ""}`}>
+          <label className="block text-xs font-medium text-green-700">
+            {t("proPages.videoUrlLabel", locale)}
+          </label>
+          <input
+            value={section.media?.[0] ?? ""}
+            onChange={(e) => onUpdate({ media: [e.target.value] })}
+            placeholder="https://www.youtube.com/embed/..."
+            className={fieldClass}
+          />
         </div>
       )}
 
       {section.type === "gallery" && (
-        <div className="mt-3">
+        <div className={`mt-3 ${isTranslating ? "opacity-60 pointer-events-none" : ""}`}>
           <label className="block text-xs font-medium text-green-700">
             {t("proPages.galleryLabel", locale)}
           </label>

@@ -311,6 +311,20 @@ export type ProPageSection = {
   visible: boolean;
 };
 
+/**
+ * Per-locale overrides for a pro page. Source language is the content
+ * on the row itself; `translations[locale]` can override any of the
+ * translatable fields (title, meta, intro, CTA label, section
+ * title/content). Locales not in the map render the source.
+ */
+export type ProPageTranslation = {
+  title?: string;
+  metaDescription?: string;
+  intro?: string;
+  ctaLabel?: string;
+  sections?: Record<string, { title?: string; content?: string }>;
+};
+
 export const proPages = pgTable("pro_pages", {
   id: serial("id").primaryKey(),
   proProfileId: integer("pro_profile_id")
@@ -326,6 +340,7 @@ export const proPages = pgTable("pro_pages", {
   ctaLabel: varchar("cta_label", { length: 100 }),
   ctaUrl: varchar("cta_url", { length: 500 }),
   ctaEmail: varchar("cta_email", { length: 255 }),
+  translations: jsonb("translations").$type<Record<string, ProPageTranslation>>(),
   published: boolean("published").notNull().default(false),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),

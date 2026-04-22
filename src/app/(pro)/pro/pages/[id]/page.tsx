@@ -2,7 +2,7 @@ import { notFound } from "next/navigation";
 import { requireProProfile } from "@/lib/pro";
 import { getProPage } from "../actions";
 import { getLocale } from "@/lib/locale";
-import type { ProPageSection } from "@/lib/db/schema";
+import type { ProPageSection, ProPageTranslation } from "@/lib/db/schema";
 import PageEditor from "./PageEditor";
 
 export const metadata = { title: "Edit page — Golf Lessons" };
@@ -39,6 +39,9 @@ export default async function ProPageEditorRoute({ params }: Props) {
         ctaLabel: page.ctaLabel,
         ctaUrl: page.ctaUrl,
         ctaEmail: page.ctaEmail,
+        translations:
+          (page.translations as Record<string, ProPageTranslation> | null) ??
+          {},
         published: page.published,
       }}
     />
