@@ -37,10 +37,12 @@ export default async function OnboardingPage() {
   const session = await getSession();
   const locale = await getLocale();
 
-  // No session → render the wizard at step 0 ("Personal"). The pro will
-  // create their account by submitting that step. The backend endpoint
-  // sets the session cookie and the wizard flips to hasAccount=true.
-  if (!session) {
+  // No pro session → render the wizard at step 0 ("Personal"). The pro
+  // will create their account by submitting that step; the backend sets
+  // the session cookie and the wizard flips to hasAccount=true. Covers
+  // both "no session at all" and "signed in as something-not-a-pro"
+  // (member/admin/dev who's starting a new pro account).
+  if (!session || !hasRole(session, "pro")) {
     return (
       <OnboardingWizard
         initialStep={0}
@@ -49,11 +51,6 @@ export default async function OnboardingPage() {
         initialData={EMPTY_DATA}
       />
     );
-  }
-
-  // Session exists but wrong role — not a pro and not upgrading to one.
-  if (!hasRole(session, "pro")) {
-    redirect("/login");
   }
 
   const [user] = await db
