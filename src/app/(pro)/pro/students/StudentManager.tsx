@@ -119,8 +119,8 @@ export default function StudentManager({
 
   return (
     <div className="mx-auto max-w-4xl px-6 py-12">
-      <div className="flex items-center justify-between">
-        <div>
+      <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-3">
+        <div className="min-w-0 flex-1">
           <div className="flex items-center gap-2">
             <h1 className="font-display text-3xl font-semibold text-green-900">
               {t("proStudents.title", locale)}
@@ -146,7 +146,7 @@ export default function StudentManager({
             ).replace("{n}", String(activeCounts.active))}
           </p>
         </div>
-        <div className="flex gap-2">
+        <div className="flex w-full flex-wrap gap-2 sm:w-auto">
           <button
             type="button"
             onClick={() => {
@@ -154,7 +154,7 @@ export default function StudentManager({
               setGeneratedPassword("");
               setShowInviteForm(true);
             }}
-            className="rounded-md bg-gold-600 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-gold-500"
+            className="flex-1 rounded-md bg-gold-600 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-gold-500 sm:flex-none"
           >
             <span className="sm:hidden">{t("proStudents.inviteShort", locale)}</span>
             <span className="hidden sm:inline">{t("proStudents.invite", locale)}</span>
@@ -166,7 +166,7 @@ export default function StudentManager({
               setGeneratedPassword("");
               setShowInviteForm(true);
             }}
-            className="rounded-md border border-green-300 bg-white px-4 py-2 text-sm font-medium text-green-700 transition-colors hover:bg-green-50"
+            className="flex-1 rounded-md border border-green-300 bg-white px-4 py-2 text-sm font-medium text-green-700 transition-colors hover:bg-green-50 sm:flex-none"
           >
             <span className="sm:hidden">{t("proStudents.addShort", locale)}</span>
             <span className="hidden sm:inline">{t("proStudents.add", locale)}</span>
