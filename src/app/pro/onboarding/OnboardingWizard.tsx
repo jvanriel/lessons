@@ -623,14 +623,22 @@ function BankStep({
 
 // ─── Step 5: Subscription Payment Form ──────────────────
 
+interface SubscriptionBillingPrefill {
+  name: string;
+  email: string;
+  phone: string;
+}
+
 function SubscriptionPaymentForm({
   plan,
   onSuccess,
   locale,
+  billingPrefill,
 }: {
   plan: "monthly" | "annual";
   onSuccess: () => void;
   locale: Locale;
+  billingPrefill: SubscriptionBillingPrefill | null;
 }) {
   const stripe = useStripe();
   const elements = useElements();
@@ -699,7 +707,20 @@ function SubscriptionPaymentForm({
   return (
     <form onSubmit={handleSubmit}>
       <div className="rounded-lg border border-green-100 bg-green-50/30 p-4">
-        <PaymentElement options={{ layout: "tabs" }} />
+        <PaymentElement
+          options={{
+            layout: "tabs",
+            defaultValues: billingPrefill
+              ? {
+                  billingDetails: {
+                    name: billingPrefill.name,
+                    email: billingPrefill.email,
+                    phone: billingPrefill.phone,
+                  },
+                }
+              : undefined,
+          }}
+        />
       </div>
       {error && (
         <div className="mt-4 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
@@ -725,6 +746,8 @@ function SubscriptionPaymentForm({
 function SubscriptionStep({ onSuccess, locale }: { onSuccess: () => void; locale: Locale }) {
   const [plan, setPlan] = useState<"monthly" | "annual">("annual");
   const [clientSecret, setClientSecret] = useState<string | null>(null);
+  const [billingPrefill, setBillingPrefill] =
+    useState<SubscriptionBillingPrefill | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -740,6 +763,7 @@ function SubscriptionStep({ onSuccess, locale }: { onSuccess: () => void; locale
       const data = await res.json();
       if (data.clientSecret) {
         setClientSecret(data.clientSecret);
+        setBillingPrefill(data.billingPrefill ?? null);
       } else {
         setError(data.error || t("proOnb.sub.initFailed", locale));
       }
@@ -776,7 +800,12 @@ function SubscriptionStep({ onSuccess, locale }: { onSuccess: () => void; locale
           stripe={getStripe()}
           options={{ clientSecret, ...stripeElementsOptions }}
         >
-          <SubscriptionPaymentForm plan={plan} onSuccess={onSuccess} locale={locale} />
+          <SubscriptionPaymentForm
+            plan={plan}
+            onSuccess={onSuccess}
+            locale={locale}
+            billingPrefill={billingPrefill}
+          />
         </Elements>
       </div>
     );
