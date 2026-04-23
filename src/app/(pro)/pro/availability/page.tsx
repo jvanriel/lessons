@@ -20,6 +20,7 @@ import {
   getMondayInTZ,
 } from "@/lib/local-date";
 import { t } from "@/lib/i18n/translations";
+import PageHeading from "@/components/app/PageHeading";
 import type {
   SerializedAvailability,
   SerializedOverride,
@@ -186,12 +187,13 @@ export default async function AvailabilityPage() {
   return (
     <div className="mx-auto max-w-5xl px-6 py-12">
       <BookingRefreshListener />
-      <h1 className="mb-2 font-display text-3xl font-semibold text-green-900">
-        {t("proAvailability.pageTitle", locale)}
-      </h1>
-      <p className="mb-8 text-green-600">
-        {t("proAvailability.pageSubtitle", locale)}
-      </p>
+      <PageHeading
+        title={t("proAvailability.pageTitle", locale)}
+        subtitle={t("proAvailability.pageSubtitle", locale)}
+        helpSlug="pro.availability"
+        locale={locale}
+        className="mb-8"
+      />
       {serializedLocations.length === 0 ? (
         <div className="rounded-xl border border-amber-200 bg-amber-50 p-6 text-center">
           <p className="text-sm text-amber-800">

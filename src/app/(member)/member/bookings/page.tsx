@@ -15,6 +15,7 @@ import { getLocale } from "@/lib/locale";
 import { formatDate } from "@/lib/format-date";
 import { todayLocal } from "@/lib/local-date";
 import { t } from "@/lib/i18n/translations";
+import PageHeading from "@/components/app/PageHeading";
 
 export const metadata = { title: "My Bookings — Golf Lessons" };
 
@@ -63,17 +64,19 @@ export default async function MemberBookingsPage() {
   return (
     <div className="mx-auto max-w-4xl px-6 py-12">
       <BookingRefreshListener />
-      <div className="mb-8 flex items-center justify-between">
-        <h1 className="font-display text-3xl font-semibold text-green-900">
-          {t("memberBookings.title", locale)}
-        </h1>
+      <PageHeading
+        title={t("memberBookings.title", locale)}
+        helpSlug="member.bookings"
+        locale={locale}
+        className="mb-8"
+      >
         <Link
           href="/member/dashboard"
           className="rounded-md bg-gold-600 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-gold-500"
         >
           {t("memberBookings.bookLesson", locale)}
         </Link>
-      </div>
+      </PageHeading>
 
       {/* Upcoming */}
       <section>

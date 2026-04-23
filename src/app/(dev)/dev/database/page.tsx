@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { listTables } from "./actions";
+import PageHeading from "@/components/app/PageHeading";
 
 export const metadata = { title: "Database — Dev — Golf Lessons" };
 
@@ -8,13 +9,12 @@ export default async function DatabasePage() {
 
   return (
     <div className="mx-auto max-w-4xl px-6 py-12">
-      <h1 className="font-display text-3xl font-semibold text-green-950">
-        Database
-      </h1>
-      <p className="mt-2 text-sm text-green-600">
-        Browse and edit records. Handle with care — writes go straight to the
-        database.
-      </p>
+      <PageHeading
+        title="Database"
+        subtitle="Browse and edit records. Handle with care — writes go straight to the database."
+        helpSlug="dev.database"
+        locale="en"
+      />
 
       <div className="mt-8 rounded-xl border border-green-200 bg-white">
         <table className="w-full text-sm">

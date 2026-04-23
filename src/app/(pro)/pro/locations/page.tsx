@@ -4,6 +4,7 @@ import { getMyLocations } from "./actions";
 import LocationManager from "./LocationManager";
 import { getLocale } from "@/lib/locale";
 import { t } from "@/lib/i18n/translations";
+import PageHeading from "@/components/app/PageHeading";
 
 export const metadata = { title: "My Locations — Golf Lessons" };
 
@@ -16,12 +17,12 @@ export default async function ProLocationsPage() {
 
   return (
     <div className="mx-auto max-w-4xl px-6 py-12">
-      <h1 className="font-display text-3xl font-semibold text-green-900">
-        {t("proLocations.pageTitle", locale)}
-      </h1>
-      <p className="mt-2 text-sm text-green-600">
-        {t("proLocations.pageSubtitle", locale)}
-      </p>
+      <PageHeading
+        title={t("proLocations.pageTitle", locale)}
+        subtitle={t("proLocations.pageSubtitle", locale)}
+        helpSlug="pro.locations"
+        locale={locale}
+      />
       <LocationManager locations={myLocations} locale={locale} />
     </div>
   );

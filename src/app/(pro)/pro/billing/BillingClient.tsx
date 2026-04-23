@@ -10,6 +10,7 @@ import {
   ANNUAL_PRICE,
   formatPrice,
 } from "@/lib/pricing";
+import PageHeading from "@/components/app/PageHeading";
 
 interface PendingCommissionBooking {
   id: number;
@@ -500,12 +501,12 @@ export default function BillingClient({
 
   return (
     <div className="mx-auto max-w-3xl px-6 py-12">
-      <h1 className="font-display text-3xl font-semibold text-green-900">
-        {t("proBilling.title", locale)}
-      </h1>
-      <p className="mt-2 text-green-700">
-        {t("proBilling.subtitle", locale)}
-      </p>
+      <PageHeading
+        title={t("proBilling.title", locale)}
+        subtitle={t("proBilling.subtitle", locale)}
+        helpSlug="pro.billing"
+        locale={locale}
+      />
 
       {/* Subscription Card */}
       <div className="mt-8 rounded-xl border border-green-200 bg-white p-6 shadow-sm">

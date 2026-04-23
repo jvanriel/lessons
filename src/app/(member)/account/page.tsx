@@ -4,6 +4,7 @@ import { users } from "@/lib/db/schema";
 import { eq } from "drizzle-orm";
 import { getLocale } from "@/lib/locale";
 import { t } from "@/lib/i18n/translations";
+import PageHeading from "@/components/app/PageHeading";
 import ProfileForm, { ChangePasswordForm } from "./ProfileForm";
 import EnablePushButton from "@/components/notifications/EnablePushButton";
 import InstallPwaSection from "@/components/app/InstallPwaSection";
@@ -26,9 +27,11 @@ export default async function AccountPage() {
 
   return (
     <section className="mx-auto max-w-2xl px-6 py-16">
-      <h1 className="font-display text-3xl font-semibold text-green-950">
-        {t("account.title", locale)}
-      </h1>
+      <PageHeading
+        title={t("account.title", locale)}
+        helpSlug="account"
+        locale={locale}
+      />
 
       <div className="mt-10 rounded-xl border border-green-200 bg-white p-8">
         <ProfileForm

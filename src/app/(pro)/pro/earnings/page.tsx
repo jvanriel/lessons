@@ -9,6 +9,7 @@ import { formatDate as formatDateHelper } from "@/lib/format-date";
 import type { Locale } from "@/lib/i18n";
 import { t } from "@/lib/i18n/translations";
 import { PLATFORM_FEE_PERCENT, STRIPE_SURCHARGE_PERCENT } from "@/lib/stripe";
+import PageHeading from "@/components/app/PageHeading";
 
 export const metadata = { title: "Earnings — Golf Lessons" };
 
@@ -119,12 +120,12 @@ export default async function EarningsPage() {
   return (
     <div className="mx-auto max-w-4xl px-6 py-12">
       <BookingRefreshListener />
-      <h1 className="font-display text-3xl font-semibold text-green-900">
-        {t("proEarnings.title", locale)}
-      </h1>
-      <p className="mt-2 text-green-700">
-        {t("proEarnings.subtitle", locale)}
-      </p>
+      <PageHeading
+        title={t("proEarnings.title", locale)}
+        subtitle={t("proEarnings.subtitle", locale)}
+        helpSlug="pro.earnings"
+        locale={locale}
+      />
 
       {/* Summary Cards */}
       <div className="mt-8 grid gap-4 sm:grid-cols-3">

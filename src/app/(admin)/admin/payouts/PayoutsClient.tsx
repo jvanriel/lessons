@@ -3,6 +3,7 @@
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { PLATFORM_FEE_PERCENT } from "@/lib/stripe";
+import PageHeading from "@/components/app/PageHeading";
 
 interface Payout {
   proProfileId: number;
@@ -67,15 +68,12 @@ export default function PayoutsClient({
 
   return (
     <div className="mx-auto max-w-5xl px-6 py-12">
-      <div className="flex items-start justify-between">
-        <div>
-          <h1 className="font-display text-3xl font-semibold text-green-900">
-            Payouts
-          </h1>
-          <p className="mt-2 text-green-700">
-            Monthly lesson payment payouts to pros.
-          </p>
-        </div>
+      <PageHeading
+        title="Payouts"
+        subtitle="Monthly lesson payment payouts to pros."
+        helpSlug="admin.payouts"
+        locale="en"
+      >
         <Button
           onClick={() =>
             window.open(`/api/admin/payouts?month=${month}&format=csv`, "_blank")
@@ -85,7 +83,7 @@ export default function PayoutsClient({
         >
           Download CSV
         </Button>
-      </div>
+      </PageHeading>
 
       {/* Month selector */}
       <div className="mt-6">

@@ -2,6 +2,7 @@ import { requireProProfile } from "@/lib/pro";
 import ProProfileEditor from "./ProProfileEditor";
 import { getLocale } from "@/lib/locale";
 import { t } from "@/lib/i18n/translations";
+import PageHeading from "@/components/app/PageHeading";
 
 export const metadata = { title: "Pro Profile — Golf Lessons" };
 
@@ -12,9 +13,11 @@ export default async function ProProfilePage() {
   if (!profile) {
     return (
       <div className="mx-auto max-w-4xl px-6 py-12">
-        <h1 className="font-display text-3xl font-semibold text-green-900">
-          {t("proProfile.pageTitle", locale)}
-        </h1>
+        <PageHeading
+          title={t("proProfile.pageTitle", locale)}
+          helpSlug="pro.profile"
+          locale={locale}
+        />
         <p className="mt-4 text-green-600">
           {t("proProfile.notCreated", locale)}
         </p>
@@ -24,9 +27,11 @@ export default async function ProProfilePage() {
 
   return (
     <section className="mx-auto max-w-2xl px-6 py-12">
-      <h1 className="font-display text-3xl font-semibold text-green-900">
-        {t("proProfile.pageTitle", locale)}
-      </h1>
+      <PageHeading
+        title={t("proProfile.pageTitle", locale)}
+        helpSlug="pro.profile"
+        locale={locale}
+      />
       <div className="mt-8 rounded-xl border border-green-200 bg-white p-8">
         <ProProfileEditor
           locale={locale}

@@ -15,6 +15,7 @@ import { BookingsView } from "./BookingsView";
 import { BookingRefreshListener } from "@/components/BookingRefreshListener";
 import { getLocale } from "@/lib/locale";
 import { t } from "@/lib/i18n/translations";
+import PageHeading from "@/components/app/PageHeading";
 import { getPaymentBadge } from "@/lib/payment-status";
 
 export const metadata = { title: "Bookings — Golf Lessons" };
@@ -76,17 +77,19 @@ export default async function ProBookingsPage() {
   return (
     <div className="mx-auto max-w-6xl px-6 py-12">
       <BookingRefreshListener />
-      <div className="mb-8 flex items-center justify-between">
-        <h1 className="font-display text-3xl font-semibold text-green-900">
-          {t("proBookingsPage.title", locale)}
-        </h1>
+      <PageHeading
+        title={t("proBookingsPage.title", locale)}
+        helpSlug="pro.bookings"
+        locale={locale}
+        className="mb-8"
+      >
         <Link
           href="/pro/availability"
           className="rounded-md border border-green-200 bg-white px-4 py-2 text-sm font-medium text-green-800 transition-colors hover:border-green-300"
         >
           {t("proBookingsPage.manageAvailability", locale)}
         </Link>
-      </div>
+      </PageHeading>
 
       {/* Bookings view (calendar or list) */}
       <section className="mb-10">
