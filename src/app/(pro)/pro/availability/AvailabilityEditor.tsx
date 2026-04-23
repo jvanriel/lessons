@@ -134,15 +134,15 @@ function getWeekNumber(d: Date): number {
 // ─── Landscape gate ──────────────────────────────────
 
 /**
- * The availability grid is 7 columns × many time-rows — a vertical
- * layout. On a phone turned sideways the rows get squashed (too little
- * vertical space) and the buttons around the grid stop fitting. Rather
- * than fight the layout, we ask the user to rotate back to portrait.
- * Hidden on tablets and up.
+ * The availability grid is 7 day-columns wide and needs space — on a
+ * phone held portrait the columns get too narrow to tap reliably and
+ * the surrounding controls overflow. On tablets and up there's always
+ * enough room so the hint is hidden. Shown only when portrait AND
+ * below the md breakpoint.
  */
 function LandscapeRotateHint({ locale }: { locale: Locale }) {
   return (
-    <div className="fixed inset-0 z-40 hidden flex-col items-center justify-center bg-cream/95 px-8 text-center landscape:max-md:flex">
+    <div className="fixed inset-0 z-40 hidden flex-col items-center justify-center bg-cream/95 px-8 text-center portrait:max-md:flex">
       <div className="mx-auto mb-6 flex h-16 w-16 items-center justify-center rounded-full border border-green-200 bg-white">
         <svg
           className="h-8 w-8 text-green-700"
@@ -159,10 +159,10 @@ function LandscapeRotateHint({ locale }: { locale: Locale }) {
         </svg>
       </div>
       <h2 className="font-display text-xl font-semibold text-green-900">
-        {t("proAvail.rotatePortrait.title", locale)}
+        {t("proAvail.rotateLandscape.title", locale)}
       </h2>
       <p className="mt-2 max-w-sm text-sm text-green-700">
-        {t("proAvail.rotatePortrait.body", locale)}
+        {t("proAvail.rotateLandscape.body", locale)}
       </p>
     </div>
   );
