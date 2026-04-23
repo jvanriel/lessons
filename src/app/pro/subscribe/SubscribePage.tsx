@@ -20,16 +20,24 @@ import {
 
 // ─── Payment Form (inside Elements provider) ────────────
 
+interface BillingPrefill {
+  name: string;
+  email: string;
+  phone: string;
+}
+
 function PaymentForm({
   plan,
   onSuccess,
   onCancel,
   locale,
+  billingPrefill,
 }: {
   plan: "monthly" | "annual";
   onSuccess: () => void;
   onCancel: () => void;
   locale: Locale;
+  billingPrefill: BillingPrefill | null;
 }) {
   const stripe = useStripe();
   const elements = useElements();
@@ -104,6 +112,15 @@ function PaymentForm({
         <PaymentElement
           options={{
             layout: "tabs",
+            defaultValues: billingPrefill
+              ? {
+                  billingDetails: {
+                    name: billingPrefill.name,
+                    email: billingPrefill.email,
+                    phone: billingPrefill.phone,
+                  },
+                }
+              : undefined,
           }}
         />
       </div>
@@ -149,6 +166,9 @@ export default function SubscribePage({ locale }: { locale: Locale }) {
   const [plan, setPlan] = useState<"monthly" | "annual">("annual");
   const [step, setStep] = useState<"plan" | "payment" | "success">("plan");
   const [clientSecret, setClientSecret] = useState<string | null>(null);
+  const [billingPrefill, setBillingPrefill] = useState<BillingPrefill | null>(
+    null,
+  );
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -167,6 +187,7 @@ export default function SubscribePage({ locale }: { locale: Locale }) {
 
       if (data.clientSecret) {
         setClientSecret(data.clientSecret);
+        setBillingPrefill(data.billingPrefill ?? null);
         setStep("payment");
       } else {
         setError(data.error || t("subscribe.initFailed", locale));
@@ -356,6 +377,7 @@ export default function SubscribePage({ locale }: { locale: Locale }) {
             <PaymentForm
               plan={plan}
               locale={locale}
+              billingPrefill={billingPrefill}
               onSuccess={() => setStep("success")}
               onCancel={() => {
                 setStep("plan");

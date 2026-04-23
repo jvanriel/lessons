@@ -54,12 +54,17 @@ export async function POST(request: NextRequest) {
 
   const stripe = getStripe();
 
-  // Create or retrieve Stripe customer
+  const fullName = `${user.firstName} ${user.lastName}`.trim();
+
+  // Create or retrieve Stripe customer. Phone lands both on the customer
+  // record (for Stripe-side records / receipts) and on the PaymentElement
+  // via the billingPrefill returned below.
   let stripeCustomerId = user.stripeCustomerId;
   if (!stripeCustomerId) {
     const customer = await stripe.customers.create({
       email: user.email,
-      name: `${user.firstName} ${user.lastName}`,
+      name: fullName,
+      phone: user.phone ?? undefined,
       metadata: {
         userId: String(user.id),
         proProfileId: String(profile.id),
@@ -71,6 +76,12 @@ export async function POST(request: NextRequest) {
       .update(users)
       .set({ stripeCustomerId: customer.id })
       .where(eq(users.id, user.id));
+  } else if (user.phone) {
+    // Customer already exists (retry flow) — make sure the phone we just
+    // collected at registration is mirrored to Stripe.
+    await stripe.customers
+      .update(stripeCustomerId, { phone: user.phone, name: fullName })
+      .catch(() => {});
   }
 
   // Create SetupIntent to collect payment method without charging
@@ -87,5 +98,10 @@ export async function POST(request: NextRequest) {
   return NextResponse.json({
     clientSecret: setupIntent.client_secret,
     customerId: stripeCustomerId,
+    billingPrefill: {
+      name: fullName,
+      email: user.email,
+      phone: user.phone ?? "",
+    },
   });
 }

@@ -6,24 +6,37 @@ import { registerPro } from "./actions";
 import { t } from "@/lib/i18n/translations";
 import type { Locale } from "@/lib/i18n";
 import { MONTHLY_PRICE, ANNUAL_PRICE, formatPrice } from "@/lib/pricing";
+import PhoneField, { isValidPhoneNumber } from "@/components/PhoneField";
 
-// Same env var the server uses in @/lib/stripe; the NEXT_PUBLIC_ prefix
-// makes it safe to read on the client. Defaults match the server fallback.
-const PLATFORM_FEE_PERCENT = (() => {
-  const raw = process.env.NEXT_PUBLIC_PLATFORM_FEE_PERCENT;
-  if (!raw) return 2.5;
+// Same env vars the server uses in @/lib/stripe; the NEXT_PUBLIC_ prefix
+// makes them safe to read on the client. Defaults match the server fallback.
+function readPercent(name: string, fallback: number): number {
+  const raw = process.env[name];
+  if (!raw) return fallback;
   const n = Number(raw);
-  if (!Number.isFinite(n) || n < 0 || n > 100) return 2.5;
+  if (!Number.isFinite(n) || n < 0 || n > 100) return fallback;
   return n;
-})();
+}
+const PLATFORM_FEE_PERCENT = readPercent(
+  "NEXT_PUBLIC_PLATFORM_FEE_PERCENT",
+  2.5,
+);
+const STRIPE_SURCHARGE_PERCENT = readPercent(
+  "NEXT_PUBLIC_STRIPE_SURCHARGE_PERCENT",
+  1.5,
+);
 
 export default function RegisterProForm({ locale }: { locale: Locale }) {
   const [state, formAction, pending] = useActionState(registerPro, null);
   const [firstName, setFirstName] = useState("");
   const [lastName, setLastName] = useState("");
   const [email, setEmail] = useState("");
+  const [phone, setPhone] = useState("");
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
+
+  const phoneValid = phone.length > 0 && isValidPhoneNumber(phone);
+  const submitDisabled = pending || !phoneValid;
 
   // Student-register page stashes typed fields here before sending us
   // "I'm a golf pro" nav, so the pro doesn't have to retype everything.
@@ -36,12 +49,14 @@ export default function RegisterProForm({ locale }: { locale: Locale }) {
         firstName?: string;
         lastName?: string;
         email?: string;
+        phone?: string;
         password?: string;
         confirmPassword?: string;
       };
       if (parsed.firstName) setFirstName(parsed.firstName);
       if (parsed.lastName) setLastName(parsed.lastName);
       if (parsed.email) setEmail(parsed.email);
+      if (parsed.phone) setPhone(parsed.phone);
       if (parsed.password) setPassword(parsed.password);
       if (parsed.confirmPassword) setConfirmPassword(parsed.confirmPassword);
     } catch {
@@ -116,6 +131,23 @@ export default function RegisterProForm({ locale }: { locale: Locale }) {
 
           <div>
             <label className="block text-sm font-medium text-green-800">
+              {t("onboarding.phone", locale)} *
+            </label>
+            <div className="mt-1">
+              <PhoneField
+                value={phone}
+                onChange={setPhone}
+                placeholder="+32 4XX XX XX XX"
+                required
+                showError
+                errorLabel={t("publicBook.err.invalidPhone", locale)}
+                name="phone"
+              />
+            </div>
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-green-800">
               {t("proReg.password", locale)} *
             </label>
             <input
@@ -157,7 +189,7 @@ export default function RegisterProForm({ locale }: { locale: Locale }) {
 
           <button
             type="submit"
-            disabled={pending}
+            disabled={submitDisabled}
             className="w-full rounded-md bg-gold-600 px-6 py-3 text-sm font-medium text-white transition-colors hover:bg-gold-500 disabled:opacity-50"
           >
             {pending
@@ -171,10 +203,13 @@ export default function RegisterProForm({ locale }: { locale: Locale }) {
               .replace("{annual}", formatPrice(ANNUAL_PRICE, locale))}
           </p>
           <p className="text-center text-xs text-green-500">
-            {t("proReg.feeNote", locale).replace(
-              "{rate}",
-              String(PLATFORM_FEE_PERCENT),
-            )}
+            {t("proReg.feeNote", locale)
+              .replace("{rate}", String(PLATFORM_FEE_PERCENT))
+              .replace("{surcharge}", String(STRIPE_SURCHARGE_PERCENT))
+              .replace(
+                "{online}",
+                String(PLATFORM_FEE_PERCENT + STRIPE_SURCHARGE_PERCENT),
+              )}
           </p>
         </form>
 

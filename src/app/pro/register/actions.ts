@@ -13,6 +13,7 @@ import { buildWelcomeEmail, emailLayout, getWelcomeSubject } from "@/lib/email-t
 import { ensureProProfile, normalizeRoles } from "@/lib/pro";
 import { getLocale } from "@/lib/locale";
 import { t } from "@/lib/i18n/translations";
+import { looksLikeE164 } from "@/lib/phone";
 
 function getSecret() {
   return new TextEncoder().encode(
@@ -39,12 +40,16 @@ export async function registerPro(
   const firstName = (formData.get("firstName") as string)?.trim();
   const lastName = (formData.get("lastName") as string)?.trim();
   const email = (formData.get("email") as string)?.trim().toLowerCase();
+  const phone = ((formData.get("phone") as string) || "").trim();
   const password = formData.get("password") as string;
   const confirm = formData.get("confirmPassword") as string;
   const preferredLocaleRaw = (formData.get("preferredLocale") as string) || "";
 
-  if (!firstName || !lastName || !email || !password) {
+  if (!firstName || !lastName || !email || !phone || !password) {
     return { error: t("authErr.allFieldsRequired", uiLocale) };
+  }
+  if (!looksLikeE164(phone)) {
+    return { error: t("publicBook.err.invalidPhone", uiLocale) };
   }
   if (password.length < 8) {
     return { error: t("authErr.passwordTooShort", uiLocale) };
@@ -74,6 +79,7 @@ export async function registerPro(
       firstName,
       lastName,
       email,
+      phone,
       password: hashed,
       roles: normalizeRoles("pro"),
       preferredLocale,

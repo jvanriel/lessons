@@ -23,18 +23,7 @@ import {
 } from "@/lib/lesson-slots";
 import crypto from "node:crypto";
 import { SignJWT } from "jose";
-// Lightweight server-side shape check for phone numbers. The real
-// validation runs on the client (PhoneField uses libphonenumber-js/min).
-// We don't pull that metadata bundle into the server graph because it
-// blows up Turbopack dev compile times on /book (~20s longer cold
-// compile). Server-side we only need to catch obvious garbage and
-// empty-string submissions — bad but parseable numbers get normalised
-// to null by the client before posting.
-function looksLikeE164(phone: string): boolean {
-  // E.164: + followed by 8-15 digits. The client already guarantees this
-  // shape; this is defence-in-depth against direct form-post abuse.
-  return /^\+[1-9]\d{7,14}$/.test(phone);
-}
+import { looksLikeE164 } from "@/lib/phone";
 import { sendEmail } from "@/lib/mail";
 import {
   buildClaimAndVerifyBookingEmail,
