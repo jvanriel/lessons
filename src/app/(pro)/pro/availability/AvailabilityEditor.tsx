@@ -131,6 +131,125 @@ function getWeekNumber(d: Date): number {
   return Math.ceil(((date.getTime() - yearStart.getTime()) / 86400000 + 1) / 7);
 }
 
+// ─── Landscape gate ──────────────────────────────────
+
+/**
+ * The availability grid is 7 columns × many time-rows — a vertical
+ * layout. On a phone turned sideways the rows get squashed (too little
+ * vertical space) and the buttons around the grid stop fitting. Rather
+ * than fight the layout, we ask the user to rotate back to portrait.
+ * Hidden on tablets and up.
+ */
+function LandscapeRotateHint({ locale }: { locale: Locale }) {
+  return (
+    <div className="fixed inset-0 z-40 hidden flex-col items-center justify-center bg-cream/95 px-8 text-center landscape:max-md:flex">
+      <div className="mx-auto mb-6 flex h-16 w-16 items-center justify-center rounded-full border border-green-200 bg-white">
+        <svg
+          className="h-8 w-8 text-green-700"
+          fill="none"
+          viewBox="0 0 24 24"
+          stroke="currentColor"
+          strokeWidth={1.5}
+        >
+          <path
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            d="M7.5 21L3 16.5m0 0L7.5 12M3 16.5h18M16.5 3L21 7.5m0 0L16.5 12M21 7.5H3"
+          />
+        </svg>
+      </div>
+      <h2 className="font-display text-xl font-semibold text-green-900">
+        {t("proAvail.rotatePortrait.title", locale)}
+      </h2>
+      <p className="mt-2 max-w-sm text-sm text-green-700">
+        {t("proAvail.rotatePortrait.body", locale)}
+      </p>
+    </div>
+  );
+}
+
+// ─── Touch paint helpers ─────────────────────────────
+
+const LONG_PRESS_MS = 350;
+const LONG_PRESS_MOVE_TOLERANCE = 10;
+
+/**
+ * Gates a cell paint operation for touch: on mouse/pen, `fire` runs
+ * immediately (and `startDrag` is also invoked). On touch, `fire` only
+ * runs if the finger stays put for ~350ms — a short tap does nothing,
+ * leaving the page free to scroll. Once long-press fires, `startDrag`
+ * gets called so the caller can attach window-level pointermove
+ * listeners to hit-test adjacent cells and paint them.
+ */
+function beginCellPointer(
+  e: React.PointerEvent,
+  fire: () => void,
+  startDrag: () => void,
+) {
+  if (e.pointerType !== "touch") {
+    e.preventDefault();
+    fire();
+    startDrag();
+    return;
+  }
+  // Touch: wait for a long-press before doing anything. Meanwhile the
+  // browser is free to scroll if the user slides their finger.
+  const startX = e.clientX;
+  const startY = e.clientY;
+  let done = false;
+  const cleanup = () => {
+    done = true;
+    window.removeEventListener("pointermove", onMove, true);
+    window.removeEventListener("pointerup", onEnd, true);
+    window.removeEventListener("pointercancel", onEnd, true);
+  };
+  const onMove = (ev: PointerEvent) => {
+    if (done) return;
+    if (
+      Math.abs(ev.clientX - startX) > LONG_PRESS_MOVE_TOLERANCE ||
+      Math.abs(ev.clientY - startY) > LONG_PRESS_MOVE_TOLERANCE
+    ) {
+      clearTimeout(timer);
+      cleanup();
+    }
+  };
+  const onEnd = () => {
+    clearTimeout(timer);
+    cleanup();
+  };
+  const timer = window.setTimeout(() => {
+    if (done) return;
+    fire();
+    startDrag();
+    if ("vibrate" in navigator) {
+      try {
+        navigator.vibrate(15);
+      } catch {
+        /* user-agent gesture rules — ignore */
+      }
+    }
+    cleanup();
+  }, LONG_PRESS_MS);
+  window.addEventListener("pointermove", onMove, true);
+  window.addEventListener("pointerup", onEnd, true);
+  window.addEventListener("pointercancel", onEnd, true);
+}
+
+/**
+ * Given a clientX/Y, find the [data-cell] element under the cursor and
+ * return its {day, row}. Null if the hit-point isn't on a cell.
+ */
+function hitTestCell(clientX: number, clientY: number): { day: number; row: number } | null {
+  const el = document.elementFromPoint(clientX, clientY);
+  const cell = el?.closest("[data-cell]") as HTMLElement | null;
+  if (!cell) return null;
+  const attr = cell.getAttribute("data-cell");
+  if (!attr) return null;
+  const parts = attr.split("-").map(Number);
+  if (parts.length !== 2 || parts.some((n) => Number.isNaN(n))) return null;
+  return { day: parts[0], row: parts[1] };
+}
+
 // ─── Main Component ──────────────────────────────────
 
 interface Props {
@@ -188,6 +307,7 @@ export default function AvailabilityEditor({
 
   return (
     <div className="mt-8 space-y-8">
+      <LandscapeRotateHint locale={locale} />
       {/* Section 1: Unified weekly template */}
       <WeeklyTemplateGrid
         locations={locations}
@@ -320,6 +440,31 @@ function WeeklyTemplateGrid({
     anchorRef.current = { day, row, adding };
   }
 
+  // Drag painting — after a mouse-down or long-press-on-touch starts,
+  // attach window listeners so moving across adjacent cells paints them
+  // with the anchor's value.
+  function startTemplateDrag() {
+    const lastKeyRef = { current: "" };
+    const move = (ev: PointerEvent) => {
+      const a = anchorRef.current;
+      if (!a) return;
+      const hit = hitTestCell(ev.clientX, ev.clientY);
+      if (!hit) return;
+      const key = `${hit.day}-${hit.row}`;
+      if (key === lastKeyRef.current) return;
+      lastKeyRef.current = key;
+      updateCell(hit.day, hit.row, a.adding);
+    };
+    const up = () => {
+      window.removeEventListener("pointermove", move, true);
+      window.removeEventListener("pointerup", up, true);
+      window.removeEventListener("pointercancel", up, true);
+    };
+    window.addEventListener("pointermove", move, true);
+    window.addEventListener("pointerup", up, true);
+    window.addEventListener("pointercancel", up, true);
+  }
+
   return (
     <div className="rounded-xl border border-green-200 bg-white p-6">
       <div className="flex items-center justify-between">
@@ -435,10 +580,13 @@ function WeeklyTemplateGrid({
                   <div
                     key={`${day}-${row}`}
                     data-cell={`${day}-${row}`}
-                    onPointerDown={(e) => {
-                      e.preventDefault();
-                      handlePointerDown(day, row, e);
-                    }}
+                    onPointerDown={(e) =>
+                      beginCellPointer(
+                        e,
+                        () => handlePointerDown(day, row, e),
+                        () => startTemplateDrag(),
+                      )
+                    }
                     onContextMenu={(e) => e.preventDefault()}
                     className={cellClass}
                     style={cellStyle}
@@ -755,6 +903,29 @@ function PreviewBlockingGrid({
     const adding = !currentState(dayIdx, row);
     paintCell(dayIdx, row, adding);
     anchorRef2.current = { day: dayIdx, row, adding };
+  }
+
+  function startOverrideDrag() {
+    const lastKeyRef = { current: "" };
+    const move = (ev: PointerEvent) => {
+      const a = anchorRef2.current;
+      if (!a) return;
+      const hit = hitTestCell(ev.clientX, ev.clientY);
+      if (!hit) return;
+      if (days[hit.day]?.isPast || fullDayBlocked[hit.day]) return;
+      const key = `${hit.day}-${hit.row}`;
+      if (key === lastKeyRef.current) return;
+      lastKeyRef.current = key;
+      paintCell(hit.day, hit.row, a.adding);
+    };
+    const up = () => {
+      window.removeEventListener("pointermove", move, true);
+      window.removeEventListener("pointerup", up, true);
+      window.removeEventListener("pointercancel", up, true);
+    };
+    window.addEventListener("pointermove", move, true);
+    window.addEventListener("pointerup", up, true);
+    window.addEventListener("pointercancel", up, true);
   }
 
   function toggleFullDay(dayIdx: number) {
@@ -1157,10 +1328,13 @@ function PreviewBlockingGrid({
                   <div
                     key={`${dayIdx}-${row}`}
                     data-cell={`${dayIdx}-${row}`}
-                    onPointerDown={(e) => {
-                      e.preventDefault();
-                      handlePointerDown(dayIdx, row, e);
-                    }}
+                    onPointerDown={(e) =>
+                      beginCellPointer(
+                        e,
+                        () => handlePointerDown(dayIdx, row, e),
+                        () => startOverrideDrag(),
+                      )
+                    }
                     onContextMenu={(e) => e.preventDefault()}
                     onDoubleClick={(e) => handleDoubleClick(dayIdx, row, e)}
                     className={cellClass}
