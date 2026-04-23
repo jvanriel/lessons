@@ -111,28 +111,13 @@ export async function POST(request: NextRequest) {
     issue.permalink ?? `https://sentry.io/organizations/`;
   const shortId = issue.shortId ?? issue.id ?? "";
 
-  // 1. Fire into the internal notification system
-  //    Targets all dev users → DB row + WebSocket + Web Push (for subscribers)
-  await createNotification({
-    type: "sentry_issue",
-    priority,
-    targetRoles: ["dev"],
-    title: `Sentry: ${title}`.slice(0, 250),
-    message: culprit
-      ? `${shortId} · ${culprit}`
-      : `${shortId} · new ${level}`,
-    actionUrl: "/dev/sentry",
-    actionLabel: "View issue",
-    metadata: {
-      sentryIssueId: issue.id,
-      shortId,
-      level,
-      permalink,
-    },
-  });
-
-  // 2. Fire directly to ntfy for guaranteed phone push (bypasses the
-  //    "skip ntfy for push-subscribed users" logic in createNotification)
+  // 1. Fire directly to ntfy FIRST, before any DB work.
+  //    ntfy is the one alert channel that has to survive a full DB
+  //    outage — the DB being unreachable is exactly the kind of
+  //    incident we need to be paged about, and if we do DB writes
+  //    first any throw here swallows the alert. (Previously we had
+  //    createNotification → ntfy in that order and missed a page
+  //    during the Neon 402 outage on 2026-04-23.)
   if (NTFY_URL && NTFY_AUTH) {
     fetch(`${NTFY_URL}/${NTFY_TOPIC}`, {
       method: "POST",
@@ -147,19 +132,46 @@ export async function POST(request: NextRequest) {
     }).catch((err) => console.error("ntfy for sentry webhook failed:", err));
   }
 
-  // 3. Record in the events table
-  await logEvent({
-    type: "sentry.issue.created",
-    level: level === "fatal" || level === "error" ? "error" : "warn",
-    payload: {
-      sentryIssueId: issue.id,
-      shortId,
-      title,
-      culprit,
-      level,
-      permalink,
-    },
-  });
+  // 2. In-app notification + event log. Each wrapped in a try/catch
+  //    so a DB outage can't take the ntfy flow down with it.
+  try {
+    await createNotification({
+      type: "sentry_issue",
+      priority,
+      targetRoles: ["dev"],
+      title: `Sentry: ${title}`.slice(0, 250),
+      message: culprit
+        ? `${shortId} · ${culprit}`
+        : `${shortId} · new ${level}`,
+      actionUrl: "/dev/sentry",
+      actionLabel: "View issue",
+      metadata: {
+        sentryIssueId: issue.id,
+        shortId,
+        level,
+        permalink,
+      },
+    });
+  } catch (err) {
+    console.error("createNotification for sentry webhook failed:", err);
+  }
+
+  try {
+    await logEvent({
+      type: "sentry.issue.created",
+      level: level === "fatal" || level === "error" ? "error" : "warn",
+      payload: {
+        sentryIssueId: issue.id,
+        shortId,
+        title,
+        culprit,
+        level,
+        permalink,
+      },
+    });
+  } catch (err) {
+    console.error("logEvent for sentry webhook failed:", err);
+  }
 
   return NextResponse.json({ ok: true });
 }
