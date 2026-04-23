@@ -5,6 +5,7 @@ import { users, lessonBookings } from "@/lib/db/schema";
 import { and, eq, isNotNull, sql, desc } from "drizzle-orm";
 import BillingClient from "./BillingClient";
 import { getLocale } from "@/lib/locale";
+import { getStripe } from "@/lib/stripe";
 
 export const metadata = { title: "Billing — Golf Lessons" };
 
@@ -60,6 +61,40 @@ export default async function BillingPage() {
         .limit(10)
     : [];
 
+  // Last 12 Stripe invoices (subscription + cash-commission items). Failures
+  // here are soft — empty list just hides the table.
+  let invoices: Array<{
+    id: string;
+    number: string | null;
+    created: number;
+    totalCents: number;
+    currency: string;
+    status: string | null;
+    hostedUrl: string | null;
+    pdfUrl: string | null;
+  }> = [];
+  if (user?.stripeCustomerId) {
+    try {
+      const stripe = getStripe();
+      const res = await stripe.invoices.list({
+        customer: user.stripeCustomerId,
+        limit: 12,
+      });
+      invoices = res.data.map((inv) => ({
+        id: inv.id ?? "",
+        number: inv.number ?? null,
+        created: inv.created,
+        totalCents: inv.total,
+        currency: inv.currency,
+        status: inv.status ?? null,
+        hostedUrl: inv.hosted_invoice_url ?? null,
+        pdfUrl: inv.invoice_pdf ?? null,
+      }));
+    } catch (err) {
+      console.error("[billing] invoices.list failed:", err);
+    }
+  }
+
   return (
     <BillingClient
       subscriptionStatus={profile.subscriptionStatus ?? "none"}
@@ -85,6 +120,7 @@ export default async function BillingPage() {
       pendingCommissionCents={pendingAgg?.total ?? 0}
       pendingCommissionCount={pendingAgg?.count ?? 0}
       pendingCommissionBookings={pendingBookings}
+      invoices={invoices}
       locale={locale}
     />
   );

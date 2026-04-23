@@ -19,6 +19,18 @@ interface PendingCommissionBooking {
   platformFeeCents: number | null;
 }
 
+interface StripeInvoice {
+  id: string;
+  number: string | null;
+  /** Unix seconds (Stripe native). */
+  created: number;
+  totalCents: number;
+  currency: string;
+  status: string | null;
+  hostedUrl: string | null;
+  pdfUrl: string | null;
+}
+
 interface BillingProps {
   subscriptionStatus: string;
   subscriptionPlan: string | null;
@@ -39,6 +51,7 @@ interface BillingProps {
   pendingCommissionCents: number;
   pendingCommissionCount: number;
   pendingCommissionBookings: PendingCommissionBooking[];
+  invoices: StripeInvoice[];
   locale: Locale;
 }
 
@@ -393,7 +406,9 @@ function InvoicingForm({
           disabled={saving}
           className="bg-gold-600 text-white hover:bg-gold-500"
         >
-          {saving ? t("proBilling.form.saving", locale) : t("proBilling.form.save", locale)}
+          {saving
+            ? t("proBilling.form.saving", locale)
+            : t("proBilling.invoicingSave", locale)}
         </Button>
       </div>
     </form>
@@ -422,6 +437,7 @@ export default function BillingClient({
   pendingCommissionCents,
   pendingCommissionCount,
   pendingCommissionBookings,
+  invoices,
   locale,
 }: BillingProps) {
   const [portalLoading, setPortalLoading] = useState(false);
@@ -828,24 +844,108 @@ export default function BillingClient({
       {/* Invoices */}
       {hasStripeCustomer && isActive && (
         <div className="mt-6 rounded-xl border border-green-200 bg-white p-6 shadow-sm">
-          <div className="flex items-start justify-between">
-            <div>
-              <h2 className="text-lg font-semibold text-green-900">
-                {t("proBilling.invoices", locale)}
-              </h2>
-              <p className="mt-1 text-sm text-green-600">
-                {t("proBilling.invoicesDesc", locale)}
-              </p>
+          <h2 className="text-lg font-semibold text-green-900">
+            {t("proBilling.invoices", locale)}
+          </h2>
+          <p className="mt-1 text-sm text-green-600">
+            {t("proBilling.invoicesDesc", locale)}
+          </p>
+
+          {invoices.length === 0 ? (
+            <p className="mt-4 text-sm text-green-500">
+              {t("proBilling.invoicesEmpty", locale)}
+            </p>
+          ) : (
+            <div className="mt-4 overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="border-b border-green-100 text-left text-xs uppercase tracking-wider text-green-500">
+                    <th className="py-2 pr-3 font-medium">
+                      {t("proBilling.invoice.number", locale)}
+                    </th>
+                    <th className="py-2 pr-3 font-medium">
+                      {t("proBilling.invoice.date", locale)}
+                    </th>
+                    <th className="py-2 pr-3 font-medium">
+                      {t("proBilling.invoice.amount", locale)}
+                    </th>
+                    <th className="py-2 pr-3 font-medium">
+                      {t("proBilling.invoice.status", locale)}
+                    </th>
+                    <th className="py-2 font-medium text-right">
+                      {t("proBilling.invoice.download", locale)}
+                    </th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-green-50">
+                  {invoices.map((inv) => {
+                    const label = t(
+                      `proBilling.invoice.status.${inv.status ?? "unknown"}`,
+                      locale,
+                    );
+                    const statusLabel = label.startsWith("proBilling.")
+                      ? inv.status ?? "—"
+                      : label;
+                    return (
+                      <tr key={inv.id}>
+                        <td className="py-2 pr-3 font-mono text-xs text-green-700">
+                          {inv.number ?? inv.id.slice(0, 10)}
+                        </td>
+                        <td className="py-2 pr-3 text-green-700">
+                          {formatBillingDate(
+                            new Date(inv.created * 1000).toISOString(),
+                            locale,
+                          )}
+                        </td>
+                        <td className="py-2 pr-3 text-green-900">
+                          {formatPrice(inv.totalCents / 100, locale)}
+                        </td>
+                        <td className="py-2 pr-3 text-green-600">
+                          {statusLabel}
+                        </td>
+                        <td className="py-2 text-right">
+                          {inv.pdfUrl ? (
+                            <a
+                              href={inv.pdfUrl}
+                              target="_blank"
+                              rel="noreferrer"
+                              className="inline-flex items-center gap-1 text-sm font-medium text-gold-600 hover:text-gold-500"
+                            >
+                              PDF
+                              <svg
+                                className="h-3 w-3"
+                                fill="none"
+                                viewBox="0 0 24 24"
+                                stroke="currentColor"
+                                strokeWidth={2}
+                              >
+                                <path
+                                  strokeLinecap="round"
+                                  strokeLinejoin="round"
+                                  d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5m-13.5-9L12 3m0 0l4.5 4.5M12 3v13.5"
+                                />
+                              </svg>
+                            </a>
+                          ) : inv.hostedUrl ? (
+                            <a
+                              href={inv.hostedUrl}
+                              target="_blank"
+                              rel="noreferrer"
+                              className="text-sm font-medium text-gold-600 hover:text-gold-500"
+                            >
+                              {t("proBilling.invoice.view", locale)}
+                            </a>
+                          ) : (
+                            <span className="text-green-400">—</span>
+                          )}
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
             </div>
-            <Button
-              variant="outline"
-              onClick={openPortal}
-              disabled={portalLoading}
-              className="border-green-200 text-green-700 hover:bg-green-50"
-            >
-              {t("proBilling.viewInvoices", locale)}
-            </Button>
-          </div>
+          )}
         </div>
       )}
 
@@ -858,10 +958,10 @@ export default function BillingClient({
           {t("proBilling.contactBody", locale)}
         </p>
         <a
-          href="mailto:info@golflessons.be"
+          href="mailto:contact@golflessons.be"
           className="mt-3 inline-flex items-center gap-1.5 text-sm font-medium text-gold-600 hover:text-gold-500"
         >
-          {t("proBilling.contactCta", locale)} · info@golflessons.be
+          {t("proBilling.contactCta", locale)} · contact@golflessons.be
         </a>
       </div>
     </div>
