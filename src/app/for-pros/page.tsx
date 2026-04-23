@@ -105,7 +105,9 @@ export default async function ForProsPage() {
                   {t("pros.pricing.perMonth", locale)}
                 </span>
               </div>
-              <p className="mt-4 text-sm text-green-500">&nbsp;</p>
+              <p className="mt-4 text-sm text-green-600">
+                {t("pros.pricing.include5", locale)}
+              </p>
             </div>
 
             {/* Annual — highlighted */}
@@ -139,7 +141,7 @@ export default async function ForProsPage() {
               {t("pros.pricing.includesTitle", locale)}
             </p>
             <ul className="mt-4 grid gap-2 sm:grid-cols-2">
-              {[1, 2, 3, 4, 5].map((n) => (
+              {[1, 2, 3, 4].map((n) => (
                 <li
                   key={n}
                   className="flex items-start gap-2 text-sm text-green-700"
@@ -169,7 +171,6 @@ export default async function ForProsPage() {
       <section className="border-t border-green-100 bg-cream py-20">
         <div className="mx-auto max-w-3xl px-6 text-center">
           <CmsBlock page={PAGE} block="cta.title" content={cms["cta.title"]} fallback={t("pros.cta.title", locale)} as="h2" className="font-display text-3xl font-semibold text-green-900" />
-          <CmsBlock page={PAGE} block="cta.desc" content={cms["cta.desc"]} fallback={t("pros.cta.desc", locale)} as="p" className="mt-4 text-green-700" />
           <Link href="/pro/register" className="mt-8 inline-block rounded-md bg-gold-600 px-8 py-3 text-sm font-medium text-white transition-colors hover:bg-gold-500">
             <CmsBlock page={PAGE} block="cta.button" content={cms["cta.button"]} fallback={t("pros.cta.button", locale)} />
           </Link>
