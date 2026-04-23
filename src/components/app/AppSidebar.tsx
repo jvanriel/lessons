@@ -35,6 +35,12 @@ interface NavSection {
    * localStorage and this flag no longer matters for them.
    */
   defaultClosed?: boolean;
+  /**
+   * Hide this section for anyone who already has the given role. Used to
+   * keep "My Lessons" out of a pro's drawer — pros use a separate account
+   * for the student-side of the product.
+   */
+  hideIfRole?: string;
 }
 
 function Icon({ d }: { d: string }) {
@@ -128,9 +134,9 @@ const sections: NavSection[] = [
   },
   {
     label: "My Lessons",
-    labelKey: "appNav.section.myLessonsAsStudent",
+    labelKey: "appNav.section.myLessons",
     role: "member",
-    defaultClosed: true,
+    hideIfRole: "pro",
     items: [
       {
         href: "/member/dashboard",
@@ -263,7 +269,11 @@ export default function AppSidebar({
   locale,
 }: AppSidebarProps) {
   const pathname = usePathname();
-  const visibleSections = sections.filter((s) => roles.includes(s.role));
+  const visibleSections = sections.filter((s) => {
+    if (!roles.includes(s.role)) return false;
+    if (s.hideIfRole && roles.includes(s.hideIfRole)) return false;
+    return true;
+  });
 
   // Track which sections are collapsed (by label), persisted to localStorage.
   // First visit seeds from each section's `defaultClosed` flag.
