@@ -59,7 +59,7 @@ export default async function Home() {
         <div className="mx-auto max-w-3xl px-6 text-center">
           <CmsBlock page={PAGE} block="proCta.title" content={cms["proCta.title"]} fallback={t("home.proCta.title", locale)} as="h2" className="font-display text-3xl font-semibold text-green-900" />
           <CmsBlock page={PAGE} block="proCta.desc" content={cms["proCta.desc"]} fallback={t("home.proCta.desc", locale)} as="p" className="mt-4 text-green-700" />
-          <Link href="/contact" className="mt-8 inline-block rounded-md bg-gold-600 px-6 py-3 text-sm font-medium text-white transition-colors hover:bg-gold-500">
+          <Link href="/for-pros" className="mt-8 inline-block rounded-md bg-gold-600 px-6 py-3 text-sm font-medium text-white transition-colors hover:bg-gold-500">
             <CmsBlock page={PAGE} block="proCta.cta" content={cms["proCta.cta"]} fallback={t("home.proCta.cta", locale)} />
           </Link>
         </div>
