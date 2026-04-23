@@ -34,8 +34,16 @@ export async function middleware(request: NextRequest) {
     }
   }
 
-  // ─── Public bypass: pro self-service signup is under /pro/ but unauthenticated
-  if (pathname === "/pro/register" || pathname.startsWith("/pro/register/")) {
+  // ─── Public bypass: pro self-service signup is under /pro/ but
+  //     unauthenticated. /pro/register redirects into /pro/onboarding
+  //     which is the new single-flow wizard (step 0 = signup); both
+  //     need to be reachable without a session.
+  if (
+    pathname === "/pro/register" ||
+    pathname.startsWith("/pro/register/") ||
+    pathname === "/pro/onboarding" ||
+    pathname.startsWith("/pro/onboarding/")
+  ) {
     return NextResponse.next();
   }
 
