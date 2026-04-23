@@ -10,7 +10,6 @@ import { eq, asc } from "drizzle-orm";
 import { todayInTZ } from "@/lib/local-date";
 import { requireProProfile } from "@/lib/pro";
 import { redirect } from "next/navigation";
-import Link from "next/link";
 import { BookingsView } from "./BookingsView";
 import { BookingRefreshListener } from "@/components/BookingRefreshListener";
 import { getLocale } from "@/lib/locale";
@@ -82,14 +81,7 @@ export default async function ProBookingsPage() {
         helpSlug="pro.bookings"
         locale={locale}
         className="mb-8"
-      >
-        <Link
-          href="/pro/availability"
-          className="rounded-md border border-green-200 bg-white px-4 py-2 text-sm font-medium text-green-800 transition-colors hover:border-green-300"
-        >
-          {t("proBookingsPage.manageAvailability", locale)}
-        </Link>
-      </PageHeading>
+      />
 
       {/* Bookings view (calendar or list) */}
       <section className="mb-10">
