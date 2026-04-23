@@ -4,6 +4,26 @@ import { useEffect } from "react";
 import * as Sentry from "@sentry/nextjs";
 
 /**
+ * Best-guess classification of the underlying failure. We don't show
+ * the raw exception to users — just pick a user-friendly message that
+ * matches the class of incident. Currently only handles "backend is
+ * over quota / billing paused"; everything else stays the generic
+ * "something went wrong".
+ */
+function classify(error: Error & { digest?: string }): "quota" | "generic" {
+  const msg = `${error.message ?? ""}`.toLowerCase();
+  if (
+    msg.includes("exceeded the compute time quota") ||
+    msg.includes("quota exceeded") ||
+    msg.includes("http status 402") ||
+    msg.includes("payment required")
+  ) {
+    return "quota";
+  }
+  return "generic";
+}
+
+/**
  * Catches errors that happen in the root layout itself (before error.tsx can
  * render, since error.tsx is inside the layout). Renders its own <html><body>
  * without the app's normal layout, so we keep the styles minimal and inline.
@@ -16,6 +36,16 @@ export default function GlobalError({
   useEffect(() => {
     Sentry.captureException(error);
   }, [error]);
+
+  const kind = classify(error);
+  const heading =
+    kind === "quota"
+      ? "Golf Lessons is paused for maintenance"
+      : "Golf Lessons is temporarily unavailable";
+  const body =
+    kind === "quota"
+      ? "We're hitting a service limit on our backend. The team has been paged and is on it — please try again in a few minutes."
+      : "Something went wrong loading the app. The error has been reported. Please try again in a moment.";
 
   return (
     <html lang="en">
@@ -82,11 +112,10 @@ export default function GlobalError({
               color: "#091a12",
             }}
           >
-            Golf Lessons is temporarily unavailable
+            {heading}
           </h1>
           <p style={{ margin: 0, fontSize: "0.875rem", color: "#365b45" }}>
-            Something went wrong loading the app. The error has been reported.
-            Please try again in a moment.
+            {body}
           </p>
 
           {error.digest && (

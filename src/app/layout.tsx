@@ -74,22 +74,33 @@ export default async function RootLayout({
   if (session) {
     // Must fetch before deciding isAppMode — we need to know whether a
     // member has completed onboarding.
-    const [user] = await db
-      .select({
-        firstName: users.firstName,
-        onboardingCompletedAt: users.onboardingCompletedAt,
-      })
-      .from(users)
-      .where(eq(users.id, session.userId))
-      .limit(1);
+    //
+    // Wrapped in try/catch so a DB outage (Neon 402, network blip)
+    // doesn't nuke every route including public marketing pages that
+    // don't actually need the DB. On failure we fall through to
+    // "public website" chrome — the user loses the authenticated
+    // shell but the homepage / /for-students / /contact still load.
+    try {
+      const [user] = await db
+        .select({
+          firstName: users.firstName,
+          onboardingCompletedAt: users.onboardingCompletedAt,
+        })
+        .from(users)
+        .where(eq(users.id, session.userId))
+        .limit(1);
 
-    const isPrivileged =
-      session.roles.includes("pro") ||
-      session.roles.includes("admin") ||
-      session.roles.includes("dev");
-    const memberOnboarded =
-      session.roles.includes("member") && !!user?.onboardingCompletedAt;
-    isAppMode = isPrivileged || memberOnboarded;
+      const isPrivileged =
+        session.roles.includes("pro") ||
+        session.roles.includes("admin") ||
+        session.roles.includes("dev");
+      const memberOnboarded =
+        session.roles.includes("member") && !!user?.onboardingCompletedAt;
+      isAppMode = isPrivileged || memberOnboarded;
+    } catch (err) {
+      console.error("[layout] session user lookup failed:", err);
+      isAppMode = false;
+    }
   }
 
   if (isAppMode && session) {
@@ -103,23 +114,40 @@ export default async function RootLayout({
     }
 
     let firstName: string | null = null;
-    const [user] = await db
-      .select({ firstName: users.firstName })
-      .from(users)
-      .where(eq(users.id, session.userId))
-      .limit(1);
-    firstName = user?.firstName ?? null;
+    try {
+      const [user] = await db
+        .select({ firstName: users.firstName })
+        .from(users)
+        .where(eq(users.id, session.userId))
+        .limit(1);
+      firstName = user?.firstName ?? null;
+    } catch (err) {
+      console.error("[layout] firstName lookup failed:", err);
+    }
 
-    // Impersonation state
-    const impersonator = await getImpersonatorSession();
+    // Impersonation state — optional, never block the layout on it.
+    let impersonator: Awaited<ReturnType<typeof getImpersonatorSession>> = null;
+    try {
+      impersonator = await getImpersonatorSession();
+    } catch (err) {
+      console.error("[layout] getImpersonatorSession failed:", err);
+    }
+
     let impersonatorName: string | null = null;
     if (impersonator) {
-      const [imp] = await db
-        .select({ firstName: users.firstName, lastName: users.lastName })
-        .from(users)
-        .where(eq(users.id, impersonator.userId))
-        .limit(1);
-      impersonatorName = [imp?.firstName, imp?.lastName].filter(Boolean).join(" ") || impersonator.email;
+      try {
+        const [imp] = await db
+          .select({ firstName: users.firstName, lastName: users.lastName })
+          .from(users)
+          .where(eq(users.id, impersonator.userId))
+          .limit(1);
+        impersonatorName =
+          [imp?.firstName, imp?.lastName].filter(Boolean).join(" ") ||
+          impersonator.email;
+      } catch (err) {
+        console.error("[layout] impersonator name lookup failed:", err);
+        impersonatorName = impersonator.email;
+      }
     }
 
     let canImpersonate = false;
