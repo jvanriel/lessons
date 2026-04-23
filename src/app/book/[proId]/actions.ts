@@ -23,7 +23,7 @@ import {
 } from "@/lib/lesson-slots";
 import crypto from "node:crypto";
 import { SignJWT } from "jose";
-import { looksLikeE164 } from "@/lib/phone";
+import { looksLikeE164, normalizePhone } from "@/lib/phone";
 import { sendEmail } from "@/lib/mail";
 import {
   buildClaimAndVerifyBookingEmail,
@@ -392,7 +392,7 @@ export async function createPublicBooking(formData: FormData) {
   const email = ((formData.get("email") as string) || "")
     .trim()
     .toLowerCase();
-  const phone = ((formData.get("phone") as string) || "").trim();
+  const phone = normalizePhone((formData.get("phone") as string) || "");
   const honeypot = (formData.get("website") as string) || "";
 
   // Honeypot — legitimate browsers leave this hidden field empty.
