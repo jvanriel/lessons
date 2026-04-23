@@ -298,12 +298,14 @@ manual         → Cash-only booking, never charged on-platform (Flow 4)
 
 ## Quick reference: money flow by scenario
 
+`platformFeeCents` = `PLATFORM_FEE_PERCENT` (2.5%, cash and online) + `STRIPE_SURCHARGE_PERCENT` (1.5%, online only — covers Stripe processing fees). Online pros effectively pay 4%; cash-only pros pay 2.5%.
+
 | Scenario | Student pays | Pro receives | Platform takes |
 |---|---|---|---|
-| Online booking, lesson happens | `priceCents` via Stripe | `priceCents − platformFeeCents` via SEPA batch | `platformFeeCents` immediately |
+| Online booking, lesson happens | `priceCents` via Stripe | `priceCents − platformFeeCents` via SEPA batch | `platformFeeCents` (4%) immediately |
 | Online booking, cancel inside window | Refunded in full | Nothing | Nothing (commission refunded too) |
 | Online booking, cancel outside window | Nothing refunded | Full payout via SEPA | Full commission |
-| Cash-only booking, lesson happens | Cash to pro | Student cash, off-platform | `platformFeeCents` via invoice item on next sub invoice |
+| Cash-only booking, lesson happens | Cash to pro | Student cash, off-platform | `platformFeeCents` (2.5%) via invoice item on next sub invoice |
 | Cash-only booking, cancel inside window | N/A (no Stripe charge) | N/A | Invoice item deleted — commission waived |
 | Pro subscription | — | — | Full subscription fee every cycle (after 14-day trial) |
 

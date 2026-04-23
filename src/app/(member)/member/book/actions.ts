@@ -438,7 +438,9 @@ export async function createBooking(formData: FormData) {
   // cash-only bookings we bill it separately to the pro via an invoice
   // item further down.
   const platformFeeCents =
-    priceCents !== null ? calculatePlatformFee(priceCents) : null;
+    priceCents !== null
+      ? calculatePlatformFee(priceCents, { online: !cashOnly })
+      : null;
 
   // NOTE: would ideally be wrapped in db.transaction() for atomicity, but
   // the @neondatabase/serverless HTTP driver does not support multi-statement

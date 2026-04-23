@@ -330,7 +330,7 @@ async function bookCashOnly(opts: {
   const startTime = `1${(createdBookingIds.length % 4)}:00`;
   const endTime = `1${(createdBookingIds.length % 4) + Math.ceil(opts.durationMin / 60)}:00`;
 
-  const platformFeeCents = calculatePlatformFee(opts.priceCents);
+  const platformFeeCents = calculatePlatformFee(opts.priceCents, { online: false });
 
   const [booking] = await db
     .insert(lessonBookings)
@@ -700,13 +700,13 @@ describe("Phase 5: Cash-only commission via invoice item", () => {
       .limit(1);
     expect(row.paymentStatus).toBe("manual");
     expect(row.stripeInvoiceItemId).toBe(cashInvoiceItemId);
-    expect(row.platformFeeCents).toBe(calculatePlatformFee(6500));
+    expect(row.platformFeeCents).toBe(calculatePlatformFee(6500, { online: false }));
   });
 
   it("Stripe invoice item is attached to the pro's customer", async () => {
     const item = await stripe.invoiceItems.retrieve(cashInvoiceItemId);
     expect(item.customer).toBe(PRO_STRIPE_CUSTOMER_ID);
-    expect(item.amount).toBe(calculatePlatformFee(6500));
+    expect(item.amount).toBe(calculatePlatformFee(6500, { online: false }));
     expect(item.currency).toBe("eur");
     expect(item.metadata?.type).toBe("cash_commission");
     expect(item.metadata?.bookingId).toBe(String(cashBookingId));
@@ -769,16 +769,25 @@ describe("Phase 6: Cash-only cancel reverses invoice item", () => {
 // ═══════════════════════════════════════════════════════
 
 describe("Phase 7: calculatePlatformFee", () => {
-  it("rounds to nearest cent", () => {
-    // At 2.5%: 6500 * 0.025 = 162.5 → 163
-    expect(calculatePlatformFee(6500)).toBe(163);
-    // 3500 * 0.025 = 87.5 → 88
-    expect(calculatePlatformFee(3500)).toBe(88);
-    // 100 * 0.025 = 2.5 → 3 (banker's? Math.round rounds half up)
-    expect(calculatePlatformFee(100)).toBe(3);
+  it("rounds to nearest cent — online (2.5% + 1.5% = 4.0%)", () => {
+    // Defaults to online (student paid via Stripe).
+    // 6500 * 0.04 = 260
+    expect(calculatePlatformFee(6500)).toBe(260);
+    // 3500 * 0.04 = 140
+    expect(calculatePlatformFee(3500)).toBe(140);
+    // 100 * 0.04 = 4
+    expect(calculatePlatformFee(100)).toBe(4);
+  });
+
+  it("cash-only drops the Stripe surcharge (2.5%)", () => {
+    expect(calculatePlatformFee(6500, { online: false })).toBe(163);
+    expect(calculatePlatformFee(3500, { online: false })).toBe(88);
+    // 100 * 0.025 = 2.5 → 3 (Math.round rounds half up)
+    expect(calculatePlatformFee(100, { online: false })).toBe(3);
   });
 
   it("handles zero", () => {
     expect(calculatePlatformFee(0)).toBe(0);
+    expect(calculatePlatformFee(0, { online: false })).toBe(0);
   });
 });

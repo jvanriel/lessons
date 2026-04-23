@@ -10,6 +10,7 @@ import {
   ANNUAL_SAVINGS_EUROS,
   formatPrice,
 } from "@/lib/pricing";
+import { PLATFORM_FEE_PERCENT, STRIPE_SURCHARGE_PERCENT } from "@/lib/stripe";
 
 export const metadata = {
   title: "For Pros — Golf Lessons",
@@ -88,7 +89,12 @@ export default async function ForProsPage() {
             {t("pros.pricing.title", locale)}
           </h2>
           <p className="mx-auto mt-4 max-w-2xl text-center text-green-600">
-            {t("pros.pricing.subtitle", locale)}
+            {t("pros.pricing.subtitle", locale)
+              .replace("{rate}", String(PLATFORM_FEE_PERCENT))
+              .replace(
+                "{online}",
+                String(PLATFORM_FEE_PERCENT + STRIPE_SURCHARGE_PERCENT),
+              )}
           </p>
 
           <div className="mt-12 grid gap-6 sm:grid-cols-2">

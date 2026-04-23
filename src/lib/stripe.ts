@@ -35,20 +35,35 @@ export function requireStripePrice(plan: "monthly" | "annual"): string {
   return val;
 }
 
-/**
- * Platform commission percentage, sourced from NEXT_PUBLIC_PLATFORM_FEE_PERCENT
- * so marketing/billing can change the fee without a code deploy. Defaults to
- * 2.5%. Values outside [0, 100] fall back to the default.
- */
-function readCommissionPercent(): number {
-  const raw = process.env.NEXT_PUBLIC_PLATFORM_FEE_PERCENT;
-  if (!raw) return 2.5;
+function readPercentEnv(name: string, fallback: number): number {
+  const raw = process.env[name];
+  if (!raw) return fallback;
   const n = Number(raw);
-  if (!Number.isFinite(n) || n < 0 || n > 100) return 2.5;
+  if (!Number.isFinite(n) || n < 0 || n > 100) return fallback;
   return n;
 }
 
-export const PLATFORM_FEE_PERCENT = readCommissionPercent();
+/**
+ * Platform commission percentage (applies to every priced booking —
+ * online or cash-only). Sourced from NEXT_PUBLIC_PLATFORM_FEE_PERCENT so
+ * marketing/billing can change the fee without a code deploy.
+ */
+export const PLATFORM_FEE_PERCENT = readPercentEnv(
+  "NEXT_PUBLIC_PLATFORM_FEE_PERCENT",
+  2.5,
+);
+
+/**
+ * Surcharge applied on top of the platform commission when the student
+ * pays online (Stripe charge). Covers Stripe processing fees — Bancontact
+ * / card / SEPA all land in the platform account and Stripe deducts its
+ * fee before settlement. Cash-only pros don't pay this surcharge because
+ * there's no Stripe charge. Sourced from NEXT_PUBLIC_STRIPE_SURCHARGE_PERCENT.
+ */
+export const STRIPE_SURCHARGE_PERCENT = readPercentEnv(
+  "NEXT_PUBLIC_STRIPE_SURCHARGE_PERCENT",
+  1.5,
+);
 
 // Minimum lesson price in cents (€50)
 export const MIN_LESSON_PRICE_CENTS = 5000;
@@ -57,8 +72,22 @@ export const MIN_LESSON_PRICE_CENTS = 5000;
 export const TRIAL_PERIOD_DAYS = 14;
 
 /**
- * Calculate platform application fee in cents for a lesson payment.
+ * Total platform cut in cents for a priced booking. Stored on
+ * `lesson_bookings.platform_fee_cents` and deducted from the pro's SEPA
+ * payout (online) or billed via subscription invoice item (cash-only).
+ *
+ * @param priceCents  Lesson price in cents
+ * @param options.online  True when the student paid via Stripe (adds
+ *                        `STRIPE_SURCHARGE_PERCENT`). Defaults to true;
+ *                        pass `false` for cash-only bookings.
  */
-export function calculatePlatformFee(priceCents: number): number {
-  return Math.round(priceCents * (PLATFORM_FEE_PERCENT / 100));
+export function calculatePlatformFee(
+  priceCents: number,
+  options: { online?: boolean } = {},
+): number {
+  const online = options.online ?? true;
+  const rate = online
+    ? PLATFORM_FEE_PERCENT + STRIPE_SURCHARGE_PERCENT
+    : PLATFORM_FEE_PERCENT;
+  return Math.round(priceCents * (rate / 100));
 }
