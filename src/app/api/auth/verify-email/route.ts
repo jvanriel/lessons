@@ -12,14 +12,14 @@ function getSecret() {
 
 /**
  * GET /api/auth/verify-email?token=...
- * Verifies the email and redirects to profile.
+ * Verifies the email and redirects to the account page.
  */
 export async function GET(request: NextRequest) {
   const token = request.nextUrl.searchParams.get("token");
 
   if (!token) {
     return NextResponse.redirect(
-      new URL("/member/profile?verified=error", request.url)
+      new URL("/account?verified=error", request.url)
     );
   }
 
@@ -36,11 +36,11 @@ export async function GET(request: NextRequest) {
       .where(eq(users.id, payload.userId as number));
 
     return NextResponse.redirect(
-      new URL("/member/profile?verified=success", request.url)
+      new URL("/account?verified=success", request.url)
     );
   } catch {
     return NextResponse.redirect(
-      new URL("/member/profile?verified=error", request.url)
+      new URL("/account?verified=error", request.url)
     );
   }
 }

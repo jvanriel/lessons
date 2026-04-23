@@ -19,7 +19,7 @@ interface AppLayoutProps {
   firstName: string | null;
   showNotifications: boolean;
   sessionToken?: string;
-  locale: string;
+  locale: Locale;
   impersonating: boolean;
   impersonatorName: string | null;
   canImpersonate: boolean;

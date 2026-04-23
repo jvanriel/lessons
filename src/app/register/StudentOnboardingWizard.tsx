@@ -920,7 +920,7 @@ export default function StudentOnboardingWizard({
       return;
     }
     // Authenticated: mark onboarding complete so middleware doesn't redirect
-    // them back to the wizard. They can fill in details later from /member/profile.
+    // them back to the wizard. They can fill in details later from /account or /member/settings.
     const result = await saveStep("complete", { generatedPassword: null });
     if (!result) {
       // saveStep already set an error; bail so the user sees it instead of

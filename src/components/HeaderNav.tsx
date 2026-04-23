@@ -23,7 +23,7 @@ interface Labels {
   login: string;
   logout: string;
   register: string;
-  profile: string;
+  account: string;
   menuOpen: string;
   menuClose: string;
   impersonateAs: string;
@@ -381,11 +381,11 @@ export default function HeaderNav({
               {userMenuOpen && (
                 <div className="absolute right-0 top-full z-20 mt-3 w-52 rounded-lg border border-green-700 bg-green-900 py-1 shadow-lg">
                   <Link
-                    href="/member/profile"
+                    href="/account"
                     onClick={() => setUserMenuOpen(false)}
                     className="block px-4 py-2 text-sm normal-case tracking-normal text-green-100/70 hover:bg-green-800 hover:text-gold-200"
                   >
-                    {labels.profile}
+                    {labels.account}
                   </Link>
                   {devLinks.length > 0 && (
                     <>
@@ -572,11 +572,11 @@ export default function HeaderNav({
               <>
                 <li>
                   <Link
-                    href="/member/profile"
+                    href="/account"
                     onClick={() => setOpen(false)}
                     className="block py-1 transition-colors duration-200 hover:text-gold-200"
                   >
-                    {labels.profile}
+                    {labels.account}
                   </Link>
                 </li>
                 {canImpersonate && (

@@ -46,7 +46,7 @@ export async function updateProfile(
     .set({ firstName, lastName, email, phone })
     .where(eq(users.id, session.userId));
 
-  revalidatePath("/member/profile");
+  revalidatePath("/account");
   return { success: true };
 }
 
@@ -61,7 +61,7 @@ export async function updateEmailPreference(
     .set({ emailOptOut })
     .where(eq(users.id, session.userId));
 
-  revalidatePath("/member/profile");
+  revalidatePath("/account");
   return { success: true };
 }
 
@@ -76,43 +76,7 @@ export async function updateLocalePreference(
     .set({ preferredLocale: locale })
     .where(eq(users.id, session.userId));
 
-  revalidatePath("/member/profile");
-  return { success: true };
-}
-
-export async function updateGolfProfile(data: {
-  handicap: string | null;
-  golfGoals: string[];
-  golfGoalsOther: string | null;
-}): Promise<{ error?: string; success?: boolean }> {
-  const session = await getSession();
-  if (!session) return { error: "Not logged in." };
-
-  let parsedHandicap: string | null = null;
-  if (data.handicap) {
-    const h = parseFloat(data.handicap);
-    if (isNaN(h) || h < 0 || h > 54) {
-      return { error: "Handicap must be between 0 and 54." };
-    }
-    parsedHandicap = String(h);
-  }
-
-  const validGoals = [
-    "driving", "short_game", "putting", "course_management",
-    "learn_basics", "fitness", "other",
-  ];
-  const filtered = (data.golfGoals || []).filter((g) => validGoals.includes(g));
-
-  await db
-    .update(users)
-    .set({
-      handicap: parsedHandicap,
-      golfGoals: filtered.length > 0 ? filtered : null,
-      golfGoalsOther: data.golfGoalsOther?.trim() || null,
-    })
-    .where(eq(users.id, session.userId));
-
-  revalidatePath("/member/profile");
+  revalidatePath("/account");
   return { success: true };
 }
 
@@ -160,7 +124,7 @@ export async function changePassword(
     .set({ password: hashed })
     .where(eq(users.id, session.userId));
 
-  revalidatePath("/member/profile");
+  revalidatePath("/account");
   return { success: true };
 }
 
@@ -180,7 +144,6 @@ export async function sendVerificationEmail(): Promise<{
   if (!user) return { error: "User not found." };
   if (user.emailVerifiedAt) return { error: "Email is already verified." };
 
-  // Create a 24-hour verification token
   const token = await new SignJWT({
     userId: session.userId,
     email: user.email,

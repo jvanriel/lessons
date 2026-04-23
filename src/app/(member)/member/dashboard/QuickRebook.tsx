@@ -210,7 +210,7 @@ export function QuickBook({ data, proId, hasPaymentMethod = true, allowBookingWi
           {t("memberQB.blockedBody", locale)}
         </p>
         <a
-          href="/member/profile"
+          href="/member/settings"
           className="mt-2 inline-block text-xs font-medium text-gold-600 hover:text-gold-500"
         >
           {t("memberQB.addPayment", locale)}

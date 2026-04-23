@@ -163,7 +163,7 @@ export default async function Header() {
             login: t("auth.login", locale),
             logout: t("auth.logout", locale),
             register: t("auth.register", locale),
-            profile: t("auth.profile", locale),
+            account: t("auth.account", locale),
             menuOpen: t("menu.open", locale),
             menuClose: t("menu.close", locale),
             impersonateAs: t("impersonate.as", locale),

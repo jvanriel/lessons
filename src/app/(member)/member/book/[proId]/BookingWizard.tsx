@@ -101,7 +101,7 @@ export function BookingWizard({
   const [error, setError] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
 
-  // sessionStorage draft so a detour to /member/profile (to add a payment
+  // sessionStorage draft so a detour to /member/settings (to add a payment
   // method) doesn't throw away the student's in-progress selections.
   // Keyed by pro id so switching pro doesn't cross-leak state.
   const draftKey = `booking-draft:pro:${pro.id}`;
@@ -496,7 +496,7 @@ export function BookingWizard({
             <div className="mt-4 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
               {t("book.paymentRequired", locale)}{" "}
               <a
-                href={`/member/profile?returnTo=${encodeURIComponent(
+                href={`/member/settings?returnTo=${encodeURIComponent(
                   `/member/book/${pro.id}`
                 )}`}
                 className="font-medium underline hover:text-red-900"
@@ -509,7 +509,7 @@ export function BookingWizard({
             <div className="mt-4 rounded-lg border border-gold-200 bg-gold-50 px-4 py-3 text-sm text-gold-800">
               {t("book.paymentOptional", locale)}{" "}
               <a
-                href={`/member/profile?returnTo=${encodeURIComponent(
+                href={`/member/settings?returnTo=${encodeURIComponent(
                   `/member/book/${pro.id}`
                 )}`}
                 className="font-medium underline hover:text-gold-900"

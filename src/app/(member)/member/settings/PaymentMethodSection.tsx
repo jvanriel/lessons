@@ -43,8 +43,8 @@ function PaymentForm({
     setError(null);
 
     const stripeReturnUrl = returnTo
-      ? `${window.location.origin}/member/profile?returnTo=${encodeURIComponent(returnTo)}`
-      : `${window.location.origin}/member/profile`;
+      ? `${window.location.origin}/member/settings?returnTo=${encodeURIComponent(returnTo)}`
+      : `${window.location.origin}/member/settings`;
     const result = await stripe.confirmSetup({
       elements,
       confirmParams: {

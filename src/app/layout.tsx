@@ -11,6 +11,7 @@ import { db } from "@/lib/db";
 import { users } from "@/lib/db/schema";
 import { eq, ne } from "drizzle-orm";
 import { getLocale } from "@/lib/locale";
+import type { Locale } from "@/lib/i18n";
 import AppLayout from "@/components/app/AppLayout";
 import InstallBanner from "@/components/app/InstallBanner";
 import Script from "next/script";
@@ -63,7 +64,7 @@ export default async function RootLayout({
         firstName: string | null;
         showNotifications: boolean;
         sessionToken?: string;
-        locale: string;
+        locale: Locale;
         impersonating: boolean;
         impersonatorName: string | null;
         canImpersonate: boolean;
