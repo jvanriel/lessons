@@ -1,5 +1,8 @@
 docs/
-scripts/
+# `scripts/*` (not `scripts/`) lets us re-include a single file below.
+# gitignore-style rules refuse to re-include a file whose parent dir
+# was excluded.
+scripts/*
 # db-migrate runs as the first step of `pnpm build` — must ship to Vercel.
 !scripts/db-migrate.ts
 src/lib/__tests__/
