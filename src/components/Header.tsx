@@ -36,8 +36,8 @@ export default async function Header() {
           { href: "/pro/locations", label: "Locations" },
           { href: "/pro/availability", label: "Availability" },
           { href: "/pro/bookings", label: "Bookings" },
-          { href: "/pro/pages", label: "Pages" },
-          { href: "/pro/mailings", label: "Mailings" },
+          // Pages + Mailings parked pre-launch — see docs/pro-pages.md,
+          // docs/pro-mailings.md. Routes still compile.
         ]
       : [];
 
