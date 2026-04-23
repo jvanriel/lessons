@@ -9,6 +9,7 @@ import { useRouter } from "next/navigation";
 import type { Locale } from "@/lib/i18n";
 import { t } from "@/lib/i18n/translations";
 import { formatDate } from "@/lib/format-date";
+import PhoneField, { isValidPhoneNumber } from "@/components/PhoneField";
 import {
   MONTHLY_PRICE,
   ANNUAL_PRICE,
@@ -19,6 +20,7 @@ import {
 } from "@/lib/pricing";
 
 const STEP_KEYS = [
+  "proOnb.step.personal",
   "proOnb.step.profile",
   "proOnb.step.locations",
   "proOnb.step.lessons",
@@ -27,12 +29,16 @@ const STEP_KEYS = [
   "proOnb.step.subscription",
 ] as const;
 const STEP_COUNT = STEP_KEYS.length;
-const STEP_SUBSCRIPTION = 5;
+const STEP_SUBSCRIPTION = 6;
 
 const inputClass =
   "mt-1 w-full rounded-md border border-green-200 bg-white px-3 py-2 text-sm text-green-900 placeholder:text-green-400 focus:border-green-400 focus:outline-none focus:ring-1 focus:ring-green-400";
 
 interface InitialData {
+  firstName: string;
+  lastName: string;
+  email: string;
+  phone: string;
   displayName: string;
   bio: string;
   specialties: string;
@@ -82,6 +88,135 @@ function ProgressBar({ current, total }: { current: number; total: number }) {
           )}
         </div>
       ))}
+    </div>
+  );
+}
+
+// ─── Step 0: Personal (account) ─────────────────────────
+
+function PersonalStep({
+  data,
+  password,
+  confirmPassword,
+  onChange,
+  onPassword,
+  onConfirmPassword,
+  hasAccount,
+  locale,
+}: {
+  data: InitialData;
+  password: string;
+  confirmPassword: string;
+  onChange: (d: Partial<InitialData>) => void;
+  onPassword: (v: string) => void;
+  onConfirmPassword: (v: string) => void;
+  /** True when a session already exists — password becomes optional. */
+  hasAccount: boolean;
+  locale: Locale;
+}) {
+  return (
+    <div className="space-y-4">
+      <p className="text-sm text-green-600">
+        {hasAccount
+          ? t("proOnb.personal.editIntro", locale)
+          : t("proOnb.personal.createIntro", locale)}
+      </p>
+
+      <div className="grid gap-3 sm:grid-cols-2">
+        <div>
+          <label className="block text-sm font-medium text-green-800">
+            {t("proOnb.personal.firstName", locale)} <span className="text-red-500">*</span>
+          </label>
+          <input
+            type="text"
+            value={data.firstName}
+            onChange={(e) => onChange({ firstName: e.target.value })}
+            className={inputClass}
+            required
+          />
+        </div>
+        <div>
+          <label className="block text-sm font-medium text-green-800">
+            {t("proOnb.personal.lastName", locale)} <span className="text-red-500">*</span>
+          </label>
+          <input
+            type="text"
+            value={data.lastName}
+            onChange={(e) => onChange({ lastName: e.target.value })}
+            className={inputClass}
+            required
+          />
+        </div>
+      </div>
+
+      <div>
+        <label className="block text-sm font-medium text-green-800">
+          {t("proOnb.personal.email", locale)} <span className="text-red-500">*</span>
+        </label>
+        <input
+          type="email"
+          value={data.email}
+          onChange={(e) => onChange({ email: e.target.value })}
+          className={inputClass}
+          autoComplete="email"
+          required
+        />
+      </div>
+
+      <div>
+        <label className="block text-sm font-medium text-green-800">
+          {t("onboarding.phone", locale)} <span className="text-red-500">*</span>
+        </label>
+        <div className="mt-1">
+          <PhoneField
+            value={data.phone}
+            onChange={(v) => onChange({ phone: v })}
+            placeholder="+32 4XX XX XX XX"
+            showError
+            errorLabel={t("publicBook.err.invalidPhone", locale)}
+            name="phone"
+          />
+        </div>
+      </div>
+
+      <div className="grid gap-3 sm:grid-cols-2">
+        <div>
+          <label className="block text-sm font-medium text-green-800">
+            {t("proOnb.personal.password", locale)}
+            {!hasAccount && <span className="text-red-500"> *</span>}
+          </label>
+          <input
+            type="password"
+            value={password}
+            onChange={(e) => onPassword(e.target.value)}
+            className={inputClass}
+            autoComplete={hasAccount ? "new-password" : "new-password"}
+            minLength={8}
+            required={!hasAccount}
+            placeholder={hasAccount ? t("proOnb.personal.passwordKeep", locale) : undefined}
+          />
+        </div>
+        <div>
+          <label className="block text-sm font-medium text-green-800">
+            {t("proOnb.personal.confirmPassword", locale)}
+            {!hasAccount && <span className="text-red-500"> *</span>}
+          </label>
+          <input
+            type="password"
+            value={confirmPassword}
+            onChange={(e) => onConfirmPassword(e.target.value)}
+            className={inputClass}
+            autoComplete="new-password"
+            minLength={8}
+            required={!hasAccount}
+          />
+        </div>
+      </div>
+      {hasAccount && (
+        <p className="text-xs text-green-500">
+          {t("proOnb.personal.passwordHint", locale)}
+        </p>
+      )}
     </div>
   );
 }
@@ -878,10 +1013,14 @@ function SubscriptionStep({ onSuccess, locale }: { onSuccess: () => void; locale
 export default function OnboardingWizard({
   initialStep,
   initialData,
+  hasAccount: initialHasAccount,
   locale,
 }: {
   initialStep: number;
   initialData: InitialData;
+  /** True when a pro session already exists on mount. Flips to true
+   *  after a successful create in step 0. */
+  hasAccount: boolean;
   locale: Locale;
 }) {
   const router = useRouter();
@@ -890,6 +1029,9 @@ export default function OnboardingWizard({
   const [locations, setLocations] = useState<Location[]>([
     { name: "", address: "", city: "" },
   ]);
+  const [password, setPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
+  const [hasAccount, setHasAccount] = useState(initialHasAccount);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -921,17 +1063,87 @@ export default function OnboardingWizard({
     let success = false;
 
     switch (step) {
-      case 0: // Profile
+      case 0: {
+        // Personal (create on first visit, update on re-visit)
+        if (!data.firstName.trim() || !data.lastName.trim() || !data.email.trim()) {
+          setError(t("authErr.allFieldsRequired", locale));
+          return;
+        }
+        if (!data.phone || !isValidPhoneNumber(data.phone)) {
+          setError(t("publicBook.err.invalidPhone", locale));
+          return;
+        }
+        if (!hasAccount) {
+          if (password.length < 8) {
+            setError(t("authErr.passwordTooShort", locale));
+            return;
+          }
+          if (password !== confirmPassword) {
+            setError(t("authErr.passwordsDontMatch", locale));
+            return;
+          }
+        } else if (password || confirmPassword) {
+          if (password.length < 8) {
+            setError(t("authErr.passwordTooShort", locale));
+            return;
+          }
+          if (password !== confirmPassword) {
+            setError(t("authErr.passwordsDontMatch", locale));
+            return;
+          }
+        }
+        setSaving(true);
+        setError(null);
+        const res = await fetch("/api/pro/personal", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            firstName: data.firstName,
+            lastName: data.lastName,
+            email: data.email,
+            phone: data.phone,
+            password: password || undefined,
+            confirmPassword: confirmPassword || undefined,
+            preferredLocale: locale,
+          }),
+        });
+        const result = await res.json();
+        setSaving(false);
+        if (!res.ok) {
+          const errMap: Record<string, string> = {
+            "missing-fields": t("authErr.allFieldsRequired", locale),
+            "invalid-phone": t("publicBook.err.invalidPhone", locale),
+            "password-required": t("authErr.allFieldsRequired", locale),
+            "password-too-short": t("authErr.passwordTooShort", locale),
+            "passwords-dont-match": t("authErr.passwordsDontMatch", locale),
+            "email-taken": t("authErr.emailExists", locale),
+            "rate-limited": t("authErr.tooManyAttempts", locale).replace(
+              "{n}",
+              String(result.retryAfter ?? 60),
+            ),
+          };
+          setError(errMap[result.error] || t("proOnb.genericSaveError", locale));
+          return;
+        }
+        if (result.mode === "create") {
+          setHasAccount(true);
+        }
+        setPassword("");
+        setConfirmPassword("");
+        success = true;
+        break;
+      }
+      case 1: // Profile
         success = await saveStep("profile", {
           displayName: data.displayName,
           bio: data.bio,
           specialties: data.specialties,
         });
         break;
-      case 1: // Locations
+      case 2: // Locations
         success = await saveStep("locations", { locations });
         break;
-      case 2: {
+      case 3: {
         // Validate: at least one selected duration must have a price > 0
         const anyPricedDuration = data.lessonDurations.some(
           (d) => (data.lessonPricing[String(d)] ?? 0) > 0
@@ -956,7 +1168,7 @@ export default function OnboardingWizard({
         });
         break;
       }
-      case 3: {
+      case 4: {
         // Invoicing — client-side shape check before round-tripping
         if (
           !data.invoiceAddressLine1.trim() ||
@@ -996,7 +1208,7 @@ export default function OnboardingWizard({
         success = true;
         break;
       }
-      case 4: // Bank
+      case 5: // Bank
         success = await saveStep("bank", {
           accountHolder: data.bankAccountHolder,
           iban: data.bankIban,
@@ -1070,13 +1282,25 @@ export default function OnboardingWizard({
             </div>
           )}
 
-          {step === 0 && <ProfileStep data={data} onChange={updateData} locale={locale} />}
-          {step === 1 && (
+          {step === 0 && (
+            <PersonalStep
+              data={data}
+              password={password}
+              confirmPassword={confirmPassword}
+              onChange={updateData}
+              onPassword={setPassword}
+              onConfirmPassword={setConfirmPassword}
+              hasAccount={hasAccount}
+              locale={locale}
+            />
+          )}
+          {step === 1 && <ProfileStep data={data} onChange={updateData} locale={locale} />}
+          {step === 2 && (
             <LocationsStep locations={locations} onChange={setLocations} locale={locale} />
           )}
-          {step === 2 && <LessonsStep data={data} onChange={updateData} locale={locale} />}
-          {step === 3 && <InvoicingStep data={data} onChange={updateData} locale={locale} />}
-          {step === 4 && <BankStep data={data} onChange={updateData} locale={locale} />}
+          {step === 3 && <LessonsStep data={data} onChange={updateData} locale={locale} />}
+          {step === 4 && <InvoicingStep data={data} onChange={updateData} locale={locale} />}
+          {step === 5 && <BankStep data={data} onChange={updateData} locale={locale} />}
           {step === STEP_SUBSCRIPTION && (
             <SubscriptionStep onSuccess={() => setStep(STEP_COUNT)} locale={locale} />
           )}

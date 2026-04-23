@@ -1,16 +1,71 @@
 import { getSession, hasRole } from "@/lib/auth";
 import { redirect } from "next/navigation";
 import { db } from "@/lib/db";
-import { proProfiles, proLocations } from "@/lib/db/schema";
+import { users, proProfiles, proLocations } from "@/lib/db/schema";
 import { eq } from "drizzle-orm";
 import OnboardingWizard from "./OnboardingWizard";
 import { getLocale } from "@/lib/locale";
 
 export const metadata = { title: "Get Started — Golf Lessons" };
 
+const EMPTY_DATA = {
+  firstName: "",
+  lastName: "",
+  email: "",
+  phone: "",
+  displayName: "",
+  bio: "",
+  specialties: "",
+  lessonDurations: [60],
+  lessonPricing: {} as Record<string, number>,
+  maxGroupSize: 4,
+  cancellationHours: 24,
+  bankAccountHolder: "",
+  bankIban: "",
+  bankBic: "",
+  invoicingType: "individual" as const,
+  companyName: "",
+  vatNumber: "",
+  invoiceAddressLine1: "",
+  invoiceAddressLine2: "",
+  invoicePostcode: "",
+  invoiceCity: "",
+  invoiceCountry: "",
+};
+
 export default async function OnboardingPage() {
   const session = await getSession();
-  if (!session || !hasRole(session, "pro")) redirect("/login");
+  const locale = await getLocale();
+
+  // No session → render the wizard at step 0 ("Personal"). The pro will
+  // create their account by submitting that step. The backend endpoint
+  // sets the session cookie and the wizard flips to hasAccount=true.
+  if (!session) {
+    return (
+      <OnboardingWizard
+        initialStep={0}
+        hasAccount={false}
+        locale={locale}
+        initialData={EMPTY_DATA}
+      />
+    );
+  }
+
+  // Session exists but wrong role — not a pro and not upgrading to one.
+  if (!hasRole(session, "pro")) {
+    redirect("/login");
+  }
+
+  const [user] = await db
+    .select({
+      firstName: users.firstName,
+      lastName: users.lastName,
+      email: users.email,
+      phone: users.phone,
+    })
+    .from(users)
+    .where(eq(users.id, session.userId))
+    .limit(1);
 
   const [profile] = await db
     .select()
@@ -28,7 +83,10 @@ export default async function OnboardingPage() {
     redirect("/pro/dashboard");
   }
 
-  // Check what's already filled in to determine starting step
+  // Check what's already filled in to determine starting step.
+  // Personal is done when user.phone exists (always true once registered
+  // — phone is collected at account creation).
+  const hasPersonal = !!user?.phone;
   const hasProfile = !!profile.bio || !!profile.specialties;
 
   const existingLocations = await db
@@ -38,44 +96,42 @@ export default async function OnboardingPage() {
     .limit(1);
   const hasLocations = existingLocations.length > 0;
 
-  // A pro has finished the lessons step once at least one per-duration
-  // price is set. Previously we checked pricePerHour (a free-text
-  // indicator); that field is gone now that we store real per-duration
-  // prices as the single source of truth.
   const pricing = (profile.lessonPricing as Record<string, number>) ?? {};
   const hasLessons = Object.values(pricing).some(
     (v) => typeof v === "number" && v > 0,
   );
   const hasBank = !!profile.bankIban;
-  // Invoicing is "done" once we have at least an address on file. Company
-  // fields are optional when invoicingType='individual' (the default).
   const hasInvoicing =
     !!profile.invoiceAddressLine1 &&
     !!profile.invoicePostcode &&
     !!profile.invoiceCity &&
     !!profile.invoiceCountry;
 
-  const locale = await getLocale();
-
-  // Find the first incomplete step
+  // Step indexes: 0=Personal, 1=Profile, 2=Locations, 3=Lessons,
+  // 4=Invoicing, 5=Bank, 6=Subscription.
   let initialStep = 0;
-  if (hasProfile) initialStep = 1;
-  if (hasProfile && hasLocations) initialStep = 2;
-  if (hasProfile && hasLocations && hasLessons) initialStep = 3;
-  if (hasProfile && hasLocations && hasLessons && hasInvoicing) initialStep = 4;
-  if (hasProfile && hasLocations && hasLessons && hasInvoicing && hasBank) initialStep = 5;
+  if (hasPersonal) initialStep = 1;
+  if (hasPersonal && hasProfile) initialStep = 2;
+  if (hasPersonal && hasProfile && hasLocations) initialStep = 3;
+  if (hasPersonal && hasProfile && hasLocations && hasLessons) initialStep = 4;
+  if (hasPersonal && hasProfile && hasLocations && hasLessons && hasInvoicing) initialStep = 5;
+  if (hasPersonal && hasProfile && hasLocations && hasLessons && hasInvoicing && hasBank) initialStep = 6;
 
   return (
     <OnboardingWizard
       initialStep={initialStep}
+      hasAccount
       locale={locale}
       initialData={{
+        firstName: user?.firstName ?? "",
+        lastName: user?.lastName ?? "",
+        email: user?.email ?? "",
+        phone: user?.phone ?? "",
         displayName: profile.displayName,
         bio: profile.bio ?? "",
         specialties: profile.specialties ?? "",
         lessonDurations: (profile.lessonDurations as number[]) ?? [60],
-        // lessonPricing is stored in cents on the DB; convert to decimal
-        // EUR for the form so the pro can type e.g. "60,50".
+        // Stored in cents; expose as decimal EUR to the editor.
         lessonPricing: Object.fromEntries(
           Object.entries(
             (profile.lessonPricing as Record<string, number>) ?? {}
