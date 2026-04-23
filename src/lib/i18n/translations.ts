@@ -18,6 +18,7 @@ const translations: Record<Locale, Record<string, string>> = {
     "appNav.profile": "Profile",
     "appNav.account": "Account",
     "appNav.settings": "Settings",
+    "appNav.more": "More",
 
     // Per-page help dialog
     "pageHelp.open": "Help for this page",
@@ -1384,6 +1385,7 @@ const translations: Record<Locale, Record<string, string>> = {
     "appNav.profile": "Profiel",
     "appNav.account": "Account",
     "appNav.settings": "Instellingen",
+    "appNav.more": "Meer",
     "pageHelp.open": "Hulp voor deze pagina",
     "pageHelp.close": "Sluiten",
     "pageHelp.placeholder": "Voor deze pagina is nog geen hulptekst geschreven. Laat het weten als iets onduidelijk is.",
@@ -2689,6 +2691,7 @@ const translations: Record<Locale, Record<string, string>> = {
     "appNav.profile": "Profil",
     "appNav.account": "Compte",
     "appNav.settings": "Paramètres",
+    "appNav.more": "Plus",
     "pageHelp.open": "Aide pour cette page",
     "pageHelp.close": "Fermer",
     "pageHelp.placeholder": "Le texte d'aide pour cette page n'a pas encore été rédigé. Faites-nous signe si quelque chose n'est pas clair.",

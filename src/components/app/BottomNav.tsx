@@ -1,5 +1,6 @@
 "use client";
 
+import { useState, useEffect } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import type { Locale } from "@/lib/i18n";
@@ -39,6 +40,10 @@ const memberTabs: TabItem[] = [
   },
 ];
 
+const moreIcon =
+  "M3.75 6.75h16.5M3.75 12h16.5m-16.5 5.25h16.5";
+
+// Three primary pro tabs — rest of the pro surface lives behind "More".
 const proTabs: TabItem[] = [
   {
     href: "/pro/dashboard",
@@ -55,34 +60,105 @@ const proTabs: TabItem[] = [
     labelKey: "appNav.bookings",
     icon: "M9 12h3.75M9 15h3.75M9 18h3.75m3 .75H18a2.25 2.25 0 0 0 2.25-2.25V6.108c0-1.135-.845-2.098-1.976-2.192a48.424 48.424 0 0 0-1.123-.08m-5.801 0c-.065.21-.1.433-.1.664 0 .414.336.75.75.75h4.5a.75.75 0 0 0 .75-.75 2.25 2.25 0 0 0-.1-.664m-5.8 0A2.251 2.251 0 0 1 13.5 2.25H15a2.25 2.25 0 0 1 2.15 1.586m-5.8 0c-.376.023-.75.05-1.124.08C9.095 4.01 8.25 4.973 8.25 6.108V8.25m0 0H4.875c-.621 0-1.125.504-1.125 1.125v11.25c0 .621.504 1.125 1.125 1.125h9.75c.621 0 1.125-.504 1.125-1.125V9.375c0-.621-.504-1.125-1.125-1.125H8.25Z",
   },
+];
+
+// Items surfaced in the "More" sheet for pros (icons mirror the sidebar).
+const proMoreItems: TabItem[] = [
   {
     href: "/pro/profile",
     labelKey: "appNav.profile",
+    icon: "M15.75 6a3.75 3.75 0 1 1-7.5 0 3.75 3.75 0 0 1 7.5 0ZM4.501 20.118a7.5 7.5 0 0 1 14.998 0A17.933 17.933 0 0 1 12 21.75c-2.676 0-5.216-.584-7.499-1.632Z",
+  },
+  {
+    href: "/pro/availability",
+    labelKey: "appNav.availability",
+    icon: "M12 6v6h4.5m4.5 0a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z",
+  },
+  {
+    href: "/pro/locations",
+    labelKey: "appNav.locations",
+    icon: "M15 10.5a3 3 0 1 1-6 0 3 3 0 0 1 6 0Z M19.5 10.5c0 7.142-7.5 11.25-7.5 11.25S4.5 17.642 4.5 10.5a7.5 7.5 0 1 1 15 0Z",
+  },
+  {
+    href: "/pro/billing",
+    labelKey: "appNav.billing",
+    icon: "M2.25 8.25h19.5M2.25 9h19.5m-16.5 5.25h6m-6 2.25h3m-3.75 3h15a2.25 2.25 0 0 0 2.25-2.25V6.75A2.25 2.25 0 0 0 19.5 4.5h-15a2.25 2.25 0 0 0-2.25 2.25v10.5A2.25 2.25 0 0 0 4.5 19.5Z",
+  },
+  {
+    href: "/pro/earnings",
+    labelKey: "appNav.earnings",
+    icon: "M12 6v12m-3-2.818.879.659c1.171.879 3.07.879 4.242 0 1.172-.879 1.172-2.303 0-3.182C13.536 12.219 12.768 12 12 12c-.725 0-1.45-.22-2.003-.659-1.106-.879-1.106-2.303 0-3.182s2.9-.879 4.006 0l.415.33M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z",
+  },
+  {
+    href: "/account",
+    labelKey: "appNav.account",
     icon: "M15.75 6a3.75 3.75 0 1 1-7.5 0 3.75 3.75 0 0 1 7.5 0ZM4.501 20.118a7.5 7.5 0 0 1 14.998 0A17.933 17.933 0 0 1 12 21.75c-2.676 0-5.216-.584-7.499-1.632Z",
   },
 ];
 
 export default function BottomNav({ roles, locale }: BottomNavProps) {
   const pathname = usePathname();
+  const [moreOpen, setMoreOpen] = useState(false);
 
   const isPro = roles.includes("pro");
-
-  // A pro who also wants to take lessons from another pro does so via a
-  // separate student account — we no longer surface their own student
-  // side through navigation. See docs/my-lessons-as-student.md.
   const tabs: TabItem[] = isPro ? proTabs : memberTabs;
 
+  // Close the sheet whenever the route changes (e.g. after tapping a
+  // link inside it).
+  useEffect(() => {
+    setMoreOpen(false);
+  }, [pathname]);
+
+  useEffect(() => {
+    if (!moreOpen) return;
+    function onKey(e: KeyboardEvent) {
+      if (e.key === "Escape") setMoreOpen(false);
+    }
+    document.addEventListener("keydown", onKey);
+    return () => document.removeEventListener("keydown", onKey);
+  }, [moreOpen]);
+
+  const moreActive =
+    isPro && proMoreItems.some((item) => pathname.startsWith(item.href));
+
   return (
-    <nav className="fixed bottom-0 left-0 right-0 z-30 flex h-14 items-center justify-around border-t border-green-200 bg-white md:hidden">
-      {tabs.map((tab) => {
-        const active =
-          pathname === tab.href || pathname.startsWith(tab.href + "/");
-        return (
-          <Link
-            key={tab.href}
-            href={tab.href}
+    <>
+      <nav className="fixed bottom-0 left-0 right-0 z-30 flex h-14 items-center justify-around border-t border-green-200 bg-white md:hidden">
+        {tabs.map((tab) => {
+          const active =
+            pathname === tab.href || pathname.startsWith(tab.href + "/");
+          return (
+            <Link
+              key={tab.href}
+              href={tab.href}
+              className={`flex flex-col items-center gap-0.5 px-2 py-1 text-[10px] font-medium transition-colors ${
+                active ? "text-gold-600" : "text-green-600/50"
+              }`}
+            >
+              <svg
+                className="h-5 w-5"
+                fill="none"
+                viewBox="0 0 24 24"
+                stroke="currentColor"
+                strokeWidth={1.5}
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  d={tab.icon}
+                />
+              </svg>
+              {t(tab.labelKey, locale)}
+            </Link>
+          );
+        })}
+        {isPro && (
+          <button
+            type="button"
+            onClick={() => setMoreOpen(true)}
+            aria-label={t("appNav.more", locale)}
             className={`flex flex-col items-center gap-0.5 px-2 py-1 text-[10px] font-medium transition-colors ${
-              active ? "text-gold-600" : "text-green-600/50"
+              moreActive || moreOpen ? "text-gold-600" : "text-green-600/50"
             }`}
           >
             <svg
@@ -92,16 +168,58 @@ export default function BottomNav({ roles, locale }: BottomNavProps) {
               stroke="currentColor"
               strokeWidth={1.5}
             >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                d={tab.icon}
-              />
+              <path strokeLinecap="round" strokeLinejoin="round" d={moreIcon} />
             </svg>
-            {t(tab.labelKey, locale)}
-          </Link>
-        );
-      })}
-    </nav>
+            {t("appNav.more", locale)}
+          </button>
+        )}
+      </nav>
+
+      {moreOpen && (
+        <div
+          className="fixed inset-0 z-40 bg-black/40 md:hidden"
+          onClick={() => setMoreOpen(false)}
+        >
+          <div
+            className="absolute inset-x-0 bottom-0 rounded-t-2xl border-t border-green-200 bg-white pb-[calc(env(safe-area-inset-bottom,0)+0.5rem)] pt-3 shadow-2xl"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="mx-auto mb-3 h-1 w-10 rounded-full bg-green-200" />
+            <div className="grid grid-cols-3 gap-2 px-4">
+              {proMoreItems.map((item) => {
+                const active =
+                  pathname === item.href || pathname.startsWith(item.href + "/");
+                return (
+                  <Link
+                    key={item.href}
+                    href={item.href}
+                    className={`flex flex-col items-center justify-center gap-1 rounded-lg border px-2 py-3 text-xs font-medium transition-colors ${
+                      active
+                        ? "border-gold-300 bg-gold-50 text-gold-700"
+                        : "border-green-100 bg-white text-green-700 hover:border-green-200"
+                    }`}
+                  >
+                    <svg
+                      className="h-6 w-6"
+                      fill="none"
+                      viewBox="0 0 24 24"
+                      stroke="currentColor"
+                      strokeWidth={1.5}
+                    >
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        d={item.icon}
+                      />
+                    </svg>
+                    {t(item.labelKey, locale)}
+                  </Link>
+                );
+              })}
+            </div>
+          </div>
+        </div>
+      )}
+    </>
   );
 }
