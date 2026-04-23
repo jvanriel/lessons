@@ -16,12 +16,38 @@ import { drizzle } from "drizzle-orm/neon-http";
 import { migrate } from "drizzle-orm/neon-http/migrator";
 import { neon } from "@neondatabase/serverless";
 
-async function main() {
-  const url =
+/**
+ * Pick the same URL the app will read at runtime. See src/lib/db/index.ts —
+ * preview builds MUST migrate the preview DB, not production.
+ */
+function pickUrl(): string | null {
+  const env = process.env.VERCEL_ENV;
+  if (env === "production") {
+    return process.env.POSTGRES_URL_NON_POOLING || process.env.POSTGRES_URL || null;
+  }
+  if (env === "preview") {
+    return (
+      process.env.POSTGRES_URL_PREVIEW_NON_POOLING ||
+      process.env.POSTGRES_URL_PREVIEW ||
+      null
+    );
+  }
+  // Local / dev — match db/index.ts fallback order.
+  return (
+    process.env.POSTGRES_URL_PREVIEW_NON_POOLING ||
+    process.env.POSTGRES_URL_PREVIEW ||
     process.env.POSTGRES_URL_NON_POOLING ||
-    process.env.POSTGRES_URL;
+    process.env.POSTGRES_URL ||
+    null
+  );
+}
+
+async function main() {
+  const url = pickUrl();
   if (!url) {
-    console.log("[db-migrate] POSTGRES_URL not set — skipping migrations.");
+    console.log(
+      `[db-migrate] No POSTGRES_URL for VERCEL_ENV=${process.env.VERCEL_ENV ?? "<local>"} — skipping.`,
+    );
     return;
   }
 
