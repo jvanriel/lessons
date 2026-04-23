@@ -28,14 +28,22 @@ const GRID_START_HOUR = 7;
 const GRID_END_HOUR = 22;
 const ROWS = (GRID_END_HOUR - GRID_START_HOUR) * 2; // 30 half-hour rows
 const CELL_H_DESKTOP = 22;
-const CELL_H_MOBILE = 44;
+const CELL_H_TOUCH = 52;
 
+/**
+ * Pick the row height based on the primary pointer. Touch devices get
+ * tall cells so fingers can tap individual half-hour slots — including
+ * phones in landscape orientation (where viewport width is wide but
+ * the user is still tapping with a thumb). Mouse users stay compact
+ * so a whole week fits on screen.
+ */
 function useCellHeight() {
   const [cellH, setCellH] = useState(CELL_H_DESKTOP);
   useEffect(() => {
-    const mq = window.matchMedia("(max-width: 639px)");
-    setCellH(mq.matches ? CELL_H_MOBILE : CELL_H_DESKTOP);
-    function handler(e: MediaQueryListEvent) { setCellH(e.matches ? CELL_H_MOBILE : CELL_H_DESKTOP); }
+    const mq = window.matchMedia("(pointer: coarse)");
+    const apply = (m: boolean) => setCellH(m ? CELL_H_TOUCH : CELL_H_DESKTOP);
+    apply(mq.matches);
+    function handler(e: MediaQueryListEvent) { apply(e.matches); }
     mq.addEventListener("change", handler);
     return () => mq.removeEventListener("change", handler);
   }, []);
@@ -131,39 +139,99 @@ function getWeekNumber(d: Date): number {
   return Math.ceil(((date.getTime() - yearStart.getTime()) / 86400000 + 1) / 7);
 }
 
-// ─── Landscape gate ──────────────────────────────────
+// ─── Landscape prompt ────────────────────────────────
 
 /**
- * The availability grid is 7 day-columns wide and needs space — on a
- * phone held portrait the columns get too narrow to tap reliably and
- * the surrounding controls overflow. On tablets and up there's always
- * enough room so the hint is hidden. Shown only when portrait AND
- * below the md breakpoint.
+ * Dialog shown on mobile portrait suggesting the pro rotate to
+ * landscape for a better grid-editing experience. "Switch" attempts
+ * screen.orientation.lock — works in installed PWAs on Chrome Android
+ * and is a no-op on browsers that don't allow it (iOS Safari). Cancel
+ * dismisses for the rest of the session. The dialog auto-hides once
+ * the user rotates to landscape (media query flips).
  */
-function LandscapeRotateHint({ locale }: { locale: Locale }) {
+function LandscapeRotatePrompt({ locale }: { locale: Locale }) {
+  const [dismissed, setDismissed] = useState(false);
+  const [switchError, setSwitchError] = useState<string | null>(null);
+
+  async function handleSwitch() {
+    setSwitchError(null);
+    // Screen Orientation API: needs a declarative or fullscreen context
+    // on most browsers. Best-effort — falls back to the "rotate
+    // manually" wording if the browser rejects the call.
+    const orientation = (screen as unknown as {
+      orientation?: {
+        lock?: (o: string) => Promise<void>;
+      };
+    }).orientation;
+    if (!orientation?.lock) {
+      setSwitchError(t("proAvail.rotateLandscape.unsupported", locale));
+      return;
+    }
+    try {
+      // Request fullscreen first so the lock is accepted in more browsers.
+      if (!document.fullscreenElement && document.documentElement.requestFullscreen) {
+        await document.documentElement.requestFullscreen().catch(() => {});
+      }
+      await orientation.lock("landscape");
+    } catch {
+      setSwitchError(t("proAvail.rotateLandscape.unsupported", locale));
+    }
+  }
+
+  if (dismissed) return null;
+
   return (
-    <div className="fixed inset-0 z-40 hidden flex-col items-center justify-center bg-cream/95 px-8 text-center portrait:max-md:flex">
-      <div className="mx-auto mb-6 flex h-16 w-16 items-center justify-center rounded-full border border-green-200 bg-white">
-        <svg
-          className="h-8 w-8 text-green-700"
-          fill="none"
-          viewBox="0 0 24 24"
-          stroke="currentColor"
-          strokeWidth={1.5}
-        >
-          <path
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            d="M7.5 21L3 16.5m0 0L7.5 12M3 16.5h18M16.5 3L21 7.5m0 0L16.5 12M21 7.5H3"
-          />
-        </svg>
+    <div
+      className="fixed inset-0 z-40 hidden items-end justify-center bg-black/40 p-4 portrait:max-md:flex"
+      onClick={() => setDismissed(true)}
+    >
+      <div
+        className="w-full max-w-sm rounded-2xl bg-white p-6 shadow-xl"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-full border border-green-200 bg-cream">
+          <svg
+            className="h-7 w-7 text-green-700"
+            fill="none"
+            viewBox="0 0 24 24"
+            stroke="currentColor"
+            strokeWidth={1.5}
+          >
+            <path
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              d="M7.5 21L3 16.5m0 0L7.5 12M3 16.5h18M16.5 3L21 7.5m0 0L16.5 12M21 7.5H3"
+            />
+          </svg>
+        </div>
+        <h2 className="text-center font-display text-xl font-semibold text-green-900">
+          {t("proAvail.rotateLandscape.title", locale)}
+        </h2>
+        <p className="mt-2 text-center text-sm text-green-700">
+          {t("proAvail.rotateLandscape.body", locale)}
+        </p>
+        {switchError && (
+          <p className="mt-3 rounded-md bg-amber-50 px-3 py-2 text-center text-xs text-amber-800">
+            {switchError}
+          </p>
+        )}
+        <div className="mt-6 grid grid-cols-2 gap-3">
+          <button
+            type="button"
+            onClick={() => setDismissed(true)}
+            className="rounded-md border border-green-200 px-4 py-2 text-sm font-medium text-green-700 transition-colors hover:bg-green-50"
+          >
+            {t("proAvail.rotateLandscape.cancel", locale)}
+          </button>
+          <button
+            type="button"
+            onClick={handleSwitch}
+            className="rounded-md bg-gold-600 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-gold-500"
+          >
+            {t("proAvail.rotateLandscape.switch", locale)}
+          </button>
+        </div>
       </div>
-      <h2 className="font-display text-xl font-semibold text-green-900">
-        {t("proAvail.rotateLandscape.title", locale)}
-      </h2>
-      <p className="mt-2 max-w-sm text-sm text-green-700">
-        {t("proAvail.rotateLandscape.body", locale)}
-      </p>
     </div>
   );
 }
@@ -307,7 +375,7 @@ export default function AvailabilityEditor({
 
   return (
     <div className="mt-8 space-y-8">
-      <LandscapeRotateHint locale={locale} />
+      <LandscapeRotatePrompt locale={locale} />
       {/* Section 1: Unified weekly template */}
       <WeeklyTemplateGrid
         locations={locations}
