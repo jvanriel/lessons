@@ -1127,6 +1127,10 @@ export default function OnboardingWizard({
         }
         if (result.mode === "create") {
           setHasAccount(true);
+          // Session cookie was just set by /api/pro/personal — re-fetch
+          // server components so the root layout picks up the session
+          // and wraps subsequent steps in the AppLayout shell.
+          router.refresh();
         }
         setPassword("");
         setConfirmPassword("");
@@ -1237,7 +1241,13 @@ export default function OnboardingWizard({
             {t("proOnb.done.body", locale)}
           </p>
           <Button
-            onClick={() => router.push("/pro/dashboard")}
+            onClick={() => {
+              // Full-page navigation so the root layout re-runs and the
+              // AppLayout shell wraps the dashboard with the now-valid
+              // pro session. router.push alone reuses the cached layout
+              // from the public-chrome render.
+              window.location.href = "/pro/dashboard";
+            }}
             className="mt-8 bg-gold-600 text-white hover:bg-gold-500 px-8 py-3 text-base font-medium"
           >
             {t("proOnb.done.cta", locale)}
