@@ -1,5 +1,7 @@
 docs/
 scripts/
+# db-migrate runs as the first step of `pnpm build` — must ship to Vercel.
+!scripts/db-migrate.ts
 src/lib/__tests__/
 vitest.config.ts
 vitest.setup.ts
