@@ -77,16 +77,16 @@ export default function DeploymentChecker() {
   if (!newVersion) return null;
 
   return (
-    <div className="fixed bottom-4 left-1/2 z-50 -translate-x-1/2 px-4">
-      <div className="flex items-center gap-3 rounded-lg border border-gold-300/50 bg-green-950 px-5 py-3 shadow-xl">
-        <span className="text-sm text-green-100/80">
+    <div className="fixed bottom-4 left-1/2 z-50 w-[min(92vw,32rem)] -translate-x-1/2 px-4">
+      <div className="flex flex-col items-center gap-2 rounded-lg border border-gold-300/50 bg-green-950 px-5 py-3 text-center shadow-xl sm:flex-row sm:text-left">
+        <span className="flex-1 text-sm text-green-100/80">
           {standalone
             ? "A newer version of the app is available."
             : "A new version is available"}
         </span>
         <button
           onClick={() => window.location.reload()}
-          className="rounded bg-gold-500 px-3 py-1 text-xs font-medium text-green-950 transition-colors hover:bg-gold-400"
+          className="shrink-0 rounded bg-gold-500 px-3 py-1 text-xs font-medium text-green-950 transition-colors hover:bg-gold-400"
         >
           {standalone ? "Update" : "Refresh"}
         </button>
