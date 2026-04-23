@@ -142,41 +142,13 @@ function getWeekNumber(d: Date): number {
 // ─── Landscape prompt ────────────────────────────────
 
 /**
- * Dialog shown on mobile portrait suggesting the pro rotate to
- * landscape for a better grid-editing experience. "Switch" attempts
- * screen.orientation.lock — works in installed PWAs on Chrome Android
- * and is a no-op on browsers that don't allow it (iOS Safari). Cancel
- * dismisses for the rest of the session. The dialog auto-hides once
- * the user rotates to landscape (media query flips).
+ * Dialog shown on mobile portrait telling the pro to rotate to
+ * landscape for a better grid-editing experience. Cancel dismisses
+ * for the session; the dialog also auto-hides as soon as the user
+ * rotates (the portrait media query stops matching).
  */
 function LandscapeRotatePrompt({ locale }: { locale: Locale }) {
   const [dismissed, setDismissed] = useState(false);
-  const [switchError, setSwitchError] = useState<string | null>(null);
-
-  async function handleSwitch() {
-    setSwitchError(null);
-    // Screen Orientation API: needs a declarative or fullscreen context
-    // on most browsers. Best-effort — falls back to the "rotate
-    // manually" wording if the browser rejects the call.
-    const orientation = (screen as unknown as {
-      orientation?: {
-        lock?: (o: string) => Promise<void>;
-      };
-    }).orientation;
-    if (!orientation?.lock) {
-      setSwitchError(t("proAvail.rotateLandscape.unsupported", locale));
-      return;
-    }
-    try {
-      // Request fullscreen first so the lock is accepted in more browsers.
-      if (!document.fullscreenElement && document.documentElement.requestFullscreen) {
-        await document.documentElement.requestFullscreen().catch(() => {});
-      }
-      await orientation.lock("landscape");
-    } catch {
-      setSwitchError(t("proAvail.rotateLandscape.unsupported", locale));
-    }
-  }
 
   if (dismissed) return null;
 
@@ -210,25 +182,13 @@ function LandscapeRotatePrompt({ locale }: { locale: Locale }) {
         <p className="mt-2 text-center text-sm text-green-700">
           {t("proAvail.rotateLandscape.body", locale)}
         </p>
-        {switchError && (
-          <p className="mt-3 rounded-md bg-amber-50 px-3 py-2 text-center text-xs text-amber-800">
-            {switchError}
-          </p>
-        )}
-        <div className="mt-6 grid grid-cols-2 gap-3">
+        <div className="mt-6 flex justify-center">
           <button
             type="button"
             onClick={() => setDismissed(true)}
-            className="rounded-md border border-green-200 px-4 py-2 text-sm font-medium text-green-700 transition-colors hover:bg-green-50"
+            className="rounded-md border border-green-200 px-6 py-2 text-sm font-medium text-green-700 transition-colors hover:bg-green-50"
           >
             {t("proAvail.rotateLandscape.cancel", locale)}
-          </button>
-          <button
-            type="button"
-            onClick={handleSwitch}
-            className="rounded-md bg-gold-600 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-gold-500"
-          >
-            {t("proAvail.rotateLandscape.switch", locale)}
           </button>
         </div>
       </div>
