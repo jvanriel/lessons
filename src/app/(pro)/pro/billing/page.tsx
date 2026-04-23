@@ -74,6 +74,14 @@ export default async function BillingPage() {
       bankAccountHolder={profile.bankAccountHolder ?? null}
       bankIban={profile.bankIban ?? null}
       bankBic={profile.bankBic ?? null}
+      invoicingType={profile.invoicingType ?? "individual"}
+      companyName={profile.companyName ?? null}
+      vatNumber={profile.vatNumber ?? null}
+      invoiceAddressLine1={profile.invoiceAddressLine1 ?? null}
+      invoiceAddressLine2={profile.invoiceAddressLine2 ?? null}
+      invoicePostcode={profile.invoicePostcode ?? null}
+      invoiceCity={profile.invoiceCity ?? null}
+      invoiceCountry={profile.invoiceCountry ?? null}
       pendingCommissionCents={pendingAgg?.total ?? 0}
       pendingCommissionCount={pendingAgg?.count ?? 0}
       pendingCommissionBookings={pendingBookings}

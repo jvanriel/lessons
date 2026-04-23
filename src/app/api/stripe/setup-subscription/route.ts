@@ -4,6 +4,7 @@ import { db } from "@/lib/db";
 import { users, proProfiles } from "@/lib/db/schema";
 import { eq } from "drizzle-orm";
 import { getStripe } from "@/lib/stripe";
+import { syncStripeCustomerInvoicing } from "@/lib/stripe-customer-sync";
 
 export async function POST(request: NextRequest) {
   const session = await getSession();
@@ -76,12 +77,15 @@ export async function POST(request: NextRequest) {
       .update(users)
       .set({ stripeCustomerId: customer.id })
       .where(eq(users.id, user.id));
-  } else if (user.phone) {
-    // Customer already exists (retry flow) — make sure the phone we just
-    // collected at registration is mirrored to Stripe.
-    await stripe.customers
-      .update(stripeCustomerId, { phone: user.phone, name: fullName })
-      .catch(() => {});
+  }
+
+  // Always push the pro's invoicing details (address, company name, VAT)
+  // onto the Stripe customer. The subscription invoices we issue depend
+  // on this. Runs on both first-create and retry.
+  try {
+    await syncStripeCustomerInvoicing(stripe, stripeCustomerId, profile, user);
+  } catch (err) {
+    console.error("[setup-subscription] invoicing sync failed:", err);
   }
 
   // Create SetupIntent to collect payment method without charging

@@ -22,10 +22,12 @@ const STEP_KEYS = [
   "proOnb.step.profile",
   "proOnb.step.locations",
   "proOnb.step.lessons",
+  "proOnb.step.invoicing",
   "proOnb.step.bank",
   "proOnb.step.subscription",
 ] as const;
 const STEP_COUNT = STEP_KEYS.length;
+const STEP_SUBSCRIPTION = 5;
 
 const inputClass =
   "mt-1 w-full rounded-md border border-green-200 bg-white px-3 py-2 text-sm text-green-900 placeholder:text-green-400 focus:border-green-400 focus:outline-none focus:ring-1 focus:ring-green-400";
@@ -42,6 +44,15 @@ interface InitialData {
   bankAccountHolder: string;
   bankIban: string;
   bankBic: string;
+  invoicingType: "individual" | "company";
+  companyName: string;
+  vatNumber: string;
+  invoiceAddressLine1: string;
+  invoiceAddressLine2: string;
+  invoicePostcode: string;
+  invoiceCity: string;
+  /** ISO-3166-1 alpha-2, e.g. BE, NL, FR. */
+  invoiceCountry: string;
 }
 
 // ─── Progress Bar ───────────────────────────────────────
@@ -378,7 +389,180 @@ function LessonsStep({
   );
 }
 
-// ─── Step 4: Bank Details ───────────────────────────────
+// ─── Step 4: Invoicing ──────────────────────────────────
+
+const COUNTRIES: Array<{ code: string; label: string }> = [
+  { code: "BE", label: "Belgium" },
+  { code: "NL", label: "Netherlands" },
+  { code: "FR", label: "France" },
+  { code: "DE", label: "Germany" },
+  { code: "LU", label: "Luxembourg" },
+  { code: "GB", label: "United Kingdom" },
+  { code: "IE", label: "Ireland" },
+  { code: "ES", label: "Spain" },
+  { code: "IT", label: "Italy" },
+  { code: "PT", label: "Portugal" },
+  { code: "AT", label: "Austria" },
+  { code: "CH", label: "Switzerland" },
+];
+
+function InvoicingStep({
+  data,
+  onChange,
+  locale,
+}: {
+  data: InitialData;
+  onChange: (d: Partial<InitialData>) => void;
+  locale: Locale;
+}) {
+  const isCompany = data.invoicingType === "company";
+  return (
+    <div className="space-y-4">
+      <p className="text-sm text-green-600">
+        {t("proOnb.inv.intro", locale)}
+      </p>
+
+      <div className="grid gap-3 sm:grid-cols-2">
+        <button
+          type="button"
+          onClick={() => onChange({ invoicingType: "individual" })}
+          className={`rounded-xl border p-4 text-left transition-all ${
+            !isCompany
+              ? "border-green-700 bg-green-50 ring-1 ring-green-700"
+              : "border-green-200 bg-white hover:border-green-400"
+          }`}
+        >
+          <div className="font-medium text-green-900">
+            {t("proOnb.inv.individual", locale)}
+          </div>
+          <div className="mt-1 text-xs text-green-600">
+            {t("proOnb.inv.individualDesc", locale)}
+          </div>
+        </button>
+        <button
+          type="button"
+          onClick={() => onChange({ invoicingType: "company" })}
+          className={`rounded-xl border p-4 text-left transition-all ${
+            isCompany
+              ? "border-green-700 bg-green-50 ring-1 ring-green-700"
+              : "border-green-200 bg-white hover:border-green-400"
+          }`}
+        >
+          <div className="font-medium text-green-900">
+            {t("proOnb.inv.company", locale)}
+          </div>
+          <div className="mt-1 text-xs text-green-600">
+            {t("proOnb.inv.companyDesc", locale)}
+          </div>
+        </button>
+      </div>
+
+      {isCompany && (
+        <>
+          <div>
+            <label className="block text-sm font-medium text-green-800">
+              {t("proOnb.inv.companyName", locale)} <span className="text-red-500">*</span>
+            </label>
+            <input
+              type="text"
+              value={data.companyName}
+              onChange={(e) => onChange({ companyName: e.target.value })}
+              className={inputClass}
+            />
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-green-800">
+              {t("proOnb.inv.vat", locale)}{" "}
+              <span className="font-normal text-green-500">
+                {t("proOnb.bank.optional", locale)}
+              </span>
+            </label>
+            <input
+              type="text"
+              value={data.vatNumber}
+              onChange={(e) => onChange({ vatNumber: e.target.value })}
+              placeholder={t("proOnb.inv.vatPlaceholder", locale)}
+              className={inputClass + " font-mono"}
+            />
+            <p className="mt-1 text-xs text-green-500">
+              {t("proOnb.inv.vatHint", locale)}
+            </p>
+          </div>
+        </>
+      )}
+
+      <div>
+        <label className="block text-sm font-medium text-green-800">
+          {t("proOnb.inv.addressLine1", locale)} <span className="text-red-500">*</span>
+        </label>
+        <input
+          type="text"
+          value={data.invoiceAddressLine1}
+          onChange={(e) => onChange({ invoiceAddressLine1: e.target.value })}
+          placeholder={t("proOnb.inv.addressLine1Placeholder", locale)}
+          className={inputClass}
+        />
+      </div>
+      <div>
+        <label className="block text-sm font-medium text-green-800">
+          {t("proOnb.inv.addressLine2", locale)}{" "}
+          <span className="font-normal text-green-500">
+            {t("proOnb.bank.optional", locale)}
+          </span>
+        </label>
+        <input
+          type="text"
+          value={data.invoiceAddressLine2}
+          onChange={(e) => onChange({ invoiceAddressLine2: e.target.value })}
+          className={inputClass}
+        />
+      </div>
+      <div className="grid gap-3 sm:grid-cols-2">
+        <div>
+          <label className="block text-sm font-medium text-green-800">
+            {t("proOnb.inv.postcode", locale)} <span className="text-red-500">*</span>
+          </label>
+          <input
+            type="text"
+            value={data.invoicePostcode}
+            onChange={(e) => onChange({ invoicePostcode: e.target.value })}
+            className={inputClass}
+          />
+        </div>
+        <div>
+          <label className="block text-sm font-medium text-green-800">
+            {t("proOnb.inv.city", locale)} <span className="text-red-500">*</span>
+          </label>
+          <input
+            type="text"
+            value={data.invoiceCity}
+            onChange={(e) => onChange({ invoiceCity: e.target.value })}
+            className={inputClass}
+          />
+        </div>
+      </div>
+      <div>
+        <label className="block text-sm font-medium text-green-800">
+          {t("proOnb.inv.country", locale)} <span className="text-red-500">*</span>
+        </label>
+        <select
+          value={data.invoiceCountry}
+          onChange={(e) => onChange({ invoiceCountry: e.target.value })}
+          className={inputClass}
+        >
+          <option value="">{t("proOnb.inv.countryPlaceholder", locale)}</option>
+          {COUNTRIES.map((c) => (
+            <option key={c.code} value={c.code}>
+              {c.label}
+            </option>
+          ))}
+        </select>
+      </div>
+    </div>
+  );
+}
+
+// ─── Step 5: Bank Details ───────────────────────────────
 
 function BankStep({
   data,
@@ -743,7 +927,47 @@ export default function OnboardingWizard({
         });
         break;
       }
-      case 3: // Bank
+      case 3: {
+        // Invoicing — client-side shape check before round-tripping
+        if (
+          !data.invoiceAddressLine1.trim() ||
+          !data.invoicePostcode.trim() ||
+          !data.invoiceCity.trim() ||
+          !data.invoiceCountry
+        ) {
+          setError(t("proOnb.inv.addressRequired", locale));
+          return;
+        }
+        if (data.invoicingType === "company" && !data.companyName.trim()) {
+          setError(t("proOnb.inv.companyNameRequired", locale));
+          return;
+        }
+        setSaving(true);
+        setError(null);
+        const res = await fetch("/api/pro/invoicing", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            invoicingType: data.invoicingType,
+            companyName: data.companyName,
+            vatNumber: data.vatNumber,
+            addressLine1: data.invoiceAddressLine1,
+            addressLine2: data.invoiceAddressLine2,
+            postcode: data.invoicePostcode,
+            city: data.invoiceCity,
+            country: data.invoiceCountry,
+          }),
+        });
+        const result = await res.json();
+        setSaving(false);
+        if (!res.ok) {
+          setError(result.error || t("proOnb.genericSaveError", locale));
+          return;
+        }
+        success = true;
+        break;
+      }
+      case 4: // Bank
         success = await saveStep("bank", {
           accountHolder: data.bankAccountHolder,
           iban: data.bankIban,
@@ -822,13 +1046,14 @@ export default function OnboardingWizard({
             <LocationsStep locations={locations} onChange={setLocations} locale={locale} />
           )}
           {step === 2 && <LessonsStep data={data} onChange={updateData} locale={locale} />}
-          {step === 3 && <BankStep data={data} onChange={updateData} locale={locale} />}
-          {step === 4 && (
+          {step === 3 && <InvoicingStep data={data} onChange={updateData} locale={locale} />}
+          {step === 4 && <BankStep data={data} onChange={updateData} locale={locale} />}
+          {step === STEP_SUBSCRIPTION && (
             <SubscriptionStep onSuccess={() => setStep(STEP_COUNT)} locale={locale} />
           )}
 
           {/* Navigation (not shown for subscription step — it has its own buttons) */}
-          {step < 4 && (
+          {step < STEP_SUBSCRIPTION && (
             <div className="mt-8 flex justify-between">
               <Button
                 type="button"

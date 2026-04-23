@@ -175,6 +175,18 @@ export const proProfiles = pgTable("pro_profiles", {
   bankAccountHolder: varchar("bank_account_holder", { length: 255 }),
   bankIban: varchar("bank_iban", { length: 34 }),
   bankBic: varchar("bank_bic", { length: 11 }),
+  // Invoicing: who we bill for subscription + cash-only commission.
+  // `invoicing_type` = 'individual' uses the user's own name; 'company'
+  // drives Stripe tax_id + B2B invoice format.
+  invoicingType: varchar("invoicing_type", { length: 20 }).notNull().default("individual"),
+  companyName: varchar("company_name", { length: 255 }),
+  vatNumber: varchar("vat_number", { length: 50 }),
+  invoiceAddressLine1: varchar("invoice_address_line1", { length: 255 }),
+  invoiceAddressLine2: varchar("invoice_address_line2", { length: 255 }),
+  invoicePostcode: varchar("invoice_postcode", { length: 20 }),
+  invoiceCity: varchar("invoice_city", { length: 100 }),
+  // ISO-3166-1 alpha-2 country code (BE, NL, FR, …).
+  invoiceCountry: varchar("invoice_country", { length: 2 }),
   deletedAt: timestamp("deleted_at"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),

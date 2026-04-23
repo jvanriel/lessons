@@ -159,5 +159,5 @@ export async function registerPro(
     roles: ["pro", "member"],
   });
 
-  redirect("/pro/subscribe");
+  redirect("/pro/onboarding");
 }

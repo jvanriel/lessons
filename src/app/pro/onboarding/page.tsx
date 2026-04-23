@@ -47,6 +47,13 @@ export default async function OnboardingPage() {
     (v) => typeof v === "number" && v > 0,
   );
   const hasBank = !!profile.bankIban;
+  // Invoicing is "done" once we have at least an address on file. Company
+  // fields are optional when invoicingType='individual' (the default).
+  const hasInvoicing =
+    !!profile.invoiceAddressLine1 &&
+    !!profile.invoicePostcode &&
+    !!profile.invoiceCity &&
+    !!profile.invoiceCountry;
 
   const locale = await getLocale();
 
@@ -55,7 +62,8 @@ export default async function OnboardingPage() {
   if (hasProfile) initialStep = 1;
   if (hasProfile && hasLocations) initialStep = 2;
   if (hasProfile && hasLocations && hasLessons) initialStep = 3;
-  if (hasProfile && hasLocations && hasLessons && hasBank) initialStep = 4;
+  if (hasProfile && hasLocations && hasLessons && hasInvoicing) initialStep = 4;
+  if (hasProfile && hasLocations && hasLessons && hasInvoicing && hasBank) initialStep = 5;
 
   return (
     <OnboardingWizard
@@ -78,6 +86,15 @@ export default async function OnboardingPage() {
         bankAccountHolder: profile.bankAccountHolder ?? "",
         bankIban: profile.bankIban ?? "",
         bankBic: profile.bankBic ?? "",
+        invoicingType:
+          profile.invoicingType === "company" ? "company" : "individual",
+        companyName: profile.companyName ?? "",
+        vatNumber: profile.vatNumber ?? "",
+        invoiceAddressLine1: profile.invoiceAddressLine1 ?? "",
+        invoiceAddressLine2: profile.invoiceAddressLine2 ?? "",
+        invoicePostcode: profile.invoicePostcode ?? "",
+        invoiceCity: profile.invoiceCity ?? "",
+        invoiceCountry: profile.invoiceCountry ?? "",
       }}
     />
   );

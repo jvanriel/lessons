@@ -28,6 +28,14 @@ interface BillingProps {
   bankAccountHolder: string | null;
   bankIban: string | null;
   bankBic: string | null;
+  invoicingType: string;
+  companyName: string | null;
+  vatNumber: string | null;
+  invoiceAddressLine1: string | null;
+  invoiceAddressLine2: string | null;
+  invoicePostcode: string | null;
+  invoiceCity: string | null;
+  invoiceCountry: string | null;
   pendingCommissionCents: number;
   pendingCommissionCount: number;
   pendingCommissionBookings: PendingCommissionBooking[];
@@ -184,6 +192,214 @@ function BankDetailsForm({
   );
 }
 
+const BILLING_COUNTRIES: Array<{ code: string; label: string }> = [
+  { code: "BE", label: "Belgium" },
+  { code: "NL", label: "Netherlands" },
+  { code: "FR", label: "France" },
+  { code: "DE", label: "Germany" },
+  { code: "LU", label: "Luxembourg" },
+  { code: "GB", label: "United Kingdom" },
+  { code: "IE", label: "Ireland" },
+  { code: "ES", label: "Spain" },
+  { code: "IT", label: "Italy" },
+  { code: "PT", label: "Portugal" },
+  { code: "AT", label: "Austria" },
+  { code: "CH", label: "Switzerland" },
+];
+
+interface InvoicingFormValues {
+  invoicingType: "individual" | "company";
+  companyName: string;
+  vatNumber: string;
+  addressLine1: string;
+  addressLine2: string;
+  postcode: string;
+  city: string;
+  country: string;
+}
+
+function InvoicingForm({
+  initial,
+  locale,
+  onSaved,
+}: {
+  initial: InvoicingFormValues;
+  locale: Locale;
+  onSaved: (v: InvoicingFormValues) => void;
+}) {
+  const [v, setV] = useState<InvoicingFormValues>(initial);
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const isCompany = v.invoicingType === "company";
+
+  async function handleSave(e: React.FormEvent) {
+    e.preventDefault();
+    setSaving(true);
+    setError(null);
+    const res = await fetch("/api/pro/invoicing", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(v),
+    });
+    const data = await res.json();
+    setSaving(false);
+    if (!res.ok) {
+      setError(data.error || t("proBilling.form.genericError", locale));
+      return;
+    }
+    onSaved(v);
+  }
+
+  const input =
+    "mt-1 w-full rounded-md border border-green-200 bg-white px-3 py-2 text-sm text-green-900 placeholder:text-green-400 focus:border-green-400 focus:outline-none focus:ring-1 focus:ring-green-400";
+
+  return (
+    <form onSubmit={handleSave} className="space-y-4">
+      {error && (
+        <div className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+          {error}
+        </div>
+      )}
+
+      <div className="grid gap-3 sm:grid-cols-2">
+        <button
+          type="button"
+          onClick={() => setV({ ...v, invoicingType: "individual" })}
+          className={`rounded-xl border p-4 text-left transition-all ${
+            !isCompany
+              ? "border-green-700 bg-green-50 ring-1 ring-green-700"
+              : "border-green-200 bg-white hover:border-green-400"
+          }`}
+        >
+          <div className="font-medium text-green-900">
+            {t("proOnb.inv.individual", locale)}
+          </div>
+        </button>
+        <button
+          type="button"
+          onClick={() => setV({ ...v, invoicingType: "company" })}
+          className={`rounded-xl border p-4 text-left transition-all ${
+            isCompany
+              ? "border-green-700 bg-green-50 ring-1 ring-green-700"
+              : "border-green-200 bg-white hover:border-green-400"
+          }`}
+        >
+          <div className="font-medium text-green-900">
+            {t("proOnb.inv.company", locale)}
+          </div>
+        </button>
+      </div>
+
+      {isCompany && (
+        <>
+          <div>
+            <label className="block text-sm font-medium text-green-800">
+              {t("proOnb.inv.companyName", locale)}
+            </label>
+            <input
+              type="text"
+              value={v.companyName}
+              onChange={(e) => setV({ ...v, companyName: e.target.value })}
+              className={input}
+              required
+            />
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-green-800">
+              {t("proOnb.inv.vat", locale)}
+            </label>
+            <input
+              type="text"
+              value={v.vatNumber}
+              onChange={(e) => setV({ ...v, vatNumber: e.target.value })}
+              placeholder={t("proOnb.inv.vatPlaceholder", locale)}
+              className={input + " font-mono"}
+            />
+          </div>
+        </>
+      )}
+
+      <div>
+        <label className="block text-sm font-medium text-green-800">
+          {t("proOnb.inv.addressLine1", locale)}
+        </label>
+        <input
+          type="text"
+          value={v.addressLine1}
+          onChange={(e) => setV({ ...v, addressLine1: e.target.value })}
+          className={input}
+          required
+        />
+      </div>
+      <div>
+        <label className="block text-sm font-medium text-green-800">
+          {t("proOnb.inv.addressLine2", locale)}
+        </label>
+        <input
+          type="text"
+          value={v.addressLine2}
+          onChange={(e) => setV({ ...v, addressLine2: e.target.value })}
+          className={input}
+        />
+      </div>
+      <div className="grid gap-3 sm:grid-cols-2">
+        <div>
+          <label className="block text-sm font-medium text-green-800">
+            {t("proOnb.inv.postcode", locale)}
+          </label>
+          <input
+            type="text"
+            value={v.postcode}
+            onChange={(e) => setV({ ...v, postcode: e.target.value })}
+            className={input}
+            required
+          />
+        </div>
+        <div>
+          <label className="block text-sm font-medium text-green-800">
+            {t("proOnb.inv.city", locale)}
+          </label>
+          <input
+            type="text"
+            value={v.city}
+            onChange={(e) => setV({ ...v, city: e.target.value })}
+            className={input}
+            required
+          />
+        </div>
+      </div>
+      <div>
+        <label className="block text-sm font-medium text-green-800">
+          {t("proOnb.inv.country", locale)}
+        </label>
+        <select
+          value={v.country}
+          onChange={(e) => setV({ ...v, country: e.target.value })}
+          className={input}
+          required
+        >
+          <option value="">{t("proOnb.inv.countryPlaceholder", locale)}</option>
+          {BILLING_COUNTRIES.map((c) => (
+            <option key={c.code} value={c.code}>
+              {c.label}
+            </option>
+          ))}
+        </select>
+      </div>
+
+      <div className="flex gap-3 pt-2">
+        <Button
+          type="submit"
+          disabled={saving}
+          className="bg-gold-600 text-white hover:bg-gold-500"
+        >
+          {saving ? t("proBilling.form.saving", locale) : t("proBilling.form.save", locale)}
+        </Button>
+      </div>
+    </form>
+  );
+}
+
 // ─── Main Billing Page ──────────────────────────────────
 
 export default function BillingClient({
@@ -195,6 +411,14 @@ export default function BillingClient({
   bankAccountHolder: initialHolder,
   bankIban: initialIban,
   bankBic: initialBic,
+  invoicingType: initialInvoicingType,
+  companyName: initialCompanyName,
+  vatNumber: initialVatNumber,
+  invoiceAddressLine1: initialAddr1,
+  invoiceAddressLine2: initialAddr2,
+  invoicePostcode: initialPostcode,
+  invoiceCity: initialCity,
+  invoiceCountry: initialCountry,
   pendingCommissionCents,
   pendingCommissionCount,
   pendingCommissionBookings,
@@ -205,6 +429,24 @@ export default function BillingClient({
   const [bankHolder, setBankHolder] = useState(initialHolder);
   const [bankIban, setBankIban] = useState(initialIban);
   const [bankBic, setBankBic] = useState(initialBic);
+
+  const [editingInvoicing, setEditingInvoicing] = useState(false);
+  const [invoicing, setInvoicing] = useState<InvoicingFormValues>({
+    invoicingType:
+      initialInvoicingType === "company" ? "company" : "individual",
+    companyName: initialCompanyName ?? "",
+    vatNumber: initialVatNumber ?? "",
+    addressLine1: initialAddr1 ?? "",
+    addressLine2: initialAddr2 ?? "",
+    postcode: initialPostcode ?? "",
+    city: initialCity ?? "",
+    country: initialCountry ?? "",
+  });
+  const hasInvoicingDetails =
+    !!invoicing.addressLine1 &&
+    !!invoicing.postcode &&
+    !!invoicing.city &&
+    !!invoicing.country;
 
   const isTrialing = subscriptionStatus === "trialing";
   const isActive =
@@ -445,6 +687,70 @@ export default function BillingClient({
           </div>
         </div>
       )}
+
+      {/* Invoicing Details */}
+      <div className="mt-6 rounded-xl border border-green-200 bg-white p-6 shadow-sm">
+        <div className="flex items-start justify-between">
+          <h2 className="text-lg font-semibold text-green-900">
+            {t("proBilling.invoicingTitle", locale)}
+          </h2>
+          {hasInvoicingDetails && !editingInvoicing && (
+            <Button
+              variant="outline"
+              onClick={() => setEditingInvoicing(true)}
+              className="border-green-200 text-green-700 hover:bg-green-50"
+            >
+              {t("proBilling.edit", locale)}
+            </Button>
+          )}
+        </div>
+        <p className="mt-1 text-sm text-green-600">
+          {t("proBilling.invoicingDesc", locale)}
+        </p>
+
+        {hasInvoicingDetails && !editingInvoicing ? (
+          <div className="mt-4 rounded-lg border border-green-100 bg-green-50/50 p-4 text-sm text-green-900">
+            {invoicing.invoicingType === "company" ? (
+              <>
+                <p className="font-medium">{invoicing.companyName}</p>
+                {invoicing.vatNumber && (
+                  <p className="mt-1 font-mono text-xs text-green-700">
+                    {t("proOnb.inv.vat", locale)}: {invoicing.vatNumber}
+                  </p>
+                )}
+              </>
+            ) : (
+              <p className="font-medium">
+                {t("proOnb.inv.individual", locale)}
+              </p>
+            )}
+            <p className="mt-2 text-green-800">{invoicing.addressLine1}</p>
+            {invoicing.addressLine2 && (
+              <p className="text-green-800">{invoicing.addressLine2}</p>
+            )}
+            <p className="text-green-800">
+              {invoicing.postcode} {invoicing.city}
+            </p>
+            <p className="text-green-800">{invoicing.country}</p>
+          </div>
+        ) : (
+          <div className="mt-4">
+            {!hasInvoicingDetails && (
+              <div className="mb-4 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-700">
+                {t("proBilling.invoicingMissing", locale)}
+              </div>
+            )}
+            <InvoicingForm
+              initial={invoicing}
+              locale={locale}
+              onSaved={(v) => {
+                setInvoicing(v);
+                setEditingInvoicing(false);
+              }}
+            />
+          </div>
+        )}
+      </div>
 
       {/* Bank Account for Payouts */}
       <div className="mt-6 rounded-xl border border-green-200 bg-white p-6 shadow-sm">
