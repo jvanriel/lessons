@@ -10,6 +10,7 @@ const translations: Record<Locale, Record<string, string>> = {
     "nav.admin": "Admin",
     // App shell (sidebar + bottom nav)
     "appNav.section.myLessons": "My Lessons",
+    "appNav.section.myLessonsAsStudent": "My Lessons (as student)",
     "appNav.section.pro": "Pro",
     "appNav.dashboard": "Dashboard",
     "appNav.myBookings": "My Bookings",
@@ -1295,6 +1296,7 @@ const translations: Record<Locale, Record<string, string>> = {
     "nav.pro": "Pro",
     "nav.admin": "Admin",
     "appNav.section.myLessons": "Mijn lessen",
+    "appNav.section.myLessonsAsStudent": "Mijn lessen (als student)",
     "appNav.section.pro": "Pro",
     "appNav.dashboard": "Dashboard",
     "appNav.myBookings": "Mijn boekingen",
@@ -2547,6 +2549,7 @@ const translations: Record<Locale, Record<string, string>> = {
     "nav.pro": "Pro",
     "nav.admin": "Admin",
     "appNav.section.myLessons": "Mes cours",
+    "appNav.section.myLessonsAsStudent": "Mes cours (en tant qu'élève)",
     "appNav.section.pro": "Pro",
     "appNav.dashboard": "Tableau de bord",
     "appNav.myBookings": "Mes réservations",
