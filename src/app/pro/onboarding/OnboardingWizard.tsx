@@ -1125,6 +1125,15 @@ export default function OnboardingWizard({
         }
         if (result.mode === "create") {
           setHasAccount(true);
+          // Mirror the server-side default: ensureProProfile seeds the
+          // profile's displayName with the first name on create. The
+          // client state was bootstrapped from EMPTY_DATA (no session
+          // on initial load) so step 2 would otherwise show Weergave-
+          // naam blank. Only pre-fill when the field is still empty —
+          // we don't want to overwrite a value the pro typed earlier.
+          if (!data.displayName.trim()) {
+            updateData({ displayName: data.firstName.trim() });
+          }
           // Deliberately NOT calling router.refresh() here. The session
           // cookie is set on the response from /api/pro/personal and is
           // sent automatically with subsequent fetch calls, so the rest
