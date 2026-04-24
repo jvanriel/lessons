@@ -23,6 +23,26 @@ export async function getProLocationTimezone(
   return row?.tz ?? "Europe/Brussels";
 }
 
+/**
+ * True when the given email is a reserved test account and the app is
+ * running on a non-production deploy. Preview-only test accounts
+ * (dummy-pro@, dummy.student@, etc.) get affordances real users don't
+ * — e.g. their pro profile auto-publishes on signup so we can test
+ * the end-to-end student-books-a-lesson flow without going through the
+ * full "set availability + prices + toggle published" dance.
+ *
+ * NEVER returns true on VERCEL_ENV=production.
+ */
+export function isPreviewTestAccount(email: string | null | undefined): boolean {
+  if (!email) return false;
+  if (process.env.VERCEL_ENV === "production") return false;
+  const e = email.toLowerCase();
+  return (
+    (e.startsWith("dummy-") || e.startsWith("dummy.")) &&
+    e.endsWith("@golflessons.be")
+  );
+}
+
 export async function requireProProfile() {
   const session = await getSession();
   if (!session || (!hasRole(session, "pro") && !hasRole(session, "admin"))) {
