@@ -52,7 +52,9 @@ export default function PageHeading({
       : t("pageHelp.placeholder", locale);
 
   return (
-    <div className={`flex items-start justify-between gap-4 ${className}`}>
+    <div
+      className={`flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between sm:gap-4 ${className}`}
+    >
       <div className="min-w-0 flex-1">
         <div className="flex items-center gap-2">
           <h1 className="font-display text-3xl font-semibold text-green-900 truncate">
@@ -85,7 +87,9 @@ export default function PageHeading({
           <p className="mt-2 text-sm text-green-600">{subtitle}</p>
         )}
       </div>
-      {children && <div className="shrink-0">{children}</div>}
+      {children && (
+        <div className="shrink-0 self-end sm:self-auto">{children}</div>
+      )}
 
       {open && (
         <div
