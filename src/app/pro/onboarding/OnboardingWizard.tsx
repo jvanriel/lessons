@@ -9,6 +9,9 @@ import type { Locale } from "@/lib/i18n";
 import { t } from "@/lib/i18n/translations";
 import { formatDate } from "@/lib/format-date";
 import PhoneField, { isValidPhoneNumber } from "@/components/PhoneField";
+import PasswordField from "@/components/PasswordField";
+
+const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 import {
   MONTHLY_PRICE,
   ANNUAL_PRICE,
@@ -113,6 +116,22 @@ function PersonalStep({
   hasAccount: boolean;
   locale: Locale;
 }) {
+  const [touched, setTouched] = useState<Record<string, boolean>>({});
+  const mark = (k: string) =>
+    setTouched((prev) => (prev[k] ? prev : { ...prev, [k]: true }));
+
+  const emailTrim = data.email.trim();
+  const emailInvalid =
+    !!touched.email && !!emailTrim && !EMAIL_RE.test(emailTrim);
+  const emailMissing = !!touched.email && !emailTrim;
+  const pwTooShort =
+    !!touched.password && password.length > 0 && password.length < 8;
+  const pwMismatch =
+    !!touched.confirmPassword &&
+    confirmPassword.length > 0 &&
+    confirmPassword !== password;
+  const err = "mt-1 text-xs text-red-600";
+
   return (
     <div className="space-y-4">
       <p className="text-sm text-green-600">
@@ -156,10 +175,17 @@ function PersonalStep({
           type="email"
           value={data.email}
           onChange={(e) => onChange({ email: e.target.value })}
+          onBlur={() => mark("email")}
           className={inputClass}
           autoComplete="email"
           required
         />
+        {emailMissing && (
+          <p className={err}>{t("authErr.allFieldsRequired", locale)}</p>
+        )}
+        {emailInvalid && (
+          <p className={err}>{t("authErr.invalidEmail", locale)}</p>
+        )}
       </div>
 
       <div>
@@ -184,31 +210,38 @@ function PersonalStep({
             {t("proOnb.personal.password", locale)}
             {!hasAccount && <span className="text-red-500"> *</span>}
           </label>
-          <input
-            type="password"
+          <PasswordField
             value={password}
-            onChange={(e) => onPassword(e.target.value)}
-            className={inputClass}
-            autoComplete={hasAccount ? "new-password" : "new-password"}
-            minLength={8}
+            onChange={onPassword}
+            onBlur={() => mark("password")}
+            onGenerate={(next) => onConfirmPassword(next)}
+            showGenerate
             required={!hasAccount}
+            minLength={8}
             placeholder={hasAccount ? t("proOnb.personal.passwordKeep", locale) : undefined}
+            className="mt-1"
           />
+          {pwTooShort && (
+            <p className={err}>{t("authErr.passwordTooShort", locale)}</p>
+          )}
         </div>
         <div>
           <label className="block text-sm font-medium text-green-800">
             {t("proOnb.personal.confirmPassword", locale)}
             {!hasAccount && <span className="text-red-500"> *</span>}
           </label>
-          <input
-            type="password"
+          <PasswordField
             value={confirmPassword}
-            onChange={(e) => onConfirmPassword(e.target.value)}
-            className={inputClass}
-            autoComplete="new-password"
-            minLength={8}
+            onChange={onConfirmPassword}
+            onBlur={() => mark("confirmPassword")}
             required={!hasAccount}
+            minLength={8}
+            allowCopy={false}
+            className="mt-1"
           />
+          {pwMismatch && (
+            <p className={err}>{t("authErr.passwordsDontMatch", locale)}</p>
+          )}
         </div>
       </div>
       {hasAccount && (

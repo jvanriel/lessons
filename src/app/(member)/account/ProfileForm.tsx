@@ -264,6 +264,8 @@ function VerificationBanner({ locale }: { locale: Locale }) {
 const inputClass =
   "block w-full rounded-lg border border-green-300 px-3 py-2 text-sm focus:border-gold-500 focus:outline-none focus:ring-1 focus:ring-gold-500";
 
+const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
 export default function ProfileForm({
   user,
   locale,
@@ -275,6 +277,7 @@ export default function ProfileForm({
     updateProfile,
     null
   );
+  const [emailError, setEmailError] = useState<string | null>(null);
 
   return (
     <div className="space-y-12">
@@ -321,8 +324,21 @@ export default function ProfileForm({
                 type="email"
                 required
                 defaultValue={user.email}
+                onBlur={(e) => {
+                  const v = e.currentTarget.value.trim();
+                  if (!v) {
+                    setEmailError(null);
+                  } else if (!EMAIL_RE.test(v)) {
+                    setEmailError(t("authErr.invalidEmail", locale));
+                  } else {
+                    setEmailError(null);
+                  }
+                }}
                 className={inputClass}
               />
+              {emailError && (
+                <p className="mt-1 text-xs text-red-600">{emailError}</p>
+              )}
             </div>
             <div>
               <label className="block text-sm font-medium text-green-800">
