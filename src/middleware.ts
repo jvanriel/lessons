@@ -16,6 +16,27 @@ export async function middleware(request: NextRequest) {
   const pathname = request.nextUrl.pathname;
   const hostname = request.headers.get("host") ?? "";
 
+  // ─── Canonical domain 308 ─────────────────────────────
+  // A Vercel deploy is reachable via three hosts: the raw
+  // lessons-xxx.vercel.app deploy URL, the lessons-xxx-zachte-g.vercel.app
+  // alias, and our custom golflessons.be / preview.golflessons.be
+  // aliases. Only the last ones should leak into shared links (QR
+  // codes, email verify/claim URLs, redirects after signup). Force
+  // every other vercel.app request over to the canonical host with
+  // a 308 so the browser replaces its address bar too.
+  const canonicalHost =
+    process.env.VERCEL_ENV === "production"
+      ? "golflessons.be"
+      : process.env.VERCEL_ENV === "preview"
+        ? "preview.golflessons.be"
+        : null;
+  if (canonicalHost && hostname.endsWith(".vercel.app")) {
+    const target = new URL(request.nextUrl);
+    target.protocol = "https:";
+    target.host = canonicalHost;
+    return NextResponse.redirect(target, 308);
+  }
+
   // ─── Pre-launch password gate (non-localhost only) ────
   if (
     !hostname.startsWith("localhost") &&

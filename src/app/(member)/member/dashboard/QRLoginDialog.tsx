@@ -50,7 +50,13 @@ function QRLoginDialog({ onClose, locale }: { onClose: () => void; locale: Local
     startTransition(async () => {
       const token = await generateQRToken();
       if (token) {
-        const url = `${window.location.origin}/api/auth/qr-login?token=${token}`;
+        // Prefer our canonical custom domain over the raw Vercel host
+        // the user might currently be on (e.g. lessons-xxx.vercel.app).
+        // The QR gets scanned on a phone that doesn't know about those
+        // preview URLs — it needs a public-facing address.
+        const origin =
+          process.env.NEXT_PUBLIC_APP_URL || window.location.origin;
+        const url = `${origin}/api/auth/qr-login?token=${token}`;
         setQrUrl(url);
       }
     });
@@ -70,7 +76,13 @@ function QRLoginDialog({ onClose, locale }: { onClose: () => void; locale: Local
     startTransition(async () => {
       const token = await generateQRToken();
       if (token) {
-        const url = `${window.location.origin}/api/auth/qr-login?token=${token}`;
+        // Prefer our canonical custom domain over the raw Vercel host
+        // the user might currently be on (e.g. lessons-xxx.vercel.app).
+        // The QR gets scanned on a phone that doesn't know about those
+        // preview URLs — it needs a public-facing address.
+        const origin =
+          process.env.NEXT_PUBLIC_APP_URL || window.location.origin;
+        const url = `${origin}/api/auth/qr-login?token=${token}`;
         setQrUrl(url);
       }
     });
