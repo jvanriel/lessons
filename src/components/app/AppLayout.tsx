@@ -20,7 +20,6 @@ interface AppLayoutProps {
   showNotifications: boolean;
   sessionToken?: string;
   locale: Locale;
-  testDualMode: boolean;
   impersonating: boolean;
   impersonatorName: string | null;
   canImpersonate: boolean;
@@ -36,7 +35,6 @@ export default function AppLayout({
   showNotifications,
   sessionToken,
   locale,
-  testDualMode,
   impersonating,
   impersonatorName,
   canImpersonate,
@@ -85,13 +83,12 @@ export default function AppLayout({
           collapsed={collapsed}
           onToggle={handleToggle}
           locale={locale as Locale}
-          testDualMode={testDualMode}
         />
         <main className="flex-1 overflow-y-auto bg-[#faf7f0] pb-14 md:pb-0">
           {children}
         </main>
       </div>
-      <BottomNav roles={roles} locale={locale as Locale} testDualMode={testDualMode} />
+      <BottomNav roles={roles} locale={locale as Locale} />
     </div>
   );
 }

@@ -9,13 +9,6 @@ import { t } from "@/lib/i18n/translations";
 interface BottomNavProps {
   roles: string[];
   locale: Locale;
-  /**
-   * Preview-only: gives test pros (dummy-*@) the mode-switch behaviour
-   * we parked for real pros. When on /pro/*, adds a "My Lessons" tab
-   * that pops over to /member/dashboard; when on /member/*, adds a
-   * "Pro" tab back. Production never gets this.
-   */
-  testDualMode?: boolean;
 }
 
 interface TabItem {
@@ -49,9 +42,6 @@ const memberTabs: TabItem[] = [
 
 const moreIcon =
   "M3.75 6.75h16.5M3.75 12h16.5m-16.5 5.25h16.5";
-
-const switchIcon =
-  "M7.5 21 3 16.5m0 0L7.5 12M3 16.5h13.5m0-13.5L21 7.5m0 0L16.5 12M21 7.5H7.5";
 
 // Three primary pro tabs — rest of the pro surface lives behind "More".
 const proTabs: TabItem[] = [
@@ -106,41 +96,12 @@ const proMoreItems: TabItem[] = [
   },
 ];
 
-export default function BottomNav({
-  roles,
-  locale,
-  testDualMode = false,
-}: BottomNavProps) {
+export default function BottomNav({ roles, locale }: BottomNavProps) {
   const pathname = usePathname();
   const [moreOpen, setMoreOpen] = useState(false);
 
   const isPro = roles.includes("pro");
-  const isMember = roles.includes("member");
-  const inProArea = pathname.startsWith("/pro/") || pathname.startsWith("/pro");
-  // Test pros (dummy-*@ on preview) see their student side via a
-  // mode-switch tab. Real pros don't — that mode is parked.
-  const showDualMode = testDualMode && isPro && isMember;
-
-  let tabs: TabItem[];
-  if (showDualMode && !inProArea) {
-    tabs = [
-      ...memberTabs,
-      { href: "/pro/dashboard", labelKey: "appNav.section.pro", icon: switchIcon },
-    ];
-  } else if (isPro) {
-    tabs = showDualMode
-      ? [
-          ...proTabs,
-          {
-            href: "/member/dashboard",
-            labelKey: "appNav.section.myLessons",
-            icon: switchIcon,
-          },
-        ]
-      : proTabs;
-  } else {
-    tabs = memberTabs;
-  }
+  const tabs: TabItem[] = isPro ? proTabs : memberTabs;
 
   // Close the sheet whenever the route changes (e.g. after tapping a
   // link inside it).
