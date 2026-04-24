@@ -56,7 +56,11 @@ export async function ensureProProfile(opts: {
     .limit(1);
   if (existing) return;
 
-  const displayName = `${opts.firstName} ${opts.lastName}`.trim() || "Pro";
+  // Default the public display name to just the first name — students
+  // see pros by their coaching persona rather than their legal full
+  // name. The pro can change it later in the onboarding wizard or on
+  // /pro/profile.
+  const displayName = opts.firstName.trim() || "Pro";
   await db.insert(proProfiles).values({
     userId: opts.userId,
     displayName,
