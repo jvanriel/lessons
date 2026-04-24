@@ -109,6 +109,13 @@ export async function POST(req: NextRequest) {
   if (!firstName || !lastName || !email || !phone) {
     return NextResponse.json({ error: "missing-fields" }, { status: 400 });
   }
+  // Email shape gate — prevents "dummy-pro" (no @domain) from sneaking
+  // through when the client didn't run HTML5 form validation. Gmail
+  // rejects a To header without an @ with "Invalid To header", which
+  // fires Sentry and creates a half-registered user row.
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+    return NextResponse.json({ error: "invalid-email" }, { status: 400 });
+  }
   if (!looksLikeE164(phone)) {
     return NextResponse.json({ error: "invalid-phone" }, { status: 400 });
   }

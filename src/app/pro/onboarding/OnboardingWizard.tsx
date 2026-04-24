@@ -1067,6 +1067,10 @@ export default function OnboardingWizard({
           setError(t("authErr.allFieldsRequired", locale));
           return;
         }
+        if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(data.email.trim())) {
+          setError(t("authErr.invalidEmail", locale));
+          return;
+        }
         if (!data.phone || !isValidPhoneNumber(data.phone)) {
           setError(t("publicBook.err.invalidPhone", locale));
           return;
@@ -1110,6 +1114,7 @@ export default function OnboardingWizard({
         if (!res.ok) {
           const errMap: Record<string, string> = {
             "missing-fields": t("authErr.allFieldsRequired", locale),
+            "invalid-email": t("authErr.invalidEmail", locale),
             "invalid-phone": t("publicBook.err.invalidPhone", locale),
             "password-required": t("authErr.allFieldsRequired", locale),
             "password-too-short": t("authErr.passwordTooShort", locale),
@@ -1238,6 +1243,53 @@ export default function OnboardingWizard({
     }
   }
 
+  // Per-step validity — when false, the Continue button is disabled so
+  // the pro can't submit obviously-bad input. Shape-only checks here;
+  // the server runs the same checks again for defence-in-depth.
+  function stepValid(): boolean {
+    switch (step) {
+      case 0: {
+        if (!data.firstName.trim() || !data.lastName.trim() || !data.email.trim()) return false;
+        if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(data.email.trim())) return false;
+        if (!data.phone || !isValidPhoneNumber(data.phone)) return false;
+        if (!hasAccount) {
+          if (password.length < 8) return false;
+          if (password !== confirmPassword) return false;
+        } else if (password || confirmPassword) {
+          if (password.length < 8) return false;
+          if (password !== confirmPassword) return false;
+        }
+        return true;
+      }
+      case 1:
+        return !!data.displayName.trim();
+      case 2:
+        return locations.some((l) => l.name.trim().length > 0);
+      case 3:
+        return data.lessonDurations.some(
+          (d) => (data.lessonPricing[String(d)] ?? 0) > 0,
+        );
+      case 4: {
+        if (
+          !data.invoiceAddressLine1.trim() ||
+          !data.invoicePostcode.trim() ||
+          !data.invoiceCity.trim() ||
+          !data.invoiceCountry
+        )
+          return false;
+        if (data.invoicingType === "company" && !data.companyName.trim()) return false;
+        return true;
+      }
+      case 5: {
+        if (!data.bankAccountHolder.trim()) return false;
+        const iban = data.bankIban.replace(/\s/g, "");
+        return /^[A-Za-z]{2}\d{2}[A-Za-z0-9]{4,30}$/.test(iban);
+      }
+      default:
+        return true;
+    }
+  }
+
   // Done step
   if (step >= STEP_COUNT) {
     return (
@@ -1341,8 +1393,8 @@ export default function OnboardingWizard({
               </Button>
               <Button
                 onClick={handleNext}
-                disabled={saving}
-                className="bg-gold-600 text-white hover:bg-gold-500"
+                disabled={saving || !stepValid()}
+                className="bg-gold-600 text-white hover:bg-gold-500 disabled:opacity-50"
               >
                 {saving ? t("proOnb.saving", locale) : t("proOnb.continue", locale)}
               </Button>
