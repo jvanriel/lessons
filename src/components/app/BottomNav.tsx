@@ -17,17 +17,9 @@ interface TabItem {
   icon: string; // SVG path d
 }
 
+// "My Lessons" (Home/Bookings) parked during closed beta — matches the
+// sidebar. Only coaching chat + account remain for member accounts.
 const memberTabs: TabItem[] = [
-  {
-    href: "/member/dashboard",
-    labelKey: "nav.home",
-    icon: "m2.25 12 8.954-8.955c.44-.439 1.152-.439 1.591 0L21.75 12M4.5 9.75v10.125c0 .621.504 1.125 1.125 1.125H9.75v-4.875c0-.621.504-1.125 1.125-1.125h2.25c.621 0 1.125.504 1.125 1.125V21h4.125c.621 0 1.125-.504 1.125-1.125V9.75M8.25 21h8.25",
-  },
-  {
-    href: "/member/bookings",
-    labelKey: "appNav.bookings",
-    icon: "M6.75 3v2.25M17.25 3v2.25M3 18.75V7.5a2.25 2.25 0 0 1 2.25-2.25h13.5A2.25 2.25 0 0 1 21 7.5v11.25m-18 0A2.25 2.25 0 0 0 5.25 21h13.5A2.25 2.25 0 0 0 21 18.75m-18 0v-7.5A2.25 2.25 0 0 1 5.25 9h13.5A2.25 2.25 0 0 1 21 11.25v7.5",
-  },
   {
     href: "/member/coaching",
     labelKey: "appNav.chat",
