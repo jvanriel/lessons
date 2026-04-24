@@ -48,6 +48,13 @@ export async function ensureProProfile(opts: {
   userId: number;
   firstName: string;
   lastName: string;
+  /**
+   * Optional — when a dummy-*@golflessons.be email is passed on a
+   * non-production deploy, the profile is auto-published so the test
+   * pro is immediately visible in the public directory. Safe on
+   * production: isPreviewTestAccount short-circuits there.
+   */
+  email?: string;
 }): Promise<void> {
   const [existing] = await db
     .select({ id: proProfiles.id })
@@ -61,10 +68,11 @@ export async function ensureProProfile(opts: {
   // name. The pro can change it later in the onboarding wizard or on
   // /pro/profile.
   const displayName = opts.firstName.trim() || "Pro";
+  const autoPublish = isPreviewTestAccount(opts.email);
   await db.insert(proProfiles).values({
     userId: opts.userId,
     displayName,
-    published: false,
+    published: autoPublish,
   });
 }
 

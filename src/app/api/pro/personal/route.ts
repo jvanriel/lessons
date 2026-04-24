@@ -238,7 +238,7 @@ export async function POST(req: NextRequest) {
     .insert(userEmails)
     .values({ userId, email, label: "primary", isPrimary: true })
     .onConflictDoNothing();
-  await ensureProProfile({ userId, firstName, lastName });
+  await ensureProProfile({ userId, firstName, lastName, email });
 
   await buildAndSendVerifyEmail(
     userId,
