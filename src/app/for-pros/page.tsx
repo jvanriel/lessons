@@ -1,4 +1,3 @@
-import Link from "next/link";
 import { getLocale } from "@/lib/locale";
 import { t } from "@/lib/i18n/translations";
 import { getCmsData } from "@/lib/cms";
@@ -11,6 +10,8 @@ import {
   formatPrice,
 } from "@/lib/pricing";
 import { PLATFORM_FEE_PERCENT, STRIPE_SURCHARGE_PERCENT } from "@/lib/stripe";
+import { isProSignupOpen } from "@/lib/feature-flags";
+import ProCta from "./ProCta";
 
 export const metadata = {
   title: "For Pros — Golf Lessons",
@@ -32,6 +33,7 @@ const featureIcons = [
 export default async function ForProsPage() {
   const locale = await getLocale();
   const cms = await getCmsData(PAGE, locale);
+  const signupOpen = isProSignupOpen();
 
   return (
     <div className="bg-cream">
@@ -43,9 +45,9 @@ export default async function ForProsPage() {
         <CmsBlock page={PAGE} block="hero.title" content={cms["hero.title"]} fallback={t("pros.hero.title", locale)} as="h1" className="mt-6 font-display text-4xl font-semibold tracking-tight text-green-900 sm:text-5xl" />
         <CmsBlock page={PAGE} block="hero.subtitle" content={cms["hero.subtitle"]} fallback={t("pros.hero.subtitle", locale)} as="p" className="mx-auto mt-6 max-w-2xl text-lg leading-relaxed text-green-700" />
         <div className="mt-10 flex items-center justify-center gap-4">
-          <Link href="/pro/register" className="rounded-md bg-gold-600 px-6 py-3 text-sm font-medium text-white transition-colors hover:bg-gold-500">
+          <ProCta signupOpen={signupOpen} locale={locale} className="rounded-md bg-gold-600 px-6 py-3 text-sm font-medium text-white transition-colors hover:bg-gold-500">
             <CmsBlock page={PAGE} block="hero.cta" content={cms["hero.cta"]} fallback={t("pros.hero.cta", locale)} />
-          </Link>
+          </ProCta>
         </div>
       </section>
 
@@ -177,9 +179,9 @@ export default async function ForProsPage() {
       <section className="border-t border-green-100 bg-cream py-20">
         <div className="mx-auto max-w-3xl px-6 text-center">
           <CmsBlock page={PAGE} block="cta.title" content={cms["cta.title"]} fallback={t("pros.cta.title", locale)} as="h2" className="font-display text-3xl font-semibold text-green-900" />
-          <Link href="/pro/register" className="mt-8 inline-block rounded-md bg-gold-600 px-8 py-3 text-sm font-medium text-white transition-colors hover:bg-gold-500">
+          <ProCta signupOpen={signupOpen} locale={locale} className="mt-8 inline-block rounded-md bg-gold-600 px-8 py-3 text-sm font-medium text-white transition-colors hover:bg-gold-500">
             <CmsBlock page={PAGE} block="cta.button" content={cms["cta.button"]} fallback={t("pros.cta.button", locale)} />
-          </Link>
+          </ProCta>
         </div>
       </section>
     </div>

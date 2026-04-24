@@ -158,6 +158,7 @@ function AccountStep({
   onGenerate,
   locale,
   showAuthFooter,
+  proSignupOpen,
 }: {
   data: ProfileData;
   onChange: (d: Partial<ProfileData>) => void;
@@ -174,6 +175,8 @@ function AccountStep({
    * Only true when the user landed on /register from the header
    * Register CTA; false for the public-booking-flow claim path. */
   showAuthFooter: boolean;
+  /** Pro self-service signup is open — enables the "I'm a golf pro" link. */
+  proSignupOpen: boolean;
 }) {
   const [showPw, setShowPw] = useState(false);
   const [copied, setCopied] = useState(false);
@@ -396,35 +399,39 @@ function AccountStep({
           <Link href="/login" className="text-gold-600 hover:text-gold-500">
             {t("auth.login", locale)}
           </Link>
-          {" · "}
-          <a
-            href="/pro/register"
-            onClick={(e) => {
-              // Stash whatever the student already typed so the pro
-              // register form can pre-fill and they don't have to
-              // retype (task 17 follow-up). sessionStorage avoids
-              // leaking the password through the URL / referer.
-              try {
-                sessionStorage.setItem(
-                  "pro-register-prefill",
-                  JSON.stringify({
-                    firstName: data.firstName,
-                    lastName: data.lastName,
-                    email: data.email,
-                    password,
-                    confirmPassword,
-                  }),
-                );
-              } catch {
-                // Quota / private mode — fall through to a normal nav.
-              }
-              // Let the default navigation proceed.
-              void e;
-            }}
-            className="text-gold-600 hover:text-gold-500"
-          >
-            {t("auth.imAGolfPro", locale)}
-          </a>
+          {proSignupOpen && (
+            <>
+              {" · "}
+              <a
+                href="/pro/register"
+                onClick={(e) => {
+                  // Stash whatever the student already typed so the pro
+                  // register form can pre-fill and they don't have to
+                  // retype (task 17 follow-up). sessionStorage avoids
+                  // leaking the password through the URL / referer.
+                  try {
+                    sessionStorage.setItem(
+                      "pro-register-prefill",
+                      JSON.stringify({
+                        firstName: data.firstName,
+                        lastName: data.lastName,
+                        email: data.email,
+                        password,
+                        confirmPassword,
+                      }),
+                    );
+                  } catch {
+                    // Quota / private mode — fall through to a normal nav.
+                  }
+                  // Let the default navigation proceed.
+                  void e;
+                }}
+                className="text-gold-600 hover:text-gold-500"
+              >
+                {t("auth.imAGolfPro", locale)}
+              </a>
+            </>
+          )}
         </p>
       )}
     </div>
@@ -701,6 +708,7 @@ export default function StudentOnboardingWizard({
   existingProIds,
   preSelectedProId,
   showAuthFooter,
+  proSignupOpen,
 }: {
   locale: Locale;
   isAuthenticated: boolean;
@@ -711,6 +719,7 @@ export default function StudentOnboardingWizard({
   existingProIds: number[];
   preSelectedProId: number | null;
   showAuthFooter: boolean;
+  proSignupOpen: boolean;
 }) {
   const router = useRouter();
   const [isAuthenticated, setIsAuthenticated] = useState(initialAuth);
@@ -1015,7 +1024,7 @@ export default function StudentOnboardingWizard({
           {error && <div className="mb-4 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">{error}</div>}
 
           {step === 0 && <LanguageStep selected={data.preferredLocale} onChange={(v) => updateData({ preferredLocale: v })} />}
-          {step === 1 && <AccountStep data={data} onChange={updateData} isAuthenticated={isAuthenticated} emailLocked={emailLocked} originalEmail={originalEmail} password={password} confirmPassword={confirmPassword} onPasswordChange={setPassword} onConfirmChange={setConfirmPassword} onGenerate={() => setPasswordGenerated(true)} locale={loc} showAuthFooter={showAuthFooter} />}
+          {step === 1 && <AccountStep data={data} onChange={updateData} isAuthenticated={isAuthenticated} emailLocked={emailLocked} originalEmail={originalEmail} password={password} confirmPassword={confirmPassword} onPasswordChange={setPassword} onConfirmChange={setConfirmPassword} onGenerate={() => setPasswordGenerated(true)} locale={loc} showAuthFooter={showAuthFooter} proSignupOpen={proSignupOpen} />}
           {step === 2 && <GolfProfileStep data={data} onChange={updateData} locale={loc} />}
           {step === 3 && <ChooseProsStep pros={pros} selected={selectedPros} onToggle={togglePro} locale={loc} />}
           {step === 4 && (
@@ -1035,28 +1044,36 @@ export default function StudentOnboardingWizard({
             // Fresh signup via the header "Register" button: let the
             // user pick which kind of account to create. Booking-flow
             // arrivals (cameFromBookingFlow) skip this and go straight
-            // to the student account step.
-            <div className="mt-8 grid gap-3 sm:grid-cols-2">
-              <Button
-                type="button"
-                variant="outline"
-                onClick={() => {
-                  // Carry the chosen language over so the pro wizard
-                  // starts in the same locale. The pro onboarding page
-                  // reads cookies/accept-language; setting the cookie
-                  // before navigation keeps step 0 of that wizard in
-                  // the right language.
-                  try {
-                    document.cookie = `locale=${data.preferredLocale};path=/;max-age=${365 * 24 * 60 * 60};samesite=lax`;
-                  } catch {
-                    // cookie write can fail in private mode — harmless.
-                  }
-                  window.location.href = "/pro/onboarding";
-                }}
-                className="border-green-200 py-3 text-base text-green-800 hover:border-green-300 hover:bg-green-50"
-              >
-                {t("onboarding.registerAsPro", loc)}
-              </Button>
+            // to the student account step. When pro signup is closed
+            // (production during the closed beta) we drop the pro
+            // option and show only the student CTA.
+            <div
+              className={`mt-8 grid gap-3 ${
+                proSignupOpen ? "sm:grid-cols-2" : ""
+              }`}
+            >
+              {proSignupOpen && (
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => {
+                    // Carry the chosen language over so the pro wizard
+                    // starts in the same locale. The pro onboarding page
+                    // reads cookies/accept-language; setting the cookie
+                    // before navigation keeps step 0 of that wizard in
+                    // the right language.
+                    try {
+                      document.cookie = `locale=${data.preferredLocale};path=/;max-age=${365 * 24 * 60 * 60};samesite=lax`;
+                    } catch {
+                      // cookie write can fail in private mode — harmless.
+                    }
+                    window.location.href = "/pro/onboarding";
+                  }}
+                  className="border-green-200 py-3 text-base text-green-800 hover:border-green-300 hover:bg-green-50"
+                >
+                  {t("onboarding.registerAsPro", loc)}
+                </Button>
+              )}
               <Button
                 onClick={handleNext}
                 disabled={saving}

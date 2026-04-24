@@ -37,8 +37,11 @@ export async function middleware(request: NextRequest) {
     return NextResponse.redirect(target, 308);
   }
 
-  // ─── Pre-launch password gate (non-localhost only) ────
+  // ─── Pre-launch password gate (preview/dev only) ─────
+  // Production is open to the public so selected pros can start
+  // receiving bookings; preview stays gated.
   if (
+    process.env.VERCEL_ENV !== "production" &&
     !hostname.startsWith("localhost") &&
     !hostname.startsWith("127.0.0.1")
   ) {
@@ -55,16 +58,32 @@ export async function middleware(request: NextRequest) {
     }
   }
 
+  const isProSignupRoute =
+    pathname === "/pro/register" ||
+    pathname.startsWith("/pro/register/") ||
+    pathname === "/pro/onboarding" ||
+    pathname.startsWith("/pro/onboarding/");
+
+  // ─── Closed-beta block on pro signup (production only) ─
+  // During the closed beta we only onboard hand-picked pros. Send
+  // unauthenticated signup attempts to the /for-pros waitlist dialog
+  // instead. Authenticated users (e.g. a pro resuming their own
+  // onboarding) still pass through.
+  if (
+    process.env.VERCEL_ENV === "production" &&
+    isProSignupRoute &&
+    !request.cookies.get("user-session")?.value
+  ) {
+    const target = new URL("/for-pros", request.url);
+    target.searchParams.set("waitlist", "1");
+    return NextResponse.redirect(target);
+  }
+
   // ─── Public bypass: pro self-service signup is under /pro/ but
   //     unauthenticated. /pro/register redirects into /pro/onboarding
   //     which is the new single-flow wizard (step 0 = signup); both
   //     need to be reachable without a session.
-  if (
-    pathname === "/pro/register" ||
-    pathname.startsWith("/pro/register/") ||
-    pathname === "/pro/onboarding" ||
-    pathname.startsWith("/pro/onboarding/")
-  ) {
+  if (isProSignupRoute) {
     return NextResponse.next();
   }
 

@@ -1373,6 +1373,17 @@ const translations: Record<Locale, Record<string, string>> = {
     "onboarding.maybeLater": "Maybe later",
     "onboarding.emailTypoHint": "Made a typo? You can fix your email here while it's still unverified.",
     "onboarding.emailWillReverify": "We'll send a new verification to this address.",
+
+    // Pro signup waitlist (closed-beta on production)
+    "proWaitlist.title": "Thanks for your interest",
+    "proWaitlist.body": "We're currently testing Golf Lessons with a small group of pros. We'll open signups to everyone very soon — leave your email and we'll let you know the moment we launch.",
+    "proWaitlist.emailLabel": "Email",
+    "proWaitlist.submit": "Notify me",
+    "proWaitlist.submitting": "Saving…",
+    "proWaitlist.success": "Thanks — we'll be in touch.",
+    "proWaitlist.close": "Close",
+    "proWaitlist.invalidEmail": "Please enter a valid email address.",
+    "proWaitlist.genericError": "Something went wrong. Please try again.",
   },
 
   nl: {
@@ -2685,6 +2696,17 @@ const translations: Record<Locale, Record<string, string>> = {
     "onboarding.maybeLater": "Misschien later",
     "onboarding.emailTypoHint": "Typfout gemaakt? Je kan je e-mail hier nog wijzigen zolang die niet bevestigd is.",
     "onboarding.emailWillReverify": "We sturen een nieuwe verificatie naar dit adres.",
+
+    // Pro-aanmelding wachtlijst (gesloten beta op productie)
+    "proWaitlist.title": "Bedankt voor je interesse",
+    "proWaitlist.body": "We testen Golf Lessons momenteel met een kleine groep pro's. Heel binnenkort openen we voor iedereen — laat je e-mailadres achter en we laten het je weten van zodra we live gaan.",
+    "proWaitlist.emailLabel": "E-mail",
+    "proWaitlist.submit": "Hou me op de hoogte",
+    "proWaitlist.submitting": "Bezig…",
+    "proWaitlist.success": "Bedankt — we nemen contact op.",
+    "proWaitlist.close": "Sluiten",
+    "proWaitlist.invalidEmail": "Geef een geldig e-mailadres op.",
+    "proWaitlist.genericError": "Er ging iets mis. Probeer het opnieuw.",
   },
 
   fr: {
@@ -3997,6 +4019,17 @@ const translations: Record<Locale, Record<string, string>> = {
     "onboarding.maybeLater": "Plus tard",
     "onboarding.emailTypoHint": "Une faute de frappe ? Vous pouvez encore modifier votre e-mail tant qu'il n'est pas confirmé.",
     "onboarding.emailWillReverify": "Nous enverrons une nouvelle vérification à cette adresse.",
+
+    // Liste d'attente inscription pro (bêta fermée en production)
+    "proWaitlist.title": "Merci de votre intérêt",
+    "proWaitlist.body": "Nous testons actuellement Golf Lessons avec un petit groupe de pros. Nous ouvrirons bientôt les inscriptions à tous — laissez-nous votre e-mail et nous vous préviendrons dès le lancement.",
+    "proWaitlist.emailLabel": "E-mail",
+    "proWaitlist.submit": "Me prévenir",
+    "proWaitlist.submitting": "Enregistrement…",
+    "proWaitlist.success": "Merci — nous vous tiendrons au courant.",
+    "proWaitlist.close": "Fermer",
+    "proWaitlist.invalidEmail": "Veuillez saisir une adresse e-mail valide.",
+    "proWaitlist.genericError": "Une erreur est survenue. Veuillez réessayer.",
   },
 };
 

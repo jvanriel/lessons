@@ -12,6 +12,7 @@ import {
 } from "@/lib/db/schema";
 import { eq, and, isNull } from "drizzle-orm";
 import StudentOnboardingWizard from "./StudentOnboardingWizard";
+import { isProSignupOpen } from "@/lib/feature-flags";
 
 export const metadata = { title: "Register — Golf Lessons" };
 
@@ -206,6 +207,7 @@ export default async function RegisterPage({ searchParams }: Props) {
         preSelectedProId && !isNaN(preSelectedProId) ? preSelectedProId : null
       }
       showAuthFooter={!cameFromBookingFlow}
+      proSignupOpen={isProSignupOpen()}
     />
   );
 }
