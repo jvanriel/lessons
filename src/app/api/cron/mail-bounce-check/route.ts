@@ -29,8 +29,12 @@ import { and, desc, eq, gte } from "drizzle-orm";
  * the account the golflessons.be aliases resolve to).
  */
 
+// The mailbox the dummy-test aliases resolve to (see
+// memory/reference_dummy_email_aliases.md). Bounces and delivery
+// status notifications land here when the app tries to email a
+// mis-typed student/pro address. Override via env if routing changes.
 const INBOX_TO_WATCH =
-  process.env.GMAIL_BOUNCE_INBOX || "it.admin@silverswing.golf";
+  process.env.GMAIL_BOUNCE_INBOX || "jan.vanriel@silverswing.golf";
 const QUERY = "from:mailer-daemon newer_than:30m label:inbox";
 const LOOKBACK_MINUTES = 120;
 
