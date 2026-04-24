@@ -23,6 +23,7 @@ import {
   type ExistingBooking,
 } from "@/lib/lesson-slots";
 import { redirect } from "next/navigation";
+import { after } from "next/server";
 import crypto from "node:crypto";
 import { getStripe, calculatePlatformFee } from "@/lib/stripe";
 import * as Sentry from "@sentry/nextjs";
@@ -755,47 +756,59 @@ export async function createBooking(formData: FormData) {
       method: "REQUEST",
     };
 
-    // Email the student (best-effort)
-    sendEmail({
-      to: email,
-      subject: getStudentBookingConfirmationSubject(pro.displayName, studentLocale),
-      html: buildStudentBookingConfirmationEmail({
-        firstName,
-        proName: pro.displayName,
-        locationName,
-        date,
-        startTime,
-        endTime,
-        duration,
-        priceCents,
-        cashOnly,
-        locale: studentLocale,
-      }),
-      attachments: [icsAttachment],
-    }).catch(() => {});
-
-    // Email the pro (best-effort)
-    sendEmail({
-      to: pro.proEmail,
-      subject: getProBookingNotificationSubject(`${firstName} ${lastName}`, proLocale),
-      html: buildProBookingNotificationEmail({
-        proFirstName: pro.proFirstName,
-        studentFirstName: firstName,
-        studentLastName: lastName,
-        studentEmail: email,
-        studentPhone: phone,
-        locationName,
-        date,
-        startTime,
-        endTime,
-        duration,
-        participantCount,
-        notes,
-        locale: proLocale,
-        paymentStatus: currentPaymentStatus,
-      }),
-      attachments: [icsAttachment],
-    }).catch(() => {});
+    // Email both parties after the server action returns so the UI
+    // isn't blocked on the Gmail round-trip, but `after()` keeps the
+    // function alive until the promises resolve — a bare
+    // `.catch(() => {})` fire-and-forget was getting killed on Vercel
+    // the moment the action responded, silently losing the emails.
+    after(async () => {
+      try {
+        await sendEmail({
+          to: email,
+          subject: getStudentBookingConfirmationSubject(pro.displayName, studentLocale),
+          html: buildStudentBookingConfirmationEmail({
+            firstName,
+            proName: pro.displayName,
+            locationName,
+            date,
+            startTime,
+            endTime,
+            duration,
+            priceCents,
+            cashOnly,
+            locale: studentLocale,
+          }),
+          attachments: [icsAttachment],
+        });
+      } catch {
+        /* sendEmail already logs email.failed + Sentry — swallow here. */
+      }
+      try {
+        await sendEmail({
+          to: pro.proEmail,
+          subject: getProBookingNotificationSubject(`${firstName} ${lastName}`, proLocale),
+          html: buildProBookingNotificationEmail({
+            proFirstName: pro.proFirstName,
+            studentFirstName: firstName,
+            studentLastName: lastName,
+            studentEmail: email,
+            studentPhone: phone,
+            locationName,
+            date,
+            startTime,
+            endTime,
+            duration,
+            participantCount,
+            notes,
+            locale: proLocale,
+            paymentStatus: currentPaymentStatus,
+          }),
+          attachments: [icsAttachment],
+        });
+      } catch {
+        /* ditto */
+      }
+    });
   }
 
   // Auto-save booking preferences
