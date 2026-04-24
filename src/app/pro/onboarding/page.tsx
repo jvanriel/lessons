@@ -30,7 +30,10 @@ const EMPTY_DATA = {
   invoiceAddressLine2: "",
   invoicePostcode: "",
   invoiceCity: "",
-  invoiceCountry: "",
+  // Belgium is the core market — defaulting here saves a tap and puts
+  // the country picker in a sensible state for most signups. Pros
+  // outside BE can still change it before saving step 4.
+  invoiceCountry: "BE",
 };
 
 export default async function OnboardingPage() {
@@ -147,7 +150,7 @@ export default async function OnboardingPage() {
         invoiceAddressLine2: profile.invoiceAddressLine2 ?? "",
         invoicePostcode: profile.invoicePostcode ?? "",
         invoiceCity: profile.invoiceCity ?? "",
-        invoiceCountry: profile.invoiceCountry ?? "",
+        invoiceCountry: profile.invoiceCountry ?? "BE",
       }}
     />
   );
