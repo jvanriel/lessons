@@ -5,7 +5,6 @@ import { Button } from "@/components/ui/button";
 import { Elements, PaymentElement, useStripe, useElements } from "@stripe/react-stripe-js";
 import { getStripe } from "@/lib/stripe-client";
 import { stripeElementsOptions } from "@/lib/stripe-appearance";
-import { useRouter } from "next/navigation";
 import type { Locale } from "@/lib/i18n";
 import { t } from "@/lib/i18n/translations";
 import { formatDate } from "@/lib/format-date";
@@ -1023,7 +1022,6 @@ export default function OnboardingWizard({
   hasAccount: boolean;
   locale: Locale;
 }) {
-  const router = useRouter();
   const [step, setStep] = useState(initialStep);
   const [data, setData] = useState<InitialData>(initialData);
   const [locations, setLocations] = useState<Location[]>([
@@ -1127,10 +1125,15 @@ export default function OnboardingWizard({
         }
         if (result.mode === "create") {
           setHasAccount(true);
-          // Session cookie was just set by /api/pro/personal — re-fetch
-          // server components so the root layout picks up the session
-          // and wraps subsequent steps in the AppLayout shell.
-          router.refresh();
+          // Deliberately NOT calling router.refresh() here. The session
+          // cookie is set on the response from /api/pro/personal and is
+          // sent automatically with subsequent fetch calls, so the rest
+          // of the wizard works fine. If we refresh, the root layout
+          // flips into app-mode mid-wizard — the sidebar and topbar
+          // suddenly appear around the still-running wizard, which is
+          // disorienting. We let the pro stay in public chrome through
+          // every step; the final "Go to dashboard" button does a full
+          // page load that brings up the app shell once.
         }
         setPassword("");
         setConfirmPassword("");
