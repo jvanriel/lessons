@@ -19,12 +19,13 @@ import { generatePassword } from "@/lib/password";
 export default function PasswordField({
   value,
   onChange,
+  label,
+  required,
   name,
   autoComplete,
-  required,
   minLength,
   placeholder,
-  showGenerate = false,
+  generateLabel,
   allowCopy = true,
   onGenerate,
   onBlur,
@@ -32,19 +33,29 @@ export default function PasswordField({
 }: {
   value: string;
   onChange: (next: string) => void;
+  /**
+   * Optional field label. When set, rendered as a flex row with the
+   * Generate button on the right — so label + action sit on one line
+   * and the input sits below at the same baseline as a sibling field
+   * without Generate.
+   */
+  label?: string;
+  /** Render a red asterisk after the label. */
+  required?: boolean;
   name?: string;
   autoComplete?: string;
-  required?: boolean;
   minLength?: number;
   placeholder?: string;
-  /** Render the "Generate" action above the field. */
-  showGenerate?: boolean;
+  /**
+   * Show the Generate button with this label. Omit to hide it (used
+   * on confirm-password fields and login forms).
+   */
+  generateLabel?: string;
   /** Show the copy-to-clipboard icon when the field has a value. */
   allowCopy?: boolean;
   /**
-   * Parent hook called when the user clicks Generate — the newly
-   * generated password is passed through so the caller can also
-   * mirror it into a confirm field, pop a "show" toggle, etc.
+   * Called when Generate is clicked with the freshly generated
+   * password. Parent typically mirrors this into a confirm field.
    */
   onGenerate?: (next: string) => void;
   onBlur?: () => void;
@@ -73,15 +84,25 @@ export default function PasswordField({
 
   return (
     <div className={className}>
-      {showGenerate && (
-        <div className="mb-1 flex justify-end">
-          <button
-            type="button"
-            onClick={handleGenerate}
-            className="text-xs font-medium text-gold-600 hover:text-gold-500"
-          >
-            Generate
-          </button>
+      {(label || generateLabel) && (
+        <div className="mb-1 flex min-h-[20px] items-center justify-between gap-3">
+          {label ? (
+            <label className="text-sm font-medium text-green-800">
+              {label}
+              {required && <span className="text-red-500"> *</span>}
+            </label>
+          ) : (
+            <span />
+          )}
+          {generateLabel && (
+            <button
+              type="button"
+              onClick={handleGenerate}
+              className="text-xs font-medium text-gold-600 hover:text-gold-500"
+            >
+              {generateLabel}
+            </button>
+          )}
         </div>
       )}
       <div className="relative">

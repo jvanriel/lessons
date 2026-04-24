@@ -206,38 +206,30 @@ function PersonalStep({
 
       <div className="grid gap-3 sm:grid-cols-2">
         <div>
-          <label className="block text-sm font-medium text-green-800">
-            {t("proOnb.personal.password", locale)}
-            {!hasAccount && <span className="text-red-500"> *</span>}
-          </label>
           <PasswordField
+            label={t("proOnb.personal.password", locale)}
+            required={!hasAccount}
             value={password}
             onChange={onPassword}
             onBlur={() => mark("password")}
             onGenerate={(next) => onConfirmPassword(next)}
-            showGenerate
-            required={!hasAccount}
+            generateLabel={t("onboarding.generatePassword", locale)}
             minLength={8}
             placeholder={hasAccount ? t("proOnb.personal.passwordKeep", locale) : undefined}
-            className="mt-1"
           />
           {pwTooShort && (
             <p className={err}>{t("authErr.passwordTooShort", locale)}</p>
           )}
         </div>
         <div>
-          <label className="block text-sm font-medium text-green-800">
-            {t("proOnb.personal.confirmPassword", locale)}
-            {!hasAccount && <span className="text-red-500"> *</span>}
-          </label>
           <PasswordField
+            label={t("proOnb.personal.confirmPassword", locale)}
+            required={!hasAccount}
             value={confirmPassword}
             onChange={onConfirmPassword}
             onBlur={() => mark("confirmPassword")}
-            required={!hasAccount}
             minLength={8}
             allowCopy={false}
-            className="mt-1"
           />
           {pwMismatch && (
             <p className={err}>{t("authErr.passwordsDontMatch", locale)}</p>
