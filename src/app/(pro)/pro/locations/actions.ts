@@ -116,16 +116,35 @@ export async function updateProLocation(
   const proLocationId = parseInt(formData.get("proLocationId") as string);
   const notes = (formData.get("notes") as string)?.trim() || null;
   const active = formData.get("active") === "true";
+  const name = (formData.get("name") as string)?.trim() || "";
+  const address = (formData.get("address") as string)?.trim() || null;
+  const city = (formData.get("city") as string)?.trim() || null;
+  const country = (formData.get("country") as string)?.trim() || null;
 
-  await db
-    .update(proLocations)
-    .set({ notes, active })
+  if (!name) return { error: "Location name is required." };
+
+  // Look up the shared locations row via the pro_locations junction,
+  // scoped to the current pro so one pro can't edit another's row.
+  const [link] = await db
+    .select({ id: proLocations.id, locationId: proLocations.locationId })
+    .from(proLocations)
     .where(
       and(
         eq(proLocations.id, proLocationId),
         eq(proLocations.proProfileId, proId)
       )
-    );
+    )
+    .limit(1);
+  if (!link) return { error: "Location not found." };
+
+  await db
+    .update(locations)
+    .set({ name, address, city, country })
+    .where(eq(locations.id, link.locationId));
+  await db
+    .update(proLocations)
+    .set({ notes, active })
+    .where(eq(proLocations.id, proLocationId));
 
   revalidatePath("/pro/locations");
   revalidatePath("/pro/availability");

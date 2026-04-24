@@ -245,9 +245,9 @@ function EditLocationForm({
     <form action={action} className="space-y-3">
       <input type="hidden" name="proLocationId" value={location.proLocationId} />
       <input type="hidden" name="active" value={String(active)} />
-      <div className="flex items-center justify-between">
+      <div className="flex items-center justify-between gap-3">
         <h3 className="font-medium text-green-900">{location.name}</h3>
-        <label className="flex items-center gap-2 text-sm text-green-700">
+        <label className="flex shrink-0 items-center gap-2 text-sm text-green-700">
           <button
             type="button"
             role="switch"
@@ -266,15 +266,61 @@ function EditLocationForm({
           {t("proLocations.active", locale)}
         </label>
       </div>
-      <div>
-        <label className="block text-xs font-medium text-green-700">
-          {t("proLocations.notes", locale)}
-        </label>
-        <input
-          name="notes"
-          defaultValue={location.notes ?? ""}
-          className={inputClass}
-        />
+      <div className="grid gap-3 sm:grid-cols-2">
+        <div>
+          <label className="block text-xs font-medium text-green-700">
+            {t("proLocations.name", locale)} *
+          </label>
+          <input
+            name="name"
+            required
+            defaultValue={location.name}
+            placeholder={t("proLocations.namePlaceholder", locale)}
+            className={inputClass}
+          />
+        </div>
+        <div>
+          <label className="block text-xs font-medium text-green-700">
+            {t("proLocations.city", locale)}
+          </label>
+          <input
+            name="city"
+            defaultValue={location.city ?? ""}
+            placeholder={t("proLocations.cityPlaceholder", locale)}
+            className={inputClass}
+          />
+        </div>
+        <div className="sm:col-span-2">
+          <label className="block text-xs font-medium text-green-700">
+            {t("proLocations.address", locale)}
+          </label>
+          <input
+            name="address"
+            defaultValue={location.address ?? ""}
+            placeholder={t("proLocations.addressPlaceholder", locale)}
+            className={inputClass}
+          />
+        </div>
+        <div>
+          <label className="block text-xs font-medium text-green-700">
+            {t("proLocations.country", locale)}
+          </label>
+          <input
+            name="country"
+            defaultValue={location.country ?? ""}
+            className={inputClass}
+          />
+        </div>
+        <div className="sm:col-span-2">
+          <label className="block text-xs font-medium text-green-700">
+            {t("proLocations.notes", locale)}
+          </label>
+          <input
+            name="notes"
+            defaultValue={location.notes ?? ""}
+            className={inputClass}
+          />
+        </div>
       </div>
       {state?.error && (
         <p className="text-sm text-red-600">{state.error}</p>
