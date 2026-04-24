@@ -982,7 +982,43 @@ export default function StudentOnboardingWizard({
             />
           )}
 
-          {step < 4 && (
+          {step === 0 && showAuthFooter && !isAuthenticated ? (
+            // Fresh signup via the header "Register" button: let the
+            // user pick which kind of account to create. Booking-flow
+            // arrivals (cameFromBookingFlow) skip this and go straight
+            // to the student account step.
+            <div className="mt-8 grid gap-3 sm:grid-cols-2">
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => {
+                  // Carry the chosen language over so the pro wizard
+                  // starts in the same locale. The pro onboarding page
+                  // reads cookies/accept-language; setting the cookie
+                  // before navigation keeps step 0 of that wizard in
+                  // the right language.
+                  try {
+                    document.cookie = `locale=${data.preferredLocale};path=/;max-age=${365 * 24 * 60 * 60};samesite=lax`;
+                  } catch {
+                    // cookie write can fail in private mode — harmless.
+                  }
+                  window.location.href = "/pro/onboarding";
+                }}
+                className="border-green-200 py-3 text-base text-green-800 hover:border-green-300 hover:bg-green-50"
+              >
+                {t("onboarding.registerAsPro", loc)}
+              </Button>
+              <Button
+                onClick={handleNext}
+                disabled={saving}
+                className="bg-gold-600 py-3 text-base text-white hover:bg-gold-500"
+              >
+                {saving
+                  ? t("onboarding.saving", loc)
+                  : t("onboarding.registerAsStudent", loc)}
+              </Button>
+            </div>
+          ) : step < 4 ? (
             <div className="mt-8 flex justify-between">
               <Button type="button" variant="outline" onClick={() => {
                 // From Payment (step 4) Back goes to either step 3
@@ -994,7 +1030,7 @@ export default function StudentOnboardingWizard({
               }} disabled={(step === 0) || saving} className="border-green-200 text-green-700 hover:bg-green-50">{t("onboarding.back", loc)}</Button>
               <Button onClick={handleNext} disabled={nextDisabled} className="bg-gold-600 text-white hover:bg-gold-500">{saving ? t("onboarding.saving", loc) : t("onboarding.continue", loc)}</Button>
             </div>
-          )}
+          ) : null}
         </div>
       </div>
     </div>
