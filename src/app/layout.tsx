@@ -6,6 +6,7 @@ import Footer from "@/components/Footer";
 import { CmsProvider } from "@/components/cms/CmsProvider";
 import DeploymentChecker from "@/components/DeploymentChecker";
 import { getSession, hasRole, getImpersonatorSession, parseRoles } from "@/lib/auth";
+import { isPreviewTestAccount } from "@/lib/pro";
 import { cookies } from "next/headers";
 import { db } from "@/lib/db";
 import { users } from "@/lib/db/schema";
@@ -65,6 +66,7 @@ export default async function RootLayout({
         showNotifications: boolean;
         sessionToken?: string;
         locale: Locale;
+        testDualMode: boolean;
         impersonating: boolean;
         impersonatorName: string | null;
         canImpersonate: boolean;
@@ -195,6 +197,7 @@ export default async function RootLayout({
       showNotifications,
       sessionToken,
       locale,
+      testDualMode: isPreviewTestAccount(session.email),
       impersonating: !!impersonator,
       impersonatorName,
       canImpersonate,

@@ -11,6 +11,13 @@ interface AppSidebarProps {
   collapsed: boolean;
   onToggle: () => void;
   locale: Locale;
+  /**
+   * Preview-only: bypasses `hideIfRole` so test pros (dummy-*@) can
+   * see their student-side drawer section too. Exists so we can
+   * exercise pro-as-student flows end-to-end without unparking the
+   * feature for real pros. See `isPreviewTestAccount` in lib/pro.
+   */
+  testDualMode?: boolean;
 }
 
 const SECTIONS_KEY = "app-sidebar-sections";
@@ -267,11 +274,12 @@ export default function AppSidebar({
   collapsed,
   onToggle,
   locale,
+  testDualMode = false,
 }: AppSidebarProps) {
   const pathname = usePathname();
   const visibleSections = sections.filter((s) => {
     if (!roles.includes(s.role)) return false;
-    if (s.hideIfRole && roles.includes(s.hideIfRole)) return false;
+    if (s.hideIfRole && roles.includes(s.hideIfRole) && !testDualMode) return false;
     return true;
   });
 
