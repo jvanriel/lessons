@@ -25,6 +25,7 @@ import crypto from "node:crypto";
 import { SignJWT } from "jose";
 import { looksLikeE164, normalizePhone } from "@/lib/phone";
 import { sendEmail } from "@/lib/mail";
+import { after } from "next/server";
 import {
   buildClaimAndVerifyBookingEmail,
   buildNewBookingOnAccountEmail,
@@ -602,87 +603,29 @@ export async function createPublicBooking(formData: FormData) {
       : loc.name
     : "";
 
-  // Build the student-facing email.
-  if (branch === "new" || branch === "unverified") {
-    const token = await new SignJWT({
-      userId,
-      purpose: "claim-booking",
-      bookingId: booking.id,
-    })
-      .setProtectedHeader({ alg: "HS256" })
-      .setIssuedAt()
-      .setExpirationTime("7d")
-      .sign(getSecret());
-    const claimUrl = `${getBaseUrl()}/api/auth/claim-booking?token=${token}`;
-    const registerUrl =
-      `${getBaseUrl()}/register?firstName=${encodeURIComponent(firstName)}` +
-      `&lastName=${encodeURIComponent(lastName)}` +
-      `&email=${encodeURIComponent(email)}` +
-      `&phone=${encodeURIComponent(phone)}` +
-      `&pro=${pro.id}`;
+  // Single .ics shared between the student and pro emails — both
+  // sides deserve a calendar invite they can drop into Google/Apple/
+  // Outlook.
+  const icsAttachment = proUser
+    ? {
+        filename: "lesson.ics",
+        contentType: "text/calendar",
+        content: buildIcs({
+          date,
+          startTime,
+          endTime,
+          summary: `Golf lesson with ${proUser.displayName}`,
+          location: locationName,
+          description: `Booked via golflessons.be — ${firstName} ${lastName}${notes ? ` — Notes: ${notes}` : ""}`,
+          bookingId: booking.id,
+        }),
+        method: "REQUEST" as const,
+      }
+    : null;
 
-    sendEmail({
-      to: email,
-      subject: getClaimBookingSubject(
-        proUser?.displayName ?? "",
-        recipientLocale
-      ),
-      html: buildClaimAndVerifyBookingEmail({
-        firstName,
-        proName: proUser?.displayName ?? "",
-        locationName,
-        date,
-        startTime,
-        endTime,
-        duration,
-        claimUrl,
-        registerUrl,
-        locale: recipientLocale,
-      }),
-    }).catch(() => {});
-  } else {
-    // Verified: short notice + login link. Don't re-verify.
-    sendEmail({
-      to: email,
-      subject: getClaimBookingSubject(
-        proUser?.displayName ?? "",
-        recipientLocale
-      ),
-      html: buildNewBookingOnAccountEmail({
-        firstName,
-        proName: proUser?.displayName ?? "",
-        locationName,
-        date,
-        startTime,
-        endTime,
-        duration,
-        loginUrl: `${getBaseUrl()}/login?email=${encodeURIComponent(email)}`,
-        locale: recipientLocale,
-      }),
-    }).catch(() => {});
-  }
-
-  // Notify the pro (in-app + email). The email body includes an
-  // "unverified" badge when branch !== "verified" so the pro knows to
-  // follow up if needed.
+  // Pro notification is still awaited — it writes the in-app row we
+  // rely on for the "New lesson booking" bell.
   if (proUser) {
-    const proLocale = resolveLocale(proUser.proLocale);
-    const ics = buildIcs({
-      date,
-      startTime,
-      endTime,
-      summary: `Golf lesson with ${proUser.displayName}`,
-      location: locationName,
-      description: `Booked via golflessons.be — ${firstName} ${lastName}${notes ? ` — Notes: ${notes}` : ""}`,
-      bookingId: booking.id,
-    });
-    const icsAttachment = {
-      filename: "lesson.ics",
-      contentType: "text/calendar",
-      content: ics,
-      method: "REQUEST" as const,
-    };
-
     await createNotification({
       type: "new_booking",
       priority: "high",
@@ -692,34 +635,114 @@ export async function createPublicBooking(formData: FormData) {
       actionUrl: "/pro/bookings",
       actionLabel: "View bookings",
     });
-
-    sendEmail({
-      to: proUser.proEmail,
-      subject: getProBookingNotificationSubject(
-        `${firstName} ${lastName}`,
-        proLocale
-      ),
-      html: buildProBookingNotificationEmail({
-        proFirstName: proUser.proFirstName,
-        studentFirstName: firstName,
-        studentLastName: lastName,
-        studentEmail: email,
-        studentPhone: phone,
-        locationName,
-        date,
-        startTime,
-        endTime,
-        duration,
-        participantCount,
-        notes,
-        locale: proLocale,
-        emailUnverified: branch !== "verified",
-        // Public booking is Phase A: zero-friction, no online charge.
-        paymentStatus: "manual",
-      }),
-      attachments: [icsAttachment],
-    }).catch(() => {});
   }
+
+  // All email sends run post-response via `after()` so the UI isn't
+  // blocked on Gmail, but Vercel keeps the function alive until they
+  // settle — a bare fire-and-forget was losing mails silently.
+  const icsAttachments = icsAttachment ? [icsAttachment] : [];
+  after(async () => {
+    // Student confirmation — branches on whether the email is already
+    // verified (login link) or still needs to claim (verify link).
+    try {
+      if (branch === "new" || branch === "unverified") {
+        const token = await new SignJWT({
+          userId,
+          purpose: "claim-booking",
+          bookingId: booking.id,
+        })
+          .setProtectedHeader({ alg: "HS256" })
+          .setIssuedAt()
+          .setExpirationTime("7d")
+          .sign(getSecret());
+        const claimUrl = `${getBaseUrl()}/api/auth/claim-booking?token=${token}`;
+        const registerUrl =
+          `${getBaseUrl()}/register?firstName=${encodeURIComponent(firstName)}` +
+          `&lastName=${encodeURIComponent(lastName)}` +
+          `&email=${encodeURIComponent(email)}` +
+          `&phone=${encodeURIComponent(phone)}` +
+          `&pro=${pro.id}`;
+
+        await sendEmail({
+          to: email,
+          subject: getClaimBookingSubject(
+            proUser?.displayName ?? "",
+            recipientLocale,
+          ),
+          html: buildClaimAndVerifyBookingEmail({
+            firstName,
+            proName: proUser?.displayName ?? "",
+            locationName,
+            date,
+            startTime,
+            endTime,
+            duration,
+            claimUrl,
+            registerUrl,
+            locale: recipientLocale,
+          }),
+          attachments: icsAttachments,
+        });
+      } else {
+        await sendEmail({
+          to: email,
+          subject: getClaimBookingSubject(
+            proUser?.displayName ?? "",
+            recipientLocale,
+          ),
+          html: buildNewBookingOnAccountEmail({
+            firstName,
+            proName: proUser?.displayName ?? "",
+            locationName,
+            date,
+            startTime,
+            endTime,
+            duration,
+            loginUrl: `${getBaseUrl()}/login?email=${encodeURIComponent(email)}`,
+            locale: recipientLocale,
+          }),
+          attachments: icsAttachments,
+        });
+      }
+    } catch {
+      /* sendEmail already logs email.failed + Sentry. */
+    }
+
+    // Pro notification email with the same ics.
+    if (proUser) {
+      try {
+        const proLocale = resolveLocale(proUser.proLocale);
+        await sendEmail({
+          to: proUser.proEmail,
+          subject: getProBookingNotificationSubject(
+            `${firstName} ${lastName}`,
+            proLocale,
+          ),
+          html: buildProBookingNotificationEmail({
+            proFirstName: proUser.proFirstName,
+            studentFirstName: firstName,
+            studentLastName: lastName,
+            studentEmail: email,
+            studentPhone: phone,
+            locationName,
+            date,
+            startTime,
+            endTime,
+            duration,
+            participantCount,
+            notes,
+            locale: proLocale,
+            emailUnverified: branch !== "verified",
+            // Public booking is Phase A: zero-friction, no online charge.
+            paymentStatus: "manual",
+          }),
+          attachments: icsAttachments,
+        });
+      } catch {
+        /* ditto */
+      }
+    }
+  });
 
   // Silently learn scheduling preferences on the pro_students row so
   // the student never has to fill out an explicit "scheduling" step —
