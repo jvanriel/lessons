@@ -297,7 +297,7 @@ export function BookingWizard({
           </label>
           <div className="mt-2 grid gap-2">
             {locations.map((l) => {
-              const single = locations.length === 1;
+              const single = !showAllSteps && locations.length === 1;
               const selected = locationId === l.id;
               return (
                 <button
@@ -342,7 +342,7 @@ export function BookingWizard({
           <div className="mt-2 flex flex-wrap gap-2">
             {pro.lessonDurations.map((d) => {
               const p = pro.lessonPricing[String(d)];
-              const single = pro.lessonDurations.length === 1;
+              const single = !showAllSteps && pro.lessonDurations.length === 1;
               const selected = duration === d;
               return (
                 <button

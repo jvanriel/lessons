@@ -121,7 +121,7 @@ export default async function MemberDashboard() {
   );
 
   return (
-    <div className="mx-auto max-w-4xl px-6 py-12">
+    <div className="mx-auto max-w-6xl px-6 py-12">
       <BookingRefreshListener />
       <div className="flex items-start justify-between gap-4">
         <div>
