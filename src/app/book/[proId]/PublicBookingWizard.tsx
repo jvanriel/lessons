@@ -94,6 +94,12 @@ export default function PublicBookingWizard({
   const [email, setEmail] = useState("");
   const [phone, setPhone] = useState("");
   const [notes, setNotes] = useState("");
+  // Per-field "touched" state — error messages below a field only
+  // show after the user has focused and then left it.
+  const [touched, setTouched] = useState<Record<string, boolean>>({});
+  const markTouched = (field: string) =>
+    setTouched((prev) => (prev[field] ? prev : { ...prev, [field]: true }));
+  const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
   const [honeypot, setHoneypot] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState(false);
@@ -597,8 +603,14 @@ export default function PublicBookingWizard({
                 aria-required="true"
                 value={firstName}
                 onChange={(e) => setFirstName(e.target.value)}
+                onBlur={() => markTouched("firstName")}
                 className="w-full rounded-md border border-green-200 bg-white px-3 py-2 text-sm text-green-900 focus:border-green-400 focus:outline-none focus:ring-1 focus:ring-green-400"
               />
+              {touched.firstName && !firstName.trim() && (
+                <p className="mt-1 text-xs text-red-600">
+                  {t("publicBook.err.nameRequired", locale)}
+                </p>
+              )}
             </div>
             <div>
               <label className="mb-1 block text-xs font-medium text-green-700">
@@ -611,8 +623,14 @@ export default function PublicBookingWizard({
                 aria-required="true"
                 value={lastName}
                 onChange={(e) => setLastName(e.target.value)}
+                onBlur={() => markTouched("lastName")}
                 className="w-full rounded-md border border-green-200 bg-white px-3 py-2 text-sm text-green-900 focus:border-green-400 focus:outline-none focus:ring-1 focus:ring-green-400"
               />
+              {touched.lastName && !lastName.trim() && (
+                <p className="mt-1 text-xs text-red-600">
+                  {t("publicBook.err.nameRequired", locale)}
+                </p>
+              )}
             </div>
           </div>
 
@@ -627,8 +645,19 @@ export default function PublicBookingWizard({
               aria-required="true"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
+              onBlur={() => markTouched("email")}
               className="w-full rounded-md border border-green-200 bg-white px-3 py-2 text-sm text-green-900 focus:border-green-400 focus:outline-none focus:ring-1 focus:ring-green-400"
             />
+            {touched.email && email.trim() && !EMAIL_RE.test(email.trim()) && (
+              <p className="mt-1 text-xs text-red-600">
+                {t("publicBook.err.invalidEmail", locale)}
+              </p>
+            )}
+            {touched.email && !email.trim() && (
+              <p className="mt-1 text-xs text-red-600">
+                {t("publicBook.err.nameRequired", locale)}
+              </p>
+            )}
           </div>
 
           <div className="mt-3">

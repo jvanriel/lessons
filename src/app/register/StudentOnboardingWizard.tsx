@@ -177,6 +177,28 @@ function AccountStep({
 }) {
   const [showPw, setShowPw] = useState(false);
   const [copied, setCopied] = useState(false);
+  // Per-field "touched" so inline validation messages only appear
+  // AFTER the user has tabbed/blurred away from a field — not while
+  // they're still typing the first character.
+  const [touched, setTouched] = useState<Record<string, boolean>>({});
+  const markTouched = (field: string) =>
+    setTouched((prev) => (prev[field] ? prev : { ...prev, [field]: true }));
+
+  const emailTrim = data.email.trim();
+  const emailInvalid =
+    !!touched.email && !!emailTrim && !EMAIL_RE.test(emailTrim);
+  const emailMissing = !!touched.email && !emailTrim;
+  const firstNameMissing = !!touched.firstName && !data.firstName.trim();
+  const lastNameMissing = !!touched.lastName && !data.lastName.trim();
+  const pwTooShort =
+    !!touched.password && password.length > 0 && password.length < 8;
+  const pwMissing =
+    !!touched.password && password.length === 0 && !isAuthenticated;
+  const pwMismatch =
+    !!touched.confirmPassword &&
+    confirmPassword.length > 0 &&
+    confirmPassword !== password;
+  const errClass = "mt-1 text-xs text-red-600";
 
   function handleGenerate() {
     const pw = generatePassword();
@@ -210,8 +232,12 @@ function AccountStep({
             type="text"
             value={data.firstName}
             onChange={(e) => onChange({ firstName: e.target.value })}
+            onBlur={() => markTouched("firstName")}
             className={inputClass}
           />
+          {firstNameMissing && (
+            <p className={errClass}>{t("authErr.allFieldsRequired", locale)}</p>
+          )}
         </div>
         <div>
           <label className="block text-sm font-medium text-green-800">
@@ -221,8 +247,12 @@ function AccountStep({
             type="text"
             value={data.lastName}
             onChange={(e) => onChange({ lastName: e.target.value })}
+            onBlur={() => markTouched("lastName")}
             className={inputClass}
           />
+          {lastNameMissing && (
+            <p className={errClass}>{t("authErr.allFieldsRequired", locale)}</p>
+          )}
         </div>
       </div>
       <div>
@@ -233,9 +263,16 @@ function AccountStep({
           type="email"
           value={data.email}
           onChange={(e) => onChange({ email: e.target.value })}
+          onBlur={() => markTouched("email")}
           disabled={emailLocked}
           className={inputClass + (emailLocked ? " opacity-60" : "")}
         />
+        {emailMissing && (
+          <p className={errClass}>{t("authErr.allFieldsRequired", locale)}</p>
+        )}
+        {emailInvalid && (
+          <p className={errClass}>{t("authErr.invalidEmail", locale)}</p>
+        )}
         {isAuthenticated && !emailLocked && (
           <p className="mt-1 text-xs text-green-500">
             {t("onboarding.emailTypoHint", locale)}
@@ -283,6 +320,7 @@ function AccountStep({
                 type={showPw ? "text" : "password"}
                 value={password}
                 onChange={(e) => onPasswordChange(e.target.value)}
+                onBlur={() => markTouched("password")}
                 minLength={8}
                 className={inputClass + " pr-20"}
               />
@@ -325,6 +363,13 @@ function AccountStep({
                 </button>
               </div>
             </div>
+            {(pwMissing || pwTooShort) && (
+              <p className={errClass}>
+                {pwTooShort
+                  ? t("authErr.passwordTooShort", locale)
+                  : t("authErr.allFieldsRequired", locale)}
+              </p>
+            )}
           </div>
           <div>
             <label className="block text-sm font-medium text-green-800">
@@ -334,9 +379,13 @@ function AccountStep({
               type={showPw ? "text" : "password"}
               value={confirmPassword}
               onChange={(e) => onConfirmChange(e.target.value)}
+              onBlur={() => markTouched("confirmPassword")}
               minLength={8}
               className={inputClass}
             />
+            {pwMismatch && (
+              <p className={errClass}>{t("authErr.passwordsDontMatch", locale)}</p>
+            )}
           </div>
         </>
       )}
