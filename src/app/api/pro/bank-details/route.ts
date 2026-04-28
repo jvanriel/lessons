@@ -3,9 +3,7 @@ import { getSession, hasRole } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { proProfiles } from "@/lib/db/schema";
 import { eq } from "drizzle-orm";
-
-// Basic IBAN validation: starts with 2 letters, then 2 digits, then up to 30 alphanumeric
-const IBAN_REGEX = /^[A-Z]{2}\d{2}[A-Z0-9]{4,30}$/;
+import { isValidIban, normalizeIban } from "@/lib/iban";
 
 export async function POST(request: Request) {
   const session = await getSession();
@@ -27,14 +25,13 @@ export async function POST(request: Request) {
     );
   }
 
-  // Normalize IBAN: remove spaces, uppercase
-  const cleanIban = iban?.replace(/\s/g, "").toUpperCase();
-  if (!cleanIban || !IBAN_REGEX.test(cleanIban)) {
+  if (!isValidIban(iban)) {
     return NextResponse.json(
       { error: "Invalid IBAN format" },
       { status: 400 }
     );
   }
+  const cleanIban = normalizeIban(iban);
 
   const [profile] = await db
     .select({ id: proProfiles.id })

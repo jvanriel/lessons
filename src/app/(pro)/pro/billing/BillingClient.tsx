@@ -11,6 +11,8 @@ import {
   formatPrice,
 } from "@/lib/pricing";
 import PageHeading from "@/components/app/PageHeading";
+import { isValidIban } from "@/lib/iban";
+import { isValidVatShape } from "@/lib/vat";
 
 interface PendingCommissionBooking {
   id: number;
@@ -120,10 +122,16 @@ function BankDetailsForm({
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  const ibanInvalid = iban.trim() !== "" && !isValidIban(iban);
+
   async function handleSave(e: React.FormEvent) {
     e.preventDefault();
-    setSaving(true);
     setError(null);
+    if (!isValidIban(iban)) {
+      setError(t("proBilling.form.ibanInvalid", locale));
+      return;
+    }
+    setSaving(true);
 
     const res = await fetch("/api/pro/bank-details", {
       method: "POST",
@@ -175,6 +183,11 @@ function BankDetailsForm({
           className="mt-1 w-full rounded-md border border-green-200 bg-white px-3 py-2 text-sm font-mono text-green-900 placeholder:text-green-400 focus:border-green-400 focus:outline-none focus:ring-1 focus:ring-green-400"
           required
         />
+        {ibanInvalid && (
+          <p className="mt-1 text-xs text-red-600">
+            {t("proBilling.form.ibanInvalid", locale)}
+          </p>
+        )}
       </div>
 
       <div>
@@ -245,11 +258,17 @@ function InvoicingForm({
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const isCompany = v.invoicingType === "company";
+  const vatInvalid =
+    isCompany && v.vatNumber.trim() !== "" && !isValidVatShape(v.vatNumber);
 
   async function handleSave(e: React.FormEvent) {
     e.preventDefault();
-    setSaving(true);
     setError(null);
+    if (vatInvalid) {
+      setError(t("proBilling.form.vatInvalid", locale));
+      return;
+    }
+    setSaving(true);
     const res = await fetch("/api/pro/invoicing", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -329,6 +348,15 @@ function InvoicingForm({
               placeholder={t("proOnb.inv.vatPlaceholder", locale)}
               className={input + " font-mono"}
             />
+            {vatInvalid ? (
+              <p className="mt-1 text-xs text-red-600">
+                {t("proBilling.form.vatInvalid", locale)}
+              </p>
+            ) : (
+              <p className="mt-1 text-xs text-green-500">
+                {t("proOnb.inv.vatHint", locale)}
+              </p>
+            )}
           </div>
         </>
       )}

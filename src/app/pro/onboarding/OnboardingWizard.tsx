@@ -10,6 +10,8 @@ import { t } from "@/lib/i18n/translations";
 import { formatDate } from "@/lib/format-date";
 import PhoneField, { isValidPhoneNumber } from "@/components/PhoneField";
 import PasswordField from "@/components/PasswordField";
+import { isValidIban } from "@/lib/iban";
+import { isValidVatShape } from "@/lib/vat";
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 import {
@@ -643,9 +645,15 @@ function InvoicingStep({
               placeholder={t("proOnb.inv.vatPlaceholder", locale)}
               className={inputClass + " font-mono"}
             />
-            <p className="mt-1 text-xs text-green-500">
-              {t("proOnb.inv.vatHint", locale)}
-            </p>
+            {data.vatNumber.trim() !== "" && !isValidVatShape(data.vatNumber) ? (
+              <p className="mt-1 text-xs text-red-600">
+                {t("proOnb.inv.vatInvalid", locale)}
+              </p>
+            ) : (
+              <p className="mt-1 text-xs text-green-500">
+                {t("proOnb.inv.vatHint", locale)}
+              </p>
+            )}
           </div>
         </>
       )}
@@ -760,6 +768,11 @@ function BankStep({
           placeholder={t("proOnb.bank.ibanPlaceholder", locale)}
           className={inputClass + " font-mono"}
         />
+        {data.bankIban.trim() !== "" && !isValidIban(data.bankIban) && (
+          <p className="mt-1 text-xs text-red-600">
+            {t("proOnb.bank.ibanInvalid", locale)}
+          </p>
+        )}
       </div>
       <div>
         <label className="block text-sm font-medium text-green-800">
@@ -1303,12 +1316,12 @@ export default function OnboardingWizard({
         )
           return false;
         if (data.invoicingType === "company" && !data.companyName.trim()) return false;
+        if (data.vatNumber.trim() && !isValidVatShape(data.vatNumber)) return false;
         return true;
       }
       case 5: {
         if (!data.bankAccountHolder.trim()) return false;
-        const iban = data.bankIban.replace(/\s/g, "");
-        return /^[A-Za-z]{2}\d{2}[A-Za-z0-9]{4,30}$/.test(iban);
+        return isValidIban(data.bankIban);
       }
       default:
         return true;
