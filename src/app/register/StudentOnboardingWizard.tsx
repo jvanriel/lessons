@@ -1047,11 +1047,17 @@ export default function StudentOnboardingWizard({
             // to the student account step. When pro signup is closed
             // (production during the closed beta) we drop the pro
             // option and show only the student CTA.
-            <div
-              className={`mt-8 grid gap-3 ${
-                proSignupOpen ? "sm:grid-cols-2" : ""
-              }`}
-            >
+            <>
+              {proSignupOpen && (
+                <p className="mt-8 text-center text-xs text-green-600">
+                  {t("onboarding.accountTypeHint", loc)}
+                </p>
+              )}
+              <div
+                className={`mt-3 grid gap-3 ${
+                  proSignupOpen ? "sm:grid-cols-2" : ""
+                }`}
+              >
               {proSignupOpen && (
                 <Button
                   type="button"
@@ -1083,7 +1089,8 @@ export default function StudentOnboardingWizard({
                   ? t("onboarding.saving", loc)
                   : t("onboarding.registerAsStudent", loc)}
               </Button>
-            </div>
+              </div>
+            </>
           ) : step < 4 ? (
             <div className="mt-8 flex justify-between">
               <Button type="button" variant="outline" onClick={() => {
