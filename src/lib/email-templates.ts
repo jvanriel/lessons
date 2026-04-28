@@ -691,6 +691,8 @@ const BOOKING_STUDENT_STRINGS: Record<Locale, {
   body: string;
   details: string;
   pro: string;
+  proEmail: string;
+  proPhone: string;
   location: string;
   date: string;
   time: string;
@@ -707,6 +709,8 @@ const BOOKING_STUDENT_STRINGS: Record<Locale, {
     body: "Your booking is confirmed. Here are the details:",
     details: "Lesson details",
     pro: "Pro",
+    proEmail: "Pro email",
+    proPhone: "Pro phone",
     location: "Location",
     date: "Date",
     time: "Time",
@@ -723,6 +727,8 @@ const BOOKING_STUDENT_STRINGS: Record<Locale, {
     body: "Je boeking is bevestigd. Hier zijn de details:",
     details: "Les details",
     pro: "Pro",
+    proEmail: "E-mail pro",
+    proPhone: "Telefoon pro",
     location: "Locatie",
     date: "Datum",
     time: "Tijd",
@@ -739,6 +745,8 @@ const BOOKING_STUDENT_STRINGS: Record<Locale, {
     body: "Votre réservation est confirmée. Voici les détails :",
     details: "Détails du cours",
     pro: "Pro",
+    proEmail: "E-mail du pro",
+    proPhone: "Téléphone du pro",
     location: "Lieu",
     date: "Date",
     time: "Heure",
@@ -794,6 +802,8 @@ function detailsTable(rows: Array<DetailRow>): string {
 export function buildStudentBookingConfirmationEmail(opts: {
   firstName: string;
   proName: string;
+  proEmail?: string | null;
+  proPhone?: string | null;
   locationName: string;
   date: string;
   startTime: string;
@@ -805,13 +815,21 @@ export function buildStudentBookingConfirmationEmail(opts: {
   locale: Locale;
 }): string {
   const s = BOOKING_STUDENT_STRINGS[opts.locale] ?? BOOKING_STUDENT_STRINGS.en;
-  const rows: Array<[string, string]> = [
+  const rows: Array<DetailRow> = [
     [s.pro, opts.proName],
+  ];
+  if (opts.proEmail) {
+    rows.push([s.proEmail, opts.proEmail, `mailto:${opts.proEmail}`]);
+  }
+  if (opts.proPhone) {
+    rows.push([s.proPhone, opts.proPhone, `tel:${opts.proPhone.replace(/\s+/g, "")}`]);
+  }
+  rows.push(
     [s.location, opts.locationName],
     [s.date, formatLessonDate(opts.date, opts.locale)],
     [s.time, `${opts.startTime} – ${opts.endTime}`],
     [s.duration, `${opts.duration} ${s.durationUnit}`],
-  ];
+  );
   if (typeof opts.priceCents === "number" && opts.priceCents > 0) {
     const amount = new Intl.NumberFormat(
       opts.locale === "en" ? "en-GB" : opts.locale === "nl" ? "nl-BE" : "fr-BE",
@@ -1162,6 +1180,8 @@ const CLAIM_BOOKING_STRINGS: Record<
     duration: string;
     durationUnit: string;
     location: string;
+    proEmail: string;
+    proPhone: string;
     alreadyIntro: (proName: string) => string;
     loginButton: string;
     registerHeading: string;
@@ -1182,6 +1202,8 @@ const CLAIM_BOOKING_STRINGS: Record<
     duration: "Duration",
     durationUnit: "minutes",
     location: "Location",
+    proEmail: "Pro email",
+    proPhone: "Pro phone",
     alreadyIntro: (pro) =>
       `We just added a new lesson with ${pro} to your account.`,
     loginButton: "View booking",
@@ -1203,6 +1225,8 @@ const CLAIM_BOOKING_STRINGS: Record<
     duration: "Duur",
     durationUnit: "minuten",
     location: "Locatie",
+    proEmail: "E-mail pro",
+    proPhone: "Telefoon pro",
     alreadyIntro: (pro) =>
       `We hebben zojuist een nieuwe les bij ${pro} aan je account toegevoegd.`,
     loginButton: "Boeking bekijken",
@@ -1224,6 +1248,8 @@ const CLAIM_BOOKING_STRINGS: Record<
     duration: "Durée",
     durationUnit: "minutes",
     location: "Lieu",
+    proEmail: "E-mail du pro",
+    proPhone: "Téléphone du pro",
     alreadyIntro: (pro) =>
       `Nous venons d'ajouter un nouveau cours avec ${pro} à votre compte.`,
     loginButton: "Voir la réservation",
@@ -1242,6 +1268,8 @@ export function getClaimBookingSubject(proName: string, locale: Locale): string 
 export function buildClaimAndVerifyBookingEmail(opts: {
   firstName: string;
   proName: string;
+  proEmail?: string | null;
+  proPhone?: string | null;
   locationName: string;
   date: string;
   startTime: string;
@@ -1252,12 +1280,18 @@ export function buildClaimAndVerifyBookingEmail(opts: {
   locale: Locale;
 }): string {
   const s = CLAIM_BOOKING_STRINGS[opts.locale] ?? CLAIM_BOOKING_STRINGS.en;
-  const rows: Array<[string, string]> = [
+  const rows: Array<DetailRow> = [
     [s.date, formatLessonDate(opts.date, opts.locale)],
     [s.time, `${opts.startTime} – ${opts.endTime}`],
     [s.duration, `${opts.duration} ${s.durationUnit}`],
     [s.location, opts.locationName],
   ];
+  if (opts.proEmail) {
+    rows.push([s.proEmail, opts.proEmail, `mailto:${opts.proEmail}`]);
+  }
+  if (opts.proPhone) {
+    rows.push([s.proPhone, opts.proPhone, `tel:${opts.proPhone.replace(/\s+/g, "")}`]);
+  }
 
   const body = `
     <h2 style="font-family:Georgia,'Times New Roman',serif;font-size:22px;color:${COLORS.green950};margin:0 0 16px 0;font-weight:normal;">
@@ -1295,6 +1329,8 @@ export function buildClaimAndVerifyBookingEmail(opts: {
 export function buildNewBookingOnAccountEmail(opts: {
   firstName: string;
   proName: string;
+  proEmail?: string | null;
+  proPhone?: string | null;
   locationName: string;
   date: string;
   startTime: string;
@@ -1304,12 +1340,18 @@ export function buildNewBookingOnAccountEmail(opts: {
   locale: Locale;
 }): string {
   const s = CLAIM_BOOKING_STRINGS[opts.locale] ?? CLAIM_BOOKING_STRINGS.en;
-  const rows: Array<[string, string]> = [
+  const rows: Array<DetailRow> = [
     [s.date, formatLessonDate(opts.date, opts.locale)],
     [s.time, `${opts.startTime} – ${opts.endTime}`],
     [s.duration, `${opts.duration} ${s.durationUnit}`],
     [s.location, opts.locationName],
   ];
+  if (opts.proEmail) {
+    rows.push([s.proEmail, opts.proEmail, `mailto:${opts.proEmail}`]);
+  }
+  if (opts.proPhone) {
+    rows.push([s.proPhone, opts.proPhone, `tel:${opts.proPhone.replace(/\s+/g, "")}`]);
+  }
 
   const body = `
     <h2 style="font-family:Georgia,'Times New Roman',serif;font-size:22px;color:${COLORS.green950};margin:0 0 16px 0;font-weight:normal;">

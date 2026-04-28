@@ -164,6 +164,11 @@ export const proProfiles = pgTable("pro_profiles", {
   lateCancelRefundPercent: integer("late_cancel_refund_percent").notNull().default(0),
   allowBookingWithoutPayment: boolean("allow_booking_without_payment").notNull().default(false),
   googleCalendarEmail: varchar("google_calendar_email", { length: 255 }),
+  // Public contact phone shown to students (booking confirmation email +
+  // /member/bookings). Kept separate from `users.phone` so a pro can have
+  // a private number for the platform and a different work number students
+  // can call.
+  contactPhone: varchar("contact_phone", { length: 50 }),
   published: boolean("published").notNull().default(false),
   // Stripe subscription
   subscriptionStatus: varchar("subscription_status", { length: 20 }).notNull().default("none"),

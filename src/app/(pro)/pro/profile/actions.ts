@@ -29,6 +29,7 @@ export async function updateProProfile(
   const displayName = (formData.get("displayName") as string).trim();
   const bio = (formData.get("bio") as string)?.trim() || null;
   const specialties = (formData.get("specialties") as string)?.trim() || null;
+  const contactPhone = (formData.get("contactPhone") as string)?.trim() || null;
   const maxGroupSize = parseInt(formData.get("maxGroupSize") as string) || 4;
   const bookingEnabled = formData.get("bookingEnabled") === "true";
   const bookingNotice = parseInt(formData.get("bookingNotice") as string) || 24;
@@ -74,6 +75,7 @@ export async function updateProProfile(
       displayName,
       bio,
       specialties,
+      contactPhone,
       lessonDurations,
       lessonPricing,
       maxGroupSize,

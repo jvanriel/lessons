@@ -582,6 +582,7 @@ export async function createPublicBooking(formData: FormData) {
     .select({
       userId: proProfiles.userId,
       displayName: proProfiles.displayName,
+      contactPhone: proProfiles.contactPhone,
       proFirstName: users.firstName,
       proEmail: users.email,
       proLocale: users.preferredLocale,
@@ -672,6 +673,8 @@ export async function createPublicBooking(formData: FormData) {
           html: buildClaimAndVerifyBookingEmail({
             firstName,
             proName: proUser?.displayName ?? "",
+            proEmail: proUser?.proEmail,
+            proPhone: proUser?.contactPhone,
             locationName,
             date,
             startTime,
@@ -693,6 +696,8 @@ export async function createPublicBooking(formData: FormData) {
           html: buildNewBookingOnAccountEmail({
             firstName,
             proName: proUser?.displayName ?? "",
+            proEmail: proUser?.proEmail,
+            proPhone: proUser?.contactPhone,
             locationName,
             date,
             startTime,
@@ -830,8 +835,11 @@ export async function resendBookingConfirmation(manageToken: string) {
   const [proRow] = await db
     .select({
       displayName: proProfiles.displayName,
+      contactPhone: proProfiles.contactPhone,
+      proEmail: users.email,
     })
     .from(proProfiles)
+    .innerJoin(users, eq(proProfiles.userId, users.id))
     .where(eq(proProfiles.id, booking.proProfileId))
     .limit(1);
 
@@ -874,6 +882,8 @@ export async function resendBookingConfirmation(manageToken: string) {
     html: buildClaimAndVerifyBookingEmail({
       firstName: student.firstName,
       proName: proRow?.displayName ?? "",
+      proEmail: proRow?.proEmail,
+      proPhone: proRow?.contactPhone,
       locationName,
       date: booking.date,
       startTime: booking.startTime,

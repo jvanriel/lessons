@@ -13,6 +13,7 @@ interface ProfileData {
   displayName: string;
   bio: string | null;
   specialties: string | null;
+  contactPhone: string | null;
   photoUrl: string | null;
   lessonDurations: number[];
   /** Per-duration lesson price in EUR (decimal). */
@@ -59,6 +60,7 @@ export default function ProProfileEditor({
   const [displayName, setDisplayName] = useState(profile.displayName);
   const [specialties, setSpecialties] = useState(profile.specialties ?? "");
   const [bio, setBio] = useState(profile.bio ?? "");
+  const [contactPhone, setContactPhone] = useState(profile.contactPhone ?? "");
 
   // Photo upload
   const [photoUrl, setPhotoUrl] = useState(profile.photoUrl);
@@ -142,6 +144,7 @@ export default function ProProfileEditor({
       formData.set("displayName", displayName);
       formData.set("specialties", specialties);
       formData.set("bio", bio);
+      formData.set("contactPhone", contactPhone);
       formData.set("maxGroupSize", String(maxGroupSize));
       formData.set("lessonDurations", JSON.stringify(lessonDurations));
       // Convert EUR → cents and only send entries for enabled durations.
@@ -303,6 +306,21 @@ export default function ProProfileEditor({
               rows={5}
               className={inputClass + " resize-none"}
             />
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-green-800">
+              {t("proProfile.contactPhone", locale)}
+            </label>
+            <input
+              type="tel"
+              value={contactPhone}
+              onChange={(e) => setContactPhone(e.target.value)}
+              placeholder={t("proProfile.contactPhonePlaceholder", locale)}
+              className={inputClass}
+            />
+            <p className="mt-1 text-xs text-green-500">
+              {t("proProfile.contactPhoneHelp", locale)}
+            </p>
           </div>
         </div>
 

@@ -4,6 +4,7 @@ import {
   proProfiles,
   proLocations,
   locations,
+  users,
 } from "@/lib/db/schema";
 import { eq, and, gte, lt, or, desc, asc } from "drizzle-orm";
 import { getSession, hasRole } from "@/lib/auth";
@@ -40,12 +41,15 @@ export default async function MemberBookingsPage() {
       notes: lessonBookings.notes,
       proName: proProfiles.displayName,
       proId: proProfiles.id,
+      proEmail: users.email,
+      proPhone: proProfiles.contactPhone,
       locationName: locations.name,
       locationCity: locations.city,
       cancellationHours: proProfiles.cancellationHours,
     })
     .from(lessonBookings)
     .innerJoin(proProfiles, eq(lessonBookings.proProfileId, proProfiles.id))
+    .innerJoin(users, eq(proProfiles.userId, users.id))
     .innerJoin(
       proLocations,
       eq(lessonBookings.proLocationId, proLocations.id)
@@ -130,6 +134,26 @@ export default async function MemberBookingsPage() {
                         {t("memberBookings.participants", locale).replace(
                           "{n}",
                           String(booking.participantCount)
+                        )}
+                      </div>
+                    )}
+                    {(booking.proEmail || booking.proPhone) && (
+                      <div className="mt-2 flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-green-600">
+                        {booking.proEmail && (
+                          <a
+                            href={`mailto:${booking.proEmail}`}
+                            className="text-green-700 underline-offset-2 hover:underline"
+                          >
+                            {booking.proEmail}
+                          </a>
+                        )}
+                        {booking.proPhone && (
+                          <a
+                            href={`tel:${booking.proPhone.replace(/\s+/g, "")}`}
+                            className="text-green-700 underline-offset-2 hover:underline"
+                          >
+                            {booking.proPhone}
+                          </a>
                         )}
                       </div>
                     )}

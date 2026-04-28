@@ -40,6 +40,7 @@ export default async function ProProfilePage() {
             displayName: profile.displayName,
             bio: profile.bio,
             specialties: profile.specialties,
+            contactPhone: profile.contactPhone,
             photoUrl: profile.photoUrl,
             lessonDurations: profile.lessonDurations as number[],
             // Stored in cents; expose as decimal euros to the editor.

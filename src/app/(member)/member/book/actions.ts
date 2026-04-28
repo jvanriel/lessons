@@ -675,6 +675,7 @@ export async function createBooking(formData: FormData) {
     .select({
       userId: proProfiles.userId,
       displayName: proProfiles.displayName,
+      contactPhone: proProfiles.contactPhone,
       proFirstName: users.firstName,
       proEmail: users.email,
       proLocale: users.preferredLocale,
@@ -769,6 +770,8 @@ export async function createBooking(formData: FormData) {
           html: buildStudentBookingConfirmationEmail({
             firstName,
             proName: pro.displayName,
+            proEmail: pro.proEmail,
+            proPhone: pro.contactPhone,
             locationName,
             date,
             startTime,

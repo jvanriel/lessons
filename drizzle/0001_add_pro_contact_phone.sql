@@ -1,0 +1,1 @@
+ALTER TABLE "pro_profiles" ADD COLUMN "contact_phone" varchar(50);
