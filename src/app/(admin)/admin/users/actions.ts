@@ -10,6 +10,7 @@ import { buildInviteEmail, buildPasswordResetEmail, getEmailStrings } from "@/li
 import { resolveLocale } from "@/lib/i18n";
 import { ensureProProfile, normalizeRoles } from "@/lib/pro";
 import { formatLocalDate } from "@/lib/local-date";
+import { notifyCounterpartOfAccountDeletion } from "@/lib/account-deletion-mailer";
 
 async function requireAdmin() {
   const session = await getSession();
@@ -137,7 +138,10 @@ function isDummyAccount(email: string): boolean {
   return email.startsWith("dummy") && email.endsWith("@golflessons.be");
 }
 
-export async function deleteUser(userId: number) {
+export async function deleteUser(userId: number): Promise<
+  | { error: string }
+  | { success: true; cancelledBookingsCount: number; isDummy: boolean }
+> {
   const session = await requireAdmin();
 
   // Prevent self-deletion
@@ -145,7 +149,8 @@ export async function deleteUser(userId: number) {
     return { error: "You cannot delete your own account." };
   }
 
-  // Dummy test accounts always get hard-deleted
+  // Dummy test accounts always get hard-deleted (testing shortcut, no
+  // notifications — the dummy's counterpart is also a dummy)
   const [userToDelete] = await db
     .select({ email: users.email })
     .from(users)
@@ -153,11 +158,34 @@ export async function deleteUser(userId: number) {
     .limit(1);
 
   if (userToDelete && isDummyAccount(userToDelete.email)) {
-    return purgeUserInternal(userId);
+    const purgeResult = await purgeUserInternal(userId);
+    if ("error" in purgeResult) return purgeResult;
+    return { success: true, cancelledBookingsCount: 0, isDummy: true };
   }
 
   const now = new Date();
   const today = formatLocalDate(now);
+
+  // Snapshot future confirmed bookings BEFORE updating, so we can notify
+  // the counterparts after the status flip.
+  const studentBookings = await db
+    .select({
+      id: lessonBookings.id,
+      date: lessonBookings.date,
+      startTime: lessonBookings.startTime,
+      endTime: lessonBookings.endTime,
+      proProfileId: lessonBookings.proProfileId,
+      proLocationId: lessonBookings.proLocationId,
+      bookedById: lessonBookings.bookedById,
+    })
+    .from(lessonBookings)
+    .where(
+      and(
+        eq(lessonBookings.bookedById, userId),
+        eq(lessonBookings.status, "confirmed"),
+        gte(lessonBookings.date, today),
+      ),
+    );
 
   // Cancel all future confirmed bookings (frees up slots)
   await db
@@ -189,11 +217,31 @@ export async function deleteUser(userId: number) {
     .where(eq(proProfiles.userId, userId))
     .limit(1);
 
+  let proBookings: typeof studentBookings = [];
   if (proProfile) {
     await db
       .update(proProfiles)
       .set({ deletedAt: now, published: false, updatedAt: now })
       .where(eq(proProfiles.id, proProfile.id));
+
+    proBookings = await db
+      .select({
+        id: lessonBookings.id,
+        date: lessonBookings.date,
+        startTime: lessonBookings.startTime,
+        endTime: lessonBookings.endTime,
+        proProfileId: lessonBookings.proProfileId,
+        proLocationId: lessonBookings.proLocationId,
+        bookedById: lessonBookings.bookedById,
+      })
+      .from(lessonBookings)
+      .where(
+        and(
+          eq(lessonBookings.proProfileId, proProfile.id),
+          eq(lessonBookings.status, "confirmed"),
+          gte(lessonBookings.date, today),
+        ),
+      );
 
     // Cancel future bookings for this pro
     await db
@@ -225,8 +273,21 @@ export async function deleteUser(userId: number) {
     .set({ deletedAt: now })
     .where(eq(users.id, userId));
 
+  // Notify counterparts. Sequential is fine — typical N is small (≪10)
+  // and serialising avoids hammering the mail provider.
+  for (const b of studentBookings) {
+    await notifyCounterpartOfAccountDeletion(b, "student");
+  }
+  for (const b of proBookings) {
+    await notifyCounterpartOfAccountDeletion(b, "pro");
+  }
+
   revalidatePath("/admin/users");
-  return { success: true };
+  return {
+    success: true,
+    cancelledBookingsCount: studentBookings.length + proBookings.length,
+    isDummy: false,
+  };
 }
 
 /**

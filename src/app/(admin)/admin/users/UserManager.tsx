@@ -354,15 +354,30 @@ function UserRowActions({
 
   function handleDelete() {
     setMenuOpen(false);
-    if (
-      !confirm(
-        `Delete user ${user.firstName} ${user.lastName}? This cannot be undone.`
-      )
-    )
-      return;
+    const isDummy =
+      user.email.startsWith("dummy") &&
+      user.email.endsWith("@golflessons.be");
+    const prompt = isDummy
+      ? `Permanently purge dummy account ${user.firstName} ${user.lastName}?\n\nThis is a hard-delete shortcut for testing. ALL data — including bookings — will be removed and this cannot be undone.`
+      : `Delete user ${user.firstName} ${user.lastName}?\n\nThe account will be soft-deleted and stays recoverable from this list.\n\nAny future confirmed bookings will be cancelled and the affected ${user.roles?.includes("pro") ? "students" : "pro"} will be emailed.`;
+    if (!confirm(prompt)) return;
     startTransition(async () => {
       const result = await deleteUser(user.id);
-      if ("error" in result) alert(result.error);
+      if ("error" in result) {
+        alert(result.error);
+        return;
+      }
+      if (result.isDummy) {
+        alert(`Dummy account purged.`);
+      } else if (result.cancelledBookingsCount > 0) {
+        alert(
+          `User soft-deleted. ${result.cancelledBookingsCount} future booking${
+            result.cancelledBookingsCount === 1 ? "" : "s"
+          } cancelled — counterparts have been notified.`,
+        );
+      } else {
+        alert(`User soft-deleted. No future bookings to cancel.`);
+      }
     });
   }
 
