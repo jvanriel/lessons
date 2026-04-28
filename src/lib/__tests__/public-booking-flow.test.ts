@@ -1069,18 +1069,26 @@ describe("Phase 3: Unverified returning student (branch=unverified)", () => {
   let bookingId3: number;
   let emailSentAt3: number;
 
-  it("reset student to unverified", async () => {
+  it("reset student to unverified stub (no password, email not verified)", async () => {
+    // Under task-65's "no password = no account" rule, just clearing
+    // emailVerifiedAt isn't enough — the password set in Phase 2 still
+    // marks this row as a real account. To re-create the "unverified
+    // returning student" scenario, clear both.
     await db
       .update(users)
-      .set({ emailVerifiedAt: null })
+      .set({ emailVerifiedAt: null, password: null })
       .where(eq(users.id, createdStudentUserId!));
 
     const [user] = await db
-      .select({ emailVerifiedAt: users.emailVerifiedAt })
+      .select({
+        emailVerifiedAt: users.emailVerifiedAt,
+        password: users.password,
+      })
       .from(users)
       .where(eq(users.id, createdStudentUserId!))
       .limit(1);
     expect(user.emailVerifiedAt).toBeNull();
+    expect(user.password).toBeNull();
   });
 
   it("books with updated name/phone", async () => {
