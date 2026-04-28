@@ -17,102 +17,15 @@ import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import { sendEmail } from "@/lib/mail";
 import { getStripe } from "@/lib/stripe";
-import { resolveLocale, type Locale } from "@/lib/i18n";
-import { emailLayout } from "@/lib/email-templates";
+import { resolveLocale } from "@/lib/i18n";
 import { getLocale } from "@/lib/locale";
 import { t } from "@/lib/i18n/translations";
 import { formatDate as formatDateLocale } from "@/lib/format-date";
-
-const CANCEL_STRINGS: Record<Locale, {
-  studentSubject: (pro: string) => string;
-  proSubject: (student: string) => string;
-  greeting: string;
-  studentBody: (pro: string) => string;
-  proBody: (student: string) => string;
-  details: string;
-  date: string;
-  time: string;
-  location: string;
-  helper: string;
-}> = {
-  en: {
-    studentSubject: (pro) => `Your lesson with ${pro} is cancelled`,
-    proSubject: (s) => `Booking cancelled by ${s}`,
-    greeting: "Hi",
-    studentBody: (pro) => `Your lesson with ${pro} has been cancelled. The slot is free again — book another time whenever you're ready.`,
-    proBody: (s) => `${s} just cancelled their booking. The slot is free again on your availability.`,
-    details: "Cancelled lesson",
-    date: "Date",
-    time: "Time",
-    location: "Location",
-    helper: "An updated calendar invite is attached so the event is removed from your calendar.",
-  },
-  nl: {
-    studentSubject: (pro) => `Je les bij ${pro} is geannuleerd`,
-    proSubject: (s) => `Boeking geannuleerd door ${s}`,
-    greeting: "Hallo",
-    studentBody: (pro) => `Je les bij ${pro} is geannuleerd. Het tijdslot is weer vrij — boek opnieuw wanneer je er klaar voor bent.`,
-    proBody: (s) => `${s} heeft net zijn of haar boeking geannuleerd. Het tijdslot is weer vrij in je beschikbaarheid.`,
-    details: "Geannuleerde les",
-    date: "Datum",
-    time: "Tijd",
-    location: "Locatie",
-    helper: "Een bijgewerkte agenda-uitnodiging zit in bijlage zodat het evenement uit je agenda verdwijnt.",
-  },
-  fr: {
-    studentSubject: (pro) => `Votre cours avec ${pro} est annulé`,
-    proSubject: (s) => `Réservation annulée par ${s}`,
-    greeting: "Bonjour",
-    studentBody: (pro) => `Votre cours avec ${pro} a été annulé. Le créneau est de nouveau libre — réservez quand vous voulez.`,
-    proBody: (s) => `${s} vient d'annuler sa réservation. Le créneau est de nouveau libre dans votre disponibilité.`,
-    details: "Cours annulé",
-    date: "Date",
-    time: "Heure",
-    location: "Lieu",
-    helper: "Une invitation calendrier mise à jour est jointe pour retirer l'événement de votre agenda.",
-  },
-};
-
-function formatLessonDate(date: string, locale: Locale): string {
-  const dateLocale = locale === "nl" ? "nl-BE" : locale === "fr" ? "fr-BE" : "en-GB";
-  return new Intl.DateTimeFormat(dateLocale, {
-    weekday: "long",
-    day: "numeric",
-    month: "long",
-    year: "numeric",
-  }).format(new Date(date + "T00:00:00"));
-}
-
-function buildCancelEmailBody(opts: {
-  greeting: string;
-  recipientFirstName: string;
-  bodyLine: string;
-  detailsHeading: string;
-  rows: Array<[string, string]>;
-  helper: string;
-  locale: Locale;
-}): string {
-  const tableRows = opts.rows
-    .map(
-      ([k, v]) => `
-        <p style="margin:0 0 8px 0;font-size:14px;">
-          <strong style="color:#091a12;">${k}:</strong>
-          <span style="color:#3d6b4f;">${v}</span>
-        </p>`
-    )
-    .join("");
-  const body = `
-    <h2 style="font-family:Georgia,'Times New Roman',serif;font-size:22px;color:#091a12;margin:0 0 16px 0;font-weight:normal;">
-      ${opts.greeting} ${opts.recipientFirstName},
-    </h2>
-    <p style="margin:0 0 20px 0;">${opts.bodyLine}</p>
-    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#e7f0ea;border:1px solid #b4d6c1;border-radius:8px;margin:0 0 24px 0;">
-      <tr><td style="padding:16px 20px;">${tableRows}</td></tr>
-    </table>
-    <p style="color:#666;font-size:13px;margin:0;">${opts.helper}</p>
-  `;
-  return emailLayout(body, undefined, opts.locale);
-}
+import {
+  CANCEL_STRINGS,
+  formatCancelLessonDate,
+  buildCancelEmailBody,
+} from "@/lib/booking-cancel-email";
 
 export async function cancelBooking(bookingId: number) {
   const session = await getSession();
@@ -318,19 +231,19 @@ export async function cancelBooking(bookingId: number) {
     actionLabel: "View bookings",
   });
 
-  // Email both parties (best-effort)
+  // Email both parties (best-effort). Student initiated this cancel
+  // — the helper picks "by student" wording for both recipients.
   if (student?.email) {
     const ss = CANCEL_STRINGS[studentLocale] ?? CANCEL_STRINGS.en;
     sendEmail({
       to: student.email,
-      subject: ss.studentSubject(pro.displayName),
+      subject: ss.studentSubject(pro.displayName, "student"),
       html: buildCancelEmailBody({
         greeting: ss.greeting,
         recipientFirstName: student.firstName,
-        bodyLine: ss.studentBody(pro.displayName),
-        detailsHeading: ss.details,
+        bodyLine: ss.studentBody(pro.displayName, "student"),
         rows: [
-          [ss.date, formatLessonDate(booking.date, studentLocale)],
+          [ss.date, formatCancelLessonDate(booking.date, studentLocale)],
           [ss.time, `${booking.startTime} – ${booking.endTime}`],
           [ss.location, locationName],
         ],
@@ -345,14 +258,13 @@ export async function cancelBooking(bookingId: number) {
     const ps = CANCEL_STRINGS[proLocale] ?? CANCEL_STRINGS.en;
     sendEmail({
       to: pro.proEmail,
-      subject: ps.proSubject(studentName),
+      subject: ps.proSubject(studentName, "student"),
       html: buildCancelEmailBody({
         greeting: ps.greeting,
         recipientFirstName: pro.proFirstName,
-        bodyLine: ps.proBody(studentName),
-        detailsHeading: ps.details,
+        bodyLine: ps.proBody(studentName, "student"),
         rows: [
-          [ps.date, formatLessonDate(booking.date, proLocale)],
+          [ps.date, formatCancelLessonDate(booking.date, proLocale)],
           [ps.time, `${booking.startTime} – ${booking.endTime}`],
           [ps.location, locationName],
         ],

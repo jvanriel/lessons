@@ -18,7 +18,14 @@ import { eq, and, asc, desc, gte, lte } from "drizzle-orm";
 import { requireProProfile } from "@/lib/pro";
 import { hashPassword } from "@/lib/auth";
 import { sendEmail } from "@/lib/mail";
-import { buildInviteEmail, getEmailStrings } from "@/lib/email-templates";
+import {
+  buildInviteEmail,
+  getEmailStrings,
+  buildStudentBookingConfirmationEmail,
+  getStudentBookingConfirmationSubject,
+  buildProBookingNotificationEmail,
+  getProBookingNotificationSubject,
+} from "@/lib/email-templates";
 import { getLocale } from "@/lib/locale";
 import {
   addDaysToDateString,
@@ -30,10 +37,18 @@ import { resolveLocale } from "@/lib/i18n";
 import { createNotification } from "@/lib/notifications";
 import {
   computeAvailableSlots,
+  buildIcs,
+  buildCancelIcs,
   type AvailabilityTemplate,
   type AvailabilityOverride,
   type ExistingBooking,
 } from "@/lib/lesson-slots";
+import {
+  CANCEL_STRINGS,
+  formatCancelLessonDate,
+  buildCancelEmailBody,
+} from "@/lib/booking-cancel-email";
+import { after } from "next/server";
 import crypto from "node:crypto";
 
 function generatePassword(length = 12): string {
@@ -984,6 +999,130 @@ export async function proQuickBookForStudent(data: {
     actionLabel: "View bookings",
   }).catch(() => {});
 
+  // Send confirmation emails (mirror `quickCreateBooking`). The student
+  // gets the same booking-confirmation mail they'd get if they had
+  // booked themselves; the pro gets the standard "new booking"
+  // notification mail so it lives in their inbox alongside the in-app
+  // toast — useful as a record of what they just booked on behalf of
+  // the student.
+  const [proRow] = await db
+    .select({
+      contactPhone: proProfiles.contactPhone,
+      lessonPricing: proProfiles.lessonPricing,
+      allowBookingWithoutPayment: proProfiles.allowBookingWithoutPayment,
+      proFirstName: users.firstName,
+      proEmail: users.email,
+      proLocale: users.preferredLocale,
+    })
+    .from(proProfiles)
+    .innerJoin(users, eq(proProfiles.userId, users.id))
+    .where(eq(proProfiles.id, profile.id))
+    .limit(1);
+
+  const [loc] = await db
+    .select({ name: locations.name, city: locations.city })
+    .from(proLocations)
+    .innerJoin(locations, eq(proLocations.locationId, locations.id))
+    .where(eq(proLocations.id, data.proLocationId))
+    .limit(1);
+  const locationName = loc
+    ? loc.city
+      ? `${loc.name}, ${loc.city}`
+      : loc.name
+    : "";
+
+  const [studentRow] = await db
+    .select({ preferredLocale: users.preferredLocale })
+    .from(users)
+    .where(eq(users.id, rel.userId))
+    .limit(1);
+  const studentLocale = resolveLocale(studentRow?.preferredLocale);
+  const proLocale = resolveLocale(proRow?.proLocale);
+
+  const perLessonCents = (
+    proRow?.lessonPricing as Record<string, number> | null
+  )?.[String(data.duration)];
+  const priceCents =
+    typeof perLessonCents === "number" && perLessonCents > 0
+      ? perLessonCents
+      : null;
+
+  const ics = buildIcs({
+    date: data.date,
+    startTime: data.startTime,
+    endTime: data.endTime,
+    summary: `Golf lesson with ${profile.displayName}`,
+    location: locationName,
+    description: `Booked via golflessons.be — ${rel.firstName} ${rel.lastName}`,
+    bookingId: booking.id,
+  });
+  const icsAttachment = {
+    filename: "lesson.ics",
+    contentType: "text/calendar",
+    content: ics,
+    method: "REQUEST",
+  };
+
+  if (proRow) {
+    after(async () => {
+      try {
+        await sendEmail({
+          to: rel.email,
+          subject: getStudentBookingConfirmationSubject(
+            profile.displayName,
+            studentLocale,
+          ),
+          html: buildStudentBookingConfirmationEmail({
+            firstName: rel.firstName,
+            proName: profile.displayName,
+            proEmail: proRow.proEmail,
+            proPhone: proRow.contactPhone,
+            locationName,
+            date: data.date,
+            startTime: data.startTime,
+            endTime: data.endTime,
+            duration: data.duration,
+            priceCents,
+            cashOnly: !!proRow.allowBookingWithoutPayment,
+            locale: studentLocale,
+          }),
+          attachments: [icsAttachment],
+        });
+      } catch {
+        /* sendEmail already logs email.failed + Sentry — swallow here. */
+      }
+      try {
+        await sendEmail({
+          to: proRow.proEmail,
+          subject: getProBookingNotificationSubject(
+            `${rel.firstName} ${rel.lastName}`,
+            proLocale,
+          ),
+          html: buildProBookingNotificationEmail({
+            proFirstName: proRow.proFirstName,
+            studentFirstName: rel.firstName,
+            studentLastName: rel.lastName,
+            studentEmail: rel.email,
+            studentPhone: rel.phone ?? "",
+            locationName,
+            date: data.date,
+            startTime: data.startTime,
+            endTime: data.endTime,
+            duration: data.duration,
+            participantCount: 1,
+            notes: null,
+            locale: proLocale,
+            // Pro-initiated booking is pay-later by definition.
+            paymentStatus: "manual",
+          }),
+          attachments: [icsAttachment],
+        });
+      } catch {
+        /* ditto */
+      }
+    });
+  }
+
   revalidatePath("/pro/students");
   revalidatePath("/pro/bookings");
   return { success: true, bookingId: booking.id };
@@ -1046,7 +1185,9 @@ export async function proCancelBooking(bookingId: number) {
       id: lessonBookings.id,
       date: lessonBookings.date,
       startTime: lessonBookings.startTime,
+      endTime: lessonBookings.endTime,
       bookedById: lessonBookings.bookedById,
+      proLocationId: lessonBookings.proLocationId,
     })
     .from(lessonBookings)
     .where(
@@ -1070,7 +1211,7 @@ export async function proCancelBooking(bookingId: number) {
     })
     .where(eq(lessonBookings.id, bookingId));
 
-  // Notify the student
+  // Notify the student (in-app)
   await createNotification({
     type: "booking_cancelled",
     priority: "high",
@@ -1080,6 +1221,107 @@ export async function proCancelBooking(bookingId: number) {
     actionUrl: "/member/bookings",
     actionLabel: "View bookings",
   }).catch(() => {});
+
+  // Email both parties (best-effort) with a CANCEL ics so the event
+  // disappears from their calendars. Mirror of the member-side
+  // cancelBooking flow, but with the "by: pro" copy variant.
+  const [student] = await db
+    .select({
+      firstName: users.firstName,
+      lastName: users.lastName,
+      email: users.email,
+      preferredLocale: users.preferredLocale,
+    })
+    .from(users)
+    .where(eq(users.id, booking.bookedById))
+    .limit(1);
+
+  const [proRow] = await db
+    .select({
+      proFirstName: users.firstName,
+      proEmail: users.email,
+      proLocale: users.preferredLocale,
+    })
+    .from(proProfiles)
+    .innerJoin(users, eq(proProfiles.userId, users.id))
+    .where(eq(proProfiles.id, profile.id))
+    .limit(1);
+
+  const [loc] = await db
+    .select({ name: locations.name, city: locations.city })
+    .from(proLocations)
+    .innerJoin(locations, eq(proLocations.locationId, locations.id))
+    .where(eq(proLocations.id, booking.proLocationId))
+    .limit(1);
+  const locationName = loc
+    ? loc.city
+      ? `${loc.name}, ${loc.city}`
+      : loc.name
+    : "";
+
+  const studentName = student
+    ? `${student.firstName} ${student.lastName}`
+    : "Student";
+  const studentLocale = resolveLocale(student?.preferredLocale);
+  const proLocale = resolveLocale(proRow?.proLocale);
+
+  const cancelIcs = buildCancelIcs({
+    date: booking.date,
+    startTime: booking.startTime,
+    endTime: booking.endTime,
+    summary: `Golf lesson with ${profile.displayName}`,
+    location: locationName,
+    description: `Cancelled by ${profile.displayName}`,
+    bookingId: booking.id,
+  });
+  const icsAttachment = {
+    filename: "lesson-cancelled.ics",
+    contentType: "text/calendar",
+    content: cancelIcs,
+    method: "CANCEL" as const,
+  };
+
+  if (student?.email) {
+    const ss = CANCEL_STRINGS[studentLocale] ?? CANCEL_STRINGS.en;
+    sendEmail({
+      to: student.email,
+      subject: ss.studentSubject(profile.displayName, "pro"),
+      html: buildCancelEmailBody({
+        greeting: ss.greeting,
+        recipientFirstName: student.firstName,
+        bodyLine: ss.studentBody(profile.displayName, "pro"),
+        rows: [
+          [ss.date, formatCancelLessonDate(booking.date, studentLocale)],
+          [ss.time, `${booking.startTime} – ${booking.endTime}`],
+          [ss.location, locationName],
+        ],
+        helper: ss.helper,
+        locale: studentLocale,
+      }),
+      attachments: [icsAttachment],
+    }).catch(() => {});
+  }
+
+  if (proRow?.proEmail) {
+    const ps = CANCEL_STRINGS[proLocale] ?? CANCEL_STRINGS.en;
+    sendEmail({
+      to: proRow.proEmail,
+      subject: ps.proSubject(studentName, "pro"),
+      html: buildCancelEmailBody({
+        greeting: ps.greeting,
+        recipientFirstName: proRow.proFirstName,
+        bodyLine: ps.proBody(studentName, "pro"),
+        rows: [
+          [ps.date, formatCancelLessonDate(booking.date, proLocale)],
+          [ps.time, `${booking.startTime} – ${booking.endTime}`],
+          [ps.location, locationName],
+        ],
+        helper: ps.helper,
+        locale: proLocale,
+      }),
+      attachments: [icsAttachment],
+    }).catch(() => {});
+  }
 
   revalidatePath("/pro/students");
   revalidatePath("/pro/bookings");
