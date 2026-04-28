@@ -36,12 +36,7 @@ function getSecret() {
   );
 }
 
-async function buildAndSendVerifyEmail(
-  userId: number,
-  email: string,
-  firstName: string,
-  locale: Locale,
-) {
+async function generateVerifyUrl(userId: number, email: string): Promise<string> {
   const verifyToken = await new SignJWT({
     userId,
     email,
@@ -55,7 +50,23 @@ async function buildAndSendVerifyEmail(
   const baseUrl =
     process.env.NEXT_PUBLIC_APP_URL ||
     (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : "http://localhost:3000");
-  const verifyUrl = `${baseUrl}/api/auth/verify-email?token=${verifyToken}`;
+  return `${baseUrl}/api/auth/verify-email?token=${verifyToken}`;
+}
+
+/**
+ * Stand-alone verify mail. Used by the email-change branch of the
+ * update path — the welcome email is *not* sent again on email change,
+ * so we still need a dedicated "please confirm your new address" mail.
+ * The create path no longer calls this: the welcome email embeds the
+ * verify CTA directly.
+ */
+async function sendStandaloneVerifyEmail(
+  userId: number,
+  email: string,
+  firstName: string,
+  locale: Locale,
+) {
+  const verifyUrl = await generateVerifyUrl(userId, email);
 
   sendEmail({
     to: email,
@@ -187,7 +198,7 @@ export async function POST(req: NextRequest) {
           isPrimary: true,
         })
         .onConflictDoNothing();
-      await buildAndSendVerifyEmail(
+      await sendStandaloneVerifyEmail(
         session.userId,
         email,
         firstName,
@@ -247,13 +258,10 @@ export async function POST(req: NextRequest) {
     .onConflictDoNothing();
   await ensureProProfile({ userId, firstName, lastName, email });
 
-  await buildAndSendVerifyEmail(
-    userId,
-    email,
-    firstName,
-    preferredLocale as Locale,
-  );
-
+  // Single welcome email with the verify CTA embedded as step 1.
+  // Replaces the previous two-mail flow (separate "verify your email"
+  // + "welcome") which arrived back-to-back at step 0 of the wizard.
+  const verifyUrl = await generateVerifyUrl(userId, email);
   sendEmail({
     to: email,
     subject: getWelcomeSubject("pro", preferredLocale as Locale),
@@ -261,6 +269,7 @@ export async function POST(req: NextRequest) {
       firstName,
       accountType: "pro",
       locale: preferredLocale as Locale,
+      verifyUrl,
     }),
   }).catch(() => {});
 

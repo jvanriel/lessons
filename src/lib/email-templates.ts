@@ -324,6 +324,14 @@ export function buildWelcomeEmail(opts: {
   firstName: string;
   accountType: "student" | "pro";
   locale: Locale;
+  /**
+   * If provided, the pro variant renders step 1 as a clickable
+   * "Verify email" CTA pointing at this URL, replacing the legacy
+   * "we sent you a separate verification link" copy. When omitted,
+   * the email keeps the legacy wording — used by the `/register`
+   * server action which doesn't (yet) send its own verify mail.
+   */
+  verifyUrl?: string;
 }): string {
   const studentStrings: Record<Locale, { body: string; note: string; button: string; buttonPath: string }> = {
     en: {
@@ -350,6 +358,8 @@ export function buildWelcomeEmail(opts: {
     intro: string;
     stepsHeading: string;
     step1: string;
+    step1Inline: string;
+    step1LinkLabel: string;
     step2: string;
     step3: string;
     step4: string;
@@ -361,6 +371,8 @@ export function buildWelcomeEmail(opts: {
       intro: "Welcome to Golf Lessons! Your pro account has been created and we're glad to have you on board. Here's what to do next:",
       stepsHeading: "Get ready to take bookings",
       step1: "Verify your email — we sent you a separate verification link.",
+      step1Inline: "Verify your email address.",
+      step1LinkLabel: "Verify now",
       step2: "Complete your subscription on the payment page so students can discover you.",
       step3: "Set up your profile, add your teaching locations, and paint your weekly availability.",
       step4: "Publish your profile and start receiving bookings.",
@@ -372,6 +384,8 @@ export function buildWelcomeEmail(opts: {
       intro: "Welkom bij Golf Lessons! Je pro-account is aangemaakt en we zijn blij je aan boord te hebben. Dit zijn de volgende stappen:",
       stepsHeading: "Klaar om boekingen te ontvangen",
       step1: "Bevestig je e-mailadres — we hebben je een aparte bevestigingslink gestuurd.",
+      step1Inline: "Bevestig je e-mailadres.",
+      step1LinkLabel: "Nu bevestigen",
       step2: "Rond je abonnement af op de betaalpagina zodat leerlingen je kunnen vinden.",
       step3: "Stel je profiel in, voeg je leslocaties toe en stel je wekelijkse beschikbaarheid in.",
       step4: "Publiceer je profiel en begin met het ontvangen van boekingen.",
@@ -383,6 +397,8 @@ export function buildWelcomeEmail(opts: {
       intro: "Bienvenue sur Golf Lessons ! Votre compte pro a été créé et nous sommes ravis de vous compter parmi nous. Voici les étapes suivantes :",
       stepsHeading: "Prêt à recevoir des réservations",
       step1: "Confirmez votre adresse e-mail — nous vous avons envoyé un lien de vérification séparé.",
+      step1Inline: "Confirmez votre adresse e-mail.",
+      step1LinkLabel: "Confirmer maintenant",
       step2: "Finalisez votre abonnement sur la page de paiement afin que les élèves puissent vous trouver.",
       step3: "Configurez votre profil, ajoutez vos lieux de cours et renseignez vos disponibilités hebdomadaires.",
       step4: "Publiez votre profil et commencez à recevoir des réservations.",
@@ -399,6 +415,9 @@ export function buildWelcomeEmail(opts: {
     const s = proStrings[opts.locale] ?? proStrings.en;
     const stepStyle = `padding:10px 0;border-bottom:1px solid ${COLORS.green100};font-size:14px;color:${COLORS.green900};`;
     const numStyle = `display:inline-block;width:22px;height:22px;line-height:22px;text-align:center;background:${COLORS.gold600};color:${COLORS.white};border-radius:50%;font-size:12px;font-weight:600;margin-right:10px;`;
+    const step1Body = opts.verifyUrl
+      ? `${s.step1Inline} <a href="${opts.verifyUrl}" style="color:${COLORS.gold600};text-decoration:underline;font-weight:500;">${s.step1LinkLabel}</a>`
+      : s.step1;
     const body = `
       <h2 style="font-family:Georgia,'Times New Roman',serif;font-size:22px;color:${COLORS.green950};margin:0 0 16px 0;font-weight:normal;">
         ${greeting} ${opts.firstName},
@@ -406,7 +425,7 @@ export function buildWelcomeEmail(opts: {
       <p style="margin:0 0 24px 0;">${s.intro}</p>
 
       <h3 style="font-family:Georgia,'Times New Roman',serif;font-size:16px;color:${COLORS.green950};margin:24px 0 8px 0;font-weight:normal;">${s.stepsHeading}</h3>
-      <div style="${stepStyle}"><span style="${numStyle}">1</span>${s.step1}</div>
+      <div style="${stepStyle}"><span style="${numStyle}">1</span>${step1Body}</div>
       <div style="${stepStyle}"><span style="${numStyle}">2</span>${s.step2}</div>
       <div style="${stepStyle}"><span style="${numStyle}">3</span>${s.step3}</div>
       <div style="${stepStyle}"><span style="${numStyle}">4</span>${s.step4}</div>
