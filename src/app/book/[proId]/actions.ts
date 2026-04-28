@@ -367,15 +367,22 @@ export async function getPublicAvailableDates(
  * account is created lazily and the first email they receive is a
  * claim-and-verify magic link.
  *
+ * "Has account" = `users.password` is set. A row that has a verified email
+ * but no password is a stub — the student clicked the claim link in a
+ * previous booking but never finished registering. Treat it like an
+ * unverified row so the second booking stays frictionless and re-invites
+ * them to register, instead of bouncing them at a login screen they
+ * can't pass. See task 65.
+ *
  * Three user-lookup branches (same HTTP response either way — the difference
  * happens in the email that gets sent, so this can't be used as an email-
  * enumeration oracle):
  *
- *  1. No row for this email → create unverified user, send claim+verify link.
- *  2. Row exists, unverified → reuse row, send claim+verify link (idempotent).
- *  3. Row exists, verified → reuse row, send "new booking on your account"
- *     notice with a login link — NOT a verify link, since email is already
- *     verified.
+ *  1. No row for this email → create stub user, send claim+verify link.
+ *  2. Row exists, no password → reuse row, send claim+verify link
+ *     (idempotent — verify link is a no-op when emailVerifiedAt is set).
+ *  3. Row exists with a password → reuse row, send "new booking on your
+ *     account" notice with a login link.
  */
 export async function createPublicBooking(formData: FormData) {
   const uiLocale = await getLocale();
@@ -482,7 +489,7 @@ export async function createPublicBooking(formData: FormData) {
       lastName: users.lastName,
       phone: users.phone,
       preferredLocale: users.preferredLocale,
-      emailVerifiedAt: users.emailVerifiedAt,
+      password: users.password,
       roles: users.roles,
     })
     .from(users)
@@ -508,11 +515,13 @@ export async function createPublicBooking(formData: FormData) {
     userId = inserted.id;
     branch = "new";
     recipientLocale = uiLocale;
-  } else if (existing[0].emailVerifiedAt == null) {
+  } else if (!existing[0].password) {
     userId = existing[0].id;
-    // Refresh name/phone in case the student typed corrections. Keep the
-    // stored locale — it was set when the row was first created and is
-    // more reliable than the current UI cookie.
+    // No password = no real account yet (stub from a previous booking
+    // that wasn't followed by registration). Refresh name/phone in case
+    // the student typed corrections. Keep the stored locale — it was
+    // set when the row was first created and is more reliable than the
+    // current UI cookie.
     await db
       .update(users)
       .set({ firstName, lastName, phone })

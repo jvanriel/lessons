@@ -404,7 +404,8 @@ async function createBookingDirect(opts: {
       ? perLessonCents
       : null;
 
-  // Three-branch user lookup
+  // Three-branch user lookup — gated on password (task 65). A row with a
+  // verified email but no password is still a stub, not a real account.
   const email = opts.email.trim().toLowerCase();
   const existing = await db
     .select({
@@ -413,7 +414,7 @@ async function createBookingDirect(opts: {
       lastName: users.lastName,
       phone: users.phone,
       preferredLocale: users.preferredLocale,
-      emailVerifiedAt: users.emailVerifiedAt,
+      password: users.password,
       roles: users.roles,
     })
     .from(users)
@@ -439,7 +440,7 @@ async function createBookingDirect(opts: {
     userId = inserted.id;
     branch = "new";
     recipientLocale = uiLocale;
-  } else if (existing[0].emailVerifiedAt == null) {
+  } else if (!existing[0].password) {
     userId = existing[0].id;
     await db
       .update(users)
@@ -957,19 +958,29 @@ describe("Phase 2: Verified student rebooking (branch=verified)", () => {
   let bookingEndTime2: string;
   let emailSentAt2: number;
 
-  it("mark student as verified (simulating claim link click)", async () => {
+  it("mark student as a fully registered account (simulating claim + register)", async () => {
     expect(createdStudentUserId).not.toBeNull();
+    // Phase 2 covers a returning student with a real account. Under the
+    // task-65 rule that's gated on `password` being set, not just on
+    // emailVerifiedAt — so we set both here.
     await db
       .update(users)
-      .set({ emailVerifiedAt: new Date() })
+      .set({
+        emailVerifiedAt: new Date(),
+        password: "$2a$10$abcdefghijklmnopqrstuvwxyz0123456789ABCDEFGHIJKL.fake",
+      })
       .where(eq(users.id, createdStudentUserId!));
 
     const [user] = await db
-      .select({ emailVerifiedAt: users.emailVerifiedAt })
+      .select({
+        emailVerifiedAt: users.emailVerifiedAt,
+        password: users.password,
+      })
       .from(users)
       .where(eq(users.id, createdStudentUserId!))
       .limit(1);
     expect(user.emailVerifiedAt).not.toBeNull();
+    expect(user.password).not.toBeNull();
   });
 
   it("books again as verified student", async () => {
