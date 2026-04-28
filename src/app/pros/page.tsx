@@ -5,6 +5,7 @@ import { eq, and, isNull } from "drizzle-orm";
 import { getLocale } from "@/lib/locale";
 import { t } from "@/lib/i18n/translations";
 import { cheapestLessonPrice } from "@/lib/pricing";
+import { excludeDummiesOnProduction } from "@/lib/pro-visibility";
 
 export const metadata = {
   title: "Our Pros — Golf Lessons",
@@ -25,7 +26,13 @@ export default async function ProsPage() {
     })
     .from(proProfiles)
     .innerJoin(users, eq(proProfiles.userId, users.id))
-    .where(and(eq(proProfiles.published, true), isNull(proProfiles.deletedAt)));
+    .where(
+      and(
+        eq(proProfiles.published, true),
+        isNull(proProfiles.deletedAt),
+        excludeDummiesOnProduction(),
+      ),
+    );
 
   // Fetch locations per pro
   const proLocationData = await db

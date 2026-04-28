@@ -7,6 +7,7 @@ import { BookingWizard } from "./BookingWizard";
 import { getStripe } from "@/lib/stripe";
 import { BookingRefreshListener } from "@/components/BookingRefreshListener";
 import { getLocale } from "@/lib/locale";
+import { excludeDummiesOnProduction } from "@/lib/pro-visibility";
 
 export async function generateMetadata({
   params,
@@ -21,7 +22,13 @@ export async function generateMetadata({
   const [pro] = await db
     .select({ displayName: proProfiles.displayName })
     .from(proProfiles)
-    .where(and(eq(proProfiles.id, id), isNull(proProfiles.deletedAt)))
+    .where(
+      and(
+        eq(proProfiles.id, id),
+        isNull(proProfiles.deletedAt),
+        excludeDummiesOnProduction(),
+      ),
+    )
     .limit(1);
 
   return {
@@ -59,7 +66,12 @@ export default async function BookingPage({
     })
     .from(proProfiles)
     .where(
-      and(eq(proProfiles.id, id), eq(proProfiles.published, true), isNull(proProfiles.deletedAt))
+      and(
+        eq(proProfiles.id, id),
+        eq(proProfiles.published, true),
+        isNull(proProfiles.deletedAt),
+        excludeDummiesOnProduction(),
+      )
     )
     .limit(1);
 

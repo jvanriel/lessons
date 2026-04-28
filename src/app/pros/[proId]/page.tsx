@@ -14,6 +14,7 @@ import JoinButton from "./JoinButton";
 import { getLocale } from "@/lib/locale";
 import { t } from "@/lib/i18n/translations";
 import { cheapestLessonPrice } from "@/lib/pricing";
+import { excludeDummiesOnProduction } from "@/lib/pro-visibility";
 
 interface Props {
   params: Promise<{ proId: string }>;
@@ -26,7 +27,14 @@ export async function generateMetadata({ params }: Props) {
   const [pro] = await db
     .select({ displayName: proProfiles.displayName, bio: proProfiles.bio })
     .from(proProfiles)
-    .where(and(eq(proProfiles.id, id), eq(proProfiles.published, true), isNull(proProfiles.deletedAt)))
+    .where(
+      and(
+        eq(proProfiles.id, id),
+        eq(proProfiles.published, true),
+        isNull(proProfiles.deletedAt),
+        excludeDummiesOnProduction(),
+      ),
+    )
     .limit(1);
 
   if (!pro) return { title: "Pro not found" };
@@ -57,7 +65,14 @@ export default async function ProProfilePage({ params }: Props) {
     })
     .from(proProfiles)
     .innerJoin(users, eq(proProfiles.userId, users.id))
-    .where(and(eq(proProfiles.id, id), eq(proProfiles.published, true), isNull(proProfiles.deletedAt)))
+    .where(
+      and(
+        eq(proProfiles.id, id),
+        eq(proProfiles.published, true),
+        isNull(proProfiles.deletedAt),
+        excludeDummiesOnProduction(),
+      ),
+    )
     .limit(1);
 
   if (!pro) notFound();

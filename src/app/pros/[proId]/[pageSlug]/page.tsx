@@ -9,6 +9,7 @@ import { getLocale } from "@/lib/locale";
 import { t } from "@/lib/i18n/translations";
 import { sanitizeHtml } from "@/lib/sanitize-html";
 import { isLocale, type Locale } from "@/lib/i18n";
+import { excludeDummiesOnProduction } from "@/lib/pro-visibility";
 
 const SOURCE_LOCALE: Locale = "nl";
 
@@ -36,7 +37,14 @@ export async function generateMetadata({ params }: Props) {
   const [pro] = await db
     .select({ id: proProfiles.id, displayName: proProfiles.displayName })
     .from(proProfiles)
-    .where(and(eq(proProfiles.id, id), eq(proProfiles.published, true), isNull(proProfiles.deletedAt)))
+    .where(
+      and(
+        eq(proProfiles.id, id),
+        eq(proProfiles.published, true),
+        isNull(proProfiles.deletedAt),
+        excludeDummiesOnProduction(),
+      ),
+    )
     .limit(1);
 
   if (!pro) return { title: "Not found" };
@@ -111,7 +119,12 @@ export default async function ProFlyerPage({ params, searchParams }: Props) {
       and(
         eq(proProfiles.id, id),
         isNull(proProfiles.deletedAt),
-        ...(isOwner ? [] : [eq(proProfiles.published, true)]),
+        ...(isOwner
+          ? []
+          : [
+              eq(proProfiles.published, true),
+              excludeDummiesOnProduction(),
+            ]),
       ),
     )
     .limit(1);

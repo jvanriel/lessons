@@ -25,6 +25,7 @@ import {
   type QuickBookData,
 } from "../book/actions";
 import { getStripe } from "@/lib/stripe";
+import { excludeDummiesOnProduction } from "@/lib/pro-visibility";
 
 export const metadata = { title: "Dashboard — Golf Lessons" };
 
@@ -103,7 +104,8 @@ export default async function MemberDashboard() {
       and(
         eq(proStudents.userId, session.userId),
         eq(proStudents.status, "active"),
-        isNull(proProfiles.deletedAt)
+        isNull(proProfiles.deletedAt),
+        excludeDummiesOnProduction(),
       )
     );
 

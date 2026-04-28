@@ -44,6 +44,7 @@ import {
 } from "@/lib/local-date";
 import { getProLocationTimezone } from "@/lib/pro";
 import { updateBookingPreferences } from "@/lib/booking-preferences";
+import { excludeDummiesOnProduction } from "@/lib/pro-visibility";
 
 /**
  * Read the UI locale from the cookie (set by the language switcher), not
@@ -82,7 +83,12 @@ export async function getBookablePros() {
     })
     .from(proProfiles)
     .where(
-      and(eq(proProfiles.published, true), eq(proProfiles.bookingEnabled, true), isNull(proProfiles.deletedAt))
+      and(
+        eq(proProfiles.published, true),
+        eq(proProfiles.bookingEnabled, true),
+        isNull(proProfiles.deletedAt),
+        excludeDummiesOnProduction(),
+      )
     );
 
   return rows;

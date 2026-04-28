@@ -2,6 +2,7 @@ import type { MetadataRoute } from "next";
 import { db } from "@/lib/db";
 import { proProfiles } from "@/lib/db/schema";
 import { eq, and, isNull } from "drizzle-orm";
+import { excludeDummiesOnProduction } from "@/lib/pro-visibility";
 
 const SITE_URL = process.env.NEXT_PUBLIC_APP_URL || "https://golflessons.be";
 
@@ -19,7 +20,13 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   const pros = await db
     .select({ id: proProfiles.id, updatedAt: proProfiles.updatedAt })
     .from(proProfiles)
-    .where(and(eq(proProfiles.published, true), isNull(proProfiles.deletedAt)));
+    .where(
+      and(
+        eq(proProfiles.published, true),
+        isNull(proProfiles.deletedAt),
+        excludeDummiesOnProduction(),
+      ),
+    );
 
   const proRoutes: MetadataRoute.Sitemap = pros.map((p) => ({
     url: `${SITE_URL}/pros/${p.id}`,

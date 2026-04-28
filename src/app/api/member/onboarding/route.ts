@@ -12,6 +12,7 @@ import { eq, and, inArray, isNull } from "drizzle-orm";
 import { sendEmail } from "@/lib/mail";
 import { buildOnboardingConfirmationEmail, getOnboardingConfirmationSubject } from "@/lib/email-templates";
 import { resolveLocale } from "@/lib/i18n";
+import { excludeDummiesOnProduction } from "@/lib/pro-visibility";
 
 const VALID_GOALS = [
   "driving",
@@ -112,7 +113,8 @@ export async function POST(request: Request) {
           and(
             inArray(proProfiles.id, proProfileIds),
             eq(proProfiles.published, true),
-            isNull(proProfiles.deletedAt)
+            isNull(proProfiles.deletedAt),
+            excludeDummiesOnProduction(),
           )
         );
       const validIds = new Set(validPros.map((p) => p.id));

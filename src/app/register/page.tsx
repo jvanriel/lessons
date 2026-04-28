@@ -13,6 +13,7 @@ import {
 import { eq, and, isNull } from "drizzle-orm";
 import StudentOnboardingWizard from "./StudentOnboardingWizard";
 import { isProSignupOpen } from "@/lib/feature-flags";
+import { excludeDummiesOnProduction } from "@/lib/pro-visibility";
 
 export const metadata = { title: "Register — Golf Lessons" };
 
@@ -113,7 +114,13 @@ export default async function RegisterPage({ searchParams }: Props) {
           lessonDurations: proProfiles.lessonDurations,
         })
         .from(proProfiles)
-        .where(and(eq(proProfiles.published, true), isNull(proProfiles.deletedAt)));
+        .where(
+          and(
+            eq(proProfiles.published, true),
+            isNull(proProfiles.deletedAt),
+            excludeDummiesOnProduction(),
+          ),
+        );
 
       publishedPros = await Promise.all(
         rawPros.map(async (p) => {

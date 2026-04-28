@@ -12,6 +12,7 @@ import { eq, and, isNull, inArray, gte } from "drizzle-orm";
 import { getSession, hasRole } from "@/lib/auth";
 import { redirect } from "next/navigation";
 import { cancelBooking } from "../bookings/actions";
+import { excludeDummiesOnProduction } from "@/lib/pro-visibility";
 
 export async function getPublishedPros() {
   const session = await getSession();
@@ -28,7 +29,13 @@ export async function getPublishedPros() {
       bio: proProfiles.bio,
     })
     .from(proProfiles)
-    .where(and(eq(proProfiles.published, true), isNull(proProfiles.deletedAt)));
+    .where(
+      and(
+        eq(proProfiles.published, true),
+        isNull(proProfiles.deletedAt),
+        excludeDummiesOnProduction(),
+      ),
+    );
 
   // Get locations for each pro
   const prosWithLocations = await Promise.all(

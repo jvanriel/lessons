@@ -20,9 +20,18 @@ const PRO_EMAIL = "dummy-pro-claude@golflessons.be";
 const STUDENT_EMAIL = "dummy-student-claude@golflessons.be";
 
 async function main() {
-  const url = process.env.POSTGRES_URL_PREVIEW || process.env.POSTGRES_URL;
+  // Hard refusal: this seed creates a published pro with a `dummy*`
+  // email. We never want it in the production DB, so don't fall back
+  // to POSTGRES_URL — the preview URL must be set explicitly.
+  const url = process.env.POSTGRES_URL_PREVIEW;
   if (!url) {
-    console.error("POSTGRES_URL_PREVIEW or POSTGRES_URL not set");
+    console.error(
+      "POSTGRES_URL_PREVIEW must be set. Refusing to fall back to POSTGRES_URL — this script seeds a `dummy*@golflessons.be` pro and must never touch production.",
+    );
+    process.exit(1);
+  }
+  if (process.env.VERCEL_ENV === "production") {
+    console.error("VERCEL_ENV=production detected. Refusing to seed.");
     process.exit(1);
   }
 

@@ -26,6 +26,7 @@ import { SignJWT } from "jose";
 import { looksLikeE164, normalizePhone } from "@/lib/phone";
 import { sendEmail } from "@/lib/mail";
 import { after } from "next/server";
+import { excludeDummiesOnProduction } from "@/lib/pro-visibility";
 import {
   buildClaimAndVerifyBookingEmail,
   buildNewBookingOnAccountEmail,
@@ -85,7 +86,8 @@ export async function getAllBookablePros() {
       and(
         eq(proProfiles.published, true),
         eq(proProfiles.bookingEnabled, true),
-        isNull(proProfiles.deletedAt)
+        isNull(proProfiles.deletedAt),
+        excludeDummiesOnProduction(),
       )
     )
     .orderBy(proProfiles.displayName);
@@ -158,7 +160,8 @@ export async function getPublicPro(proIdStr: string) {
         eq(proProfiles.id, id),
         eq(proProfiles.published, true),
         eq(proProfiles.bookingEnabled, true),
-        isNull(proProfiles.deletedAt)
+        isNull(proProfiles.deletedAt),
+        excludeDummiesOnProduction(),
       )
     )
     .limit(1);
