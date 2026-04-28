@@ -428,14 +428,10 @@ function LessonsStep({
         onChange({ lessonDurations: current.filter((x) => x !== d) });
       }
     } else {
-      // When enabling a duration, pre-fill its price from the 60-min
-      // baseline if the pro has one, otherwise default €50/hour pro-rated.
-      const baseline = data.lessonPricing["60"] ?? 50;
-      const prefilled =
-        data.lessonPricing[String(d)] ?? Math.round((baseline * d) / 60);
+      // No price pre-fill: any number we'd inject feels like a
+      // recommendation. The pro must enter their own.
       onChange({
         lessonDurations: [...current, d].sort((a, b) => a - b),
-        lessonPricing: { ...data.lessonPricing, [String(d)]: prefilled },
       });
     }
   }

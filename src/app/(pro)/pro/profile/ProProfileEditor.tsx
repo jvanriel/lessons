@@ -348,20 +348,8 @@ export default function ProProfileEditor({
                         setLessonDurations(
                           [...lessonDurations, d].sort((a, b) => a - b)
                         );
-                        // Pre-fill a price if one isn't set yet, pro-rated
-                        // from the 60-min baseline (or €50/h default).
-                        if (lessonPricing[String(d)] == null) {
-                          const baseline = lessonPricing["60"] ?? 50;
-                          const prefill = Math.round((baseline * d) / 60);
-                          setLessonPricing((prev) => ({
-                            ...prev,
-                            [String(d)]: prefill,
-                          }));
-                          setLessonPriceInputs((prev) => ({
-                            ...prev,
-                            [String(d)]: formatPriceInput(prefill, locale),
-                          }));
-                        }
+                        // No price pre-fill: any value we'd inject reads
+                        // like a recommendation. The pro types their own.
                       } else {
                         const next = lessonDurations.filter((v) => v !== d);
                         if (next.length > 0) setLessonDurations(next);
