@@ -11,6 +11,9 @@ export default async function AdminTasksPage() {
   const session = await getSession();
   const [allTasks, adminUsers] = await Promise.all([
     db.select().from(tasks).orderBy(asc(tasks.column), asc(tasks.position)),
+    // Task assignees: admins + devs only. Pros do NOT belong here —
+    // they live on the platform but don't triage internal work. To put
+    // a pro on a task, grant them the admin role first (task 68).
     db
       .select({
         id: users.id,
@@ -22,7 +25,6 @@ export default async function AdminTasksPage() {
         and(
           or(
             like(users.roles, "%admin%"),
-            like(users.roles, "%pro%"),
             like(users.roles, "%dev%")
           ),
           not(ilike(users.email, "dummy%")),
