@@ -1186,12 +1186,35 @@ export async function quickCreateBooking(data: {
     phone: user.phone,
   });
 
-  // Notify the pro
+  // Notify the pro + email both parties (mirrors `createBooking` —
+  // task 67: Quick Book used to be silent, no confirmation mail).
   const [pro] = await db
-    .select({ userId: proProfiles.userId, displayName: proProfiles.displayName })
+    .select({
+      userId: proProfiles.userId,
+      displayName: proProfiles.displayName,
+      contactPhone: proProfiles.contactPhone,
+      lessonPricing: proProfiles.lessonPricing,
+      allowBookingWithoutPayment: proProfiles.allowBookingWithoutPayment,
+      proFirstName: users.firstName,
+      proEmail: users.email,
+      proLocale: users.preferredLocale,
+    })
     .from(proProfiles)
+    .innerJoin(users, eq(proProfiles.userId, users.id))
     .where(eq(proProfiles.id, data.proProfileId))
     .limit(1);
+
+  const [loc] = await db
+    .select({ name: locations.name, city: locations.city })
+    .from(proLocations)
+    .innerJoin(locations, eq(proLocations.locationId, locations.id))
+    .where(eq(proLocations.id, data.proLocationId))
+    .limit(1);
+  const locationName = loc
+    ? loc.city
+      ? `${loc.name}, ${loc.city}`
+      : loc.name
+    : "";
 
   if (pro) {
     await createNotification({
@@ -1202,6 +1225,87 @@ export async function quickCreateBooking(data: {
       message: `${user.firstName} ${user.lastName} booked a lesson on ${data.date} at ${data.startTime}.`,
       actionUrl: "/pro/bookings",
       actionLabel: "View bookings",
+    });
+
+    const studentLocale = resolveLocale(user.preferredLocale);
+    const proLocale = resolveLocale(pro.proLocale);
+    const perLessonCents = (
+      pro.lessonPricing as Record<string, number> | null
+    )?.[String(data.duration)];
+    const priceCents =
+      typeof perLessonCents === "number" && perLessonCents > 0
+        ? perLessonCents
+        : null;
+
+    const ics = buildIcs({
+      date: data.date,
+      startTime: data.startTime,
+      endTime: data.endTime,
+      summary: `Golf lesson with ${pro.displayName}`,
+      location: locationName,
+      description: `Booked via golflessons.be — ${user.firstName} ${user.lastName}`,
+      bookingId: booking.id,
+    });
+    const icsAttachment = {
+      filename: "lesson.ics",
+      contentType: "text/calendar",
+      content: ics,
+      method: "REQUEST",
+    };
+
+    after(async () => {
+      try {
+        await sendEmail({
+          to: user.email,
+          subject: getStudentBookingConfirmationSubject(pro.displayName, studentLocale),
+          html: buildStudentBookingConfirmationEmail({
+            firstName: user.firstName,
+            proName: pro.displayName,
+            proEmail: pro.proEmail,
+            proPhone: pro.contactPhone,
+            locationName,
+            date: data.date,
+            startTime: data.startTime,
+            endTime: data.endTime,
+            duration: data.duration,
+            priceCents,
+            cashOnly: !!pro.allowBookingWithoutPayment,
+            locale: studentLocale,
+          }),
+          attachments: [icsAttachment],
+        });
+      } catch {
+        /* sendEmail already logs email.failed + Sentry — swallow here. */
+      }
+      try {
+        await sendEmail({
+          to: pro.proEmail,
+          subject: getProBookingNotificationSubject(
+            `${user.firstName} ${user.lastName}`,
+            proLocale,
+          ),
+          html: buildProBookingNotificationEmail({
+            proFirstName: pro.proFirstName,
+            studentFirstName: user.firstName,
+            studentLastName: user.lastName,
+            studentEmail: user.email,
+            studentPhone: user.phone ?? "",
+            locationName,
+            date: data.date,
+            startTime: data.startTime,
+            endTime: data.endTime,
+            duration: data.duration,
+            participantCount: 1,
+            notes: null,
+            locale: proLocale,
+            // Quick Book is pay-later; no PI is run synchronously.
+            paymentStatus: "manual",
+          }),
+          attachments: [icsAttachment],
+        });
+      } catch {
+        /* ditto */
+      }
     });
   }
 
