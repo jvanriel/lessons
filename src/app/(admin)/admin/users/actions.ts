@@ -11,6 +11,7 @@ import { resolveLocale } from "@/lib/i18n";
 import { ensureProProfile, normalizeRoles } from "@/lib/pro";
 import { formatLocalDate } from "@/lib/local-date";
 import { notifyCounterpartOfAccountDeletion } from "@/lib/account-deletion-mailer";
+import { logEvent } from "@/lib/events";
 
 async function requireAdmin() {
   const session = await getSession();
@@ -727,6 +728,78 @@ export async function removeUserEmail(emailId: number) {
   }
 
   await db.delete(userEmails).where(eq(userEmails.id, emailId));
+
+  revalidatePath("/admin/users");
+  return { success: true };
+}
+
+// ─── Subscription waiver (comp) ─────────────────────────
+
+/**
+ * Flip a pro's subscription_status between 'comp' (waived — no
+ * subscription fee, no booking commission) and 'none'. Used for team /
+ * founder accounts that don't pay to use the platform. The cash- and
+ * online-commission code paths skip billing when the status is 'comp',
+ * so a comped pro can be published without a Stripe customer.
+ *
+ * Reverting to 'none' just removes the waiver — it doesn't activate a
+ * Stripe subscription. The pro would still need to go through the
+ * normal subscription setup flow if you want them on a paid plan.
+ */
+export async function setProSubscriptionComp(
+  userId: number,
+  comp: boolean,
+): Promise<{ error?: string; success?: boolean }> {
+  const session = await requireAdmin();
+
+  const [profile] = await db
+    .select({
+      id: proProfiles.id,
+      currentStatus: proProfiles.subscriptionStatus,
+      stripeSubscriptionId: proProfiles.stripeSubscriptionId,
+    })
+    .from(proProfiles)
+    .where(eq(proProfiles.userId, userId))
+    .limit(1);
+
+  if (!profile) return { error: "User has no pro profile." };
+
+  // Refuse to overwrite an active paid subscription with a comp — that
+  // would silently waive a real Stripe subscription. Cancel/expire it
+  // first via the normal flow.
+  if (
+    comp &&
+    profile.stripeSubscriptionId &&
+    (profile.currentStatus === "active" ||
+      profile.currentStatus === "trialing" ||
+      profile.currentStatus === "past_due")
+  ) {
+    return {
+      error:
+        "This pro has an active paid subscription. Cancel it in Stripe first before waiving.",
+    };
+  }
+
+  const nextStatus = comp ? "comp" : "none";
+  if (profile.currentStatus === nextStatus) {
+    return { success: true };
+  }
+
+  await db
+    .update(proProfiles)
+    .set({ subscriptionStatus: nextStatus, updatedAt: new Date() })
+    .where(eq(proProfiles.id, profile.id));
+
+  await logEvent({
+    type: "pro.subscription.comp",
+    actorId: session.userId,
+    targetId: userId,
+    payload: {
+      proProfileId: profile.id,
+      from: profile.currentStatus,
+      to: nextStatus,
+    },
+  }).catch(() => {});
 
   revalidatePath("/admin/users");
   return { success: true };

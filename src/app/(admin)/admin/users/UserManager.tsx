@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useActionState, useTransition, useRef, useEffect } from "react";
+import { useRouter } from "next/navigation";
 import {
   createUser,
   updateUser,
@@ -12,6 +13,7 @@ import {
   activateAsPro,
   addUserEmail,
   removeUserEmail,
+  setProSubscriptionComp,
 } from "./actions";
 
 interface UserEmail {
@@ -32,6 +34,8 @@ interface User {
   createdAt: string | null;
   deletedAt: string | null;
   emails: UserEmail[];
+  /** Pulled from the user's pro_profile when they have one. Null otherwise. */
+  subscriptionStatus: string | null;
 }
 
 const ROLES = ["member", "admin", "pro", "dev"];
@@ -1021,6 +1025,10 @@ function UserDialog({
             </div>
           </form>
 
+          {selectedRoles.includes("pro") && (
+            <SubscriptionCompToggle user={user} />
+          )}
+
           {/* Email aliases */}
           <div className="mt-6 border-t border-green-100 pt-6">
             <h3 className="text-sm font-semibold text-green-800">
@@ -1035,6 +1043,78 @@ function UserDialog({
           </div>
         </div>
       </div>
+    </div>
+  );
+}
+
+function SubscriptionCompToggle({ user }: { user: User }) {
+  const router = useRouter();
+  const [isComp, setIsComp] = useState(user.subscriptionStatus === "comp");
+  const [pending, startTransition] = useTransition();
+  const [error, setError] = useState<string | null>(null);
+  const [saved, setSaved] = useState(false);
+
+  function onToggle() {
+    const next = !isComp;
+    const verb = next ? "Waive subscription" : "Revoke waiver";
+    if (
+      !confirm(
+        next
+          ? `Waive subscription for ${user.firstName} ${user.lastName}?\n\nThe pro can be published without a Stripe customer, and no booking commission will be billed. Used for team / founder accounts.`
+          : `Revoke the subscription waiver for ${user.firstName} ${user.lastName}?\n\nThis just removes the comp flag — it does not start a Stripe subscription. The pro will appear unsubscribed until they sign up for a paid plan.`,
+      )
+    )
+      return;
+    setError(null);
+    setSaved(false);
+    startTransition(async () => {
+      const result = await setProSubscriptionComp(user.id, next);
+      if (result.error) {
+        setError(result.error);
+        return;
+      }
+      setIsComp(next);
+      setSaved(true);
+      router.refresh();
+      void verb;
+    });
+  }
+
+  return (
+    <div className="mt-6 rounded-lg border border-green-100 bg-green-50/40 px-4 py-3 text-sm">
+      <div className="flex items-center justify-between">
+        <div>
+          <p className="font-medium text-green-900">
+            Subscription waiver
+            {isComp && (
+              <span className="ml-2 rounded-full bg-gold-100 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-gold-700">
+                Waived
+              </span>
+            )}
+          </p>
+          <p className="mt-1 text-xs text-green-600">
+            {isComp
+              ? "No subscription fee, no booking commission. Pro can publish without a Stripe customer."
+              : `Current status: ${user.subscriptionStatus ?? "(no pro profile)"}`}
+          </p>
+        </div>
+        <button
+          type="button"
+          onClick={onToggle}
+          disabled={pending}
+          className={`rounded-md border px-3 py-1.5 text-xs font-medium transition-colors disabled:opacity-50 ${
+            isComp
+              ? "border-amber-300 bg-white text-amber-700 hover:bg-amber-50"
+              : "border-gold-500 bg-gold-600 text-white hover:bg-gold-500"
+          }`}
+        >
+          {pending ? "Saving..." : isComp ? "Revoke waiver" : "Waive subscription"}
+        </button>
+      </div>
+      {error && <p className="mt-2 text-xs text-red-600">{error}</p>}
+      {saved && !error && (
+        <p className="mt-2 text-xs text-green-700">Saved.</p>
+      )}
     </div>
   );
 }

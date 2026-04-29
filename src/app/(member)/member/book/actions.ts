@@ -415,6 +415,7 @@ export async function createBooking(formData: FormData) {
     .select({
       lessonPricing: proProfiles.lessonPricing,
       allowBookingWithoutPayment: proProfiles.allowBookingWithoutPayment,
+      subscriptionStatus: proProfiles.subscriptionStatus,
     })
     .from(proProfiles)
     .where(eq(proProfiles.id, proProfileId))
@@ -440,12 +441,17 @@ export async function createBooking(formData: FormData) {
   }
 
   const priceCents = computedPriceCents;
+  // "comp" pros (team / founder accounts) get a full waiver — no
+  // subscription fee, no booking commission. Skip the fee calculation
+  // entirely so the cash-commission invoice block doesn't fire and the
+  // online-payment flow records `platformFeeCents = null`.
+  const isComp = priceRow?.subscriptionStatus === "comp";
   // Commission is recorded on every priced booking — online or cash-only.
   // For online bookings we deduct it from the paid lesson amount; for
   // cash-only bookings we bill it separately to the pro via an invoice
   // item further down.
   const platformFeeCents =
-    priceCents !== null
+    priceCents !== null && !isComp
       ? calculatePlatformFee(priceCents, { online: !cashOnly })
       : null;
 

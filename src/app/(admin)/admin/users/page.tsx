@@ -1,12 +1,12 @@
 import { db } from "@/lib/db";
-import { users, userEmails } from "@/lib/db/schema";
+import { users, userEmails, proProfiles } from "@/lib/db/schema";
 import { desc } from "drizzle-orm";
 import UserManager from "./UserManager";
 
 export const metadata = { title: "Users — Admin — Golf Lessons" };
 
 export default async function AdminUsersPage() {
-  const [allUsers, allEmails] = await Promise.all([
+  const [allUsers, allEmails, allProProfiles] = await Promise.all([
     db
       .select({
         id: users.id,
@@ -22,7 +22,18 @@ export default async function AdminUsersPage() {
       .from(users)
       .orderBy(desc(users.createdAt)),
     db.select().from(userEmails),
+    db
+      .select({
+        userId: proProfiles.userId,
+        subscriptionStatus: proProfiles.subscriptionStatus,
+      })
+      .from(proProfiles),
   ]);
+
+  const subscriptionByUser: Record<number, string> = {};
+  for (const p of allProProfiles) {
+    subscriptionByUser[p.userId] = p.subscriptionStatus;
+  }
 
   const emailsByUser: Record<
     number,
@@ -48,6 +59,7 @@ export default async function AdminUsersPage() {
     deletedAt: u.deletedAt?.toISOString() ?? null,
     createdAt: u.createdAt?.toISOString() ?? null,
     emails: emailsByUser[u.id] ?? [],
+    subscriptionStatus: subscriptionByUser[u.id] ?? null,
   }));
 
   return (
