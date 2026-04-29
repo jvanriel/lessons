@@ -11,6 +11,7 @@ import {
   proSchedulePeriods,
 } from "@/lib/db/schema";
 import { getSession, hasRole } from "@/lib/auth";
+import { validateSchedulePeriods } from "@/lib/schedule-periods";
 
 async function requireProWithProfile() {
   const session = await getSession();
@@ -121,64 +122,11 @@ export async function saveSchedulePeriods(input: {
 }): Promise<{ error?: string }> {
   const { profile } = await requireProWithProfile();
 
-  // Per-period shape validation.
-  for (const p of input.periods) {
-    if (p.validFrom && p.validUntil && p.validFrom > p.validUntil) {
-      return { error: "Period start must be on or before its end." };
-    }
-    for (const s of p.slots) {
-      if (s.dayOfWeek < 0 || s.dayOfWeek > 6) {
-        return { error: "Invalid day of week." };
-      }
-      if (s.startTime >= s.endTime) {
-        return { error: "Slot end time must be after start time." };
-      }
-    }
-  }
-
-  // Exclusive-timeline invariants. Sort by `validFrom` (null first)
-  // and walk the list once. At most one null-from at the head, at
-  // most one null-until at the tail, and consecutive periods can't
-  // overlap.
-  const sorted = [...input.periods].sort((a, b) => {
-    if (a.validFrom === null && b.validFrom !== null) return -1;
-    if (b.validFrom === null && a.validFrom !== null) return 1;
-    return (a.validFrom ?? "").localeCompare(b.validFrom ?? "");
-  });
-  let nullFromCount = 0;
-  let nullUntilCount = 0;
-  for (const p of sorted) {
-    if (p.validFrom === null) nullFromCount++;
-    if (p.validUntil === null) nullUntilCount++;
-  }
-  if (nullFromCount > 1) {
-    return { error: "Only the first period may have an open start." };
-  }
-  if (nullUntilCount > 1) {
-    return { error: "Only the last period may have an open end." };
-  }
-  for (let i = 0; i < sorted.length; i++) {
-    const p = sorted[i];
-    const isFirst = i === 0;
-    const isLast = i === sorted.length - 1;
-    if (!isFirst && p.validFrom === null) {
-      return { error: "Only the first period may have an open start." };
-    }
-    if (!isLast && p.validUntil === null) {
-      return { error: "Only the last period may have an open end." };
-    }
-  }
-  for (let i = 0; i < sorted.length - 1; i++) {
-    const a = sorted[i];
-    const b = sorted[i + 1];
-    // a.validUntil null means a runs forever — only valid if a is the
-    // last period (i == n-1), so this branch can't be reached.
-    if (a.validUntil && b.validFrom && a.validUntil >= b.validFrom) {
-      return {
-        error: "Schedule periods overlap. Each period must end before the next begins.",
-      };
-    }
-  }
+  // Validate exclusive-timeline invariants + slot shape. Pure helper
+  // lives in `@/lib/schedule-periods` so it can be unit-tested.
+  const validation = validateSchedulePeriods(input.periods);
+  if (!validation.ok) return { error: validation.error };
+  const sorted = validation.sorted;
 
   // Verify every referenced location belongs to this pro.
   const referencedLocs = new Set(

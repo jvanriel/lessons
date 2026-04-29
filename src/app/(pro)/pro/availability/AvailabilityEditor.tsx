@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useCallback, useRef, useMemo, useEffect } from "react";
+import { useState, useCallback, useRef, useMemo, useEffect, type ReactNode } from "react";
 import type {
   SerializedAvailability,
   SerializedOverride,
@@ -124,17 +124,19 @@ function availabilityToLocationGrid(slots: SerializedAvailability[]): LocationGr
  * persists on the next save.
  */
 function buildPeriods(
-  periodDefs: SerializedSchedulePeriod[],
-  slots: SerializedAvailability[],
+  periodDefs: SerializedSchedulePeriod[] | undefined,
+  slots: SerializedAvailability[] | undefined,
 ): Period[] {
+  const safeDefs = periodDefs ?? [];
+  const safeSlots = slots ?? [];
   const slotsByKey = new Map<string, SerializedAvailability[]>();
-  for (const s of slots) {
+  for (const s of safeSlots) {
     const key = `${s.validFrom ?? ""}|${s.validUntil ?? ""}`;
     const arr = slotsByKey.get(key) ?? [];
     arr.push(s);
     slotsByKey.set(key, arr);
   }
-  const periods: Period[] = periodDefs.map((d) => {
+  const periods: Period[] = safeDefs.map((d) => {
     const key = `${d.validFrom ?? ""}|${d.validUntil ?? ""}`;
     const matched = slotsByKey.get(key) ?? [];
     return {
@@ -552,6 +554,11 @@ function SchedulePeriodsSection({
     defaultUntil: string;
   } | null>(null);
   const [pendingRemoveId, setPendingRemoveId] = useState<string | null>(null);
+  // When the user removes the chronologically last period, the dialog
+  // offers a checkbox to also clear the new-last period's
+  // `validUntil` (extend to "open end"). Tracked separately so the
+  // toggle resets between opens.
+  const [pendingExtendPrevious, setPendingExtendPrevious] = useState(false);
   const debounceRef = useRef<ReturnType<typeof setTimeout>>(undefined);
   // Tracks the JSON of the most recently dispatched save payload.
   // Why: `saveSchedulePeriods` calls `revalidatePath`, which causes the
@@ -669,13 +676,29 @@ function SchedulePeriodsSection({
       return;
     }
     setPendingRemoveId(id);
+    setPendingExtendPrevious(false);
   }
 
   function confirmRemovePeriod() {
     const id = pendingRemoveId;
+    const extendPrev = pendingExtendPrevious;
     setPendingRemoveId(null);
+    setPendingExtendPrevious(false);
     if (!id) return;
-    const next = periods.filter((p) => p.id !== id);
+    const idx = periods.findIndex((p) => p.id === id);
+    if (idx < 0) return;
+    const wasLast = idx === periods.length - 1 && periods.length > 1;
+
+    let next = periods.filter((p) => p.id !== id);
+    // If the user removed the chronologically last period and ticked
+    // the "extend previous" toggle, clear the new-last's validUntil
+    // so the timeline keeps an open end (no closing date).
+    if (extendPrev && wasLast && next.length > 0) {
+      const newLastIdx = next.length - 1;
+      next = next.map((p, i) =>
+        i === newLastIdx ? { ...p, validUntil: null } : p,
+      );
+    }
     // Always keep at least one period (the unbounded "Always") so the
     // grid has somewhere to render. If the user removes the last
     // period, recreate an empty unbounded one.
@@ -864,16 +887,37 @@ function SchedulePeriodsSection({
         />
       )}
       {pendingRemoveId !== null && (() => {
-        const target = periods.find((p) => p.id === pendingRemoveId);
+        const idx = periods.findIndex((p) => p.id === pendingRemoveId);
+        const target = periods[idx];
+        const isLastWithPrevious =
+          idx === periods.length - 1 && periods.length > 1;
         return (
           <ConfirmDialog
             title={t("proAvail.removePeriod", locale)}
             message={t("proAvail.removePeriodConfirm", locale)}
             detail={target ? periodLabel(target, locale) : undefined}
+            extra={
+              isLastWithPrevious ? (
+                <label className="mt-3 flex items-start gap-2 text-xs text-green-700">
+                  <input
+                    type="checkbox"
+                    checked={pendingExtendPrevious}
+                    onChange={(e) => setPendingExtendPrevious(e.target.checked)}
+                    className="mt-0.5 h-3.5 w-3.5 rounded border-green-300 text-green-700"
+                  />
+                  <span>
+                    {t("proAvail.extendPreviousAfterRemove", locale)}
+                  </span>
+                </label>
+              ) : undefined
+            }
             confirmLabel={t("proAvail.removePeriod", locale)}
             cancelLabel={t("proAvail.cancel", locale)}
             onConfirm={confirmRemovePeriod}
-            onClose={() => setPendingRemoveId(null)}
+            onClose={() => {
+              setPendingRemoveId(null);
+              setPendingExtendPrevious(false);
+            }}
             danger
           />
         );
@@ -886,6 +930,7 @@ function ConfirmDialog({
   title,
   message,
   detail,
+  extra,
   confirmLabel,
   cancelLabel,
   onConfirm,
@@ -895,6 +940,7 @@ function ConfirmDialog({
   title: string;
   message: string;
   detail?: string;
+  extra?: ReactNode;
   confirmLabel: string;
   cancelLabel: string;
   onConfirm: () => void;
@@ -918,6 +964,7 @@ function ConfirmDialog({
           </p>
         )}
         <p className="mt-3 text-sm text-green-800">{message}</p>
+        {extra}
         <div className="mt-5 flex gap-3">
           <button
             type="button"

@@ -573,6 +573,169 @@ describe("validFrom / validUntil", () => {
   });
 });
 
+// ─── Multi-period schedules (task 78) ────────────────
+//
+// The engine has no notion of "period" — it filters templates by
+// `validFrom`/`validUntil` per date. The exclusive-timeline editor
+// guarantees those bounds don't overlap, so for any date at most one
+// period's templates can match. These tests verify the cross-period
+// behavior holds when the editor delivers a non-overlapping schedule.
+
+describe("multi-period schedules (exclusive timeline)", () => {
+  const pastNow = new Date("2020-01-01T00:00:00");
+  // 2026-05-04 is a Monday (ISO dayOfWeek=0).
+  // 2026-06-15 is a Monday.
+  // 2026-08-03 is a Monday.
+
+  it("two bounded periods — each date picks only its own period's templates", () => {
+    const may: AvailabilityTemplate = {
+      dayOfWeek: 0,
+      startTime: "09:00",
+      endTime: "10:00",
+      validFrom: "2026-05-01",
+      validUntil: "2026-05-31",
+    };
+    const aug: AvailabilityTemplate = {
+      dayOfWeek: 0,
+      startTime: "14:00",
+      endTime: "15:00",
+      validFrom: "2026-08-01",
+      validUntil: "2026-08-31",
+    };
+    const templates = [may, aug];
+
+    const mayDay = computeAvailableSlots(
+      "2026-05-04", templates, [], [], 0, 60, pastNow,
+    );
+    expect(mayDay).toEqual([{ startTime: "09:00", endTime: "10:00" }]);
+
+    const augDay = computeAvailableSlots(
+      "2026-08-03", templates, [], [], 0, 60, pastNow,
+    );
+    expect(augDay).toEqual([{ startTime: "14:00", endTime: "15:00" }]);
+  });
+
+  it("gap between bounded periods has no availability", () => {
+    const may: AvailabilityTemplate = {
+      dayOfWeek: 0,
+      startTime: "09:00",
+      endTime: "10:00",
+      validFrom: "2026-05-01",
+      validUntil: "2026-05-31",
+    };
+    const aug: AvailabilityTemplate = {
+      dayOfWeek: 0,
+      startTime: "14:00",
+      endTime: "15:00",
+      validFrom: "2026-08-01",
+      validUntil: "2026-08-31",
+    };
+    // Mid-June is in the gap — neither template's range contains it.
+    const slots = computeAvailableSlots(
+      "2026-06-15", [may, aug], [], [], 0, 60, pastNow,
+    );
+    expect(slots).toEqual([]);
+  });
+
+  it("open-start + open-end pair partition the timeline", () => {
+    // First period: until end of May, no earlier-bound.
+    const earlier: AvailabilityTemplate = {
+      dayOfWeek: 0,
+      startTime: "09:00",
+      endTime: "10:00",
+      validFrom: null,
+      validUntil: "2026-05-31",
+    };
+    // Last period: from June 1, no closing date.
+    const later: AvailabilityTemplate = {
+      dayOfWeek: 0,
+      startTime: "14:00",
+      endTime: "15:00",
+      validFrom: "2026-06-01",
+      validUntil: null,
+    };
+    const templates = [earlier, later];
+
+    // 1900-01-01 is way in the past — only the open-start matches.
+    // (Use any Monday-equivalent that the engine accepts.)
+    const veryEarly = computeAvailableSlots(
+      "2026-04-27", templates, [], [], 0, 60, pastNow,
+    );
+    expect(veryEarly).toEqual([{ startTime: "09:00", endTime: "10:00" }]);
+
+    // After June 1 — only the open-end matches.
+    const veryLate = computeAvailableSlots(
+      "2026-12-28", templates, [], [], 0, 60, pastNow,
+    );
+    expect(veryLate).toEqual([{ startTime: "14:00", endTime: "15:00" }]);
+  });
+
+  it("vacation: bounded period with no slot rows yields no availability", () => {
+    // Spring period covers April–May with hours; June is the
+    // "vacation" period (its row in pro_schedule_periods exists with
+    // an empty slot grid, so it contributes no templates here).
+    const spring: AvailabilityTemplate = {
+      dayOfWeek: 0,
+      startTime: "09:00",
+      endTime: "10:00",
+      validFrom: "2026-04-01",
+      validUntil: "2026-05-31",
+    };
+    const summer: AvailabilityTemplate = {
+      dayOfWeek: 0,
+      startTime: "14:00",
+      endTime: "15:00",
+      validFrom: "2026-07-01",
+      validUntil: "2026-08-31",
+    };
+
+    // Mid-June — not covered by spring or summer, no vacation slots
+    // exist either. Result: empty.
+    const june = computeAvailableSlots(
+      "2026-06-15", [spring, summer], [], [], 0, 60, pastNow,
+    );
+    expect(june).toEqual([]);
+  });
+
+  it("multiple templates within one period union per day; foreign-period templates don't leak", () => {
+    // Two morning + afternoon windows for the May period.
+    const mayMorning: AvailabilityTemplate = {
+      dayOfWeek: 0,
+      startTime: "09:00",
+      endTime: "10:00",
+      validFrom: "2026-05-01",
+      validUntil: "2026-05-31",
+    };
+    const mayAfternoon: AvailabilityTemplate = {
+      dayOfWeek: 0,
+      startTime: "14:00",
+      endTime: "15:00",
+      validFrom: "2026-05-01",
+      validUntil: "2026-05-31",
+    };
+    // August window that should NOT contribute on a May date.
+    const augMorning: AvailabilityTemplate = {
+      dayOfWeek: 0,
+      startTime: "07:00",
+      endTime: "08:00",
+      validFrom: "2026-08-01",
+      validUntil: "2026-08-31",
+    };
+
+    const slots = computeAvailableSlots(
+      "2026-05-04",
+      [mayMorning, mayAfternoon, augMorning],
+      [], [], 0, 60, pastNow,
+    );
+    // The 07:00 window from August must not appear.
+    expect(slots).toEqual([
+      { startTime: "09:00", endTime: "10:00" },
+      { startTime: "14:00", endTime: "15:00" },
+    ]);
+  });
+
+});
+
 // ─── Edge cases ──────────────────────────────────────
 
 describe("edge cases", () => {
