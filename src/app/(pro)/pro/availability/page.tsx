@@ -69,9 +69,17 @@ export default async function AvailabilityPage() {
           startTime: proAvailability.startTime,
           endTime: proAvailability.endTime,
           proLocationId: proAvailability.proLocationId,
+          validFrom: proAvailability.validFrom,
+          validUntil: proAvailability.validUntil,
         })
         .from(proAvailability)
-        .where(eq(proAvailability.proProfileId, proId)),
+        .where(eq(proAvailability.proProfileId, proId))
+        .orderBy(
+          asc(proAvailability.validFrom),
+          asc(proAvailability.validUntil),
+          asc(proAvailability.dayOfWeek),
+          asc(proAvailability.startTime),
+        ),
       db
         .select({
           id: proAvailabilityOverrides.id,
@@ -140,8 +148,8 @@ export default async function AvailabilityPage() {
       dayOfWeek: t.dayOfWeek,
       startTime: t.startTime,
       endTime: t.endTime,
-      validFrom: null,
-      validUntil: null,
+      validFrom: t.validFrom,
+      validUntil: t.validUntil,
     })
   );
 

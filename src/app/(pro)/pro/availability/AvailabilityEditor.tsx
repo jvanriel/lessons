@@ -12,6 +12,7 @@ import { saveSchedulePeriods, saveWeekOverrides } from "./actions";
 import { t } from "@/lib/i18n/translations";
 import type { Locale } from "@/lib/i18n";
 import { formatDate as formatDateLocale } from "@/lib/format-date";
+import { addDaysToDateString } from "@/lib/local-date";
 
 // ─── Constants ───────────────────────────────────────
 
@@ -405,16 +406,45 @@ export default function AvailabilityEditor({
   );
 
   // Reset when server data changes (e.g. after another tab saved).
-  const prevAvailRef = useRef(availability);
+  // Compare by serialized content, not array reference: revalidatePath
+  // re-supplies a fresh array each save, but the content is unchanged
+  // for our own writes — resetting on every reference change would
+  // wipe client-only state like a just-added empty period that hasn't
+  // been painted (and so isn't yet representable in the slot table).
+  const prevAvailRef = useRef<string>(JSON.stringify(availability));
+  // Mirror periods + active id in refs so the reset effect can read
+  // the latest values without listing them as deps (which would make
+  // the effect re-run on every paint).
+  const periodsRef = useRef(periods);
+  const activePeriodIdRef = useRef(activePeriodId);
+  periodsRef.current = periods;
+  activePeriodIdRef.current = activePeriodId;
   useEffect(() => {
-    if (prevAvailRef.current !== availability) {
-      prevAvailRef.current = availability;
-      const next = availabilityToPeriods(availability);
-      setPeriods(next);
-      setActivePeriodId((cur) =>
-        next.some((p) => p.id === cur) ? cur : next[0]?.id ?? "p1",
-      );
-    }
+    const serialized = JSON.stringify(availability);
+    if (prevAvailRef.current === serialized) return;
+    prevAvailRef.current = serialized;
+    const next = availabilityToPeriods(availability);
+    // Preserve the active tab across resets by matching the (validFrom,
+    // validUntil) pair, not the client-side id. `availabilityToPeriods`
+    // generates fresh ids on every call, while `addPeriod` uses
+    // `Date.now()`-based ids — so a plain id lookup would fall through
+    // to `next[0]` after every save, which is the "tab jumped back to
+    // the first period" symptom.
+    const currentActive = periodsRef.current.find(
+      (p) => p.id === activePeriodIdRef.current,
+    );
+    setPeriods(next);
+    setActivePeriodId(() => {
+      if (currentActive) {
+        const matched = next.find(
+          (p) =>
+            p.validFrom === currentActive.validFrom &&
+            p.validUntil === currentActive.validUntil,
+        );
+        if (matched) return matched.id;
+      }
+      return next[0]?.id ?? "p1";
+    });
   }, [availability]);
 
   const activePeriod = periods.find((p) => p.id === activePeriodId) ?? periods[0];
@@ -501,36 +531,71 @@ function SchedulePeriodsSection({
   const [saveError, setSaveError] = useState<string | null>(null);
   const [showAdd, setShowAdd] = useState(false);
   const [editingDatesFor, setEditingDatesFor] = useState<string | null>(null);
+  // Pending duplicate held only in the dialog until the user picks
+  // dates and clicks Save. Committing immediately (the previous
+  // behavior) caused the auto-save to fire with two periods sharing
+  // the source's dates → server returned an overlap error.
+  const [pendingDuplicate, setPendingDuplicate] = useState<{
+    grid: LocationGrid;
+    defaultFrom: string;
+    defaultUntil: string;
+  } | null>(null);
+  const [pendingRemoveId, setPendingRemoveId] = useState<string | null>(null);
   const debounceRef = useRef<ReturnType<typeof setTimeout>>(undefined);
-  const prevPeriodsRef = useRef(periods);
+  // Tracks the JSON of the most recently dispatched save payload.
+  // Why: `saveSchedulePeriods` calls `revalidatePath`, which causes the
+  // server to re-supply `availability` with a new array reference even
+  // when the content is identical. The parent then rebuilds `periods`
+  // (also a new reference). A reference-only check would treat that as
+  // a fresh edit and re-save — saving forever in a loop. Comparing the
+  // serialized payload breaks the cycle.
+  const lastSavedRef = useRef<string | null>(null);
 
   const activePeriod =
     periods.find((p) => p.id === activePeriodId) ?? periods[0];
 
   // Auto-save: on any change to `periods`, debounce 2s then push the
-  // whole set via `saveSchedulePeriods`. Skip the initial mount so
-  // we don't immediately save the server-provided state.
+  // whole set via `saveSchedulePeriods`. First render primes the ref
+  // with the server-loaded state so we don't immediately save it back.
   useEffect(() => {
-    if (prevPeriodsRef.current === periods) return;
-    prevPeriodsRef.current = periods;
+    // Empty periods (no slots painted) are kept in client state — the
+    // user just added the tab and hasn't filled it yet — but excluded
+    // from the save payload. The slot table has no separate notion of
+    // a "period definition," so an empty bounded period would silently
+    // disappear on the next server reload. Filtering them out here
+    // avoids both that data loss and a useless wipe-and-rewrite that
+    // produces the same DB content.
+    const payload = {
+      periods: periods
+        .map((p) => ({
+          validFrom: p.validFrom,
+          validUntil: p.validUntil,
+          slots: locations.flatMap((loc) =>
+            gridToSlotsForLocation(p.grid, loc.id).map((s) => ({
+              proLocationId: loc.id,
+              ...s,
+            })),
+          ),
+        }))
+        .filter((p) => p.slots.length > 0),
+    };
+    const serialized = JSON.stringify(payload);
+
+    if (lastSavedRef.current === null) {
+      lastSavedRef.current = serialized;
+      return;
+    }
+    if (lastSavedRef.current === serialized) return;
 
     clearTimeout(debounceRef.current);
     debounceRef.current = setTimeout(() => {
       setSaveStatus("saving");
       setSaveError(null);
+      // Mark this snapshot as "the one we're persisting" before the
+      // request goes out, so revalidate-triggered re-renders with the
+      // same content don't schedule a duplicate save.
+      lastSavedRef.current = serialized;
       (async () => {
-        const payload = {
-          periods: periods.map((p) => ({
-            validFrom: p.validFrom,
-            validUntil: p.validUntil,
-            slots: locations.flatMap((loc) =>
-              gridToSlotsForLocation(p.grid, loc.id).map((s) => ({
-                proLocationId: loc.id,
-                ...s,
-              })),
-            ),
-          })),
-        };
         const result = await saveSchedulePeriods(payload);
         if (result.error) {
           setSaveStatus("error");
@@ -562,25 +627,49 @@ function SchedulePeriodsSection({
 
   function duplicateActivePeriod() {
     if (!activePeriod) return;
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-    const monthLater = new Date(today);
-    monthLater.setMonth(monthLater.getMonth() + 1);
-    monthLater.setDate(monthLater.getDate() - 1);
+    // Default the new range to the day after the source ends (so the
+    // two are contiguous, not overlapping) and 30 days long. If the
+    // source is unbounded, anchor to today instead.
+    const fromAnchor = activePeriod.validUntil
+      ? addDaysToDateString(activePeriod.validUntil, 1)
+      : toLocalDateStr(new Date());
+    const defaultUntil = addDaysToDateString(fromAnchor, 30);
+    setPendingDuplicate({
+      grid: cloneGrid(activePeriod.grid),
+      defaultFrom: fromAnchor,
+      defaultUntil,
+    });
+  }
+
+  function commitDuplicate(validFrom: string, validUntil: string) {
+    if (!pendingDuplicate) return;
     const id = `p${Date.now()}`;
     const next: Period = {
       id,
-      validFrom: toLocalDateStr(today),
-      validUntil: toLocalDateStr(monthLater),
-      grid: cloneGrid(activePeriod.grid),
+      validFrom,
+      validUntil,
+      grid: pendingDuplicate.grid,
     };
     onPeriodsChange([...periods, next].sort(sortPeriods));
     onActivePeriodChange(id);
-    setEditingDatesFor(id);
+    setPendingDuplicate(null);
   }
 
   function removePeriod(id: string) {
-    if (!window.confirm(t("proAvail.removePeriodConfirm", locale))) return;
+    // The unbounded "Always" period is the editor's fallback grid and
+    // cannot be removed. Defensive guard — the UI also hides the
+    // button for it.
+    const target = periods.find((p) => p.id === id);
+    if (target && target.validFrom === null && target.validUntil === null) {
+      return;
+    }
+    setPendingRemoveId(id);
+  }
+
+  function confirmRemovePeriod() {
+    const id = pendingRemoveId;
+    setPendingRemoveId(null);
+    if (!id) return;
     const next = periods.filter((p) => p.id !== id);
     // Always keep at least one period (the unbounded "Always") so the
     // grid has somewhere to render. If the user removes the last
@@ -672,18 +761,19 @@ function SchedulePeriodsSection({
               >
                 {t("proAvail.duplicate", locale)}
               </button>
-              {periods.length > 1 && (
-                <>
-                  <span className="text-green-300">•</span>
-                  <button
-                    type="button"
-                    onClick={() => removePeriod(activePeriod.id)}
-                    className="text-red-500 underline-offset-2 hover:underline hover:text-red-600"
-                  >
-                    {t("proAvail.removePeriod", locale)}
-                  </button>
-                </>
-              )}
+              {periods.length > 1 &&
+                !(activePeriod.validFrom === null && activePeriod.validUntil === null) && (
+                  <>
+                    <span className="text-green-300">•</span>
+                    <button
+                      type="button"
+                      onClick={() => removePeriod(activePeriod.id)}
+                      className="text-red-500 underline-offset-2 hover:underline hover:text-red-600"
+                    >
+                      {t("proAvail.removePeriod", locale)}
+                    </button>
+                  </>
+                )}
             </div>
           </div>
 
@@ -699,17 +789,32 @@ function SchedulePeriodsSection({
         </div>
       )}
 
-      {showAdd && (
-        <PeriodDatesDialog
-          mode="add"
-          locale={locale}
-          existingBoundedRanges={periods
-            .filter((p) => p.validFrom && p.validUntil)
-            .map((p) => ({ id: p.id, from: p.validFrom!, until: p.validUntil! }))}
-          onSubmit={addPeriod}
-          onClose={() => setShowAdd(false)}
-        />
-      )}
+      {showAdd && (() => {
+        // Anchor on the latest existing bounded period's end + 1 day,
+        // or today if no bounded periods exist yet. Span 30 days.
+        const latestUntil = periods
+          .map((p) => p.validUntil)
+          .filter((d): d is string => !!d)
+          .sort()
+          .at(-1);
+        const fromAnchor = latestUntil
+          ? addDaysToDateString(latestUntil, 1)
+          : toLocalDateStr(new Date());
+        const untilAnchor = addDaysToDateString(fromAnchor, 30);
+        return (
+          <PeriodDatesDialog
+            mode="add"
+            initialFrom={fromAnchor}
+            initialUntil={untilAnchor}
+            locale={locale}
+            existingBoundedRanges={periods
+              .filter((p) => p.validFrom && p.validUntil)
+              .map((p) => ({ id: p.id, from: p.validFrom!, until: p.validUntil! }))}
+            onSubmit={addPeriod}
+            onClose={() => setShowAdd(false)}
+          />
+        );
+      })()}
       {editingDatesFor !== null && (() => {
         const p = periods.find((x) => x.id === editingDatesFor);
         if (!p) return null;
@@ -733,6 +838,99 @@ function SchedulePeriodsSection({
           />
         );
       })()}
+      {pendingDuplicate !== null && (
+        <PeriodDatesDialog
+          mode="add"
+          initialFrom={pendingDuplicate.defaultFrom}
+          initialUntil={pendingDuplicate.defaultUntil}
+          locale={locale}
+          existingBoundedRanges={periods
+            .filter((p) => p.validFrom && p.validUntil)
+            .map((p) => ({
+              id: p.id,
+              from: p.validFrom!,
+              until: p.validUntil!,
+            }))}
+          onSubmit={commitDuplicate}
+          onClose={() => setPendingDuplicate(null)}
+        />
+      )}
+      {pendingRemoveId !== null && (() => {
+        const target = periods.find((p) => p.id === pendingRemoveId);
+        return (
+          <ConfirmDialog
+            title={t("proAvail.removePeriod", locale)}
+            message={t("proAvail.removePeriodConfirm", locale)}
+            detail={target ? periodLabel(target, locale) : undefined}
+            confirmLabel={t("proAvail.removePeriod", locale)}
+            cancelLabel={t("proAvail.cancel", locale)}
+            onConfirm={confirmRemovePeriod}
+            onClose={() => setPendingRemoveId(null)}
+            danger
+          />
+        );
+      })()}
+    </div>
+  );
+}
+
+function ConfirmDialog({
+  title,
+  message,
+  detail,
+  confirmLabel,
+  cancelLabel,
+  onConfirm,
+  onClose,
+  danger = false,
+}: {
+  title: string;
+  message: string;
+  detail?: string;
+  confirmLabel: string;
+  cancelLabel: string;
+  onConfirm: () => void;
+  onClose: () => void;
+  danger?: boolean;
+}) {
+  return (
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/50"
+      onClick={(e) => {
+        if (e.target === e.currentTarget) onClose();
+      }}
+    >
+      <div className="mx-4 w-full max-w-sm rounded-xl border border-green-200 bg-white p-6 shadow-2xl">
+        <h3 className="font-display text-lg font-semibold text-green-900">
+          {title}
+        </h3>
+        {detail && (
+          <p className="mt-2 rounded-md bg-green-50 px-3 py-2 text-sm font-medium text-green-900">
+            {detail}
+          </p>
+        )}
+        <p className="mt-3 text-sm text-green-800">{message}</p>
+        <div className="mt-5 flex gap-3">
+          <button
+            type="button"
+            onClick={onClose}
+            className="flex-1 rounded-md border border-green-200 px-4 py-2 text-sm font-medium text-green-700 hover:bg-green-50"
+          >
+            {cancelLabel}
+          </button>
+          <button
+            type="button"
+            onClick={onConfirm}
+            className={
+              danger
+                ? "flex-1 rounded-md bg-red-600 px-4 py-2 text-sm font-medium text-white hover:bg-red-500"
+                : "flex-1 rounded-md bg-green-700 px-4 py-2 text-sm font-medium text-white hover:bg-green-800"
+            }
+          >
+            {confirmLabel}
+          </button>
+        </div>
+      </div>
     </div>
   );
 }
@@ -880,9 +1078,17 @@ function WeeklyTemplateGrid({
   // periods. The grid no longer needs `dirtyLocations` or its own
   // save-status indicator.
 
+  // Mirror the controlled `grid` prop in a ref so drag-paint reads the
+  // latest state on every pointermove. Without this, the move handler
+  // captures `grid` from the render where the drag started and each
+  // step paints from that stale grid — so the drag ends up persisting
+  // only the last cell.
+  const gridRef = useRef(grid);
+  gridRef.current = grid;
+
   const updateCell = useCallback((day: number, row: number, adding: boolean) => {
     onGridChange(
-      grid.map((col, colIdx) =>
+      gridRef.current.map((col, colIdx) =>
         colIdx === day
           ? col.map((cell, rowIdx) => {
               if (rowIdx !== row) return cell;
@@ -894,7 +1100,7 @@ function WeeklyTemplateGrid({
           : col.map((cell) => new Set(cell)),
       ),
     );
-  }, [activeLocationId, grid, onGridChange]);
+  }, [activeLocationId, onGridChange]);
 
   // Anchor for Shift+click range selection on desktop. Stores the last
   // deliberately clicked cell plus the value the click produced, so a
