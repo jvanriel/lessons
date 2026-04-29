@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { after } from "next/server";
 import crypto from "crypto";
 import { createNotification } from "@/lib/notifications";
 import { logEvent } from "@/lib/events";
@@ -111,15 +112,23 @@ export async function POST(request: NextRequest) {
     issue.permalink ?? `https://sentry.io/organizations/`;
   const shortId = issue.shortId ?? issue.id ?? "";
 
-  // 1. Fire directly to ntfy FIRST, before any DB work.
-  //    ntfy is the one alert channel that has to survive a full DB
-  //    outage — the DB being unreachable is exactly the kind of
-  //    incident we need to be paged about, and if we do DB writes
-  //    first any throw here swallows the alert. (Previously we had
-  //    createNotification → ntfy in that order and missed a page
-  //    during the Neon 402 outage on 2026-04-23.)
+  // 1. Fire directly to ntfy FIRST, before any DB work. ntfy is the one
+  //    alert channel that has to survive a full DB outage — the DB
+  //    being unreachable is exactly the kind of incident we need to be
+  //    paged about, and if we do DB writes first any throw here
+  //    swallows the alert. (Previously we had createNotification →
+  //    ntfy in that order and missed a page during the Neon 402
+  //    outage on 2026-04-23.)
+  //
+  //    The bare fetch is dispatched synchronously here; an `after()`
+  //    hook then awaits the response, checks `res.ok`, and on failure
+  //    writes a `sentry.issue.ntfy_failed` row to the events table.
+  //    Without this we'd have no DB-side signal when ntfy returns
+  //    non-2xx (the bare fetch promise resolves successfully on 4xx /
+  //    5xx, so the previous `.catch()` only fired on network errors —
+  //    a delivery failure looked identical to a delivery success).
   if (NTFY_URL && NTFY_AUTH) {
-    fetch(`${NTFY_URL}/${NTFY_TOPIC}`, {
+    const ntfyPromise = fetch(`${NTFY_URL}/${NTFY_TOPIC}`, {
       method: "POST",
       headers: {
         Title: `Sentry: ${title}`.slice(0, 250),
@@ -129,7 +138,36 @@ export async function POST(request: NextRequest) {
         Tags: level,
       },
       body: `${shortId}${culprit ? ` · ${culprit}` : ""}`,
-    }).catch((err) => console.error("ntfy for sentry webhook failed:", err));
+    });
+    after(async () => {
+      let detail: string | undefined;
+      try {
+        const res = await ntfyPromise;
+        if (!res.ok) {
+          const body = await res.text().catch(() => "");
+          detail = `HTTP ${res.status}: ${body.slice(0, 200)}`;
+        }
+      } catch (err) {
+        detail = err instanceof Error ? err.message : String(err);
+      }
+      if (detail) {
+        console.error("ntfy POST failed:", detail);
+        try {
+          await logEvent({
+            type: "sentry.issue.ntfy_failed",
+            level: "warn",
+            payload: {
+              sentryIssueId: issue.id,
+              shortId,
+              permalink,
+              detail: detail.slice(0, 500),
+            },
+          });
+        } catch (e) {
+          console.error("logEvent (ntfy_failed) failed:", e);
+        }
+      }
+    });
   }
 
   // 2. In-app notification + event log. Each wrapped in a try/catch
