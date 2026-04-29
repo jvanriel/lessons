@@ -16,11 +16,20 @@ import { SignJWT, jwtVerify } from "jose";
 const PROD_HOST = "golflessons.be";
 const PREVIEW_HOST = "preview.golflessons.be";
 
+// Defensive: env vars set via the Vercel UI sometimes carry trailing
+// whitespace (a stray space at the end of the value pasted into the
+// dashboard). WebAuthn verification fails strict-equality on the
+// origin, so a single space breaks Face ID / Touch ID registration
+// with a confusing "expected '...<space>'" error.
+function cleanEnv(v: string | undefined): string | undefined {
+  return v?.trim() || undefined;
+}
+
 export function getRpId(): string {
   // Use the public app URL when set (production / preview deploys).
   // For local dev fall back to "localhost" — that's what Safari and
   // Chrome accept on http://localhost during testing.
-  const appUrl = process.env.NEXT_PUBLIC_APP_URL;
+  const appUrl = cleanEnv(process.env.NEXT_PUBLIC_APP_URL);
   if (appUrl) {
     try {
       return new URL(appUrl).hostname;
@@ -38,7 +47,7 @@ export function getRpName(): string {
 }
 
 export function getExpectedOrigin(): string | string[] {
-  const appUrl = process.env.NEXT_PUBLIC_APP_URL;
+  const appUrl = cleanEnv(process.env.NEXT_PUBLIC_APP_URL);
   if (appUrl) return appUrl.replace(/\/$/, "");
   if (process.env.VERCEL_ENV === "production") return `https://${PROD_HOST}`;
   if (process.env.VERCEL_ENV === "preview") return `https://${PREVIEW_HOST}`;
