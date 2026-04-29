@@ -17,6 +17,21 @@
  */
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import { render, within } from "@testing-library/react";
+
+// `BookingsCalendar` calls `useRouter().refresh()` after a successful
+// cancel. This test renders the component in isolation (no app-router
+// mount), so stub the hook with a no-op router.
+vi.mock("next/navigation", () => ({
+  useRouter: () => ({
+    refresh: () => {},
+    push: () => {},
+    replace: () => {},
+    back: () => {},
+    forward: () => {},
+    prefetch: () => {},
+  }),
+}));
+
 import { BookingsCalendar } from "../BookingsCalendar";
 
 type Case = {

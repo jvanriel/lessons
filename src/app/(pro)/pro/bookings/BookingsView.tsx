@@ -1,12 +1,15 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useTransition } from "react";
+import { useRouter } from "next/navigation";
 import { BookingsCalendar } from "./BookingsCalendar";
 import { formatDate as formatDateHelper } from "@/lib/format-date";
 import { todayInTZ } from "@/lib/local-date";
 import type { Locale } from "@/lib/i18n";
 import { t } from "@/lib/i18n/translations";
 import { getPaymentBadge } from "@/lib/payment-status";
+import { proCancelBooking } from "../students/actions";
+import { CancelBookingDialog } from "../_components/CancelBookingDialog";
 
 interface Booking {
   id: number;
@@ -43,6 +46,10 @@ function BookingsList({
   locale: Locale;
   timezone: string;
 }) {
+  const router = useRouter();
+  const [cancelTarget, setCancelTarget] = useState<Booking | null>(null);
+  const [pending, startTransition] = useTransition();
+
   const formatDate = (dateStr: string) =>
     formatDateHelper(dateStr, locale, {
       weekday: "short",
@@ -50,11 +57,33 @@ function BookingsList({
       day: "numeric",
       year: "numeric",
     });
+  const formatDateShort = (dateStr: string) =>
+    formatDateHelper(dateStr, locale, {
+      weekday: "short",
+      month: "short",
+      day: "numeric",
+    });
 
   const today = todayInTZ(timezone);
   const upcoming = bookings.filter(
     (b) => b.date >= today && b.status === "confirmed"
   );
+
+  function handleCancel() {
+    if (!cancelTarget) return;
+    const id = cancelTarget.id;
+    startTransition(async () => {
+      const result = await proCancelBooking(id);
+      if ("error" in result) {
+        alert(result.error);
+      } else {
+        // Server-side already revalidates /pro/bookings; refresh the
+        // client cache so the cancelled row drops immediately.
+        router.refresh();
+      }
+      setCancelTarget(null);
+    });
+  }
 
   if (upcoming.length === 0) {
     return (
@@ -117,26 +146,49 @@ function BookingsList({
                     </p>
                   </div>
                 </div>
-                <div className="text-right">
-                  {b.participantCount > 1 && (
-                    <span className="text-xs text-green-500">
-                      {t("proBookingsView.participants", locale).replace(
-                        "{n}",
-                        String(b.participantCount)
-                      )}
-                    </span>
-                  )}
-                  {b.notes && (
-                    <p className="max-w-[200px] truncate text-xs text-green-400">
-                      {b.notes}
-                    </p>
-                  )}
+                <div className="flex items-center gap-3">
+                  <div className="text-right">
+                    {b.participantCount > 1 && (
+                      <span className="text-xs text-green-500">
+                        {t("proBookingsView.participants", locale).replace(
+                          "{n}",
+                          String(b.participantCount)
+                        )}
+                      </span>
+                    )}
+                    {b.notes && (
+                      <p className="max-w-[200px] truncate text-xs text-green-400">
+                        {b.notes}
+                      </p>
+                    )}
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setCancelTarget(b)}
+                    disabled={pending}
+                    className="text-[11px] font-medium text-red-400 hover:text-red-600 disabled:opacity-50"
+                  >
+                    {t("proStudentBookings.cancel", locale)}
+                  </button>
                 </div>
               </div>
             ))}
           </div>
         </div>
       ))}
+      {cancelTarget && (
+        <CancelBookingDialog
+          date={cancelTarget.date}
+          startTime={cancelTarget.startTime}
+          endTime={cancelTarget.endTime}
+          studentName={`${cancelTarget.studentFirstName ?? ""} ${cancelTarget.studentLastName ?? ""}`.trim() || undefined}
+          onConfirm={handleCancel}
+          onClose={() => setCancelTarget(null)}
+          pending={pending}
+          formatDate={formatDateShort}
+          locale={locale}
+        />
+      )}
     </div>
   );
 }

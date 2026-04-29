@@ -1,10 +1,11 @@
 "use client";
 
-import { useState, useEffect, useTransition, useRef, useCallback } from "react";
+import { useState, useEffect, useTransition, useCallback } from "react";
 import { getStudentBookings, proCancelBooking } from "./actions";
 import { formatDate as formatDateHelper } from "@/lib/format-date";
 import type { Locale } from "@/lib/i18n";
 import { t } from "@/lib/i18n/translations";
+import { CancelBookingDialog } from "../_components/CancelBookingDialog";
 
 interface Booking {
   id: number;
@@ -21,71 +22,6 @@ function makeFormatDate(locale: Locale) {
       month: "short",
       day: "numeric",
     });
-}
-
-function CancelDialog({
-  booking,
-  onConfirm,
-  onClose,
-  pending,
-  formatDate,
-  locale,
-}: {
-  booking: Booking;
-  onConfirm: () => void;
-  onClose: () => void;
-  pending: boolean;
-  formatDate: (dateStr: string) => string;
-  locale: Locale;
-}) {
-  const backdropRef = useRef<HTMLDivElement>(null);
-
-  return (
-    <div
-      ref={backdropRef}
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/50"
-      onClick={(e) => {
-        if (e.target === backdropRef.current) onClose();
-      }}
-    >
-      <div className="mx-4 w-full max-w-sm rounded-xl border border-green-200 bg-white p-6 shadow-2xl">
-        <h3 className="font-display text-lg font-semibold text-green-900">
-          {t("proStudentBookings.cancelDialog.title", locale)}
-        </h3>
-        <div className="mt-4 rounded-lg border border-green-100 bg-green-50/50 p-4">
-          <p className="text-sm font-medium text-green-900">
-            {formatDate(booking.date)}
-          </p>
-          <p className="text-sm text-green-600">
-            {booking.startTime} - {booking.endTime}
-          </p>
-        </div>
-        <p className="mt-3 text-sm text-green-600">
-          {t("proStudentBookings.cancelDialog.body", locale)}
-        </p>
-        <div className="mt-5 flex gap-3">
-          <button
-            type="button"
-            onClick={onClose}
-            disabled={pending}
-            className="flex-1 rounded-md border border-green-200 px-4 py-2 text-sm font-medium text-green-700 transition-colors hover:bg-green-50 disabled:opacity-50"
-          >
-            {t("proStudentBookings.cancelDialog.keep", locale)}
-          </button>
-          <button
-            type="button"
-            onClick={onConfirm}
-            disabled={pending}
-            className="flex-1 rounded-md bg-red-500 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-red-600 disabled:opacity-50"
-          >
-            {pending
-              ? t("proStudentBookings.cancelDialog.cancelling", locale)
-              : t("proStudentBookings.cancelDialog.confirm", locale)}
-          </button>
-        </div>
-      </div>
-    </div>
-  );
 }
 
 export function StudentBookings({ proStudentId, locale }: { proStudentId: number; locale: Locale }) {
@@ -159,8 +95,10 @@ export function StudentBookings({ proStudentId, locale }: { proStudentId: number
       </div>
 
       {cancelTarget && (
-        <CancelDialog
-          booking={cancelTarget}
+        <CancelBookingDialog
+          date={cancelTarget.date}
+          startTime={cancelTarget.startTime}
+          endTime={cancelTarget.endTime}
           onConfirm={handleCancel}
           onClose={() => setCancelTarget(null)}
           pending={isPending}

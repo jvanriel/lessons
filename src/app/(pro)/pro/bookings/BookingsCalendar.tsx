@@ -1,6 +1,7 @@
 "use client";
 
-import { useState, useMemo } from "react";
+import { useState, useMemo, useTransition } from "react";
+import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { formatDate as formatDateLocale } from "@/lib/format-date";
@@ -13,6 +14,8 @@ import {
 import type { Locale } from "@/lib/i18n";
 import { t } from "@/lib/i18n/translations";
 import { getPaymentBadge } from "@/lib/payment-status";
+import { proCancelBooking } from "../students/actions";
+import { CancelBookingDialog } from "../_components/CancelBookingDialog";
 
 // ─── Types ──────────────────────────────────────────
 
@@ -94,10 +97,13 @@ export function BookingsCalendar({
   locale,
   timezone = "Europe/Brussels",
 }: Props) {
+  const router = useRouter();
   const [weekStart, setWeekStart] = useState(() =>
     getMondayInTZ(new Date(), timezone),
   );
   const [expandedBookingId, setExpandedBookingId] = useState<number | null>(null);
+  const [cancelTargetId, setCancelTargetId] = useState<number | null>(null);
+  const [cancelPending, startCancelTransition] = useTransition();
 
   const weekDates = useMemo(() => {
     return Array.from({ length: 7 }, (_, i) =>
@@ -458,7 +464,56 @@ export function BookingsCalendar({
                 {booking.notes}
               </div>
             )}
+
+            {booking.status === "confirmed" && (
+              <div className="mt-4 border-t border-green-100 pt-3">
+                <button
+                  type="button"
+                  onClick={() => setCancelTargetId(booking.id)}
+                  disabled={cancelPending}
+                  className="text-xs font-medium text-red-500 hover:text-red-600 disabled:opacity-50"
+                >
+                  {t("proStudentBookings.cancel", locale)}
+                </button>
+              </div>
+            )}
           </div>
+        );
+      })()}
+
+      {cancelTargetId !== null && (() => {
+        const target = bookings.find((b) => b.id === cancelTargetId);
+        if (!target) return null;
+        return (
+          <CancelBookingDialog
+            date={target.date}
+            startTime={target.startTime}
+            endTime={target.endTime}
+            studentName={`${target.studentFirstName ?? ""} ${target.studentLastName ?? ""}`.trim() || undefined}
+            onConfirm={() => {
+              const id = target.id;
+              startCancelTransition(async () => {
+                const result = await proCancelBooking(id);
+                if ("error" in result) {
+                  alert(result.error);
+                } else {
+                  router.refresh();
+                  if (expandedBookingId === id) setExpandedBookingId(null);
+                }
+                setCancelTargetId(null);
+              });
+            }}
+            onClose={() => setCancelTargetId(null)}
+            pending={cancelPending}
+            formatDate={(d) =>
+              formatDateLocale(d, locale, {
+                weekday: "short",
+                month: "short",
+                day: "numeric",
+              })
+            }
+            locale={locale}
+          />
         );
       })()}
     </div>
