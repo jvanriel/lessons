@@ -308,6 +308,22 @@ export default function StudentManager({
                 <p className="text-sm font-medium text-green-900">
                   {currentStudent.firstName} {currentStudent.lastName}
                 </p>
+                <div className="mt-0.5 flex flex-wrap items-center gap-x-3 text-xs">
+                  <a
+                    href={`mailto:${currentStudent.email}`}
+                    className="text-green-600 underline-offset-2 hover:underline"
+                  >
+                    {currentStudent.email}
+                  </a>
+                  {currentStudent.phone && (
+                    <a
+                      href={`tel:${currentStudent.phone.replace(/\s+/g, "")}`}
+                      className="text-green-600 underline-offset-2 hover:underline"
+                    >
+                      {currentStudent.phone}
+                    </a>
+                  )}
+                </div>
                 <p className="text-xs text-green-500">
                   {formatDate(currentBooking.date, locale, {
                     weekday: "short",
@@ -443,7 +459,7 @@ export default function StudentManager({
                   }
                   className="w-full p-4 text-left"
                 >
-                  {/* Row 1: avatar + name + email */}
+                  {/* Row 1: avatar + name + clickable email/phone */}
                   <div className="flex items-center gap-3">
                     <div
                       className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-full text-sm font-medium ${
@@ -459,7 +475,24 @@ export default function StudentManager({
                       <p className="text-sm font-medium text-green-900">
                         {student.firstName} {student.lastName}
                       </p>
-                      <p className="truncate text-xs text-green-500">{student.email}</p>
+                      <div className="mt-0.5 flex flex-wrap items-center gap-x-3 text-xs">
+                        <a
+                          href={`mailto:${student.email}`}
+                          onClick={(e) => e.stopPropagation()}
+                          className="truncate text-green-600 underline-offset-2 hover:underline"
+                        >
+                          {student.email}
+                        </a>
+                        {student.phone && (
+                          <a
+                            href={`tel:${student.phone.replace(/\s+/g, "")}`}
+                            onClick={(e) => e.stopPropagation()}
+                            className="text-green-600 underline-offset-2 hover:underline"
+                          >
+                            {student.phone}
+                          </a>
+                        )}
+                      </div>
                     </div>
                   </div>
                   {/* Row 2: status + expand icon */}

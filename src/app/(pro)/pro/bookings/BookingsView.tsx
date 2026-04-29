@@ -140,6 +140,24 @@ function BookingsList({
                         </span>
                       )}
                     </p>
+                    {/* Clickable email + phone — same pattern as the
+                        calendar's expanded detail panel (commit 7876e0d). */}
+                    <p className="mt-0.5 flex flex-wrap items-center gap-x-3 gap-y-0.5 text-xs">
+                      <a
+                        href={`mailto:${b.studentEmail}`}
+                        className="text-green-600 underline-offset-2 hover:underline"
+                      >
+                        {b.studentEmail}
+                      </a>
+                      {b.studentPhone && (
+                        <a
+                          href={`tel:${b.studentPhone.replace(/\s+/g, "")}`}
+                          className="text-green-600 underline-offset-2 hover:underline"
+                        >
+                          {b.studentPhone}
+                        </a>
+                      )}
+                    </p>
                     <p className="text-xs text-green-500">
                       {b.locationName}
                       {b.locationCity ? `, ${b.locationCity}` : ""}
