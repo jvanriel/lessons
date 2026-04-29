@@ -7,6 +7,7 @@ import type {
   SerializedProLocationWithName,
   SerializedBooking,
   SerializedProfileSettings,
+  SerializedSchedulePeriod,
 } from "./actions";
 import { saveSchedulePeriods, saveWeekOverrides } from "./actions";
 import { t } from "@/lib/i18n/translations";
@@ -112,40 +113,47 @@ function availabilityToLocationGrid(slots: SerializedAvailability[]): LocationGr
 }
 
 /**
- * Group serialized availability rows into editor-side periods, keyed
- * by their `(validFrom, validUntil)` pair. A pro who has never used
- * bounded periods produces a single "Always" period (both null).
+ * Build editor-side periods from server data (task 78). Period defs
+ * come from `pro_schedule_periods` (so empty / vacation periods
+ * persist); slot rows from `pro_availability` are attached to their
+ * matching period by `(validFrom, validUntil)` tuple. With the new
+ * exclusive-timeline model, periods don't overlap and the
+ * chronologically first may have `validFrom = null`, the last may
+ * have `validUntil = null`. A pro with no period defs yet gets a
+ * single empty unbounded "Always" period as a starting point — it
+ * persists on the next save.
  */
-function availabilityToPeriods(slots: SerializedAvailability[]): Period[] {
-  const groups = new Map<string, SerializedAvailability[]>();
+function buildPeriods(
+  periodDefs: SerializedSchedulePeriod[],
+  slots: SerializedAvailability[],
+): Period[] {
+  const slotsByKey = new Map<string, SerializedAvailability[]>();
   for (const s of slots) {
     const key = `${s.validFrom ?? ""}|${s.validUntil ?? ""}`;
-    const arr = groups.get(key) ?? [];
+    const arr = slotsByKey.get(key) ?? [];
     arr.push(s);
-    groups.set(key, arr);
+    slotsByKey.set(key, arr);
   }
-  const periods: Period[] = [];
-  let counter = 0;
-  for (const [, arr] of groups) {
+  const periods: Period[] = periodDefs.map((d) => {
+    const key = `${d.validFrom ?? ""}|${d.validUntil ?? ""}`;
+    const matched = slotsByKey.get(key) ?? [];
+    return {
+      id: `p${d.id}`,
+      validFrom: d.validFrom,
+      validUntil: d.validUntil,
+      grid: availabilityToLocationGrid(matched),
+    };
+  });
+  if (periods.length === 0) {
     periods.push({
-      id: `p${++counter}`,
-      validFrom: arr[0].validFrom,
-      validUntil: arr[0].validUntil,
-      grid: availabilityToLocationGrid(arr),
-    });
-  }
-  // Always include an unbounded ("Always") period so the editor always
-  // has somewhere to put rows when the pro hasn't created any
-  // bounded periods yet.
-  if (!periods.some((p) => p.validFrom === null && p.validUntil === null)) {
-    periods.unshift({
-      id: `p${++counter}`,
+      id: "p-default",
       validFrom: null,
       validUntil: null,
       grid: emptyGrid(),
     });
   }
-  // Sort: unbounded first, then bounded by start date.
+  // Sort by validFrom ASC; null-from goes first (chronologically
+  // earliest), null-until is implicitly the last position.
   periods.sort((a, b) => {
     if (a.validFrom === null && b.validFrom !== null) return -1;
     if (b.validFrom === null && a.validFrom !== null) return 1;
@@ -371,6 +379,7 @@ function hitTestCell(clientX: number, clientY: number): { day: number; row: numb
 interface Props {
   locations: SerializedProLocationWithName[];
   availability: SerializedAvailability[];
+  schedulePeriods: SerializedSchedulePeriod[];
   overrides: SerializedOverride[];
   bookings: SerializedBooking[];
   profileSettings: SerializedProfileSettings;
@@ -380,6 +389,7 @@ interface Props {
 export default function AvailabilityEditor({
   locations,
   availability,
+  schedulePeriods,
   overrides,
   bookings,
   profileSettings,
@@ -397,21 +407,22 @@ export default function AvailabilityEditor({
   // Active brush for painting
   const [activeLocationId, setActiveLocationId] = useState<number>(locations[0]?.id || 0);
 
-  // Multi-period state (task 77). Replaces the single `templateGrid`.
+  // Multi-period state (tasks 77, 78). Built from period defs +
+  // matching slot rows; sorted chronologically.
   const [periods, setPeriods] = useState<Period[]>(() =>
-    availabilityToPeriods(availability),
+    buildPeriods(schedulePeriods, availability),
   );
   const [activePeriodId, setActivePeriodId] = useState<string>(
-    () => availabilityToPeriods(availability)[0]?.id ?? "p1",
+    () => buildPeriods(schedulePeriods, availability)[0]?.id ?? "p1",
   );
 
-  // Reset when server data changes (e.g. after another tab saved).
-  // Compare by serialized content, not array reference: revalidatePath
-  // re-supplies a fresh array each save, but the content is unchanged
-  // for our own writes — resetting on every reference change would
-  // wipe client-only state like a just-added empty period that hasn't
-  // been painted (and so isn't yet representable in the slot table).
-  const prevAvailRef = useRef<string>(JSON.stringify(availability));
+  // Reset when server data changes. Compare by serialized content of
+  // BOTH the period defs and the slot rows — revalidatePath
+  // re-supplies fresh references after every save, so a reference
+  // check would needlessly clobber client-only state.
+  const prevAvailRef = useRef<string>(
+    JSON.stringify({ schedulePeriods, availability }),
+  );
   // Mirror periods + active id in refs so the reset effect can read
   // the latest values without listing them as deps (which would make
   // the effect re-run on every paint).
@@ -420,16 +431,16 @@ export default function AvailabilityEditor({
   periodsRef.current = periods;
   activePeriodIdRef.current = activePeriodId;
   useEffect(() => {
-    const serialized = JSON.stringify(availability);
+    const serialized = JSON.stringify({ schedulePeriods, availability });
     if (prevAvailRef.current === serialized) return;
     prevAvailRef.current = serialized;
-    const next = availabilityToPeriods(availability);
+    const next = buildPeriods(schedulePeriods, availability);
     // Preserve the active tab across resets by matching the (validFrom,
-    // validUntil) pair, not the client-side id. `availabilityToPeriods`
-    // generates fresh ids on every call, while `addPeriod` uses
-    // `Date.now()`-based ids — so a plain id lookup would fall through
-    // to `next[0]` after every save, which is the "tab jumped back to
-    // the first period" symptom.
+    // validUntil) pair, not the client-side id. `buildPeriods`
+    // generates ids from server `pro_schedule_periods.id`, while
+    // `addPeriod` uses `Date.now()`-based ids — a plain id lookup
+    // would fall through to `next[0]` after every save, which is the
+    // "tab jumped back to the first period" symptom.
     const currentActive = periodsRef.current.find(
       (p) => p.id === activePeriodIdRef.current,
     );
@@ -445,7 +456,7 @@ export default function AvailabilityEditor({
       }
       return next[0]?.id ?? "p1";
     });
-  }, [availability]);
+  }, [availability, schedulePeriods]);
 
   const activePeriod = periods.find((p) => p.id === activePeriodId) ?? periods[0];
 
@@ -558,26 +569,20 @@ function SchedulePeriodsSection({
   // whole set via `saveSchedulePeriods`. First render primes the ref
   // with the server-loaded state so we don't immediately save it back.
   useEffect(() => {
-    // Empty periods (no slots painted) are kept in client state — the
-    // user just added the tab and hasn't filled it yet — but excluded
-    // from the save payload. The slot table has no separate notion of
-    // a "period definition," so an empty bounded period would silently
-    // disappear on the next server reload. Filtering them out here
-    // avoids both that data loss and a useless wipe-and-rewrite that
-    // produces the same DB content.
+    // Task 78: empty periods (no slots painted) now persist as
+    // vacation / closed dates via `pro_schedule_periods`, so we no
+    // longer filter them out of the save payload.
     const payload = {
-      periods: periods
-        .map((p) => ({
-          validFrom: p.validFrom,
-          validUntil: p.validUntil,
-          slots: locations.flatMap((loc) =>
-            gridToSlotsForLocation(p.grid, loc.id).map((s) => ({
-              proLocationId: loc.id,
-              ...s,
-            })),
-          ),
-        }))
-        .filter((p) => p.slots.length > 0),
+      periods: periods.map((p) => ({
+        validFrom: p.validFrom,
+        validUntil: p.validUntil,
+        slots: locations.flatMap((loc) =>
+          gridToSlotsForLocation(p.grid, loc.id).map((s) => ({
+            proLocationId: loc.id,
+            ...s,
+          })),
+        ),
+      })),
     };
     const serialized = JSON.stringify(payload);
 
@@ -614,13 +619,13 @@ function SchedulePeriodsSection({
 
   function addPeriod(validFrom: string, validUntil: string) {
     const id = `p${Date.now()}`;
-    const next: Period = {
+    const inserted: Period = {
       id,
       validFrom,
       validUntil,
       grid: emptyGrid(),
     };
-    onPeriodsChange([...periods, next].sort(sortPeriods));
+    onPeriodsChange(insertWithSplit(periods, inserted).sort(sortPeriods));
     onActivePeriodChange(id);
     setShowAdd(false);
   }
@@ -644,13 +649,13 @@ function SchedulePeriodsSection({
   function commitDuplicate(validFrom: string, validUntil: string) {
     if (!pendingDuplicate) return;
     const id = `p${Date.now()}`;
-    const next: Period = {
+    const inserted: Period = {
       id,
       validFrom,
       validUntil,
       grid: pendingDuplicate.grid,
     };
-    onPeriodsChange([...periods, next].sort(sortPeriods));
+    onPeriodsChange(insertWithSplit(periods, inserted).sort(sortPeriods));
     onActivePeriodChange(id);
     setPendingDuplicate(null);
   }
@@ -816,13 +821,16 @@ function SchedulePeriodsSection({
         );
       })()}
       {editingDatesFor !== null && (() => {
-        const p = periods.find((x) => x.id === editingDatesFor);
+        const idx = periods.findIndex((x) => x.id === editingDatesFor);
+        const p = periods[idx];
         if (!p) return null;
         return (
           <PeriodDatesDialog
             mode="edit"
             initialFrom={p.validFrom}
             initialUntil={p.validUntil}
+            allowOpenStart={idx === 0}
+            allowOpenEnd={idx === periods.length - 1}
             locale={locale}
             existingBoundedRanges={periods
               .filter((x) => x.id !== p.id && x.validFrom && x.validUntil)
@@ -941,6 +949,59 @@ function sortPeriods(a: Period, b: Period): number {
   return (a.validFrom ?? "").localeCompare(b.validFrom ?? "");
 }
 
+/**
+ * Insert a new period into an exclusive timeline (task 78). If the
+ * new range falls entirely inside an existing period, that period is
+ * split: a "before" segment (its grid cloned) is created if there's
+ * room before the new range, and an "after" segment likewise. This
+ * lets the user add a bounded period inside an unbounded "Altijd"
+ * (or another bounded period — e.g. a vacation inside summer) without
+ * losing the surrounding schedule.
+ *
+ * If the new range doesn't fall inside any existing period (it sits
+ * in a gap, or partially overlaps a bounded period), it's appended
+ * as-is. The server will still validate non-overlap and surface an
+ * error for the partial-overlap case — auto-resolving that would be
+ * surprising.
+ */
+function insertWithSplit(existing: Period[], inserted: Period): Period[] {
+  const containing = existing.find((p) => {
+    if (p.id === inserted.id) return false;
+    if (inserted.validFrom === null || inserted.validUntil === null) {
+      return false;
+    }
+    const fromOk = p.validFrom === null || p.validFrom <= inserted.validFrom;
+    const untilOk = p.validUntil === null || p.validUntil >= inserted.validUntil;
+    return fromOk && untilOk;
+  });
+  if (!containing || inserted.validFrom === null || inserted.validUntil === null) {
+    return [...existing, inserted];
+  }
+  const beforeFrom = containing.validFrom;
+  const beforeUntil = addDaysToDateString(inserted.validFrom, -1);
+  const afterFrom = addDaysToDateString(inserted.validUntil, 1);
+  const afterUntil = containing.validUntil;
+  const out = existing.filter((p) => p.id !== containing.id);
+  if (beforeFrom === null || beforeFrom <= beforeUntil) {
+    out.push({
+      id: `p${Date.now()}b`,
+      validFrom: beforeFrom,
+      validUntil: beforeUntil,
+      grid: cloneGrid(containing.grid),
+    });
+  }
+  out.push(inserted);
+  if (afterUntil === null || afterFrom <= afterUntil) {
+    out.push({
+      id: `p${Date.now()}a`,
+      validFrom: afterFrom,
+      validUntil: afterUntil,
+      grid: cloneGrid(containing.grid),
+    });
+  }
+  return out;
+}
+
 function periodLabel(p: Period, locale: Locale): string {
   if (!p.validFrom && !p.validUntil) return t("proAvail.alwaysPeriod", locale);
   const from = p.validFrom ? formatDateShort(p.validFrom, locale) : "…";
@@ -964,37 +1025,57 @@ function PeriodDatesDialog({
   locale,
   onSubmit,
   onClose,
+  allowOpenStart = false,
+  allowOpenEnd = false,
 }: {
   mode: "add" | "edit";
   initialFrom?: string | null;
   initialUntil?: string | null;
   existingBoundedRanges: Array<{ id: string; from: string; until: string }>;
   locale: Locale;
+  // Sends `""` (empty) for boundary fields the user wants to clear.
+  // Callers convert that to `null` before persisting.
   onSubmit: (from: string, until: string) => void;
   onClose: () => void;
+  // Task 78 — only the chronologically first period may have null
+  // `validFrom` and only the last may have null `validUntil`. The
+  // editor passes `true` for the field whose null state is allowed.
+  allowOpenStart?: boolean;
+  allowOpenEnd?: boolean;
 }) {
   const [from, setFrom] = useState(initialFrom ?? "");
   const [until, setUntil] = useState(initialUntil ?? "");
+  const [openStart, setOpenStart] = useState(
+    allowOpenStart && initialFrom === null,
+  );
+  const [openEnd, setOpenEnd] = useState(
+    allowOpenEnd && initialUntil === null,
+  );
   const [error, setError] = useState<string | null>(null);
 
   function submit() {
     setError(null);
-    if (!from || !until) {
+    const fromValue = openStart ? "" : from;
+    const untilValue = openEnd ? "" : until;
+    if ((!fromValue && !openStart) || (!untilValue && !openEnd)) {
       setError(t("proAvail.periodDatesRequired", locale));
       return;
     }
-    if (from > until) {
+    if (fromValue && untilValue && fromValue > untilValue) {
       setError(t("proAvail.periodFromBeforeUntil", locale));
       return;
     }
-    // Overlap guard against other bounded periods.
-    for (const r of existingBoundedRanges) {
-      if (from <= r.until && r.from <= until) {
-        setError(t("proAvail.periodOverlap", locale));
-        return;
+    // Overlap guard against other bounded periods. Open-ended fields
+    // skip this check — server enforces the broader invariant.
+    if (fromValue && untilValue) {
+      for (const r of existingBoundedRanges) {
+        if (fromValue <= r.until && r.from <= untilValue) {
+          setError(t("proAvail.periodOverlap", locale));
+          return;
+        }
       }
     }
-    onSubmit(from, until);
+    onSubmit(fromValue, untilValue);
   }
 
   return (
@@ -1015,19 +1096,43 @@ function PeriodDatesDialog({
             {t("proAvail.periodFrom", locale)}
             <input
               type="date"
-              value={from}
+              value={openStart ? "" : from}
+              disabled={openStart}
               onChange={(e) => setFrom(e.target.value)}
-              className="mt-1 block w-full rounded-md border border-green-200 bg-white px-3 py-2 text-sm text-green-900 focus:border-green-400 focus:outline-none focus:ring-1 focus:ring-green-400"
+              className="mt-1 block w-full rounded-md border border-green-200 bg-white px-3 py-2 text-sm text-green-900 focus:border-green-400 focus:outline-none focus:ring-1 focus:ring-green-400 disabled:bg-green-50 disabled:text-green-400"
             />
+            {allowOpenStart && (
+              <span className="mt-1 flex items-center gap-2 text-[11px] font-normal text-green-600">
+                <input
+                  type="checkbox"
+                  checked={openStart}
+                  onChange={(e) => setOpenStart(e.target.checked)}
+                  className="h-3 w-3 rounded border-green-300 text-green-700"
+                />
+                {t("proAvail.openStart", locale)}
+              </span>
+            )}
           </label>
           <label className="block text-xs font-medium text-green-700">
             {t("proAvail.periodUntil", locale)}
             <input
               type="date"
-              value={until}
+              value={openEnd ? "" : until}
+              disabled={openEnd}
               onChange={(e) => setUntil(e.target.value)}
-              className="mt-1 block w-full rounded-md border border-green-200 bg-white px-3 py-2 text-sm text-green-900 focus:border-green-400 focus:outline-none focus:ring-1 focus:ring-green-400"
+              className="mt-1 block w-full rounded-md border border-green-200 bg-white px-3 py-2 text-sm text-green-900 focus:border-green-400 focus:outline-none focus:ring-1 focus:ring-green-400 disabled:bg-green-50 disabled:text-green-400"
             />
+            {allowOpenEnd && (
+              <span className="mt-1 flex items-center gap-2 text-[11px] font-normal text-green-600">
+                <input
+                  type="checkbox"
+                  checked={openEnd}
+                  onChange={(e) => setOpenEnd(e.target.checked)}
+                  className="h-3 w-3 rounded border-green-300 text-green-700"
+                />
+                {t("proAvail.openEnd", locale)}
+              </span>
+            )}
           </label>
           {error && <p className="text-xs text-red-600">{error}</p>}
         </div>

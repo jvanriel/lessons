@@ -258,6 +258,24 @@ export const proAvailability = pgTable("pro_availability", {
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
 
+// Schedule periods (task 78). Authoritative period definitions, so
+// empty periods (vacation / closed) can persist without slot rows.
+// `pro_availability` rows join by date-tuple match (`valid_from`,
+// `valid_until` IS NOT DISTINCT FROM …); the engine still reads slots
+// from `pro_availability` directly. Invariants enforced in
+// `saveSchedulePeriods`: only the chronologically first period may
+// have `validFrom = null`, only the last may have `validUntil = null`,
+// and bounded periods don't overlap. Gap dates have no availability.
+export const proSchedulePeriods = pgTable("pro_schedule_periods", {
+  id: serial("id").primaryKey(),
+  proProfileId: integer("pro_profile_id")
+    .references(() => proProfiles.id, { onDelete: "cascade" })
+    .notNull(),
+  validFrom: date("valid_from"),
+  validUntil: date("valid_until"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
 export const proAvailabilityOverrides = pgTable(
   "pro_availability_overrides",
   {

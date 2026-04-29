@@ -8,6 +8,7 @@ import {
   proLocations,
   proAvailability,
   proAvailabilityOverrides,
+  proSchedulePeriods,
 } from "@/lib/db/schema";
 import { getSession, hasRole } from "@/lib/auth";
 
@@ -35,6 +36,12 @@ export interface SerializedAvailability {
   dayOfWeek: number;
   startTime: string;
   endTime: string;
+  validFrom: string | null;
+  validUntil: string | null;
+}
+
+export interface SerializedSchedulePeriod {
+  id: number;
   validFrom: string | null;
   validUntil: string | null;
 }
@@ -76,24 +83,29 @@ export interface SerializedProfileSettings {
 // ─── Bulk Save Weekly Template ──────────────────────
 
 /**
- * Replace ALL availability templates for the pro with the given set of
- * schedule periods. Each period defines a date range (open at either
- * end via `null`) plus its own list of weekly slots across all
+ * Replace ALL availability + period defs for the pro with the given
+ * set of schedule periods. Each period defines a date range (open at
+ * either end via `null`) plus its own list of weekly slots across all
  * locations.
  *
- * Rules (task 77):
- *   - Bounded periods (both ends set) MUST NOT overlap each other in
- *     time. Two unbounded periods, or a bounded + unbounded pair,
- *     coexist by design — `computeAvailableSlots` already unions every
- *     matching template per day.
+ * Rules (task 78 — exclusive timeline):
+ *   - At most ONE period has `validFrom = null` (the chronologically
+ *     first); at most ONE has `validUntil = null` (the last). All
+ *     others have both bounds.
+ *   - When sorted by `validFrom`, periods don't overlap. Gaps between
+ *     bounded periods are allowed — those dates simply have no
+ *     availability (matches the engine's filter behavior).
  *   - `validFrom <= validUntil` per period.
- *   - Each slot's `(start_time, end_time)` must be a positive interval
- *     and the location must belong to this pro.
+ *   - Empty periods (zero slots) are valid and represent vacation /
+ *     closed dates — they live in `pro_schedule_periods` only.
+ *   - Each slot's `(start_time, end_time)` is a positive interval and
+ *     its location belongs to this pro.
  *
- * The action wipes every `proAvailability` row for the pro and re-
- * inserts from the supplied periods. We don't bother with diff-
- * patching — the row count is small and a clean rewrite avoids the
- * "two browser tabs out of sync" failure mode.
+ * The action wipes every `pro_availability` and `pro_schedule_periods`
+ * row for the pro and reinserts from the supplied periods. Drizzle /
+ * Neon HTTP doesn't support multi-statement transactions; a crash
+ * between delete and insert leaves the pro with empty availability —
+ * the risk window is tiny and the user can re-save.
  */
 export async function saveSchedulePeriods(input: {
   periods: Array<{
@@ -109,15 +121,10 @@ export async function saveSchedulePeriods(input: {
 }): Promise<{ error?: string }> {
   const { profile } = await requireProWithProfile();
 
-  // Validate each period's shape + collect bounded ranges for the
-  // overlap check.
-  const bounded: Array<{ from: string; until: string }> = [];
+  // Per-period shape validation.
   for (const p of input.periods) {
     if (p.validFrom && p.validUntil && p.validFrom > p.validUntil) {
       return { error: "Period start must be on or before its end." };
-    }
-    if (p.validFrom && p.validUntil) {
-      bounded.push({ from: p.validFrom, until: p.validUntil });
     }
     for (const s of p.slots) {
       if (s.dayOfWeek < 0 || s.dayOfWeek > 6) {
@@ -129,17 +136,47 @@ export async function saveSchedulePeriods(input: {
     }
   }
 
-  // Overlap check on bounded periods only. O(n²) but n is tiny.
-  for (let i = 0; i < bounded.length; i++) {
-    for (let j = i + 1; j < bounded.length; j++) {
-      const a = bounded[i];
-      const b = bounded[j];
-      if (a.from <= b.until && b.from <= a.until) {
-        return {
-          error:
-            "Two schedule periods overlap. Bounded periods must not share dates.",
-        };
-      }
+  // Exclusive-timeline invariants. Sort by `validFrom` (null first)
+  // and walk the list once. At most one null-from at the head, at
+  // most one null-until at the tail, and consecutive periods can't
+  // overlap.
+  const sorted = [...input.periods].sort((a, b) => {
+    if (a.validFrom === null && b.validFrom !== null) return -1;
+    if (b.validFrom === null && a.validFrom !== null) return 1;
+    return (a.validFrom ?? "").localeCompare(b.validFrom ?? "");
+  });
+  let nullFromCount = 0;
+  let nullUntilCount = 0;
+  for (const p of sorted) {
+    if (p.validFrom === null) nullFromCount++;
+    if (p.validUntil === null) nullUntilCount++;
+  }
+  if (nullFromCount > 1) {
+    return { error: "Only the first period may have an open start." };
+  }
+  if (nullUntilCount > 1) {
+    return { error: "Only the last period may have an open end." };
+  }
+  for (let i = 0; i < sorted.length; i++) {
+    const p = sorted[i];
+    const isFirst = i === 0;
+    const isLast = i === sorted.length - 1;
+    if (!isFirst && p.validFrom === null) {
+      return { error: "Only the first period may have an open start." };
+    }
+    if (!isLast && p.validUntil === null) {
+      return { error: "Only the last period may have an open end." };
+    }
+  }
+  for (let i = 0; i < sorted.length - 1; i++) {
+    const a = sorted[i];
+    const b = sorted[i + 1];
+    // a.validUntil null means a runs forever — only valid if a is the
+    // last period (i == n-1), so this branch can't be reached.
+    if (a.validUntil && b.validFrom && a.validUntil >= b.validFrom) {
+      return {
+        error: "Schedule periods overlap. Each period must end before the next begins.",
+      };
     }
   }
 
@@ -160,15 +197,26 @@ export async function saveSchedulePeriods(input: {
     }
   }
 
-  // Wipe + re-insert. Drizzle/Neon HTTP doesn't support multi-stmt
-  // transactions, so a crash between delete and insert leaves the pro
-  // with empty availability. The risk window is tiny and the user can
-  // re-save, but document the trade-off.
+  // Wipe + reinsert both tables. Periods always persist (including
+  // empty ones for vacation); slots only for non-empty periods.
   await db
     .delete(proAvailability)
     .where(eq(proAvailability.proProfileId, profile.id));
+  await db
+    .delete(proSchedulePeriods)
+    .where(eq(proSchedulePeriods.proProfileId, profile.id));
 
-  const rows = input.periods.flatMap((p) =>
+  if (sorted.length > 0) {
+    await db.insert(proSchedulePeriods).values(
+      sorted.map((p) => ({
+        proProfileId: profile.id,
+        validFrom: p.validFrom,
+        validUntil: p.validUntil,
+      })),
+    );
+  }
+
+  const slotRows = sorted.flatMap((p) =>
     p.slots.map((s) => ({
       proProfileId: profile.id,
       proLocationId: s.proLocationId,
@@ -179,8 +227,8 @@ export async function saveSchedulePeriods(input: {
       validUntil: p.validUntil,
     })),
   );
-  if (rows.length > 0) {
-    await db.insert(proAvailability).values(rows);
+  if (slotRows.length > 0) {
+    await db.insert(proAvailability).values(slotRows);
   }
 
   revalidatePath("/pro/availability");

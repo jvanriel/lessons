@@ -4,6 +4,7 @@ import {
   proLocations,
   proAvailability,
   proAvailabilityOverrides,
+  proSchedulePeriods,
   lessonBookings,
   locations,
   users,
@@ -27,6 +28,7 @@ import type {
   SerializedProLocationWithName,
   SerializedBooking,
   SerializedProfileSettings,
+  SerializedSchedulePeriod,
 } from "./actions";
 
 export const metadata = { title: "Availability — Golf Lessons" };
@@ -45,7 +47,7 @@ export default async function AvailabilityPage() {
   const startStr = formatLocalDateInTZ(monday, tz);
   const endStr = addDaysToDateString(startStr, 35);
 
-  const [proLocs, templates, overrides, bookings, profileData] =
+  const [proLocs, templates, periodDefs, overrides, bookings, profileData] =
     await Promise.all([
       db
         .select({
@@ -79,6 +81,20 @@ export default async function AvailabilityPage() {
           asc(proAvailability.validUntil),
           asc(proAvailability.dayOfWeek),
           asc(proAvailability.startTime),
+        ),
+      // Schedule period defs (task 78). Includes empty periods that
+      // represent vacation / closed dates and have no slot rows.
+      db
+        .select({
+          id: proSchedulePeriods.id,
+          validFrom: proSchedulePeriods.validFrom,
+          validUntil: proSchedulePeriods.validUntil,
+        })
+        .from(proSchedulePeriods)
+        .where(eq(proSchedulePeriods.proProfileId, proId))
+        .orderBy(
+          asc(proSchedulePeriods.validFrom),
+          asc(proSchedulePeriods.validUntil),
         ),
       db
         .select({
@@ -153,6 +169,14 @@ export default async function AvailabilityPage() {
     })
   );
 
+  const serializedSchedulePeriods: SerializedSchedulePeriod[] = periodDefs.map(
+    (p) => ({
+      id: p.id,
+      validFrom: p.validFrom,
+      validUntil: p.validUntil,
+    })
+  );
+
   const serializedOverrides: SerializedOverride[] = overrides.map((o) => ({
     id: o.id,
     proLocationId: o.proLocationId,
@@ -218,6 +242,7 @@ export default async function AvailabilityPage() {
         <AvailabilityEditor
           locations={serializedLocations}
           availability={serializedAvailability}
+          schedulePeriods={serializedSchedulePeriods}
           overrides={serializedOverrides}
           bookings={serializedBookings}
           profileSettings={settings}
