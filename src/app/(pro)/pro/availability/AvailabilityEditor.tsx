@@ -202,12 +202,16 @@ const LONG_PRESS_MS = 350;
 const LONG_PRESS_MOVE_TOLERANCE = 10;
 
 /**
- * Gates a cell paint operation for touch: on mouse/pen, `fire` runs
- * immediately (and `startDrag` is also invoked). On touch, `fire` only
- * runs if the finger stays put for ~350ms — a short tap does nothing,
- * leaving the page free to scroll. Once long-press fires, `startDrag`
- * gets called so the caller can attach window-level pointermove
- * listeners to hit-test adjacent cells and paint them.
+ * Gates a cell paint operation by pointer type:
+ *
+ *   - Mouse / pen → `fire` runs immediately AND `startDrag` is invoked,
+ *     so a desktop click toggles the cell and a held-down drag paints
+ *     the cells the cursor crosses.
+ *   - Touch → `fire` only runs after the finger stays put for ~350ms
+ *     (long-press, with a haptic buzz on supported devices). A short
+ *     tap does nothing — leaves the page free to scroll. `startDrag`
+ *     is NOT called on touch: drag-paint is desktop-only by design
+ *     (task 75). Mobile users toggle one cell per long-press.
  */
 function beginCellPointer(
   e: React.PointerEvent,
@@ -248,7 +252,8 @@ function beginCellPointer(
   const timer = window.setTimeout(() => {
     if (done) return;
     fire();
-    startDrag();
+    // Intentionally NOT calling startDrag on touch — drag-paint is
+    // desktop-only. Long-press toggles a single cell and stops.
     if ("vibrate" in navigator) {
       try {
         navigator.vibrate(15);
@@ -468,9 +473,9 @@ function WeeklyTemplateGrid({
     anchorRef.current = { day, row, adding };
   }
 
-  // Drag painting — after a mouse-down or long-press-on-touch starts,
-  // attach window listeners so moving across adjacent cells paints them
-  // with the anchor's value.
+  // Drag painting — desktop only. After a mouse-down, attach window
+  // listeners so moving across adjacent cells paints them with the
+  // anchor's value. Touch never calls this (see `beginCellPointer`).
   function startTemplateDrag() {
     const lastKeyRef = { current: "" };
     const move = (ev: PointerEvent) => {
@@ -933,6 +938,8 @@ function PreviewBlockingGrid({
     anchorRef2.current = { day: dayIdx, row, adding };
   }
 
+  // Drag painting — desktop only (see `beginCellPointer`). Touch never
+  // calls this; mobile long-press toggles one cell at a time.
   function startOverrideDrag() {
     const lastKeyRef = { current: "" };
     const move = (ev: PointerEvent) => {
