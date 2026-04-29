@@ -521,3 +521,34 @@ export const stripeEvents = pgTable("stripe_events", {
   payload: jsonb("payload").$type<Record<string, unknown>>().notNull(),
   processedAt: timestamp("processed_at").defaultNow().notNull(),
 });
+
+// ─── WebAuthn (Face ID / Touch ID / passkeys) ─────────────────────
+//
+// One row per device-bound credential a user has registered. A user can
+// have many — phone, laptop, hardware key, etc. `credentialId` is the
+// base64url-encoded id the browser/authenticator returns; we look it
+// up on assertion. `publicKey` is the raw COSE public key bytes.
+// `counter` is bumped on each successful assertion to detect cloned
+// authenticators (a regression in counter is a hard error). `transports`
+// captures hints from the browser ("internal", "usb", "ble", etc.) so
+// follow-up assertions can be steered to the right authenticator.
+export const webauthnCredentials = pgTable(
+  "webauthn_credentials",
+  {
+    id: serial("id").primaryKey(),
+    userId: integer("user_id")
+      .references(() => users.id, { onDelete: "cascade" })
+      .notNull(),
+    credentialId: varchar("credential_id", { length: 255 }).notNull().unique(),
+    publicKey: text("public_key").notNull(),
+    counter: integer("counter").notNull().default(0),
+    transports: jsonb("transports").$type<string[]>(),
+    /** User-supplied label so they can tell their phone from their laptop. */
+    nickname: varchar("nickname", { length: 100 }),
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+    lastUsedAt: timestamp("last_used_at"),
+  },
+  (table) => ({
+    userIdIdx: index("webauthn_credentials_user_id_idx").on(table.userId),
+  })
+);

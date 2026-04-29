@@ -380,6 +380,162 @@ export default function ProfileForm({
         locale={locale}
       />
 
+      {/* Passkeys (Face ID / Touch ID / Windows Hello) */}
+      <PasskeysSection locale={locale} />
+
+    </div>
+  );
+}
+
+interface Credential {
+  id: number;
+  nickname: string | null;
+  transports: string[] | null;
+  createdAt: string;
+  lastUsedAt: string | null;
+}
+
+function PasskeysSection({ locale }: { locale: Locale }) {
+  const [supported, setSupported] = useState<boolean | null>(null);
+  const [credentials, setCredentials] = useState<Credential[] | null>(null);
+  const [adding, setAdding] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (typeof window === "undefined" || !window.PublicKeyCredential) {
+      setSupported(false);
+      return;
+    }
+    PublicKeyCredential.isUserVerifyingPlatformAuthenticatorAvailable()
+      .then((ok) => setSupported(!!ok))
+      .catch(() => setSupported(false));
+  }, []);
+
+  async function fetchCredentials() {
+    const res = await fetch("/api/auth/webauthn/credentials");
+    if (res.ok) {
+      const data = await res.json();
+      setCredentials(data.credentials);
+    }
+  }
+
+  useEffect(() => { fetchCredentials(); }, []);
+
+  async function handleAdd() {
+    setError(null);
+    setAdding(true);
+    try {
+      const optsRes = await fetch("/api/auth/webauthn/registration-options", {
+        method: "POST",
+      });
+      if (!optsRes.ok) {
+        const j = await optsRes.json().catch(() => ({}));
+        throw new Error(j.error || "Could not start registration");
+      }
+      const options = await optsRes.json();
+      const { startRegistration } = await import("@simplewebauthn/browser");
+      const attestation = await startRegistration({ optionsJSON: options });
+      const nickname = window.prompt(t("passkey.nicknamePrompt", locale)) ?? "";
+      const verifyRes = await fetch(
+        "/api/auth/webauthn/registration-verify",
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ response: attestation, nickname }),
+        },
+      );
+      const data = await verifyRes.json();
+      if (!verifyRes.ok || !data.success) {
+        throw new Error(data.error || "Registration failed");
+      }
+      await fetchCredentials();
+    } catch (err) {
+      if (
+        err instanceof DOMException &&
+        (err.name === "NotAllowedError" || err.name === "AbortError")
+      ) {
+        // User cancelled the OS prompt — silent.
+      } else {
+        setError(
+          err instanceof Error ? err.message : t("passkey.error", locale),
+        );
+      }
+    } finally {
+      setAdding(false);
+    }
+  }
+
+  async function handleRemove(id: number) {
+    if (!window.confirm(t("passkey.removeConfirm", locale))) return;
+    const res = await fetch(`/api/auth/webauthn/credentials/${id}`, {
+      method: "DELETE",
+    });
+    if (res.ok) {
+      setCredentials((prev) => prev?.filter((c) => c.id !== id) ?? null);
+    }
+  }
+
+  if (supported === false && (credentials?.length ?? 0) === 0) {
+    // No passkeys + the device can't add any — hide the whole section
+    // rather than show a "your browser can't do this" message.
+    return null;
+  }
+
+  return (
+    <div>
+      <h2 className="font-display text-xl font-semibold text-green-950">
+        {t("passkey.heading", locale)}
+      </h2>
+      <p className="mt-2 text-sm text-green-700/60">
+        {t("passkey.intro", locale)}
+      </p>
+
+      {credentials && credentials.length > 0 && (
+        <ul className="mt-4 space-y-2">
+          {credentials.map((c) => (
+            <li
+              key={c.id}
+              className="flex items-center justify-between rounded-lg border border-green-200 bg-white px-4 py-3"
+            >
+              <div>
+                <p className="text-sm font-medium text-green-900">
+                  {c.nickname || t("passkey.unnamed", locale)}
+                </p>
+                <p className="mt-0.5 text-xs text-green-600">
+                  {c.lastUsedAt
+                    ? t("passkey.lastUsed", locale).replace(
+                        "{date}",
+                        new Date(c.lastUsedAt).toLocaleDateString(locale),
+                      )
+                    : t("passkey.neverUsed", locale)}
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => handleRemove(c.id)}
+                className="text-xs font-medium text-red-500 hover:text-red-600"
+              >
+                {t("passkey.remove", locale)}
+              </button>
+            </li>
+          ))}
+        </ul>
+      )}
+
+      {supported && (
+        <button
+          type="button"
+          onClick={handleAdd}
+          disabled={adding}
+          className="mt-4 inline-flex items-center gap-2 rounded-lg border border-green-300 bg-white px-4 py-2 text-sm font-medium text-green-800 hover:border-gold-500 hover:text-gold-700 disabled:opacity-50"
+        >
+          <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+            <path strokeLinecap="round" strokeLinejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
+          </svg>
+          {adding ? t("passkey.adding", locale) : t("passkey.addThisDevice", locale)}
+        </button>
+      )}
+      {error && <p className="mt-2 text-xs text-red-600">{error}</p>}
     </div>
   );
 }

@@ -2,12 +2,98 @@
 
 import { useActionState, useState, useRef, useEffect, useCallback } from "react";
 import { userLogin } from "./actions";
-import { useSearchParams } from "next/navigation";
+import { useSearchParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import { Suspense } from "react";
 import { t } from "@/lib/i18n/translations";
 import type { Locale } from "@/lib/i18n";
 import PasswordInput from "@/components/PasswordInput";
+
+function PasskeyButton({
+  locale,
+  onSuccess,
+}: {
+  locale: Locale;
+  onSuccess: () => void;
+}) {
+  const [supported, setSupported] = useState<boolean | null>(null);
+  const [pending, setPending] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    // Browser support gate. The platform-authenticator check rules out
+    // browsers that don't have any biometric hardware available, so the
+    // button only shows up where Face ID / Touch ID / Windows Hello can
+    // actually run.
+    if (typeof window === "undefined" || !window.PublicKeyCredential) {
+      setSupported(false);
+      return;
+    }
+    PublicKeyCredential.isUserVerifyingPlatformAuthenticatorAvailable()
+      .then((ok) => setSupported(!!ok))
+      .catch(() => setSupported(false));
+  }, []);
+
+  async function handleClick() {
+    setError(null);
+    setPending(true);
+    try {
+      const optsRes = await fetch("/api/auth/webauthn/auth-options", {
+        method: "POST",
+      });
+      if (!optsRes.ok) throw new Error("Could not start passkey login");
+      const options = await optsRes.json();
+      const { startAuthentication } = await import(
+        "@simplewebauthn/browser"
+      );
+      const assertion = await startAuthentication({ optionsJSON: options });
+      const verifyRes = await fetch("/api/auth/webauthn/auth-verify", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ response: assertion }),
+      });
+      const data = await verifyRes.json();
+      if (!verifyRes.ok || !data.success) {
+        throw new Error(data.error || "Passkey login failed");
+      }
+      onSuccess();
+    } catch (err) {
+      // The user cancelling the OS prompt fires a DOMException with
+      // name "NotAllowedError" or "AbortError" — treat as silent.
+      if (
+        err instanceof DOMException &&
+        (err.name === "NotAllowedError" || err.name === "AbortError")
+      ) {
+        setError(null);
+      } else {
+        setError(
+          err instanceof Error ? err.message : t("auth.passkeyError", locale),
+        );
+      }
+    } finally {
+      setPending(false);
+    }
+  }
+
+  if (supported === false) return null;
+
+  return (
+    <div className="mt-4">
+      <button
+        type="button"
+        onClick={handleClick}
+        disabled={pending || supported === null}
+        className="flex w-full items-center justify-center gap-2 rounded-lg border border-green-700 px-4 py-2.5 text-sm font-medium text-green-100/70 transition-colors hover:border-gold-500 hover:text-gold-200 disabled:opacity-50"
+      >
+        <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+          <path strokeLinecap="round" strokeLinejoin="round" d="M16.5 10.5V6.75a4.5 4.5 0 1 0-9 0v3.75m-.75 11.25h10.5a2.25 2.25 0 0 0 2.25-2.25v-6.75a2.25 2.25 0 0 0-2.25-2.25H6.75a2.25 2.25 0 0 0-2.25 2.25v6.75a2.25 2.25 0 0 0 2.25 2.25Z" />
+        </svg>
+        {pending ? t("auth.passkeySigningIn", locale) : t("auth.signInWithPasskey", locale)}
+      </button>
+      {error && <p className="mt-2 text-xs text-red-400">{error}</p>}
+    </div>
+  );
+}
 
 function QRScanButton({ locale }: { locale: Locale }) {
   const [scanning, setScanning] = useState(false);
@@ -146,6 +232,7 @@ function GoogleErrorMessage({ error, locale }: { error: string | null; locale: L
 
 function LoginFormInner({ locale }: { locale: Locale }) {
   const searchParams = useSearchParams();
+  const router = useRouter();
   const from = searchParams.get("from");
   const prefillEmail = searchParams.get("email") ?? "";
   const googleError = searchParams.get("error");
@@ -154,6 +241,14 @@ function LoginFormInner({ locale }: { locale: Locale }) {
   const googleUrl = from
     ? `/api/auth/google?from=${encodeURIComponent(from)}`
     : "/api/auth/google";
+
+  function onPasskeySuccess() {
+    // Same destination logic as a successful password / Google login —
+    // server already minted the session cookie, so a hard nav lands the
+    // user on the right authenticated page.
+    window.location.href = from || "/";
+    void router; // keep import in scope
+  }
 
   return (
     <div className="flex min-h-screen items-center justify-center bg-green-950 px-6">
@@ -240,6 +335,9 @@ function LoginFormInner({ locale }: { locale: Locale }) {
         </a>
 
         <GoogleErrorMessage error={googleError} locale={locale} />
+
+        {/* Passkey / Face ID — only renders when a platform authenticator is available */}
+        <PasskeyButton locale={locale} onSuccess={onPasskeySuccess} />
 
         {/* QR scan — mobile only */}
         <div className="sm:hidden">
