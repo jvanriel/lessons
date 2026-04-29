@@ -8,8 +8,7 @@ import {
   users,
   events,
 } from "@/lib/db/schema";
-import { and, eq, gte, lte } from "drizzle-orm";
-import { sql } from "drizzle-orm";
+import { and, eq, gte, lte, inArray } from "drizzle-orm";
 import { getSession, hasRole } from "@/lib/auth";
 import { logEvent } from "@/lib/events";
 import { sendEmail } from "@/lib/mail";
@@ -93,7 +92,12 @@ export async function GET(request: NextRequest) {
     });
   }
 
-  // Find which booking ids already had a reminder sent (idempotency)
+  // Find which booking ids already had a reminder sent (idempotency).
+  // Use `inArray` rather than raw `sql\`= ANY(${ids})\`` — the Neon
+  // HTTP driver serializes a JS array passed via the sql template
+  // tag as the bare value when there's only one element (so a
+  // single-id array `[14]` ends up as the integer `14`, which
+  // Postgres rejects with "malformed array literal: \"14\"").
   const ids = inWindow.map((b) => b.id);
   const sentRows = await db
     .select({ targetId: events.targetId })
@@ -101,7 +105,7 @@ export async function GET(request: NextRequest) {
     .where(
       and(
         eq(events.type, "lesson.reminder_sent"),
-        sql`${events.targetId} = ANY(${ids})`
+        inArray(events.targetId, ids)
       )
     );
   const alreadySent = new Set(sentRows.map((r) => r.targetId));
