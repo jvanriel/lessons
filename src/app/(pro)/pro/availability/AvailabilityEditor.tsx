@@ -8,7 +8,7 @@ import type {
   SerializedBooking,
   SerializedProfileSettings,
 } from "./actions";
-import { saveWeeklyTemplate, saveWeekOverrides } from "./actions";
+import { saveSchedulePeriods, saveWeekOverrides } from "./actions";
 import { t } from "@/lib/i18n/translations";
 import type { Locale } from "@/lib/i18n";
 import { formatDate as formatDateLocale } from "@/lib/format-date";
@@ -75,10 +75,31 @@ function timeToRow(time: string): number {
 // Grid cell stores a Set of location IDs
 type LocationGrid = Set<number>[][];
 
-function availabilityToLocationGrid(slots: SerializedAvailability[]): LocationGrid {
-  const grid: LocationGrid = Array.from({ length: 7 }, () =>
+/**
+ * One schedule period in the editor. The "Always" period has both
+ * date bounds set to null and is always present (it represents
+ * unbounded weekly availability — the historical default).
+ */
+interface Period {
+  /** Stable client-side id for React keys + dirty tracking. */
+  id: string;
+  validFrom: string | null;
+  validUntil: string | null;
+  grid: LocationGrid;
+}
+
+function emptyGrid(): LocationGrid {
+  return Array.from({ length: 7 }, () =>
     Array.from({ length: ROWS }, () => new Set<number>()),
   );
+}
+
+function cloneGrid(g: LocationGrid): LocationGrid {
+  return g.map((col) => col.map((cell) => new Set(cell)));
+}
+
+function availabilityToLocationGrid(slots: SerializedAvailability[]): LocationGrid {
+  const grid: LocationGrid = emptyGrid();
   for (const s of slots) {
     const startRow = timeToRow(s.startTime);
     const endRow = timeToRow(s.endTime);
@@ -87,6 +108,67 @@ function availabilityToLocationGrid(slots: SerializedAvailability[]): LocationGr
     }
   }
   return grid;
+}
+
+/**
+ * Group serialized availability rows into editor-side periods, keyed
+ * by their `(validFrom, validUntil)` pair. A pro who has never used
+ * bounded periods produces a single "Always" period (both null).
+ */
+function availabilityToPeriods(slots: SerializedAvailability[]): Period[] {
+  const groups = new Map<string, SerializedAvailability[]>();
+  for (const s of slots) {
+    const key = `${s.validFrom ?? ""}|${s.validUntil ?? ""}`;
+    const arr = groups.get(key) ?? [];
+    arr.push(s);
+    groups.set(key, arr);
+  }
+  const periods: Period[] = [];
+  let counter = 0;
+  for (const [, arr] of groups) {
+    periods.push({
+      id: `p${++counter}`,
+      validFrom: arr[0].validFrom,
+      validUntil: arr[0].validUntil,
+      grid: availabilityToLocationGrid(arr),
+    });
+  }
+  // Always include an unbounded ("Always") period so the editor always
+  // has somewhere to put rows when the pro hasn't created any
+  // bounded periods yet.
+  if (!periods.some((p) => p.validFrom === null && p.validUntil === null)) {
+    periods.unshift({
+      id: `p${++counter}`,
+      validFrom: null,
+      validUntil: null,
+      grid: emptyGrid(),
+    });
+  }
+  // Sort: unbounded first, then bounded by start date.
+  periods.sort((a, b) => {
+    if (a.validFrom === null && b.validFrom !== null) return -1;
+    if (b.validFrom === null && a.validFrom !== null) return 1;
+    return (a.validFrom ?? "").localeCompare(b.validFrom ?? "");
+  });
+  return periods;
+}
+
+/** Project the union of every matching period's grid for a given date. */
+function projectGridForDate(
+  periods: Period[],
+  dateStr: string,
+): LocationGrid {
+  const out = emptyGrid();
+  for (const p of periods) {
+    if (p.validFrom && dateStr < p.validFrom) continue;
+    if (p.validUntil && dateStr > p.validUntil) continue;
+    for (let day = 0; day < 7; day++) {
+      for (let row = 0; row < ROWS; row++) {
+        for (const id of p.grid[day][row]) out[day][row].add(id);
+      }
+    }
+  }
+  return out;
 }
 
 // Extract slots for one location from the grid
@@ -314,17 +396,34 @@ export default function AvailabilityEditor({
   // Active brush for painting
   const [activeLocationId, setActiveLocationId] = useState<number>(locations[0]?.id || 0);
 
-  // Lift template grid state so preview can read it
-  const [templateGrid, setTemplateGrid] = useState(() => availabilityToLocationGrid(availability));
+  // Multi-period state (task 77). Replaces the single `templateGrid`.
+  const [periods, setPeriods] = useState<Period[]>(() =>
+    availabilityToPeriods(availability),
+  );
+  const [activePeriodId, setActivePeriodId] = useState<string>(
+    () => availabilityToPeriods(availability)[0]?.id ?? "p1",
+  );
 
-  // Reset when server data changes
+  // Reset when server data changes (e.g. after another tab saved).
   const prevAvailRef = useRef(availability);
   useEffect(() => {
     if (prevAvailRef.current !== availability) {
       prevAvailRef.current = availability;
-      setTemplateGrid(availabilityToLocationGrid(availability));
+      const next = availabilityToPeriods(availability);
+      setPeriods(next);
+      setActivePeriodId((cur) =>
+        next.some((p) => p.id === cur) ? cur : next[0]?.id ?? "p1",
+      );
     }
   }, [availability]);
+
+  const activePeriod = periods.find((p) => p.id === activePeriodId) ?? periods[0];
+
+  function updatePeriodGrid(periodId: string, grid: LocationGrid) {
+    setPeriods((prev) =>
+      prev.map((p) => (p.id === periodId ? { ...p, grid } : p)),
+    );
+  }
 
   if (locations.length === 0) {
     return (
@@ -341,27 +440,416 @@ export default function AvailabilityEditor({
   return (
     <div className="mt-8 space-y-8">
       <LandscapeRotatePrompt locale={locale} />
-      {/* Section 1: Unified weekly template */}
-      <WeeklyTemplateGrid
+
+      {/* Section 1: Schedule periods (tab strip + active grid) */}
+      <SchedulePeriodsSection
+        periods={periods}
+        activePeriodId={activePeriodId}
+        onActivePeriodChange={setActivePeriodId}
+        onPeriodsChange={setPeriods}
         locations={locations}
         locationColorMap={locationColorMap}
         activeLocationId={activeLocationId}
         onActiveLocationChange={setActiveLocationId}
-        grid={templateGrid}
-        onGridChange={setTemplateGrid}
+        onGridChange={(grid) => activePeriod && updatePeriodGrid(activePeriod.id, grid)}
         locale={locale}
       />
 
-      {/* Section 2: Preview / blocking grid */}
+      {/* Section 2: Preview / blocking grid — shows the union of all
+          periods that match the visible week. */}
       <PreviewBlockingGrid
         locations={locations}
         locationColorMap={locationColorMap}
-        templateGrid={templateGrid}
+        periods={periods}
         overrides={overrides}
         bookings={bookings}
         profileSettings={profileSettings}
         locale={locale}
       />
+    </div>
+  );
+}
+
+// ─── Schedule Periods Section ────────────────────────
+
+function SchedulePeriodsSection({
+  periods,
+  activePeriodId,
+  onActivePeriodChange,
+  onPeriodsChange,
+  locations,
+  locationColorMap,
+  activeLocationId,
+  onActiveLocationChange,
+  onGridChange,
+  locale,
+}: {
+  periods: Period[];
+  activePeriodId: string;
+  onActivePeriodChange: (id: string) => void;
+  onPeriodsChange: (next: Period[]) => void;
+  locations: SerializedProLocationWithName[];
+  locationColorMap: Map<number, number>;
+  activeLocationId: number;
+  onActiveLocationChange: (id: number) => void;
+  onGridChange: (grid: LocationGrid) => void;
+  locale: Locale;
+}) {
+  const [saveStatus, setSaveStatus] = useState<"idle" | "saving" | "saved" | "error">(
+    "idle",
+  );
+  const [saveError, setSaveError] = useState<string | null>(null);
+  const [showAdd, setShowAdd] = useState(false);
+  const [editingDatesFor, setEditingDatesFor] = useState<string | null>(null);
+  const debounceRef = useRef<ReturnType<typeof setTimeout>>(undefined);
+  const prevPeriodsRef = useRef(periods);
+
+  const activePeriod =
+    periods.find((p) => p.id === activePeriodId) ?? periods[0];
+
+  // Auto-save: on any change to `periods`, debounce 2s then push the
+  // whole set via `saveSchedulePeriods`. Skip the initial mount so
+  // we don't immediately save the server-provided state.
+  useEffect(() => {
+    if (prevPeriodsRef.current === periods) return;
+    prevPeriodsRef.current = periods;
+
+    clearTimeout(debounceRef.current);
+    debounceRef.current = setTimeout(() => {
+      setSaveStatus("saving");
+      setSaveError(null);
+      (async () => {
+        const payload = {
+          periods: periods.map((p) => ({
+            validFrom: p.validFrom,
+            validUntil: p.validUntil,
+            slots: locations.flatMap((loc) =>
+              gridToSlotsForLocation(p.grid, loc.id).map((s) => ({
+                proLocationId: loc.id,
+                ...s,
+              })),
+            ),
+          })),
+        };
+        const result = await saveSchedulePeriods(payload);
+        if (result.error) {
+          setSaveStatus("error");
+          setSaveError(result.error);
+        } else {
+          setSaveStatus("saved");
+          setTimeout(
+            () => setSaveStatus((s) => (s === "saved" ? "idle" : s)),
+            2000,
+          );
+        }
+      })();
+    }, 2000);
+    return () => clearTimeout(debounceRef.current);
+  }, [periods, locations]);
+
+  function addPeriod(validFrom: string, validUntil: string) {
+    const id = `p${Date.now()}`;
+    const next: Period = {
+      id,
+      validFrom,
+      validUntil,
+      grid: emptyGrid(),
+    };
+    onPeriodsChange([...periods, next].sort(sortPeriods));
+    onActivePeriodChange(id);
+    setShowAdd(false);
+  }
+
+  function duplicateActivePeriod() {
+    if (!activePeriod) return;
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const monthLater = new Date(today);
+    monthLater.setMonth(monthLater.getMonth() + 1);
+    monthLater.setDate(monthLater.getDate() - 1);
+    const id = `p${Date.now()}`;
+    const next: Period = {
+      id,
+      validFrom: toLocalDateStr(today),
+      validUntil: toLocalDateStr(monthLater),
+      grid: cloneGrid(activePeriod.grid),
+    };
+    onPeriodsChange([...periods, next].sort(sortPeriods));
+    onActivePeriodChange(id);
+    setEditingDatesFor(id);
+  }
+
+  function removePeriod(id: string) {
+    if (!window.confirm(t("proAvail.removePeriodConfirm", locale))) return;
+    const next = periods.filter((p) => p.id !== id);
+    // Always keep at least one period (the unbounded "Always") so the
+    // grid has somewhere to render. If the user removes the last
+    // period, recreate an empty unbounded one.
+    if (next.length === 0) {
+      next.push({ id: `p${Date.now()}`, validFrom: null, validUntil: null, grid: emptyGrid() });
+    }
+    onPeriodsChange(next);
+    if (activePeriodId === id) {
+      onActivePeriodChange(next[0].id);
+    }
+  }
+
+  function updatePeriodDates(
+    id: string,
+    validFrom: string | null,
+    validUntil: string | null,
+  ) {
+    onPeriodsChange(
+      periods
+        .map((p) =>
+          p.id === id ? { ...p, validFrom, validUntil } : p,
+        )
+        .sort(sortPeriods),
+    );
+    setEditingDatesFor(null);
+  }
+
+  return (
+    <div className="space-y-4">
+      <div className="flex flex-wrap items-center gap-2">
+        <span className="text-sm font-medium text-green-800">
+          {t("proAvail.schedulePeriods", locale)}:
+        </span>
+        {periods.map((p) => (
+          <button
+            key={p.id}
+            type="button"
+            onClick={() => onActivePeriodChange(p.id)}
+            className={`rounded-full px-3 py-1 text-xs font-medium transition-colors ${
+              p.id === activePeriodId
+                ? "bg-green-700 text-white"
+                : "border border-green-200 bg-white text-green-700 hover:border-green-400"
+            }`}
+            title={periodLabel(p, locale)}
+          >
+            {periodLabel(p, locale)}
+          </button>
+        ))}
+        <button
+          type="button"
+          onClick={() => setShowAdd(true)}
+          className="rounded-full border border-dashed border-green-300 px-3 py-1 text-xs font-medium text-green-600 hover:border-gold-500 hover:text-gold-600"
+        >
+          + {t("proAvail.addPeriod", locale)}
+        </button>
+        <div className="ml-auto flex items-center gap-3">
+          {saveStatus === "saving" && (
+            <span className="text-xs text-green-700/50 animate-pulse">{t("proAvail.saving", locale)}</span>
+          )}
+          {saveStatus === "saved" && (
+            <span className="text-xs text-green-600">{t("proAvail.saved", locale)}</span>
+          )}
+          {saveStatus === "error" && saveError && (
+            <span className="text-xs text-red-600">{saveError}</span>
+          )}
+        </div>
+      </div>
+
+      {activePeriod && (
+        <div className="space-y-3 rounded-xl border border-green-200 bg-white p-4">
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <p className="text-sm text-green-700">
+              {periodDescription(activePeriod, locale)}
+            </p>
+            <div className="flex items-center gap-2 text-xs">
+              <button
+                type="button"
+                onClick={() => setEditingDatesFor(activePeriod.id)}
+                className="text-green-700 underline-offset-2 hover:underline"
+              >
+                {t("proAvail.editDates", locale)}
+              </button>
+              <span className="text-green-300">•</span>
+              <button
+                type="button"
+                onClick={duplicateActivePeriod}
+                className="text-green-700 underline-offset-2 hover:underline"
+              >
+                {t("proAvail.duplicate", locale)}
+              </button>
+              {periods.length > 1 && (
+                <>
+                  <span className="text-green-300">•</span>
+                  <button
+                    type="button"
+                    onClick={() => removePeriod(activePeriod.id)}
+                    className="text-red-500 underline-offset-2 hover:underline hover:text-red-600"
+                  >
+                    {t("proAvail.removePeriod", locale)}
+                  </button>
+                </>
+              )}
+            </div>
+          </div>
+
+          <WeeklyTemplateGrid
+            locations={locations}
+            locationColorMap={locationColorMap}
+            activeLocationId={activeLocationId}
+            onActiveLocationChange={onActiveLocationChange}
+            grid={activePeriod.grid}
+            onGridChange={onGridChange}
+            locale={locale}
+          />
+        </div>
+      )}
+
+      {showAdd && (
+        <PeriodDatesDialog
+          mode="add"
+          locale={locale}
+          existingBoundedRanges={periods
+            .filter((p) => p.validFrom && p.validUntil)
+            .map((p) => ({ id: p.id, from: p.validFrom!, until: p.validUntil! }))}
+          onSubmit={addPeriod}
+          onClose={() => setShowAdd(false)}
+        />
+      )}
+      {editingDatesFor !== null && (() => {
+        const p = periods.find((x) => x.id === editingDatesFor);
+        if (!p) return null;
+        return (
+          <PeriodDatesDialog
+            mode="edit"
+            initialFrom={p.validFrom}
+            initialUntil={p.validUntil}
+            locale={locale}
+            existingBoundedRanges={periods
+              .filter((x) => x.id !== p.id && x.validFrom && x.validUntil)
+              .map((x) => ({
+                id: x.id,
+                from: x.validFrom!,
+                until: x.validUntil!,
+              }))}
+            onSubmit={(from, until) =>
+              updatePeriodDates(p.id, from || null, until || null)
+            }
+            onClose={() => setEditingDatesFor(null)}
+          />
+        );
+      })()}
+    </div>
+  );
+}
+
+function sortPeriods(a: Period, b: Period): number {
+  if (a.validFrom === null && b.validFrom !== null) return -1;
+  if (b.validFrom === null && a.validFrom !== null) return 1;
+  return (a.validFrom ?? "").localeCompare(b.validFrom ?? "");
+}
+
+function periodLabel(p: Period, locale: Locale): string {
+  if (!p.validFrom && !p.validUntil) return t("proAvail.alwaysPeriod", locale);
+  const from = p.validFrom ? formatDateShort(p.validFrom, locale) : "…";
+  const until = p.validUntil ? formatDateShort(p.validUntil, locale) : "…";
+  return `${from} – ${until}`;
+}
+
+function periodDescription(p: Period, locale: Locale): string {
+  if (!p.validFrom && !p.validUntil)
+    return t("proAvail.alwaysPeriodDesc", locale);
+  return t("proAvail.periodActiveBetween", locale)
+    .replace("{from}", p.validFrom ?? "…")
+    .replace("{until}", p.validUntil ?? "…");
+}
+
+function PeriodDatesDialog({
+  mode,
+  initialFrom,
+  initialUntil,
+  existingBoundedRanges,
+  locale,
+  onSubmit,
+  onClose,
+}: {
+  mode: "add" | "edit";
+  initialFrom?: string | null;
+  initialUntil?: string | null;
+  existingBoundedRanges: Array<{ id: string; from: string; until: string }>;
+  locale: Locale;
+  onSubmit: (from: string, until: string) => void;
+  onClose: () => void;
+}) {
+  const [from, setFrom] = useState(initialFrom ?? "");
+  const [until, setUntil] = useState(initialUntil ?? "");
+  const [error, setError] = useState<string | null>(null);
+
+  function submit() {
+    setError(null);
+    if (!from || !until) {
+      setError(t("proAvail.periodDatesRequired", locale));
+      return;
+    }
+    if (from > until) {
+      setError(t("proAvail.periodFromBeforeUntil", locale));
+      return;
+    }
+    // Overlap guard against other bounded periods.
+    for (const r of existingBoundedRanges) {
+      if (from <= r.until && r.from <= until) {
+        setError(t("proAvail.periodOverlap", locale));
+        return;
+      }
+    }
+    onSubmit(from, until);
+  }
+
+  return (
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/50"
+      onClick={(e) => {
+        if (e.target === e.currentTarget) onClose();
+      }}
+    >
+      <div className="mx-4 w-full max-w-sm rounded-xl border border-green-200 bg-white p-6 shadow-2xl">
+        <h3 className="font-display text-lg font-semibold text-green-900">
+          {mode === "add"
+            ? t("proAvail.addPeriod", locale)
+            : t("proAvail.editPeriodDates", locale)}
+        </h3>
+        <div className="mt-4 grid gap-3">
+          <label className="block text-xs font-medium text-green-700">
+            {t("proAvail.periodFrom", locale)}
+            <input
+              type="date"
+              value={from}
+              onChange={(e) => setFrom(e.target.value)}
+              className="mt-1 block w-full rounded-md border border-green-200 bg-white px-3 py-2 text-sm text-green-900 focus:border-green-400 focus:outline-none focus:ring-1 focus:ring-green-400"
+            />
+          </label>
+          <label className="block text-xs font-medium text-green-700">
+            {t("proAvail.periodUntil", locale)}
+            <input
+              type="date"
+              value={until}
+              onChange={(e) => setUntil(e.target.value)}
+              className="mt-1 block w-full rounded-md border border-green-200 bg-white px-3 py-2 text-sm text-green-900 focus:border-green-400 focus:outline-none focus:ring-1 focus:ring-green-400"
+            />
+          </label>
+          {error && <p className="text-xs text-red-600">{error}</p>}
+        </div>
+        <div className="mt-5 flex gap-3">
+          <button
+            type="button"
+            onClick={onClose}
+            className="flex-1 rounded-md border border-green-200 px-4 py-2 text-sm font-medium text-green-700 hover:bg-green-50"
+          >
+            {t("proAvail.cancel", locale)}
+          </button>
+          <button
+            type="button"
+            onClick={submit}
+            className="flex-1 rounded-md bg-green-700 px-4 py-2 text-sm font-medium text-white hover:bg-green-800"
+          >
+            {t("proAvail.save", locale)}
+          </button>
+        </div>
+      </div>
     </div>
   );
 }
@@ -386,33 +874,11 @@ function WeeklyTemplateGrid({
   locale: Locale;
 }) {
   const CELL_H = useCellHeight();
-  const [dirtyLocations, setDirtyLocations] = useState<Set<number>>(new Set());
-  const [saveStatus, setSaveStatus] = useState<"idle" | "saving" | "saved">("idle");
-  const debounceRef = useRef<ReturnType<typeof setTimeout>>(undefined);
-
-  // Auto-save dirty locations after 2s of inactivity
-  useEffect(() => {
-    if (dirtyLocations.size === 0) return;
-    clearTimeout(debounceRef.current);
-    debounceRef.current = setTimeout(() => {
-      setSaveStatus("saving");
-      const locIds = [...dirtyLocations];
-      setDirtyLocations(new Set());
-      (async () => {
-        for (const locId of locIds) {
-          const slots = gridToSlotsForLocation(grid, locId);
-          const result = await saveWeeklyTemplate({ proLocationId: locId, slots });
-          if (result.error) {
-            setSaveStatus("idle");
-            return;
-          }
-        }
-        setSaveStatus("saved");
-        setTimeout(() => setSaveStatus((s) => (s === "saved" ? "idle" : s)), 2000);
-      })();
-    }, 2000);
-    return () => clearTimeout(debounceRef.current);
-  }, [dirtyLocations, grid]);
+  // Auto-save now lives on the parent (`SchedulePeriodsSection`) so the
+  // grid component stays a controlled view: edits go up via
+  // `onGridChange`, the parent debounces and saves the full set of
+  // periods. The grid no longer needs `dirtyLocations` or its own
+  // save-status indicator.
 
   const updateCell = useCallback((day: number, row: number, adding: boolean) => {
     onGridChange(
@@ -428,8 +894,6 @@ function WeeklyTemplateGrid({
           : col.map((cell) => new Set(cell)),
       ),
     );
-    setDirtyLocations((prev) => new Set(prev).add(activeLocationId));
-    setSaveStatus("idle");
   }, [activeLocationId, grid, onGridChange]);
 
   // Anchor for Shift+click range selection on desktop. Stores the last
@@ -507,14 +971,8 @@ function WeeklyTemplateGrid({
             {t("proAvail.weeklyHelp", locale)}
           </p>
         </div>
-        <div className="flex items-center gap-3">
-          {saveStatus === "saving" && (
-            <span className="text-xs text-green-700/50 animate-pulse">{t("proAvail.saving", locale)}</span>
-          )}
-          {saveStatus === "saved" && (
-            <span className="text-xs text-green-600">{t("proAvail.saved", locale)}</span>
-          )}
-        </div>
+        {/* Save status indicator now lives on the period tab strip
+            (parent component) so it covers all periods at once. */}
       </div>
 
       {/* Location brush selector */}
@@ -719,7 +1177,7 @@ function findBlockStart(cells: boolean[][], dayIdx: number, row: number): number
 function PreviewBlockingGrid({
   locations,
   locationColorMap,
-  templateGrid,
+  periods,
   overrides,
   bookings,
   profileSettings,
@@ -727,7 +1185,9 @@ function PreviewBlockingGrid({
 }: {
   locations: SerializedProLocationWithName[];
   locationColorMap: Map<number, number>;
-  templateGrid: LocationGrid;
+  /** All schedule periods. The preview unions every matching period
+   *  per visible day to compute the projected weekly template. */
+  periods: Period[];
   overrides: SerializedOverride[];
   bookings: SerializedBooking[];
   profileSettings: SerializedProfileSettings;
@@ -798,10 +1258,16 @@ function PreviewBlockingGrid({
 
   // ─── Template availability + bookings (read-only background) ──
   const { templateAvailMap, bookingMap } = useMemo(() => {
-    // Map templateGrid (indexed by dayOfWeek 0-6) onto the calendar days
-    const aMap: Set<number>[][] = Array.from({ length: 7 }, (_, dayIdx) =>
-      Array.from({ length: ROWS }, (_, row) => new Set(templateGrid[days[dayIdx].dayOfWeek][row])),
-    );
+    // For each visible day, project the union of every period whose
+    // (validFrom, validUntil) range covers that date. Coexistence
+    // semantics — same as the slot engine in `lesson-slots.ts`.
+    const aMap: Set<number>[][] = Array.from({ length: 7 }, (_, dayIdx) => {
+      const projected = projectGridForDate(periods, days[dayIdx].date);
+      return Array.from(
+        { length: ROWS },
+        (_, row) => new Set(projected[days[dayIdx].dayOfWeek][row]),
+      );
+    });
 
     const bMap: (string | null)[][] = Array.from({ length: 7 }, () =>
       Array<string | null>(ROWS).fill(null),
@@ -817,7 +1283,7 @@ function PreviewBlockingGrid({
     }
 
     return { templateAvailMap: aMap, bookingMap: bMap };
-  }, [days, templateGrid, bookings]);
+  }, [days, periods, bookings, locale]);
 
   // ─── Paint handlers ───────────────────────────────
 
