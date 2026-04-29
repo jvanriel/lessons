@@ -16,8 +16,10 @@ interface ProfileData {
   contactPhone: string | null;
   photoUrl: string | null;
   lessonDurations: number[];
-  /** Per-duration lesson price in EUR (decimal). */
+  /** Per-duration price for the first student in EUR (decimal). */
   lessonPricing: Record<string, number>;
+  /** Per-duration price for each additional student in EUR (decimal). */
+  extraStudentPricing: Record<string, number>;
   maxGroupSize: number;
   bookingEnabled: boolean;
   bookingNotice: number;
@@ -128,6 +130,23 @@ export default function ProProfileEditor({
         ]),
       ),
   );
+  // Per-duration price for each *additional* student in the same lesson
+  // (group-discount mechanism — task 76). Mirrors lessonPricing's pair of
+  // value-state + display-string-state so partial input ("12,5") doesn't
+  // get clobbered by Number round-tripping.
+  const [extraStudentPricing, setExtraStudentPricing] = useState<
+    Record<string, number>
+  >(profile.extraStudentPricing);
+  const [extraStudentPriceInputs, setExtraStudentPriceInputs] = useState<
+    Record<string, string>
+  >(() =>
+    Object.fromEntries(
+      Object.entries(profile.extraStudentPricing).map(([k, v]) => [
+        k,
+        formatPriceInput(v, locale),
+      ]),
+    ),
+  );
   const [maxGroupSize, setMaxGroupSize] = useState(profile.maxGroupSize);
   const [bookingEnabled, setBookingEnabled] = useState(profile.bookingEnabled);
   const [bookingNotice, setBookingNotice] = useState(profile.bookingNotice);
@@ -156,6 +175,18 @@ export default function ProProfileEditor({
         }
       }
       formData.set("lessonPricing", JSON.stringify(pricingCents));
+      // Same conversion + filter for extra-student pricing. Allow zero
+      // (a "free for extra students" tier is intentional copy of the
+      // base pricing model except >0; for extras, 0 means free) — but
+      // skip negative values just in case.
+      const extraCents: Record<string, number> = {};
+      for (const d of lessonDurations) {
+        const eur = extraStudentPricing[String(d)];
+        if (typeof eur === "number" && eur >= 0) {
+          extraCents[String(d)] = Math.round(eur * 100);
+        }
+      }
+      formData.set("extraStudentPricing", JSON.stringify(extraCents));
       formData.set("bookingEnabled", String(bookingEnabled));
       formData.set("bookingNotice", String(bookingNotice));
       formData.set("bookingHorizon", String(bookingHorizon));
@@ -422,9 +453,55 @@ export default function ProProfileEditor({
                       className={inputClass + " pl-7"}
                     />
                   </div>
+                  {/* Per-extra-student rate (task 76). Default 0 = base
+                      rate covers the whole group. */}
+                  <label className="mt-2 block text-xs font-medium text-green-700">
+                    {t("proProfile.extraStudentPrice", locale).replace(
+                      "{n}",
+                      String(d)
+                    )}
+                  </label>
+                  <div className="relative mt-1">
+                    <span className="pointer-events-none absolute inset-y-0 left-3 flex items-center text-sm text-green-500">
+                      €
+                    </span>
+                    <input
+                      type="text"
+                      inputMode="decimal"
+                      value={extraStudentPriceInputs[String(d)] ?? ""}
+                      onChange={(e) => {
+                        const raw = e.target.value;
+                        setExtraStudentPriceInputs((prev) => ({
+                          ...prev,
+                          [String(d)]: raw,
+                        }));
+                        const parsed = parsePriceInput(raw);
+                        setExtraStudentPricing((prev) => {
+                          const next = { ...prev };
+                          if (parsed === null) delete next[String(d)];
+                          else next[String(d)] = parsed;
+                          return next;
+                        });
+                      }}
+                      onBlur={() => {
+                        const v = extraStudentPricing[String(d)];
+                        if (typeof v === "number") {
+                          setExtraStudentPriceInputs((prev) => ({
+                            ...prev,
+                            [String(d)]: formatPriceInput(v, locale),
+                          }));
+                        }
+                      }}
+                      placeholder="0"
+                      className={inputClass + " pl-7"}
+                    />
+                  </div>
                 </div>
               ))}
             </div>
+            <p className="mt-3 text-xs text-green-600">
+              {t("proProfile.extraStudentPriceHint", locale)}
+            </p>
           </div>
 
           <div>

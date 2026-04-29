@@ -27,6 +27,7 @@ import { looksLikeE164, normalizePhone } from "@/lib/phone";
 import { sendEmail } from "@/lib/mail";
 import { after } from "next/server";
 import { excludeDummiesOnProduction } from "@/lib/pro-visibility";
+import { computeBookingPriceCents } from "@/lib/pricing";
 import {
   buildClaimAndVerifyBookingEmail,
   buildNewBookingOnAccountEmail,
@@ -77,6 +78,7 @@ export async function getAllBookablePros() {
       specialties: proProfiles.specialties,
       lessonDurations: proProfiles.lessonDurations,
       lessonPricing: proProfiles.lessonPricing,
+      extraStudentPricing: proProfiles.extraStudentPricing,
       maxGroupSize: proProfiles.maxGroupSize,
       bookingHorizon: proProfiles.bookingHorizon,
       bookingNotice: proProfiles.bookingNotice,
@@ -149,6 +151,7 @@ export async function getPublicPro(proIdStr: string) {
       specialties: proProfiles.specialties,
       lessonDurations: proProfiles.lessonDurations,
       lessonPricing: proProfiles.lessonPricing,
+      extraStudentPricing: proProfiles.extraStudentPricing,
       maxGroupSize: proProfiles.maxGroupSize,
       bookingEnabled: proProfiles.bookingEnabled,
       bookingHorizon: proProfiles.bookingHorizon,
@@ -475,14 +478,15 @@ export async function createPublicBooking(formData: FormData) {
 
   // Price snapshot — informational only on this flow (no charge). We still
   // record it so later "retroactively pay for this lesson" flows have an
-  // authoritative number.
-  const perLessonCents = (
-    pro.lessonPricing as Record<string, number> | null
-  )?.[String(duration)];
-  const priceCents =
-    typeof perLessonCents === "number" && perLessonCents > 0
-      ? perLessonCents * participantCount
-      : null;
+  // authoritative number. Group-rate aware (task 76).
+  const priceCents = computeBookingPriceCents({
+    lessonPricing: pro.lessonPricing as Record<string, number> | null,
+    extraStudentPricing: pro.extraStudentPricing as
+      | Record<string, number>
+      | null,
+    duration,
+    participantCount,
+  });
 
   // ─── User lookup: three-branch logic ──────────────────
   const existing = await db

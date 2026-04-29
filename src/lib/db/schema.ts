@@ -142,12 +142,27 @@ export const proProfiles = pgTable("pro_profiles", {
    */
   pricePerHour: text("price_per_hour"),
   /**
-   * Per-duration lesson price in EUR cents for actual charging.
-   * Keys are duration minutes as strings matching `lessonDurations`,
-   * values are prices in cents. Example: `{ "30": 3500, "60": 6500 }`.
-   * Used by the booking flow to compute the PaymentIntent amount.
+   * Per-duration lesson price in EUR cents for actual charging — for
+   * the *first* student. Keys are duration minutes as strings matching
+   * `lessonDurations`, values are prices in cents. Example:
+   * `{ "30": 3500, "60": 6500 }`. Used by the booking flow to compute
+   * the PaymentIntent amount.
    */
   lessonPricing: jsonb("lesson_pricing")
+    .$type<Record<string, number>>()
+    .notNull()
+    .default({}),
+  /**
+   * Per-duration price for each *additional* student in the same lesson
+   * (group-discount mechanism). Keyed the same way as `lessonPricing`.
+   * Total billed = `lessonPricing[d] + extraStudentPricing[d] * (participantCount - 1)`.
+   *
+   * **Default is zero.** When a duration is missing here, extra students
+   * are billed at 0 — the base rate covers the whole group. Pros who
+   * want to charge per-head set a value; the default reflects the most
+   * common coaching convention (one group lesson, one price).
+   */
+  extraStudentPricing: jsonb("extra_student_pricing")
     .$type<Record<string, number>>()
     .notNull()
     .default({}),

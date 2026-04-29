@@ -18,6 +18,7 @@ const EMPTY_DATA = {
   specialties: "",
   lessonDurations: [60],
   lessonPricing: {} as Record<string, number>,
+  extraStudentPricing: {} as Record<string, number>,
   maxGroupSize: 4,
   cancellationHours: 24,
   bankAccountHolder: "",
@@ -135,6 +136,11 @@ export default async function OnboardingPage() {
         lessonPricing: Object.fromEntries(
           Object.entries(
             (profile.lessonPricing as Record<string, number>) ?? {}
+          ).map(([k, cents]) => [k, cents / 100])
+        ),
+        extraStudentPricing: Object.fromEntries(
+          Object.entries(
+            (profile.extraStudentPricing as Record<string, number>) ?? {}
           ).map(([k, cents]) => [k, cents / 100])
         ),
         maxGroupSize: profile.maxGroupSize,

@@ -45,6 +45,7 @@ import {
 import { getProLocationTimezone } from "@/lib/pro";
 import { updateBookingPreferences } from "@/lib/booking-preferences";
 import { excludeDummiesOnProduction } from "@/lib/pro-visibility";
+import { computeBookingPriceCents } from "@/lib/pricing";
 
 /**
  * Read the UI locale from the cookie (set by the language switcher), not
@@ -414,19 +415,24 @@ export async function createBooking(formData: FormData) {
   const [priceRow] = await db
     .select({
       lessonPricing: proProfiles.lessonPricing,
+      extraStudentPricing: proProfiles.extraStudentPricing,
       allowBookingWithoutPayment: proProfiles.allowBookingWithoutPayment,
       subscriptionStatus: proProfiles.subscriptionStatus,
     })
     .from(proProfiles)
     .where(eq(proProfiles.id, proProfileId))
     .limit(1);
-  const perLessonCents = (priceRow?.lessonPricing as Record<string, number> | null)?.[
-    String(duration)
-  ];
-  const computedPriceCents =
-    typeof perLessonCents === "number" && perLessonCents > 0
-      ? perLessonCents * participantCount
-      : null;
+  // Group-rate aware: base + extra * (count - 1). Falls back to base
+  // for every extra student when the pro hasn't configured a group
+  // rate (preserves pre-task-76 behaviour).
+  const computedPriceCents = computeBookingPriceCents({
+    lessonPricing: priceRow?.lessonPricing as Record<string, number> | null,
+    extraStudentPricing: priceRow?.extraStudentPricing as
+      | Record<string, number>
+      | null,
+    duration,
+    participantCount,
+  });
 
   // Cash-only pros: `allowBookingWithoutPayment=true` means the pro settles
   // with the student offline (cash at the course, bank transfer, whatever).

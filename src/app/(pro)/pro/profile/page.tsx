@@ -49,6 +49,11 @@ export default async function ProProfilePage() {
                 (profile.lessonPricing as Record<string, number>) ?? {}
               ).map(([k, cents]) => [k, cents / 100])
             ),
+            extraStudentPricing: Object.fromEntries(
+              Object.entries(
+                (profile.extraStudentPricing as Record<string, number>) ?? {}
+              ).map(([k, cents]) => [k, cents / 100])
+            ),
             maxGroupSize: profile.maxGroupSize,
             bookingEnabled: profile.bookingEnabled,
             bookingNotice: profile.bookingNotice,

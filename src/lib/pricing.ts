@@ -95,3 +95,34 @@ export function cheapestLessonPrice(
   const minCents = Math.min(...cents);
   return formatPrice(minCents / 100, locale);
 }
+
+/**
+ * Total price for a booking with `participantCount` students at the
+ * given duration, applying the per-duration extra-student rate when
+ * configured.
+ *
+ * Default for an unset extra rate is **zero** — i.e. extra students
+ * cost nothing on top of the base price unless the pro explicitly
+ * sets a per-extra rate. This matches the convention in most coaching
+ * setups (group lesson = base rate, regardless of headcount) and
+ * intentionally diverges from the pre-task-76 behaviour that charged
+ * the full base rate for every participant.
+ *
+ * Returns `null` when the base rate isn't a positive number (treats
+ * the booking as price-not-configured, same as the old code path).
+ */
+export function computeBookingPriceCents(opts: {
+  lessonPricing: Record<string, number> | null | undefined;
+  extraStudentPricing?: Record<string, number> | null;
+  duration: number;
+  participantCount: number;
+}): number | null {
+  const base = opts.lessonPricing?.[String(opts.duration)];
+  if (typeof base !== "number" || base <= 0) return null;
+  const count = Math.max(1, Math.floor(opts.participantCount));
+  if (count === 1) return base;
+  const extraRate = opts.extraStudentPricing?.[String(opts.duration)];
+  const extra =
+    typeof extraRate === "number" && extraRate >= 0 ? extraRate : 0;
+  return base + extra * (count - 1);
+}

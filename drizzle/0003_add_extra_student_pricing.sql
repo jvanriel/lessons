@@ -1,0 +1,1 @@
+ALTER TABLE "pro_profiles" ADD COLUMN "extra_student_pricing" jsonb DEFAULT '{}'::jsonb NOT NULL;

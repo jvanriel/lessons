@@ -84,11 +84,13 @@ export async function POST(request: Request) {
       const {
         lessonDurations,
         lessonPricing,
+        extraStudentPricing,
         maxGroupSize,
         cancellationHours,
       } = data as {
         lessonDurations: number[];
         lessonPricing?: Record<string, number>;
+        extraStudentPricing?: Record<string, number>;
         maxGroupSize: number;
         cancellationHours: number;
       };
@@ -110,11 +112,22 @@ export async function POST(request: Request) {
         );
       }
 
+      // Sanitise extraStudentPricing: zero is valid here (= "free for
+      // each extra", which is the default when missing — see task 76).
+      const cleanedExtra: Record<string, number> = {};
+      for (const [k, v] of Object.entries(extraStudentPricing ?? {})) {
+        if (!validDurations.has(k)) continue;
+        const cents = Math.round(Number(v));
+        if (!Number.isFinite(cents) || cents < 0) continue;
+        cleanedExtra[k] = cents;
+      }
+
       await db
         .update(proProfiles)
         .set({
           lessonDurations: lessonDurations?.length ? lessonDurations : [60],
           lessonPricing: cleanedPricing,
+          extraStudentPricing: cleanedExtra,
           maxGroupSize: maxGroupSize || 4,
           cancellationHours: cancellationHours || 24,
           updatedAt: new Date(),

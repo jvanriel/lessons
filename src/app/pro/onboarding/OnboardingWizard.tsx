@@ -49,6 +49,8 @@ interface InitialData {
   lessonDurations: number[];
   /** Per-duration lesson price in EUR (user-facing, NOT cents). */
   lessonPricing: Record<string, number>;
+  /** Per-duration extra-student rate in EUR. Default 0 = base covers group. */
+  extraStudentPricing: Record<string, number>;
   maxGroupSize: number;
   cancellationHours: number;
   bankAccountHolder: string;
@@ -444,6 +446,14 @@ function LessonsStep({
     });
   }
 
+  function updateExtraPriceForDuration(d: number, value: string) {
+    const n = parsePriceInput(value);
+    if (n === null) return;
+    onChange({
+      extraStudentPricing: { ...data.extraStudentPricing, [String(d)]: n },
+    });
+  }
+
   return (
     <div className="space-y-5">
       <div>
@@ -503,9 +513,42 @@ function LessonsStep({
                   className={inputClass + " pl-7"}
                 />
               </div>
+              {/* Per-extra-student rate (task 76). Default 0 = base rate
+                  covers the whole group. */}
+              <label className="mt-2 block text-xs font-medium text-green-700">
+                {t("proProfile.extraStudentPrice", locale).replace(
+                  "{n}",
+                  String(d)
+                )}
+              </label>
+              <div className="relative mt-1">
+                <span className="pointer-events-none absolute inset-y-0 left-3 flex items-center text-sm text-green-500">
+                  €
+                </span>
+                <input
+                  type="text"
+                  inputMode="decimal"
+                  value={
+                    data.extraStudentPricing[String(d)] !== undefined
+                      ? formatPriceInput(
+                          data.extraStudentPricing[String(d)],
+                          locale,
+                        )
+                      : ""
+                  }
+                  onChange={(e) =>
+                    updateExtraPriceForDuration(d, e.target.value)
+                  }
+                  placeholder="0"
+                  className={inputClass + " pl-7"}
+                />
+              </div>
             </div>
           ))}
         </div>
+        <p className="mt-3 text-xs text-green-600">
+          {t("proProfile.extraStudentPriceHint", locale)}
+        </p>
       </div>
 
       <div>
@@ -1215,9 +1258,17 @@ export default function OnboardingWizard({
             lessonPricingCents[String(d)] = Math.round(eur * 100);
           }
         }
+        const extraStudentPricingCents: Record<string, number> = {};
+        for (const d of data.lessonDurations) {
+          const eur = data.extraStudentPricing[String(d)];
+          if (typeof eur === "number" && eur >= 0) {
+            extraStudentPricingCents[String(d)] = Math.round(eur * 100);
+          }
+        }
         success = await saveStep("lessons", {
           lessonDurations: data.lessonDurations,
           lessonPricing: lessonPricingCents,
+          extraStudentPricing: extraStudentPricingCents,
           maxGroupSize: data.maxGroupSize,
           cancellationHours: data.cancellationHours,
         });

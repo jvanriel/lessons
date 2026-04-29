@@ -62,6 +62,25 @@ export async function updateProProfile(
     }
   } catch {}
 
+  // Per-duration extra-student price in cents (task 76). Same shape as
+  // lessonPricing but **zero is valid** (= "free for extra students",
+  // which is also the default when missing).
+  let extraStudentPricing: Record<string, number> = {};
+  try {
+    const parsed = JSON.parse(
+      (formData.get("extraStudentPricing") as string) ?? "{}"
+    );
+    if (parsed && typeof parsed === "object") {
+      const validDurations = new Set(lessonDurations.map(String));
+      for (const [k, v] of Object.entries(parsed)) {
+        if (!validDurations.has(k)) continue;
+        const cents = Math.round(Number(v));
+        if (!Number.isFinite(cents) || cents < 0) continue;
+        extraStudentPricing[k] = cents;
+      }
+    }
+  } catch {}
+
   if (!displayName) {
     return { error: t("proProfile.err.displayNameRequired", locale) };
   }
@@ -78,6 +97,7 @@ export async function updateProProfile(
       contactPhone,
       lessonDurations,
       lessonPricing,
+      extraStudentPricing,
       maxGroupSize,
       bookingEnabled,
       bookingNotice,
