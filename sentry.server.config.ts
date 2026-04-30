@@ -12,8 +12,8 @@ Sentry.init({
   // Environment tag based on Vercel
   environment: process.env.VERCEL_ENV || "development",
 
-  // Don't crash if no DSN in dev
-  enabled: !!process.env.NEXT_PUBLIC_SENTRY_DSN,
+  // Only report from Vercel deployments — local dev errors stay in the terminal
+  enabled: !!process.env.NEXT_PUBLIC_SENTRY_DSN && !!process.env.VERCEL_ENV,
 
   // Release = git commit SHA from Vercel
   release: process.env.VERCEL_GIT_COMMIT_SHA,

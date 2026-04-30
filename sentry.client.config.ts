@@ -13,5 +13,7 @@ Sentry.init({
   sendDefaultPii: true,
 
   environment: process.env.NEXT_PUBLIC_VERCEL_ENV || "development",
-  enabled: !!process.env.NEXT_PUBLIC_SENTRY_DSN,
+  enabled:
+    !!process.env.NEXT_PUBLIC_SENTRY_DSN &&
+    !!process.env.NEXT_PUBLIC_VERCEL_ENV,
 });

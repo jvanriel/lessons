@@ -7,6 +7,6 @@ Sentry.init({
   sendDefaultPii: true,
 
   environment: process.env.VERCEL_ENV || "development",
-  enabled: !!process.env.NEXT_PUBLIC_SENTRY_DSN,
+  enabled: !!process.env.NEXT_PUBLIC_SENTRY_DSN && !!process.env.VERCEL_ENV,
   release: process.env.VERCEL_GIT_COMMIT_SHA,
 });
