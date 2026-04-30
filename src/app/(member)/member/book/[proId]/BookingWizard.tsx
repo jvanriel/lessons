@@ -289,11 +289,19 @@ export function BookingWizard({
 
       {/* Location — always shown so a single-location pro's address
           is visible to the student too (task 49). Single-location is
-          rendered as a passive chip. */}
+          rendered as a passive chip and the label stays a noun
+          ("Locatie"); with multiple options the label switches to an
+          imperative ("Kies de locatie") to make the action obvious
+          (task 42). */}
       {locations.length > 0 && (
         <div className="mt-8">
           <label className="block text-sm font-medium text-green-800">
-            {t("publicBook.location", locale)}
+            {t(
+              locations.length > 1
+                ? "publicBook.locationPick"
+                : "publicBook.location",
+              locale,
+            )}
           </label>
           <div className="mt-2 grid gap-2">
             {locations.map((l) => {
@@ -332,12 +340,18 @@ export function BookingWizard({
         </div>
       )}
 
-      {/* Duration — always shown; single-duration renders as a single
-          passive chip for symmetry with the location row. */}
+      {/* Duration — always shown; single-duration renders as a
+          passive chip with a noun label ("Duur"), multi switches to
+          imperative ("Kies de lesduur") (task 42). */}
       {locationId && pro.lessonDurations.length > 0 && (
         <div className="mt-6">
           <label className="block text-sm font-medium text-green-800">
-            {t("publicBook.duration", locale)}
+            {t(
+              pro.lessonDurations.length > 1
+                ? "publicBook.durationPick"
+                : "publicBook.duration",
+              locale,
+            )}
           </label>
           <div className="mt-2 flex flex-wrap gap-2">
             {pro.lessonDurations.map((d) => {

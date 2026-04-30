@@ -550,11 +550,18 @@ export default function PublicBookingWizard({
       </div>
 
       {/* Step 1: Location — always shown so a single-location pro's
-          address is visible to the student too (task 49). */}
+          address is visible to the student too (task 49). Label is
+          imperative when there's a real choice, noun otherwise
+          (task 42). */}
       {pro.locations.length > 0 && (
         <div className="mt-8">
           <label className="block text-sm font-medium text-green-800">
-            {t("publicBook.location", locale)}
+            {t(
+              pro.locations.length > 1
+                ? "publicBook.locationPick"
+                : "publicBook.location",
+              locale,
+            )}
           </label>
           <div className="mt-2 grid gap-2">
             {pro.locations.map((l) => {
@@ -588,7 +595,12 @@ export default function PublicBookingWizard({
       {locationId && pro.lessonDurations.length > 0 && (
         <div className="mt-6">
           <label className="block text-sm font-medium text-green-800">
-            {t("publicBook.duration", locale)}
+            {t(
+              pro.lessonDurations.length > 1
+                ? "publicBook.durationPick"
+                : "publicBook.duration",
+              locale,
+            )}
           </label>
           <div className="mt-2 flex flex-wrap gap-2">
             {pro.lessonDurations.map((d) => {
