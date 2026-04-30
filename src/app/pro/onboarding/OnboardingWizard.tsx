@@ -574,9 +574,15 @@ function LessonsStep({
         <input
           type="number"
           value={data.cancellationHours}
-          onChange={(e) =>
-            onChange({ cancellationHours: parseInt(e.target.value) || 24 })
-          }
+          onChange={(e) => {
+            // 0 is a valid value here ("no free-cancel window") so
+            // can't use `parseInt(...) || 24` — that'd coerce 0 to
+            // 24 and the user could never set it to zero.
+            const n = parseInt(e.target.value, 10);
+            onChange({
+              cancellationHours: Number.isFinite(n) && n >= 0 ? n : 24,
+            });
+          }}
           min="0"
           max="168"
           className={inputClass + " max-w-[200px]"}

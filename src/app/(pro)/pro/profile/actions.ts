@@ -8,6 +8,16 @@ import { getSession, hasRole } from "@/lib/auth";
 import { getLocale } from "@/lib/locale";
 import { t } from "@/lib/i18n/translations";
 
+// Parse an integer where 0 is a legitimate value. The naive
+// `parseInt(x) || fallback` pattern coerces "0" → fallback because
+// `0 || 24 === 24`. Used for `cancellationHours` (0 = "no free
+// cancel window, every cancel is late, no refund") and
+// `bookingNotice` (0 = "students can book up to lesson start").
+function parseIntZeroOk(input: string, fallback: number): number {
+  const n = parseInt(input, 10);
+  return Number.isFinite(n) && n >= 0 ? n : fallback;
+}
+
 export async function updateProProfile(
   _prev: { error?: string; success?: boolean } | null,
   formData: FormData
@@ -32,9 +42,9 @@ export async function updateProProfile(
   const contactPhone = (formData.get("contactPhone") as string)?.trim() || null;
   const maxGroupSize = parseInt(formData.get("maxGroupSize") as string) || 4;
   const bookingEnabled = formData.get("bookingEnabled") === "true";
-  const bookingNotice = parseInt(formData.get("bookingNotice") as string) || 24;
+  const bookingNotice = parseIntZeroOk(formData.get("bookingNotice") as string, 24);
   const bookingHorizon = parseInt(formData.get("bookingHorizon") as string) || 60;
-  const cancellationHours = parseInt(formData.get("cancellationHours") as string) || 24;
+  const cancellationHours = parseIntZeroOk(formData.get("cancellationHours") as string, 24);
   const allowBookingWithoutPayment = formData.get("allowBookingWithoutPayment") === "true";
 
   let lessonDurations: number[] = [60];
