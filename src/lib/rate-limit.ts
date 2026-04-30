@@ -13,9 +13,15 @@ const redis = new Redis({
 // Each limiter is a separate keyspace prefixed with its name.
 // Sliding window — harder to game than fixed window at the boundary.
 
+// Bumped 3 → 10/h after Nadine's task 22 retest: hitting the cap on
+// every typo-cycle was painful (3 password-confirm mismatches and
+// you're locked out for an hour). Calling code now also defers the
+// rate-limit check until *after* shape/format validation, so the only
+// attempts that count are ones that genuinely reached the user-
+// creation step.
 export const registerLimiter = new Ratelimit({
   redis,
-  limiter: Ratelimit.slidingWindow(3, "1 h"),
+  limiter: Ratelimit.slidingWindow(10, "1 h"),
   prefix: "rl:register",
   analytics: true,
 });

@@ -228,14 +228,9 @@ export async function POST(req: NextRequest) {
   }
 
   // ─── CREATE PATH ──────────────────────────────────────────
-  const limit = await limitByIp(registerLimiter);
-  if (!limit.ok) {
-    return NextResponse.json(
-      { error: "rate-limited", retryAfter: limit.retryAfter },
-      { status: 429 },
-    );
-  }
-
+  // Validate the password fields *before* burning a rate-limit slot
+  // (task 22 — Nadine got locked out after a few mismatched-password
+  // typo cycles during pro registration).
   if (!password) {
     return NextResponse.json({ error: "password-required" }, { status: 400 });
   }
@@ -244,6 +239,14 @@ export async function POST(req: NextRequest) {
   }
   if (password !== confirm) {
     return NextResponse.json({ error: "passwords-dont-match" }, { status: 400 });
+  }
+
+  const limit = await limitByIp(registerLimiter);
+  if (!limit.ok) {
+    return NextResponse.json(
+      { error: "rate-limited", retryAfter: limit.retryAfter },
+      { status: 429 },
+    );
   }
 
   const [existing] = await db

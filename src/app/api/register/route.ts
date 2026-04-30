@@ -8,6 +8,7 @@ import { createNotification } from "@/lib/notifications";
 import { sendEmail } from "@/lib/mail";
 import { emailLayout, formatGreeting, getEmailStrings } from "@/lib/email-templates";
 import { resolveLocale } from "@/lib/i18n";
+import { t } from "@/lib/i18n/translations";
 import { limitByIp, registerLimiter } from "@/lib/rate-limit";
 
 function getSecret() {
@@ -17,14 +18,6 @@ function getSecret() {
 }
 
 export async function POST(request: Request) {
-  const limit = await limitByIp(registerLimiter);
-  if (!limit.ok) {
-    return NextResponse.json(
-      { error: `Too many registration attempts. Try again in ${limit.retryAfter}s.` },
-      { status: 429, headers: { "Retry-After": String(limit.retryAfter) } }
-    );
-  }
-
   const formData = await request.formData();
 
   const firstName = (formData.get("firstName") as string)?.trim();
@@ -34,17 +27,36 @@ export async function POST(request: Request) {
   const password = formData.get("password") as string;
   const confirm = formData.get("confirmPassword") as string;
   const preferredLocaleRaw = (formData.get("preferredLocale") as string) || "";
+  const locale = resolveLocale(preferredLocaleRaw);
 
+  // Form-shape validation runs before the rate-limit so a mismatched
+  // password (or any other client-side typo) doesn't burn slots —
+  // task 22 retest from Nadine: getting locked out after 3 typo-fix
+  // cycles was the actual bug, not the protection itself. The
+  // limiter still fires before we hit the DB / send mail.
   if (!firstName || !lastName || !email || !password) {
-    return NextResponse.json({ error: "All fields are required." }, { status: 400 });
+    return NextResponse.json({ error: t("authErr.allFieldsRequired", locale) }, { status: 400 });
   }
 
   if (password.length < 8) {
-    return NextResponse.json({ error: "Password must be at least 8 characters." }, { status: 400 });
+    return NextResponse.json({ error: t("authErr.passwordTooShort", locale) }, { status: 400 });
   }
 
   if (password !== confirm) {
-    return NextResponse.json({ error: "Passwords do not match." }, { status: 400 });
+    return NextResponse.json({ error: t("authErr.passwordsDontMatch", locale) }, { status: 400 });
+  }
+
+  const limit = await limitByIp(registerLimiter);
+  if (!limit.ok) {
+    return NextResponse.json(
+      {
+        error: t("authErr.tooManyAttempts", locale).replace(
+          "{n}",
+          String(limit.retryAfter),
+        ),
+      },
+      { status: 429, headers: { "Retry-After": String(limit.retryAfter) } }
+    );
   }
 
   const [existing] = await db
@@ -54,7 +66,10 @@ export async function POST(request: Request) {
     .limit(1);
 
   const hashed = await hashPassword(password);
-  const preferredLocale = resolveLocale(preferredLocaleRaw);
+  // `preferredLocale` mirrors `locale` from above and is what the
+  // user's row stores. Kept as a separate name so the schema-facing
+  // call sites read clearly.
+  const preferredLocale = locale;
   let userId: number;
 
   // An existing row is "claimable" if it has no password set — that's
@@ -71,7 +86,7 @@ export async function POST(request: Request) {
     await db.update(users).set({ firstName, lastName, phone, password: hashed, roles: "member", preferredLocale }).where(eq(users.id, existing.id));
     userId = existing.id;
   } else if (existing) {
-    return NextResponse.json({ error: "An account with this email already exists." }, { status: 400 });
+    return NextResponse.json({ error: t("authErr.emailExists", locale) }, { status: 400 });
   } else {
     const inserted = await db.insert(users).values({ firstName, lastName, email, phone, password: hashed, roles: "member", preferredLocale }).returning({ id: users.id });
     userId = inserted[0].id;
@@ -88,7 +103,6 @@ export async function POST(request: Request) {
     metadata: { userId, email, accountType: "student" },
   }).catch(() => {});
 
-  const locale = preferredLocale;
   // Welcome email deliberately skipped for students — the richer
   // post-onboarding confirmation (see api/member/onboarding) doubles as
   // the registration acknowledgement. Sending both made students receive
