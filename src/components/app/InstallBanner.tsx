@@ -1,6 +1,8 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import type { Locale } from "@/lib/i18n";
+import { t } from "@/lib/i18n/translations";
 
 interface BeforeInstallPromptEvent extends Event {
   prompt: () => Promise<void>;
@@ -22,7 +24,7 @@ function isStandalone(): boolean {
   return window.matchMedia("(display-mode: standalone)").matches;
 }
 
-export default function InstallBanner() {
+export default function InstallBanner({ locale }: { locale: Locale }) {
   const [prompt, setPrompt] = useState<BeforeInstallPromptEvent | null>(null);
   const [visible, setVisible] = useState(false);
 
@@ -114,22 +116,22 @@ export default function InstallBanner() {
         </div>
         <div className="min-w-0 flex-1">
           <p className="text-sm font-medium text-green-950">
-            Install Golf Lessons
+            {t("installBanner.title", locale)}
           </p>
           <p className="text-xs text-green-600">
-            Add to your home screen for a faster experience.
+            {t("installBanner.subtitle", locale)}
           </p>
         </div>
         <button
           onClick={handleInstall}
           className="shrink-0 rounded-md bg-gold-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-gold-500"
         >
-          Install
+          {t("installBanner.cta", locale)}
         </button>
         <button
           onClick={handleDismiss}
           className="shrink-0 rounded p-1 text-green-400 hover:bg-green-50 hover:text-green-600"
-          aria-label="Dismiss"
+          aria-label={t("installBanner.dismiss", locale)}
         >
           <svg
             className="h-4 w-4"

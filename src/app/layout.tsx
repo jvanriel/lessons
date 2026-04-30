@@ -104,8 +104,12 @@ export default async function RootLayout({
     }
   }
 
+  // Resolve the user's preferred locale once for the whole layout so
+  // it's available to both the authenticated shell and unauthenticated
+  // chrome (e.g. <InstallBanner /> shown on every page).
+  const locale = await getLocale();
+
   if (isAppMode && session) {
-    const locale = await getLocale();
     // All authenticated users get notifications
     const showNotifications = true;
 
@@ -222,7 +226,7 @@ export default async function RootLayout({
             </>
           )}
         </CmsProvider>
-        <InstallBanner />
+        <InstallBanner locale={locale} />
         <DeploymentChecker />
         <Script id="pwa-bootstrap" strategy="afterInteractive">
           {`if('serviceWorker' in navigator){navigator.serviceWorker.register('/sw.js')}
