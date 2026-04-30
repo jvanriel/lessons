@@ -68,7 +68,14 @@ export function CancelBookingButton({
 
   return (
     <div className="flex flex-col items-end gap-1">
-      {lateCancel && confirming && (
+      {/* Persistent warning when the deadline is past. Nadine
+          flagged the previous behavior where this text only
+          appeared after a first click and disappeared on
+          navigation — the user lost the "no refund" cue and saw
+          only the button. Showing the note unconditionally when
+          the deadline has passed makes the cost-of-cancel obvious
+          before the user even clicks (task 37). */}
+      {lateCancel && (
         <span className="max-w-[22rem] text-right text-xs text-green-600">
           {t("memberBookings.cancelNoRefundNote", locale)}
         </span>

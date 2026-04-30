@@ -3,6 +3,7 @@
 import { useState, useRef, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { cancelBooking } from "../bookings/actions";
+import { checkCancellationAllowed } from "@/lib/lesson-slots";
 import { t } from "@/lib/i18n/translations";
 import type { Locale } from "@/lib/i18n";
 import { formatDate } from "@/lib/format-date";
@@ -12,6 +13,7 @@ interface Props {
   date: string;
   startTime: string;
   proName: string;
+  cancellationHours: number;
   locale: Locale;
 }
 
@@ -20,6 +22,7 @@ export function CancelBookingButton({
   date,
   startTime,
   proName,
+  cancellationHours,
   locale,
 }: Props) {
   const router = useRouter();
@@ -27,6 +30,12 @@ export function CancelBookingButton({
   const [open, setOpen] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const backdropRef = useRef<HTMLDivElement>(null);
+
+  // Late-cancel detection — same logic as the bookings list page so
+  // the dashboard's quick cancel button doesn't silently let a
+  // student into the no-refund branch without warning them (task 37).
+  const check = checkCancellationAllowed(date, startTime, cancellationHours, "confirmed");
+  const lateCancel = !check.canCancel;
 
   function handleCancel() {
     setError(null);
@@ -47,7 +56,9 @@ export function CancelBookingButton({
         onClick={() => setOpen(true)}
         className="text-xs text-red-400 hover:text-red-600"
       >
-        {t("bookings.cancelLink", locale)}
+        {lateCancel
+          ? t("memberBookings.cancelNoRefund", locale)
+          : t("bookings.cancelLink", locale)}
       </button>
 
       {open && (
@@ -76,6 +87,12 @@ export function CancelBookingButton({
               {t("bookings.cancelConfirmAt", locale)}{" "}
               <span className="font-medium text-green-800">{startTime}</span>?
             </p>
+
+            {lateCancel && (
+              <p className="mt-3 rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800">
+                {t("memberBookings.cancelNoRefundNote", locale)}
+              </p>
+            )}
 
             {error && (
               <div className="mt-3 rounded-md border border-red-200 bg-red-50 px-3 py-2 text-xs text-red-700">

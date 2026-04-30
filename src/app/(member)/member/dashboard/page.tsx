@@ -48,6 +48,7 @@ export default async function MemberDashboard() {
       proName: proProfiles.displayName,
       proId: proProfiles.id,
       locationName: locations.name,
+      cancellationHours: proProfiles.cancellationHours,
     })
     .from(lessonBookings)
     .innerJoin(proProfiles, eq(lessonBookings.proProfileId, proProfiles.id))
@@ -286,6 +287,7 @@ export default async function MemberDashboard() {
                   date={booking.date}
                   startTime={booking.startTime}
                   proName={booking.proName}
+                  cancellationHours={booking.cancellationHours}
                 />
               </div>
             ))}
