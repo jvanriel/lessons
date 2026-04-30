@@ -866,6 +866,11 @@ export interface QuickBookData {
   suggestedSlot: { startTime: string; endTime: string } | null;
   alternativeSlots: { startTime: string; endTime: string }[];
   alternativeDates: string[];
+  // Full list of available dates from today through the pro's
+  // bookingHorizon — used by the QuickBook arrows to step through
+  // every available day, in either direction, regardless of which
+  // interval pill is active (task 35).
+  availableDates: string[];
 }
 
 /**
@@ -980,23 +985,33 @@ export async function getQuickBookData(
     lastBooking?.date ?? null
   );
 
-  // Batch-fetch availability data once for the full 4-week window,
-  // then compute slots in-memory per date (avoids N+1 DB round-trips)
+  // Batch-fetch availability data once across the full booking
+  // horizon (task 35: arrows need to step backwards from an
+  // interval-jumped suggested date too, so we can't anchor the
+  // window on `suggestedDate`). Filtered in-memory per date below
+  // to avoid N+1 round-trips.
   const tz = await getProLocationTimezone(rel.preferredLocationId);
   const now = new Date();
-  const windowStart = suggestedDate;
-  const windowEnd = addDaysToDateString(suggestedDate, 28);
+  const windowStart = todayInTZ(tz);
 
-  const [proSettings, templateRows, overrideRows, bookingRows] =
+  // Read pro settings first so we know the booking horizon for the
+  // window of overrides/bookings to fetch.
+  const [proSettingsRow] = await db
+    .select({
+      bookingNotice: proProfiles.bookingNotice,
+      cancellationHours: proProfiles.cancellationHours,
+      bookingHorizon: proProfiles.bookingHorizon,
+    })
+    .from(proProfiles)
+    .where(eq(proProfiles.id, proProfileId))
+    .limit(1);
+  const bookingNotice = proSettingsRow?.bookingNotice ?? 0;
+  const cancellationHours = proSettingsRow?.cancellationHours ?? 0;
+  const bookingHorizon = proSettingsRow?.bookingHorizon ?? 60;
+  const windowEnd = addDaysToDateString(windowStart, bookingHorizon);
+
+  const [templateRows, overrideRows, bookingRows] =
     await Promise.all([
-      db
-        .select({
-          bookingNotice: proProfiles.bookingNotice,
-          cancellationHours: proProfiles.cancellationHours,
-        })
-        .from(proProfiles)
-        .where(eq(proProfiles.id, proProfileId))
-        .limit(1),
       db
         .select({
           dayOfWeek: proAvailability.dayOfWeek,
@@ -1046,9 +1061,6 @@ export async function getQuickBookData(
         ),
     ]);
 
-  const bookingNotice = proSettings[0]?.bookingNotice ?? 0;
-  const cancellationHours = proSettings[0]?.cancellationHours ?? 0;
-
   // Normalize date values from DB (may be Date objects — driver anchors
   // `date` columns to UTC midnight — or timezone-shifted ISO strings).
   // Reading UTC fields keeps the answer stable across server TZs.
@@ -1085,25 +1097,42 @@ export async function getQuickBookData(
     );
   }
 
-  // Collect dates with available slots — suggested date first, then scan forward
+  // Scan the full booking horizon once and remember every date that
+  // has at least one open slot. The arrows in QuickBook step through
+  // this list in either direction, so going back to "today + 3" from
+  // an interval-jumped "today + 7" works without a second round-trip
+  // (task 35).
+  const availableDates: string[] = [];
+  let scanDate = windowStart;
+  while (scanDate <= windowEnd) {
+    if (slotsForDate(scanDate).length > 0) {
+      availableDates.push(scanDate);
+    }
+    scanDate = addDaysToDateString(scanDate, 1);
+  }
+
+  // suggestedDate may itself be unavailable (templates changed,
+  // pro is on holiday, etc.). Find the closest available date
+  // ≥ suggestedDate; if none, fall back to the closest one before.
   let bestDate = suggestedDate;
   let bestSlots = slotsForDate(suggestedDate);
-  const alternativeDates: string[] = [];
-  let dateStr = suggestedDate;
-
-  for (let i = 0; i < 28 && alternativeDates.length < 4; i++) {
-    dateStr = addDaysToDateString(dateStr, 1);
-    const daySlots = slotsForDate(dateStr);
-    if (daySlots.length > 0) {
-      alternativeDates.push(dateStr);
+  if (bestSlots.length === 0) {
+    const after = availableDates.find((d) => d >= suggestedDate);
+    if (after) {
+      bestDate = after;
+      bestSlots = slotsForDate(bestDate);
+    } else if (availableDates.length > 0) {
+      bestDate = availableDates[availableDates.length - 1];
+      bestSlots = slotsForDate(bestDate);
     }
   }
 
-  // If suggested date has no slots, promote the first alternative
-  if (bestSlots.length === 0 && alternativeDates.length > 0) {
-    bestDate = alternativeDates.shift()!;
-    bestSlots = slotsForDate(bestDate);
-  }
+  // Forward-window of alternatives kept for backward-compat with any
+  // caller that reads it. The QuickBook UI now derives its visible
+  // pill window from `availableDates` instead.
+  const alternativeDates = availableDates
+    .filter((d) => d > bestDate)
+    .slice(0, 4);
 
   const suggestedSlot =
     bestSlots.find((s) => s.startTime === rel.preferredTime) ??
@@ -1126,6 +1155,7 @@ export async function getQuickBookData(
       (s) => s.startTime !== suggestedSlot?.startTime
     ),
     alternativeDates,
+    availableDates,
   };
 }
 

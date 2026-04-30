@@ -256,93 +256,113 @@ export function QuickBook({ data, proId, hasPaymentMethod = true, allowBookingWi
         </div>
       )}
 
-      {/* Date pills with arrows */}
-          <div className="mb-3 flex items-center gap-1">
-            <button
-              type="button"
-              onClick={() => {
-                const allDates = [data.suggestedDate, ...data.alternativeDates.filter((d) => d !== data.suggestedDate)];
-                const idx = allDates.indexOf(selectedDate);
-                if (idx > 0) {
-                  switchDate(allDates[idx - 1]);
-                  return;
-                }
-                // First pill + active interval: treat left-arrow as "undo
-                // the forward jump" — clear the interval so the server
-                // recomputes a near-term suggestion that exposes earlier
-                // available dates (task 35).
-                if (interval) {
-                  setInterval(null);
-                  startTransition(async () => {
-                    await updatePreferredInterval(data.proStudentId, null);
-                    router.refresh();
-                  });
-                }
-              }}
-              className="shrink-0 rounded p-0.5 text-green-400 hover:text-green-700 disabled:opacity-30"
-              disabled={selectedDate === data.suggestedDate && !interval}
-            >
-              <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                <path strokeLinecap="round" strokeLinejoin="round" d="M15 19l-7-7 7-7" />
-              </svg>
-            </button>
-            <div className="flex flex-1 gap-1.5 overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
-              {[data.suggestedDate, ...data.alternativeDates.filter((d) => d !== data.suggestedDate)].map((d, idx) => (
+      {/* Date pills with arrows. The arrows step `selectedDate`
+          through the full `availableDates` list (every day with at
+          least one open slot within the booking horizon), in either
+          direction — Nadine's mental model from task 35 retest:
+          "Via de pijltjes kan ik klikken van beschikbare dag naar
+          beschikbare dag binnen de boekingshorizon."
+
+          The pills below render a sliding window of 5 dates around
+          the selection so an interval-jumped suggested date still
+          shows context on both sides. Pressing left arrow on
+          today+7 (after "Over een week") now navigates back to
+          today+6/+5/etc. instead of clearing the interval. */}
+          {(() => {
+            const all = data.availableDates;
+            const selectedIdx = Math.max(0, all.indexOf(selectedDate));
+            // 5-pill window centered on the selection, clamped to
+            // the list bounds.
+            const WINDOW = 5;
+            let start = selectedIdx - Math.floor(WINDOW / 2);
+            if (start < 0) start = 0;
+            let end = start + WINDOW;
+            if (end > all.length) {
+              end = all.length;
+              start = Math.max(0, end - WINDOW);
+            }
+            const visible = all.slice(start, end);
+            return (
+              <div className="mb-3 flex items-center gap-1">
                 <button
-                  key={d}
-                  ref={(el) => {
-                    if (el) pillRefs.current.set(d, el);
-                    else pillRefs.current.delete(d);
+                  type="button"
+                  onClick={() => {
+                    if (selectedIdx > 0) switchDate(all[selectedIdx - 1]);
                   }}
-                  onPointerDown={() => {
-                    dateHoldTimer.current = setTimeout(() => {
-                      dateHoldTimer.current = null;
-                      startTransition(async () => {
-                        const prefDay = formatDateLocale(data.suggestedDate, locale, { weekday: "long" });
-                        const result = await explainDateSlots(data.proProfileId, data.locationId, d, data.duration, idx === 0, false, prefDay, interval);
-                        setExplanation(result);
-                      });
-                    }, 600);
-                  }}
-                  onPointerUp={() => {
-                    if (dateHoldTimer.current) {
-                      clearTimeout(dateHoldTimer.current);
-                      dateHoldTimer.current = null;
-                      switchDate(d);
-                    }
-                  }}
-                  onPointerLeave={() => {
-                    if (dateHoldTimer.current) {
-                      clearTimeout(dateHoldTimer.current);
-                      dateHoldTimer.current = null;
-                    }
-                  }}
-                  onContextMenu={(e) => e.preventDefault()}
-                  className={`shrink-0 rounded-lg px-2.5 py-1 text-center transition-colors select-none ${
-                    selectedDate === d
-                      ? "bg-gold-600 text-white"
-                      : "bg-green-50 text-green-700 hover:bg-green-100"
-                  }`}
+                  className="shrink-0 rounded p-0.5 text-green-400 hover:text-green-700 disabled:opacity-30"
+                  disabled={selectedIdx <= 0}
                 >
-                  <div className="text-[10px] font-medium leading-tight">{formatDatePillDay(d)}</div>
-                  <div className="text-[10px] leading-tight">{formatDatePillDate(d)}</div>
+                  <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M15 19l-7-7 7-7" />
+                  </svg>
                 </button>
-              ))}
-            </div>
-            <button
-              type="button"
-              onClick={() => {
-                const allDates = [data.suggestedDate, ...data.alternativeDates.filter((d) => d !== data.suggestedDate)];
-                const idx = allDates.indexOf(selectedDate);
-                if (idx < allDates.length - 1) switchDate(allDates[idx + 1]);
-              }}
-              className="shrink-0 rounded p-0.5 text-green-400 hover:text-green-700"
-            >
-              <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
-              </svg>
-            </button>
-          </div>
+                <div className="flex flex-1 gap-1.5 overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+                  {visible.map((d) => (
+                    <button
+                      key={d}
+                      ref={(el) => {
+                        if (el) pillRefs.current.set(d, el);
+                        else pillRefs.current.delete(d);
+                      }}
+                      onPointerDown={() => {
+                        dateHoldTimer.current = setTimeout(() => {
+                          dateHoldTimer.current = null;
+                          startTransition(async () => {
+                            const prefDay = formatDateLocale(data.suggestedDate, locale, { weekday: "long" });
+                            const result = await explainDateSlots(
+                              data.proProfileId,
+                              data.locationId,
+                              d,
+                              data.duration,
+                              d === data.suggestedDate,
+                              false,
+                              prefDay,
+                              interval,
+                            );
+                            setExplanation(result);
+                          });
+                        }, 600);
+                      }}
+                      onPointerUp={() => {
+                        if (dateHoldTimer.current) {
+                          clearTimeout(dateHoldTimer.current);
+                          dateHoldTimer.current = null;
+                          switchDate(d);
+                        }
+                      }}
+                      onPointerLeave={() => {
+                        if (dateHoldTimer.current) {
+                          clearTimeout(dateHoldTimer.current);
+                          dateHoldTimer.current = null;
+                        }
+                      }}
+                      onContextMenu={(e) => e.preventDefault()}
+                      className={`shrink-0 rounded-lg px-2.5 py-1 text-center transition-colors select-none ${
+                        selectedDate === d
+                          ? "bg-gold-600 text-white"
+                          : "bg-green-50 text-green-700 hover:bg-green-100"
+                      }`}
+                    >
+                      <div className="text-[10px] font-medium leading-tight">{formatDatePillDay(d)}</div>
+                      <div className="text-[10px] leading-tight">{formatDatePillDate(d)}</div>
+                    </button>
+                  ))}
+                </div>
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (selectedIdx < all.length - 1) switchDate(all[selectedIdx + 1]);
+                  }}
+                  className="shrink-0 rounded p-0.5 text-green-400 hover:text-green-700 disabled:opacity-30"
+                  disabled={selectedIdx >= all.length - 1}
+                >
+                  <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
+                  </svg>
+                </button>
+              </div>
+            );
+          })()}
 
           {/* Time slots — hold any slot to book */}
           {isPending && slots.length === 0 ? (
