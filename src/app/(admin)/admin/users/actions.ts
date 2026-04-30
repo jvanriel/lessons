@@ -6,7 +6,12 @@ import { users, userEmails, proProfiles, lessonBookings, proStudents } from "@/l
 import { eq, and, gte } from "drizzle-orm";
 import { getSession, hasRole, hashPassword } from "@/lib/auth";
 import { sendEmail } from "@/lib/mail";
-import { buildInviteEmail, buildPasswordResetEmail, getEmailStrings } from "@/lib/email-templates";
+import {
+  buildInviteEmail,
+  buildPasswordResetEmail,
+  formatGreeting,
+  getEmailStrings,
+} from "@/lib/email-templates";
 import { resolveLocale } from "@/lib/i18n";
 import { ensureProProfile, normalizeRoles } from "@/lib/pro";
 import { formatLocalDate } from "@/lib/local-date";
@@ -644,7 +649,7 @@ export async function activateAsPro(
 
   const body = `
     <h2 style="font-family:Georgia,'Times New Roman',serif;font-size:22px;color:#091a12;margin:0 0 16px 0;font-weight:normal;">
-      ${(getEmailStrings(locale)).inviteGreeting} ${user.firstName},
+      ${formatGreeting(getEmailStrings(locale).inviteGreeting, user.firstName, locale)}
     </h2>
     <p style="margin:0 0 16px 0;">${s.body}</p>
     <p style="margin:0 0 24px 0;color:#555;">${s.note}</p>

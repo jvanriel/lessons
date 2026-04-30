@@ -108,6 +108,20 @@ export function getEmailStrings(locale: Locale) {
   return EMAIL_STRINGS[locale] ?? EMAIL_STRINGS.en;
 }
 
+/**
+ * Locale-aware greeting line. Dutch (per het Groene Boekje) does NOT
+ * place a comma after the salutation; English and French do. Returns
+ * the full "Hallo Jan" / "Hi Jan," / "Bonjour Jan," string.
+ */
+export function formatGreeting(
+  greeting: string,
+  firstName: string,
+  locale: Locale,
+): string {
+  const punct = locale === "nl" ? "" : ",";
+  return `${greeting} ${firstName}${punct}`;
+}
+
 /** Diamond divider motif — mirrors the site's ── ◆ ── pattern. */
 function diamondDivider(color = COLORS.muted) {
   return `
@@ -248,7 +262,7 @@ export function buildInviteEmail(opts: {
 
   const body = `
     <h2 style="font-family:Georgia,'Times New Roman',serif;font-size:22px;color:${COLORS.green950};margin:0 0 16px 0;font-weight:normal;">
-      ${s.inviteGreeting} ${opts.firstName},
+      ${formatGreeting(s.inviteGreeting, opts.firstName, opts.locale)}
     </h2>
     <p style="margin:0 0 20px 0;">${s.inviteBody}</p>
     <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:${COLORS.green100};border:1px solid #b4d6c1;border-radius:8px;margin:0 0 20px 0;">
@@ -290,7 +304,7 @@ export function buildPasswordResetEmail(opts: {
 
   const body = `
     <h2 style="font-family:Georgia,'Times New Roman',serif;font-size:22px;color:${COLORS.green950};margin:0 0 16px 0;font-weight:normal;">
-      ${s.inviteGreeting} ${opts.firstName},
+      ${formatGreeting(s.inviteGreeting, opts.firstName, opts.locale)}
     </h2>
     <p style="margin:0 0 20px 0;">${s.resetBody}</p>
     <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:${COLORS.green100};border:1px solid #b4d6c1;border-radius:8px;margin:0 0 20px 0;">
@@ -420,7 +434,7 @@ export function buildWelcomeEmail(opts: {
       : s.step1;
     const body = `
       <h2 style="font-family:Georgia,'Times New Roman',serif;font-size:22px;color:${COLORS.green950};margin:0 0 16px 0;font-weight:normal;">
-        ${greeting} ${opts.firstName},
+        ${formatGreeting(greeting, opts.firstName, opts.locale)}
       </h2>
       <p style="margin:0 0 24px 0;">${s.intro}</p>
 
@@ -443,7 +457,7 @@ export function buildWelcomeEmail(opts: {
   const s = studentStrings[opts.locale] ?? studentStrings.en;
   const body = `
     <h2 style="font-family:Georgia,'Times New Roman',serif;font-size:22px;color:${COLORS.green950};margin:0 0 16px 0;font-weight:normal;">
-      ${greeting} ${opts.firstName},
+      ${formatGreeting(greeting, opts.firstName, opts.locale)}
     </h2>
     <p style="margin:0 0 16px 0;">${s.body}</p>
     <p style="margin:0 0 24px 0;color:#555;">${s.note}</p>
@@ -541,7 +555,7 @@ export function buildOnboardingConfirmationEmail(opts: {
 
   let body = `
     <h2 style="font-family:Georgia,'Times New Roman',serif;font-size:22px;color:${COLORS.green950};margin:0 0 16px 0;font-weight:normal;">
-      ${s.greeting} ${opts.firstName},
+      ${formatGreeting(s.greeting, opts.firstName, opts.locale)}
     </h2>
     <p style="margin:0 0 20px 0;">${s.intro}</p>
 
@@ -630,7 +644,7 @@ export function buildTrialEndingEmail(opts: {
 
   const body = `
     <h2 style="font-family:Georgia,'Times New Roman',serif;font-size:22px;color:${COLORS.green950};margin:0 0 16px 0;font-weight:normal;">
-      ${s.greeting} ${opts.firstName},
+      ${formatGreeting(s.greeting, opts.firstName, opts.locale)}
     </h2>
     <p style="margin:0 0 16px 0;">${s.body}</p>
     <p style="margin:0 0 24px 0;color:#555;font-size:14px;"><strong>${dateStr}</strong></p>
@@ -684,7 +698,7 @@ export function buildPaymentFailedEmail(opts: {
   const s = PAYMENT_FAILED_STRINGS[opts.locale] ?? PAYMENT_FAILED_STRINGS.en;
   const body = `
     <h2 style="font-family:Georgia,'Times New Roman',serif;font-size:22px;color:${COLORS.green950};margin:0 0 16px 0;font-weight:normal;">
-      ${s.greeting} ${opts.firstName},
+      ${formatGreeting(s.greeting, opts.firstName, opts.locale)}
     </h2>
     <p style="margin:0 0 16px 0;">${s.body}</p>
     <p style="margin:0 0 24px 0;color:#555;font-size:14px;">${s.impact}</p>
@@ -858,7 +872,7 @@ export function buildStudentBookingConfirmationEmail(opts: {
   }
   const body = `
     <h2 style="font-family:Georgia,'Times New Roman',serif;font-size:22px;color:${COLORS.green950};margin:0 0 16px 0;font-weight:normal;">
-      ${s.greeting} ${opts.firstName},
+      ${formatGreeting(s.greeting, opts.firstName, opts.locale)}
     </h2>
     <p style="margin:0 0 20px 0;">${s.body}</p>
     ${detailsTable(rows)}
@@ -1054,7 +1068,7 @@ export function buildProBookingNotificationEmail(opts: {
 
   const body = `
     <h2 style="font-family:Georgia,'Times New Roman',serif;font-size:22px;color:${COLORS.green950};margin:0 0 16px 0;font-weight:normal;">
-      ${s.greeting} ${opts.proFirstName},
+      ${formatGreeting(s.greeting, opts.proFirstName, opts.locale)}
     </h2>
     <p style="margin:0 0 20px 0;">${s.body(studentFullName)}</p>
     ${paymentNotice}
@@ -1154,7 +1168,7 @@ export function buildLessonReminderEmail(opts: {
       : `${getBaseUrl()}/pro/bookings`;
   const body = `
     <h2 style="font-family:Georgia,'Times New Roman',serif;font-size:22px;color:${COLORS.green950};margin:0 0 16px 0;font-weight:normal;">
-      ${s.greeting} ${opts.recipientFirstName},
+      ${formatGreeting(s.greeting, opts.recipientFirstName, opts.locale)}
     </h2>
     <p style="margin:0 0 20px 0;">${bodyLine}</p>
     ${detailsTable([
@@ -1314,7 +1328,7 @@ export function buildClaimAndVerifyBookingEmail(opts: {
 
   const body = `
     <h2 style="font-family:Georgia,'Times New Roman',serif;font-size:22px;color:${COLORS.green950};margin:0 0 16px 0;font-weight:normal;">
-      ${s.greeting} ${opts.firstName},
+      ${formatGreeting(s.greeting, opts.firstName, opts.locale)}
     </h2>
     <p style="margin:0 0 20px 0;">${s.claimIntro(opts.proName)}</p>
     ${detailsTable(rows)}
@@ -1374,7 +1388,7 @@ export function buildNewBookingOnAccountEmail(opts: {
 
   const body = `
     <h2 style="font-family:Georgia,'Times New Roman',serif;font-size:22px;color:${COLORS.green950};margin:0 0 16px 0;font-weight:normal;">
-      ${s.greeting} ${opts.firstName},
+      ${formatGreeting(s.greeting, opts.firstName, opts.locale)}
     </h2>
     <p style="margin:0 0 20px 0;">${s.alreadyIntro(opts.proName)}</p>
     ${detailsTable(rows)}

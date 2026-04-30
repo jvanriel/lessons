@@ -5,7 +5,7 @@ import { users, userEmails } from "@/lib/db/schema";
 import { and, eq, isNull, ne } from "drizzle-orm";
 import { getSession, setSessionCookie } from "@/lib/auth";
 import { sendEmail } from "@/lib/mail";
-import { emailLayout } from "@/lib/email-templates";
+import { emailLayout, formatGreeting, getEmailStrings } from "@/lib/email-templates";
 import { resolveLocale, type Locale } from "@/lib/i18n";
 
 function getSecret() {
@@ -118,6 +118,23 @@ export async function POST(request: NextRequest) {
     (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : "http://localhost:3000");
   const verifyUrl = `${baseUrl}/api/auth/verify-email?token=${verifyToken}`;
 
+  // Match the verify-email mail (task 56): greeting as h2 22px
+  // Georgia, body inherits the layout default text color, NL drops
+  // the comma after the salutation.
+  const greetingWord = getEmailStrings(locale).inviteGreeting;
+  const intro =
+    locale === "nl"
+      ? `Je e-mailadres is gewijzigd naar ${newEmail}. Klik hieronder om dit nieuwe adres te bevestigen.`
+      : locale === "fr"
+        ? `Votre adresse e-mail a été modifiée en ${newEmail}. Cliquez ci-dessous pour confirmer la nouvelle adresse.`
+        : `Your email address was changed to ${newEmail}. Click below to confirm the new address.`;
+  const buttonLabel =
+    locale === "nl"
+      ? "E-mail bevestigen"
+      : locale === "fr"
+        ? "Confirmer l'e-mail"
+        : "Verify email";
+
   sendEmail({
     to: newEmail,
     subject:
@@ -127,21 +144,15 @@ export async function POST(request: NextRequest) {
           ? "Confirmez votre e-mail — Golf Lessons"
           : "Verify your email — Golf Lessons",
     html: emailLayout(
-      `<h2 style="margin:0 0 16px;color:#091a12;font-family:Georgia,serif;font-size:24px;font-weight:normal;">
-        ${locale === "nl" ? "Bevestig je e-mail" : locale === "fr" ? "Confirmez votre e-mail" : "Verify your email"}
+      `<h2 style="font-family:Georgia,'Times New Roman',serif;font-size:22px;color:#091a12;margin:0 0 16px 0;font-weight:normal;">
+        ${formatGreeting(greetingWord, me.firstName, locale)}
       </h2>
-      <p style="margin:0 0 24px;color:#3d6b4f;font-size:14px;line-height:1.6">
-        ${
-          locale === "nl"
-            ? `Hallo ${me.firstName}, je e-mailadres is gewijzigd naar ${newEmail}. Klik hieronder om dit nieuwe adres te bevestigen.`
-            : locale === "fr"
-              ? `Bonjour ${me.firstName}, votre adresse e-mail a été modifiée en ${newEmail}. Cliquez ci-dessous pour confirmer la nouvelle adresse.`
-              : `Hi ${me.firstName}, your email address was changed to ${newEmail}. Click below to confirm the new address.`
-        }
-      </p>
-      <a href="${verifyUrl}" style="display:inline-block;padding:12px 24px;background:#c4a035;color:#fff;border-radius:6px;text-decoration:none;font-weight:500;font-size:14px">
-        ${locale === "nl" ? "E-mail bevestigen" : locale === "fr" ? "Confirmer l'e-mail" : "Verify email"}
-      </a>`,
+      <p style="margin:0 0 24px 0;">${intro}</p>
+      <p style="margin:0 0 24px 0;">
+        <a href="${verifyUrl}" style="display:inline-block;padding:12px 28px;background:#a68523;color:#fff;border-radius:6px;text-decoration:none;font-weight:500;font-size:14px;">
+          ${buttonLabel}
+        </a>
+      </p>`,
       undefined,
       locale
     ),
