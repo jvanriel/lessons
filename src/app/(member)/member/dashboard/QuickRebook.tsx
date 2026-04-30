@@ -6,6 +6,7 @@ import Link from "next/link";
 import {
   quickCreateBooking,
   getAvailableSlots,
+  getDateBlockReason,
   updatePreferredInterval,
   explainDateSlots,
   type QuickBookData,
@@ -186,10 +187,13 @@ export function QuickBook({ data, proId, hasPaymentMethod = true, allowBookingWi
     }
   }, [status]);
 
+  const [blockReason, setBlockReason] = useState<string | null>(null);
+
   // Switch to a different date
   function switchDate(dateStr: string) {
     setSelectedDate(dateStr);
     setSlots([]);
+    setBlockReason(null);
     startTransition(async () => {
       const newSlots = await getAvailableSlots(
         data.proProfileId,
@@ -198,6 +202,17 @@ export function QuickBook({ data, proId, hasPaymentMethod = true, allowBookingWi
         data.duration
       );
       setSlots(newSlots);
+      // Surface the pro's block reason inline next to "no slots"
+      // instead of hiding it behind the long-press explain dialog
+      // (task 27 — Nadine's 2026-04-28 retest).
+      if (newSlots.length === 0) {
+        const reason = await getDateBlockReason(
+          data.proProfileId,
+          data.locationId,
+          dateStr,
+        );
+        setBlockReason(reason);
+      }
     });
   }
 
@@ -389,9 +404,17 @@ export function QuickBook({ data, proId, hasPaymentMethod = true, allowBookingWi
               {t("memberQB.loadingTimes", locale)}
             </div>
           ) : slots.length === 0 ? (
-            <p className="py-2 text-xs text-green-500">
-              {t("memberQB.noSlots", locale)}
-            </p>
+            <div className="py-2 text-xs text-green-500">
+              <p>{t("memberQB.noSlots", locale)}</p>
+              {blockReason && (
+                <p className="mt-1 text-green-700">
+                  <span className="font-medium">
+                    {t("memberQB.blockReasonLabel", locale)}:
+                  </span>{" "}
+                  {blockReason}
+                </p>
+              )}
+            </div>
           ) : (
             <>
               <p className="mb-1.5 text-[11px] italic text-green-500">

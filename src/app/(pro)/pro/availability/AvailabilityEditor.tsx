@@ -1274,11 +1274,25 @@ function WeeklyTemplateGrid({
     const dMax = Math.max(d0, d1);
     const rMin = Math.min(r0, r1);
     const rMax = Math.max(r0, r1);
-    for (let d = dMin; d <= dMax; d++) {
-      for (let r = rMin; r <= rMax; r++) {
-        updateCell(d, r, adding);
-      }
-    }
+    // Build the new grid in one pass and push it via `onGridChange`
+    // once. Iterating `updateCell` per cell would lose every
+    // intermediate update — `onGridChange` flows up to a parent
+    // setState, and synchronous loops in the same handler all read
+    // the same `gridRef.current` snapshot, so only the last cell
+    // would survive. That was the "shift-klik werkt niet" symptom
+    // from Nadine's 2026-04-28 retest of task 27 (1d).
+    onGridChange(
+      gridRef.current.map((col, colIdx) =>
+        col.map((cell, rowIdx) => {
+          if (colIdx < dMin || colIdx > dMax) return new Set(cell);
+          if (rowIdx < rMin || rowIdx > rMax) return new Set(cell);
+          const next = new Set(cell);
+          if (adding) next.add(activeLocationId);
+          else next.delete(activeLocationId);
+          return next;
+        }),
+      ),
+    );
   }
 
   function handlePointerDown(day: number, row: number, e: React.PointerEvent) {

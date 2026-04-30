@@ -313,6 +313,49 @@ export async function getAvailableSlots(
 }
 
 /**
+ * Return the human-readable reason a pro entered when blocking a
+ * specific date. Used by the booking UI to surface the reason next
+ * to the "no slots" message — Nadine's task 27 retest noted that
+ * students could see "no availability" but not WHY. We return the
+ * reason of the most-restrictive blocked override that applies on
+ * the date (full-day block first; per-time block as a fallback) or
+ * `null` if there is none.
+ */
+export async function getDateBlockReason(
+  proProfileId: number,
+  locationId: number,
+  date: string,
+): Promise<string | null> {
+  await requireMember();
+  const overrides = await db
+    .select({
+      type: proAvailabilityOverrides.type,
+      startTime: proAvailabilityOverrides.startTime,
+      endTime: proAvailabilityOverrides.endTime,
+      proLocationId: proAvailabilityOverrides.proLocationId,
+      reason: proAvailabilityOverrides.reason,
+    })
+    .from(proAvailabilityOverrides)
+    .where(
+      and(
+        eq(proAvailabilityOverrides.proProfileId, proProfileId),
+        eq(proAvailabilityOverrides.date, date),
+      ),
+    );
+  const relevant = overrides.filter(
+    (o) =>
+      o.type === "blocked" &&
+      (o.proLocationId === null || o.proLocationId === locationId) &&
+      !!o.reason,
+  );
+  // Prefer a full-day block (no times) — that's the override that
+  // most likely explains "the entire day is closed".
+  const fullDay = relevant.find((o) => !o.startTime && !o.endTime);
+  if (fullDay) return fullDay.reason;
+  return relevant[0]?.reason ?? null;
+}
+
+/**
  * Check if a user has a saved payment method on their Stripe customer.
  */
 async function userHasPaymentMethod(userId: number): Promise<boolean> {

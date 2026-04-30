@@ -12,6 +12,7 @@ import { BookingCalendar } from "@/components/BookingCalendar";
 import {
   createPublicBooking,
   getPublicSlots,
+  getPublicDateBlockReason,
   getPublicAvailableDates,
   resendBookingConfirmation,
   updateBookerEmailAndResend,
@@ -155,14 +156,27 @@ export default function PublicBookingWizard({
       .finally(() => setLoadingDates(false));
   }, [pro, locationId, duration]);
 
+  const [blockReason, setBlockReason] = useState<string | null>(null);
+
   // Fetch slots when date is picked.
   useEffect(() => {
     if (!pro || !locationId || !duration || !date) return;
     setLoadingSlots(true);
     setSlots([]);
     setSlot(null);
+    setBlockReason(null);
     getPublicSlots(pro.id, locationId, date, duration)
-      .then((s) => setSlots(s))
+      .then(async (s) => {
+        setSlots(s);
+        if (s.length === 0) {
+          const reason = await getPublicDateBlockReason(
+            pro.id,
+            locationId,
+            date,
+          );
+          setBlockReason(reason);
+        }
+      })
       .finally(() => setLoadingSlots(false));
   }, [pro, locationId, duration, date]);
 
@@ -669,9 +683,17 @@ export default function PublicBookingWizard({
                       {t("publicBook.loading", locale)}
                     </p>
                   ) : slots.length === 0 ? (
-                    <p className="mt-2 text-sm text-green-600">
-                      {t("publicBook.noSlots", locale)}
-                    </p>
+                    <div className="mt-2 text-sm text-green-600">
+                      <p>{t("publicBook.noSlots", locale)}</p>
+                      {blockReason && (
+                        <p className="mt-1 text-green-700">
+                          <span className="font-medium">
+                            {t("memberQB.blockReasonLabel", locale)}:
+                          </span>{" "}
+                          {blockReason}
+                        </p>
+                      )}
+                    </div>
                   ) : (
                     <div className="mt-3 grid grid-cols-3 gap-2 sm:grid-cols-4">
                       {slots.map((s) => (

@@ -7,6 +7,7 @@ import { BookingCalendar } from "@/components/BookingCalendar";
 import {
   getAvailableDates,
   getAvailableSlots,
+  getDateBlockReason,
   createBooking,
 } from "../actions";
 import { t } from "@/lib/i18n/translations";
@@ -94,6 +95,10 @@ export function BookingWizard({
   const [slots, setSlots] = useState<Slot[]>([]);
   const [loadingDates, setLoadingDates] = useState(false);
   const [loadingSlots, setLoadingSlots] = useState(false);
+  // Reason the pro entered when blocking the selected date — shown
+  // inline next to the "no slots" message so the student knows
+  // *why* nothing is available (task 27, Nadine retest 2026-04-28).
+  const [blockReason, setBlockReason] = useState<string | null>(null);
 
   const [notes, setNotes] = useState("");
   const [participantCount, setParticipantCount] = useState(1);
@@ -172,14 +177,19 @@ export function BookingWizard({
     setLoadingSlots(true);
     setSlots([]);
     setSlot(null);
+    setBlockReason(null);
     getAvailableSlots(pro.id, locationId, date, duration)
-      .then((s) => {
+      .then(async (s) => {
         setSlots(s);
         const wanted = restoreRef.current?.slotStartTime;
         if (wanted) {
           const match = s.find((x) => x.startTime === wanted);
           if (match) setSlot(match);
           restoreRef.current = null;
+        }
+        if (s.length === 0) {
+          const reason = await getDateBlockReason(pro.id, locationId, date);
+          setBlockReason(reason);
         }
       })
       .finally(() => setLoadingSlots(false));
@@ -424,9 +434,17 @@ export function BookingWizard({
                       {t("publicBook.loading", locale)}
                     </p>
                   ) : slots.length === 0 ? (
-                    <p className="mt-2 text-sm text-green-600">
-                      {t("publicBook.noSlots", locale)}
-                    </p>
+                    <div className="mt-2 text-sm text-green-600">
+                      <p>{t("publicBook.noSlots", locale)}</p>
+                      {blockReason && (
+                        <p className="mt-1 text-green-700">
+                          <span className="font-medium">
+                            {t("memberQB.blockReasonLabel", locale)}:
+                          </span>{" "}
+                          {blockReason}
+                        </p>
+                      )}
+                    </div>
                   ) : (
                     <div className="mt-3 grid grid-cols-3 gap-2 sm:grid-cols-4">
                       {slots.map((s) => (
