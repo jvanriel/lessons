@@ -657,12 +657,22 @@ function PaymentStep({
   if (clientSecret) {
     return (
       <div className="space-y-4">
-        {/* The "Je kaart wordt veilig bewaard" helper is intentionally
-            omitted here — Stripe's PaymentElement renders its own
-            mandate/consent text below the card form, so showing both
-            felt redundant (task 55). We add an explicit Terms link
-            below so "hun voorwaarden" has a concrete target even when
-            Stripe's own mandate doesn't linkify it. */}
+        {/* Up-front scope + fee disclosure (task 55). Stripe's own
+            mandate text talks about "future payments in accordance
+            with their terms" without saying WHAT those payments are
+            — Nadine's retest flagged this as ambiguous, plus she
+            wanted platform-fee transparency. So before the card
+            form we spell out both: card is charged only for lessons
+            the student books, and platform fees are on the pro. */}
+        <div className="rounded-lg border border-green-100 bg-green-50/50 p-4">
+          <p className="font-medium text-green-900 text-sm">
+            {t("onboarding.paymentScopeHeading", locale)}
+          </p>
+          <ul className="mt-2 space-y-1.5 text-sm text-green-700 list-disc pl-5">
+            <li>{t("onboarding.paymentScopeBullet1", locale)}</li>
+            <li>{t("onboarding.paymentScopeBullet2", locale)}</li>
+          </ul>
+        </div>
         <Elements stripe={getStripe()} options={{ clientSecret, ...stripeElementsOptions }}>
           <PaymentForm onSuccess={onSuccess} locale={locale} billing={billing} />
         </Elements>
