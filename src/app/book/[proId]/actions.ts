@@ -803,6 +803,35 @@ export async function resendBookingConfirmation(manageToken: string) {
   if (!manageToken || typeof manageToken !== "string") {
     return { error: "Invalid token" };
   }
+  const limit = await limitByKey(resendClaimLimiter, manageToken);
+  if (!limit.ok) {
+    return {
+      error: `Even geduld — probeer opnieuw over ${limit.retryAfter}s.`,
+    };
+  }
+  return await _sendClaimEmail(manageToken);
+}
+
+/**
+ * Update the booker's email (typo-fix flow) and resend the
+ * claim-and-verify mail to the new address. Only allowed for
+ * bookings whose user hasn't verified yet — once a user is
+ * verified, they should change their email via the account page.
+ *
+ * Shares the resend rate-limit bucket so a user who corrects then
+ * resends doesn't double-burn slots.
+ */
+export async function updateBookerEmailAndResend(
+  manageToken: string,
+  newEmail: string,
+) {
+  if (!manageToken || typeof manageToken !== "string") {
+    return { error: "Invalid token" };
+  }
+  const cleaned = (newEmail ?? "").trim().toLowerCase();
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(cleaned)) {
+    return { error: "Geen geldig e-mailadres." };
+  }
 
   const limit = await limitByKey(resendClaimLimiter, manageToken);
   if (!limit.ok) {
@@ -811,6 +840,57 @@ export async function resendBookingConfirmation(manageToken: string) {
     };
   }
 
+  const [booking] = await db
+    .select({ id: lessonBookings.id, bookedById: lessonBookings.bookedById })
+    .from(lessonBookings)
+    .where(eq(lessonBookings.manageToken, manageToken))
+    .limit(1);
+  if (!booking) return { error: "Booking not found" };
+
+  const [user] = await db
+    .select({
+      id: users.id,
+      email: users.email,
+      emailVerifiedAt: users.emailVerifiedAt,
+    })
+    .from(users)
+    .where(eq(users.id, booking.bookedById))
+    .limit(1);
+  if (!user) return { error: "User not found" };
+  if (user.emailVerifiedAt) {
+    return { error: "Account is al geverifieerd. Log in om je e-mail te wijzigen." };
+  }
+
+  if (cleaned !== user.email.toLowerCase()) {
+    // Reject if the new address already belongs to a different user.
+    const [collision] = await db
+      .select({ id: users.id })
+      .from(users)
+      .where(sql`LOWER(${users.email}) = ${cleaned}`)
+      .limit(1);
+    if (collision && collision.id !== user.id) {
+      return { error: "Dat e-mailadres is al in gebruik. Probeer in te loggen of gebruik een ander adres." };
+    }
+    await db
+      .update(users)
+      .set({ email: cleaned })
+      .where(eq(users.id, user.id));
+    await db
+      .update(lessonParticipants)
+      .set({ email: cleaned })
+      .where(eq(lessonParticipants.bookingId, booking.id));
+  }
+
+  return await _sendClaimEmail(manageToken);
+}
+
+/**
+ * Internal: build and send the claim-and-verify mail for a booking.
+ * Caller is responsible for rate-limiting. Returns success even when
+ * the user is already verified (UI just shows "Sent" — no second
+ * email is sent).
+ */
+async function _sendClaimEmail(manageToken: string) {
   const [booking] = await db
     .select({
       id: lessonBookings.id,

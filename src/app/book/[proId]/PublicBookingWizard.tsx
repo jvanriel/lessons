@@ -14,6 +14,7 @@ import {
   getPublicSlots,
   getPublicAvailableDates,
   resendBookingConfirmation,
+  updateBookerEmailAndResend,
 } from "./actions";
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -107,6 +108,21 @@ export default function PublicBookingWizard({
   const [manageToken, setManageToken] = useState<string | null>(null);
   const [resendState, setResendState] = useState<"idle" | "pending" | "sent" | "error">("idle");
   const [resendError, setResendError] = useState<string | null>(null);
+  // Inline edit on the success screen — lets a user fix a typo'd
+  // address without losing the booking. Updates the user record and
+  // resends in one server call (task 51).
+  const [editingEmail, setEditingEmail] = useState(false);
+  const [emailDraft, setEmailDraft] = useState("");
+  const [emailEditError, setEmailEditError] = useState<string | null>(null);
+
+  // Auto-revert resend state from "sent" back to "idle" after one
+  // minute so the user can retry if the second send still didn't
+  // arrive (task 51).
+  useEffect(() => {
+    if (resendState !== "sent") return;
+    const timer = setTimeout(() => setResendState("idle"), 60_000);
+    return () => clearTimeout(timer);
+  }, [resendState]);
   const [pending, startTransition] = useTransition();
 
   // When the user picks a pro, reset all downstream state and apply the
@@ -251,6 +267,33 @@ export default function PublicBookingWizard({
     }
   }
 
+  function startEditingEmail() {
+    setEmailDraft(email);
+    setEmailEditError(null);
+    setEditingEmail(true);
+  }
+
+  async function handleEmailSave() {
+    if (!manageToken) return;
+    const next = emailDraft.trim().toLowerCase();
+    if (!EMAIL_RE.test(next)) {
+      setEmailEditError(t("publicBook.err.invalidEmail", locale));
+      return;
+    }
+    setEmailEditError(null);
+    setResendState("pending");
+    setResendError(null);
+    const result = await updateBookerEmailAndResend(manageToken, next);
+    if ("error" in result && result.error) {
+      setEmailEditError(result.error);
+      setResendState("idle");
+      return;
+    }
+    setEmail(next);
+    setEditingEmail(false);
+    setResendState("sent");
+  }
+
   if (success) {
     const registerHref =
       `/register?firstName=${encodeURIComponent(firstName)}` +
@@ -265,8 +308,72 @@ export default function PublicBookingWizard({
             {t("publicBook.success.title", locale)}
           </h1>
           <p className="mt-3 text-green-700">
-            {t("publicBook.success.body", locale).replace("{email}", email)}
+            {t("publicBook.success.body", locale)}
           </p>
+
+          {/* Sent-to line + inline email edit (task 51). The edit
+              affordance is only meaningful while the user can still
+              actually fix a typo — i.e. for the new/unverified
+              branches that received the claim-and-verify mail.
+              Verified users got a regular login mail to their
+              already-known address; no edit needed. */}
+          {manageToken && branch !== "verified" && (
+            <div className="mt-5 rounded-lg border border-green-100 bg-green-50/40 p-4 text-sm">
+              {!editingEmail ? (
+                <div className="flex flex-col items-center gap-1 sm:flex-row sm:justify-center sm:gap-2">
+                  <span className="text-green-600">
+                    {t("publicBook.success.sentTo", locale)}{" "}
+                    <span className="font-medium text-green-900">{email}</span>
+                  </span>
+                  <button
+                    type="button"
+                    onClick={startEditingEmail}
+                    className="text-xs text-gold-700 underline underline-offset-2 hover:text-gold-800"
+                  >
+                    {t("publicBook.success.editEmail", locale)}
+                  </button>
+                </div>
+              ) : (
+                <div className="flex flex-col gap-2">
+                  <input
+                    type="email"
+                    value={emailDraft}
+                    onChange={(e) => setEmailDraft(e.target.value)}
+                    autoFocus
+                    inputMode="email"
+                    autoComplete="email"
+                    className="w-full rounded-md border border-green-200 px-3 py-2 text-sm text-green-900 focus:border-green-400 focus:outline-none focus:ring-1 focus:ring-green-400"
+                  />
+                  <div className="flex flex-col gap-2 sm:flex-row sm:justify-end">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setEditingEmail(false);
+                        setEmailEditError(null);
+                      }}
+                      disabled={resendState === "pending"}
+                      className="rounded-md border border-green-200 px-4 py-2 text-sm font-medium text-green-700 hover:bg-green-50 disabled:opacity-60"
+                    >
+                      {t("publicBook.success.editCancel", locale)}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={handleEmailSave}
+                      disabled={resendState === "pending"}
+                      className="rounded-md bg-green-700 px-4 py-2 text-sm font-medium text-white hover:bg-green-800 disabled:opacity-60"
+                    >
+                      {resendState === "pending"
+                        ? t("publicBook.success.editing", locale)
+                        : t("publicBook.success.editSave", locale)}
+                    </button>
+                  </div>
+                  {emailEditError && (
+                    <p className="text-xs text-red-600">{emailEditError}</p>
+                  )}
+                </div>
+              )}
+            </div>
+          )}
 
           {/* Fallback if the email didn't arrive. Only shown for the
               new/unverified branches — verified users got a
