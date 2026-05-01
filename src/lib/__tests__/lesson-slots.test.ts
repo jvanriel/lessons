@@ -857,10 +857,12 @@ describe("buildIcs", () => {
     expect(withoutCrlf).not.toContain("\n");
   });
 
-  it("has correct DTSTART and DTEND", () => {
+  it("has correct DTSTART and DTEND in UTC", () => {
+    // 2026-03-14 is before EU DST switch (last Sunday of March),
+    // so Brussels is CET (UTC+1). 10:00 local → 09:00 UTC.
     const ics = buildIcs(baseParams);
-    expect(ics).toContain("DTSTART:20260314T100000");
-    expect(ics).toContain("DTEND:20260314T110000");
+    expect(ics).toContain("DTSTART:20260314T090000Z");
+    expect(ics).toContain("DTEND:20260314T100000Z");
   });
 
   it("has correct UID", () => {
@@ -874,9 +876,14 @@ describe("buildIcs", () => {
     expect(ics).toContain("LOCATION:Test Golf Club");
   });
 
-  it("has METHOD:REQUEST", () => {
+  it("has METHOD:PUBLISH (informational, not RSVP)", () => {
+    // The booking is already confirmed by the booking flow — the .ics is
+    // an informational publication, not a meeting REQUEST awaiting RSVP.
+    // Outlook on Mac silently drops METHOD:REQUEST events that lack an
+    // ATTENDEE block; PUBLISH avoids that pitfall.
     const ics = buildIcs(baseParams);
-    expect(ics).toContain("METHOD:REQUEST");
+    expect(ics).toContain("METHOD:PUBLISH");
+    expect(ics).not.toContain("METHOD:REQUEST");
   });
 
   it("has 1-hour alarm", () => {
@@ -884,11 +891,87 @@ describe("buildIcs", () => {
     expect(ics).toContain("TRIGGER:-PT1H");
   });
 
-  it("does not use UTC Z suffix (local time)", () => {
+  it("emits DTSTART in UTC with trailing Z", () => {
+    // Wall-clock local times in TZID-less DTSTART get treated as UTC by
+    // many calendar apps and shifted by the recipient's offset (Outlook,
+    // Apple Mail). Always emit UTC with the explicit Z suffix.
     const ics = buildIcs(baseParams);
-    // DTSTART should not end with Z
     const dtStartLine = ics.split("\r\n").find((l) => l.startsWith("DTSTART:"));
-    expect(dtStartLine).not.toMatch(/Z$/);
+    expect(dtStartLine).toMatch(/Z$/);
+  });
+
+  it("converts Brussels CEST (summer) → UTC correctly", () => {
+    // Reproduction of the user-reported bug: a lesson booked at 10:30
+    // local on 2026-05-07 was showing up at 12:30 in Outlook because
+    // the ICS emitted a TZID-less local time that calendar apps
+    // interpreted as UTC and shifted by the recipient's offset (+2h
+    // for CEST). 10:30 Brussels CEST ≡ 08:30 UTC.
+    const ics = buildIcs({
+      ...baseParams,
+      date: "2026-05-07",
+      startTime: "10:30",
+      endTime: "11:30",
+    });
+    expect(ics).toContain("DTSTART:20260507T083000Z");
+    expect(ics).toContain("DTEND:20260507T093000Z");
+    // Sanity: must NOT emit the bare local-wall-clock that triggered
+    // the original bug.
+    expect(ics).not.toContain("DTSTART:20260507T103000");
+    expect(ics).not.toContain("DTEND:20260507T113000");
+  });
+
+  it("handles DST forward jump (last Sunday of March)", () => {
+    // 2026-03-29 02:00 local skips to 03:00 — Brussels switches CET→CEST.
+    // 10:00 on 2026-03-28 (still CET, +1) → 09:00 UTC.
+    const before = buildIcs({
+      ...baseParams,
+      date: "2026-03-28",
+      startTime: "10:00",
+      endTime: "11:00",
+    });
+    expect(before).toContain("DTSTART:20260328T090000Z");
+    // 10:00 on 2026-03-30 (now CEST, +2) → 08:00 UTC.
+    const after = buildIcs({
+      ...baseParams,
+      date: "2026-03-30",
+      startTime: "10:00",
+      endTime: "11:00",
+    });
+    expect(after).toContain("DTSTART:20260330T080000Z");
+  });
+
+  it("handles DST backward jump (last Sunday of October)", () => {
+    // 2026-10-25 03:00 local falls back to 02:00 — Brussels switches CEST→CET.
+    // 10:00 on 2026-10-24 (still CEST, +2) → 08:00 UTC.
+    const before = buildIcs({
+      ...baseParams,
+      date: "2026-10-24",
+      startTime: "10:00",
+      endTime: "11:00",
+    });
+    expect(before).toContain("DTSTART:20261024T080000Z");
+    // 10:00 on 2026-10-26 (now CET, +1) → 09:00 UTC.
+    const after = buildIcs({
+      ...baseParams,
+      date: "2026-10-26",
+      startTime: "10:00",
+      endTime: "11:00",
+    });
+    expect(after).toContain("DTSTART:20261026T090000Z");
+  });
+
+  it("respects an explicit non-default tz parameter", () => {
+    // A pro teaching from London (UTC+0 winter, UTC+1 summer) — make
+    // sure the optional `tz` override is wired through.
+    const ics = buildIcs({
+      ...baseParams,
+      tz: "Europe/London",
+      date: "2026-03-14",
+      startTime: "10:00",
+      endTime: "11:00",
+    });
+    // London on 2026-03-14 is still GMT (+0), so 10:00 local = 10:00 UTC.
+    expect(ics).toContain("DTSTART:20260314T100000Z");
   });
 });
 
@@ -931,10 +1014,10 @@ describe("buildCancelIcs", () => {
     expect(ics).toContain("UID:booking-999@golflessons.be");
   });
 
-  it("has correct DTSTART and DTEND", () => {
+  it("has correct DTSTART and DTEND in UTC", () => {
     const ics = buildCancelIcs(baseParams);
-    expect(ics).toContain("DTSTART:20260314T100000");
-    expect(ics).toContain("DTEND:20260314T110000");
+    expect(ics).toContain("DTSTART:20260314T090000Z");
+    expect(ics).toContain("DTEND:20260314T100000Z");
   });
 
   it("does not include VALARM (no alarm for cancellations)", () => {

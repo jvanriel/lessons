@@ -178,7 +178,7 @@ export async function GET(request: NextRequest) {
       filename: "lesson.ics",
       contentType: "text/calendar",
       content: ics,
-      method: "REQUEST",
+      method: "PUBLISH",
     };
 
     const studentName = student.firstName;

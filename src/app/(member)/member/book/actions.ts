@@ -815,7 +815,7 @@ export async function createBooking(formData: FormData) {
       filename: "lesson.ics",
       contentType: "text/calendar",
       content: ics,
-      method: "REQUEST",
+      method: "PUBLISH",
     };
 
     // Email both parties after the server action returns so the UI
@@ -1341,7 +1341,7 @@ export async function quickCreateBooking(data: {
       filename: "lesson.ics",
       contentType: "text/calendar",
       content: ics,
-      method: "REQUEST",
+      method: "PUBLISH",
     };
 
     after(async () => {

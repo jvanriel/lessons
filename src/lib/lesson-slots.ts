@@ -228,12 +228,35 @@ export interface IcsParams {
   location: string;
   description: string;
   bookingId: number;
+  /** IANA timezone the date/time strings are expressed in. Defaults to
+   * Europe/Brussels. */
+  tz?: string;
+}
+
+/**
+ * Format `date` + `time` (in `tz`) as a UTC ICS DATE-TIME string with the
+ * trailing `Z`, e.g. "20260507T083000Z". Emitting UTC avoids the bug where
+ * a TZID-less local time like "20260507T103000" gets interpreted as UTC by
+ * the recipient's calendar app and shifted by their local offset.
+ */
+function toIcsUtc(date: string, time: string, tz: string): string {
+  const utc = fromZonedTime(`${date}T${time}:00`, tz);
+  return utc.toISOString().replace(/[-:]/g, "").replace(/\.\d{3}/, "");
 }
 
 export function buildCancelIcs(params: IcsParams): string {
-  const { date, startTime, endTime, summary, location, description, bookingId } = params;
-  const dtStart = date.replace(/-/g, "") + "T" + startTime.replace(":", "") + "00";
-  const dtEnd = date.replace(/-/g, "") + "T" + endTime.replace(":", "") + "00";
+  const {
+    date,
+    startTime,
+    endTime,
+    summary,
+    location,
+    description,
+    bookingId,
+    tz = DEFAULT_TZ,
+  } = params;
+  const dtStart = toIcsUtc(date, startTime, tz);
+  const dtEnd = toIcsUtc(date, endTime, tz);
   const now = new Date();
   const dtStamp = now.toISOString().replace(/[-:]/g, "").replace(/\.\d{3}/, "");
   const uid = `booking-${bookingId}@golflessons.be`;
@@ -261,9 +284,18 @@ export function buildCancelIcs(params: IcsParams): string {
 }
 
 export function buildIcs(params: IcsParams): string {
-  const { date, startTime, endTime, summary, location, description, bookingId } = params;
-  const dtStart = date.replace(/-/g, "") + "T" + startTime.replace(":", "") + "00";
-  const dtEnd = date.replace(/-/g, "") + "T" + endTime.replace(":", "") + "00";
+  const {
+    date,
+    startTime,
+    endTime,
+    summary,
+    location,
+    description,
+    bookingId,
+    tz = DEFAULT_TZ,
+  } = params;
+  const dtStart = toIcsUtc(date, startTime, tz);
+  const dtEnd = toIcsUtc(date, endTime, tz);
   const now = new Date();
   const dtStamp = now.toISOString().replace(/[-:]/g, "").replace(/\.\d{3}/, "");
   const uid = `booking-${bookingId}@golflessons.be`;
@@ -273,7 +305,11 @@ export function buildIcs(params: IcsParams): string {
     "VERSION:2.0",
     "PRODID:-//Golf Lessons//Lesson Booking//EN",
     "CALSCALE:GREGORIAN",
-    "METHOD:REQUEST",
+    // PUBLISH (not REQUEST): the booking is already confirmed by the
+    // booking flow, so the .ics is informational, not an RSVP-required
+    // invite. METHOD:REQUEST without ATTENDEE confuses Outlook on Mac
+    // and the event silently fails to land in the calendar.
+    "METHOD:PUBLISH",
     "BEGIN:VEVENT",
     `UID:${uid}`,
     `DTSTAMP:${dtStamp}`,

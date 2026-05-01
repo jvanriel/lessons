@@ -673,7 +673,7 @@ export async function createPublicBooking(formData: FormData) {
           description: `Booked via golflessons.be — ${firstName} ${lastName}${notes ? ` — Notes: ${notes}` : ""}`,
           bookingId: booking.id,
         }),
-        method: "REQUEST" as const,
+        method: "PUBLISH" as const,
       }
     : null;
 

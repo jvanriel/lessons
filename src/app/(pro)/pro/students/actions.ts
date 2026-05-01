@@ -1060,7 +1060,7 @@ export async function proQuickBookForStudent(data: {
     filename: "lesson.ics",
     contentType: "text/calendar",
     content: ics,
-    method: "REQUEST",
+    method: "PUBLISH",
   };
 
   if (proRow) {
