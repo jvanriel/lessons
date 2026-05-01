@@ -59,6 +59,7 @@ export default async function BookingPage({
       specialties: proProfiles.specialties,
       lessonDurations: proProfiles.lessonDurations,
       lessonPricing: proProfiles.lessonPricing,
+      extraStudentPricing: proProfiles.extraStudentPricing,
       bookingEnabled: proProfiles.bookingEnabled,
       published: proProfiles.published,
       maxGroupSize: proProfiles.maxGroupSize,
@@ -149,6 +150,8 @@ export default async function BookingPage({
           lessonDurations: pro.lessonDurations as number[],
           lessonPricing:
             (pro.lessonPricing as Record<string, number> | null) ?? {},
+          extraStudentPricing:
+            (pro.extraStudentPricing as Record<string, number> | null) ?? null,
           maxGroupSize: pro.maxGroupSize,
         }}
         locations={proLocs}

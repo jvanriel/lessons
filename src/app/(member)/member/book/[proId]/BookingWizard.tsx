@@ -13,7 +13,7 @@ import {
 import { t } from "@/lib/i18n/translations";
 import type { Locale } from "@/lib/i18n";
 import { formatDate as formatDateLocale } from "@/lib/format-date";
-import { formatPrice } from "@/lib/pricing";
+import { formatPrice, computeBookingPriceCents } from "@/lib/pricing";
 
 // ─── Types ──────────────────────────────────────────
 
@@ -25,6 +25,12 @@ interface ProInfo {
   lessonDurations: number[];
   /** Real charged prices in EUR cents, keyed by duration-in-minutes string. */
   lessonPricing: Record<string, number>;
+  /**
+   * Per-extra-student surcharge in EUR cents, keyed by duration. The total
+   * billed for N participants is `lessonPricing[d] + extraStudentPricing[d] * (N - 1)`.
+   * Default of `null`/missing means extra students cost nothing.
+   */
+  extraStudentPricing: Record<string, number> | null;
   maxGroupSize: number;
 }
 
@@ -222,7 +228,15 @@ export function BookingWizard({
     return typeof p === "number" && p > 0 ? p : null;
   }, [pro.lessonPricing, duration]);
 
-  const totalCents = priceCents !== null ? priceCents * participantCount : null;
+  const totalCents = useMemo(() => {
+    if (!duration) return null;
+    return computeBookingPriceCents({
+      lessonPricing: pro.lessonPricing,
+      extraStudentPricing: pro.extraStudentPricing,
+      duration,
+      participantCount,
+    });
+  }, [pro.lessonPricing, pro.extraStudentPricing, duration, participantCount]);
 
   const paymentBlocked = !hasPaymentMethod && !allowBookingWithoutPayment;
   const requiresPriceButNone =
