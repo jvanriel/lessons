@@ -4,6 +4,16 @@ End-user-visible changes shipped to the platform. Engineering details
 that don't affect what students or pros see live in `docs/gaps.md` and
 the git history. Newest first.
 
+## 2026-05-02 — v1.1.11
+
+- **Admins can now reconcile a refund out-of-band.** When a refund
+  has to be issued directly in the Stripe dashboard (because the
+  automatic refund failed, the payment is too old, or the customer
+  was paid back via SEPA), admins can now go to /admin → Manual
+  refund, look up the booking by ID, supply a reason, and mark it
+  refunded. The booking notes get an audit line with who did it
+  and why.
+
 ## 2026-05-02 — v1.1.10
 
 - **Behind-the-scenes cleanup.** Removed an old, unused registration
