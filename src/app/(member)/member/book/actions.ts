@@ -41,11 +41,8 @@ import {
 import { resolveLocale, type Locale } from "@/lib/i18n";
 import { t } from "@/lib/i18n/translations";
 import { getLocale } from "@/lib/locale";
-import {
-  addDaysToDateString,
-  formatLocalDate,
-  todayInTZ,
-} from "@/lib/local-date";
+import { addDaysToDateString, todayInTZ } from "@/lib/local-date";
+import { computeSuggestedDate } from "@/lib/booking-suggestion";
 import { getProLocationTimezone } from "@/lib/pro";
 import { updateBookingPreferences } from "@/lib/booking-preferences";
 import { excludeDummiesOnProduction } from "@/lib/pro-visibility";
@@ -734,11 +731,6 @@ export async function createBooking(formData: FormData) {
 
 // ─── Quick Book ────────────────────────────────────
 
-/** Convert JS Date.getDay() (0=Sun) to ISO weekday (0=Mon..6=Sun) */
-function jsDayToIso(jsDay: number): number {
-  return jsDay === 0 ? 6 : jsDay - 1;
-}
-
 export interface QuickBookData {
   hasPreferences: true;
   proStudentId: number;
@@ -769,41 +761,6 @@ export interface QuickBookData {
  * "In a month"  → next preferred day ≥ 28 days from today
  * No interval   → next preferred day from tomorrow
  */
-function computeSuggestedDate(
-  interval: string | null,
-  preferredDayOfWeek: number,
-  _lastBookingDate: string | null
-): string {
-  const today = new Date();
-  today.setHours(0, 0, 0, 0);
-
-  // No interval: start from today (show today's slots if available)
-  if (!interval) {
-    const todayIso = jsDayToIso(today.getDay());
-    let diff = preferredDayOfWeek - todayIso;
-    if (diff < 0) diff += 7;
-    // If preferred day is today, diff = 0 → show today
-    const next = new Date(today);
-    next.setDate(next.getDate() + diff);
-    return formatLocalDate(next);
-  }
-
-  // Minimum days ahead based on interval
-  let minDaysAhead = 7;
-  if (interval === "biweekly") minDaysAhead = 14;
-  else if (interval === "monthly") minDaysAhead = 28;
-
-  // Start from today + minDaysAhead, find next occurrence of preferred day
-  const earliest = new Date(today);
-  earliest.setDate(earliest.getDate() + minDaysAhead);
-
-  const earliestIso = jsDayToIso(earliest.getDay());
-  let diff = preferredDayOfWeek - earliestIso;
-  if (diff < 0) diff += 7;
-  earliest.setDate(earliest.getDate() + diff);
-
-  return formatLocalDate(earliest);
-}
 
 /**
  * Fetch quick book data: suggested date/time based on saved preferences.
@@ -866,10 +823,18 @@ export async function getQuickBookData(
     .orderBy(desc(lessonBookings.date))
     .limit(1);
 
+  // Resolve the location TZ first — both `computeSuggestedDate`
+  // (for the suggestion anchor) and `windowStart` below use it. The
+  // suggestion needs the same TZ as the window or a late-evening
+  // student gets a suggestion a day before `windowStart` and the
+  // fallback silently overrides it (gaps.md §0).
+  const tz = await getProLocationTimezone(rel.preferredLocationId);
+
   const suggestedDate = computeSuggestedDate(
     rel.preferredInterval,
     rel.preferredDayOfWeek,
-    lastBooking?.date ?? null
+    lastBooking?.date ?? null,
+    tz,
   );
 
   // Batch-fetch availability data once across the full booking
@@ -877,7 +842,6 @@ export async function getQuickBookData(
   // interval-jumped suggested date too, so we can't anchor the
   // window on `suggestedDate`). Filtered in-memory per date below
   // to avoid N+1 round-trips.
-  const tz = await getProLocationTimezone(rel.preferredLocationId);
   const now = new Date();
   const windowStart = todayInTZ(tz);
 

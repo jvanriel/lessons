@@ -791,3 +791,215 @@ describe("Phase 7: calculatePlatformFee", () => {
     expect(calculatePlatformFee(0, { online: false })).toBe(0);
   });
 });
+
+// ═══════════════════════════════════════════════════════
+// Phase 8: Shared booking-charge helpers (direct integration)
+// ═══════════════════════════════════════════════════════
+//
+// The phases above replicate the production logic inline so the test
+// stays close to the spec without depending on Next.js server-action
+// runtime. After 2026-05 the same logic moved into shared helpers
+// (`runOffSessionCharge`, `claimCashCommission`) so `createBooking`
+// and `quickCreateBooking` would behave identically. These cases
+// exercise the helpers DIRECTLY against real Stripe + DB so the
+// extraction stays honest.
+
+describe("Phase 8: runOffSessionCharge + claimCashCommission helpers", () => {
+  let helpersStudent: Awaited<ReturnType<typeof createStudentWithCard>>;
+
+  beforeAll(async () => {
+    // Reuse the success-card flow: the helper test only needs an
+    // attached, chargeable PM. The pre-existing student rows are
+    // teardown-cleaned by `fullStudentReset` in afterAll.
+    helpersStudent = await createStudentWithCard("success");
+  });
+
+  it("runOffSessionCharge succeeds end-to-end + flips paymentStatus to paid", async () => {
+    const { runOffSessionCharge } = await import("@/lib/booking-charge");
+
+    // Insert a booking row with the same shape `createBooking` uses
+    // BEFORE its charge call: priceCents present, paymentStatus
+    // pending.
+    const future = new Date();
+    future.setDate(future.getDate() + 45);
+    const date = future.toISOString().slice(0, 10);
+    const startTime = "08:00";
+    const endTime = "09:00";
+    const priceCents = 4500;
+
+    const [booking] = await db
+      .insert(lessonBookings)
+      .values({
+        proProfileId: PRO_PROFILE_ID,
+        bookedById: helpersStudent.userId,
+        proLocationId: PRO_LOCATION_ID,
+        date,
+        startTime,
+        endTime,
+        participantCount: 1,
+        status: "confirmed",
+        notes: "[TEST] phase-8 runOffSessionCharge",
+        manageToken: randomBytes(32).toString("hex"),
+        priceCents,
+        platformFeeCents: calculatePlatformFee(priceCents, { online: true }),
+        paymentStatus: "pending",
+      })
+      .returning({ id: lessonBookings.id });
+    createdBookingIds.push(booking.id);
+
+    await db.insert(lessonParticipants).values({
+      bookingId: booking.id,
+      firstName: "Dummy",
+      lastName: "Student",
+      email: STUDENT_EMAIL,
+      phone: "+32471000000",
+    });
+
+    await runOffSessionCharge({
+      bookingId: booking.id,
+      userId: helpersStudent.userId,
+      proProfileId: PRO_PROFILE_ID,
+      priceCents,
+      date,
+      startTime,
+      endTime,
+    });
+
+    const [row] = await db
+      .select({
+        paymentStatus: lessonBookings.paymentStatus,
+        stripePaymentIntentId: lessonBookings.stripePaymentIntentId,
+        paidAt: lessonBookings.paidAt,
+      })
+      .from(lessonBookings)
+      .where(eq(lessonBookings.id, booking.id))
+      .limit(1);
+
+    expect(row?.paymentStatus).toBe("paid");
+    expect(row?.stripePaymentIntentId).toMatch(/^pi_/);
+    expect(row?.paidAt).not.toBeNull();
+  });
+
+  it("claimCashCommission posts an invoice item + records the id on the booking", async () => {
+    const { claimCashCommission } = await import("@/lib/booking-charge");
+
+    const future = new Date();
+    future.setDate(future.getDate() + 50);
+    const date = future.toISOString().slice(0, 10);
+    const startTime = "10:00";
+    const endTime = "11:00";
+    const priceCents = 5500;
+    const platformFeeCents = calculatePlatformFee(priceCents, { online: false });
+
+    const [booking] = await db
+      .insert(lessonBookings)
+      .values({
+        proProfileId: PRO_PROFILE_ID,
+        bookedById: helpersStudent.userId,
+        proLocationId: PRO_LOCATION_ID,
+        date,
+        startTime,
+        endTime,
+        participantCount: 1,
+        status: "confirmed",
+        notes: "[TEST] phase-8 claimCashCommission",
+        manageToken: randomBytes(32).toString("hex"),
+        priceCents,
+        platformFeeCents,
+        paymentStatus: "manual",
+      })
+      .returning({ id: lessonBookings.id });
+    createdBookingIds.push(booking.id);
+
+    await db.insert(lessonParticipants).values({
+      bookingId: booking.id,
+      firstName: "Dummy",
+      lastName: "Student",
+      email: STUDENT_EMAIL,
+      phone: "+32471000000",
+    });
+
+    await claimCashCommission({
+      bookingId: booking.id,
+      proProfileId: PRO_PROFILE_ID,
+      platformFeeCents,
+      date,
+      startTime,
+    });
+
+    const [row] = await db
+      .select({ stripeInvoiceItemId: lessonBookings.stripeInvoiceItemId })
+      .from(lessonBookings)
+      .where(eq(lessonBookings.id, booking.id))
+      .limit(1);
+
+    expect(row?.stripeInvoiceItemId).toMatch(/^ii_/);
+    if (row?.stripeInvoiceItemId) {
+      createdInvoiceItemIds.push(row.stripeInvoiceItemId);
+    }
+  });
+
+  it("runOffSessionCharge marks the booking failed when the student has no PM", async () => {
+    // Tear down the saved PMs on this customer, then call the helper —
+    // it should catch the "no payment method" error and flip the row
+    // to `failed` rather than throwing.
+    const { runOffSessionCharge } = await import("@/lib/booking-charge");
+
+    const methods = await stripe.paymentMethods.list({
+      customer: helpersStudent.customerId,
+      limit: 10,
+    });
+    for (const m of methods.data) {
+      await stripe.paymentMethods.detach(m.id);
+    }
+
+    const future = new Date();
+    future.setDate(future.getDate() + 55);
+    const date = future.toISOString().slice(0, 10);
+    const [booking] = await db
+      .insert(lessonBookings)
+      .values({
+        proProfileId: PRO_PROFILE_ID,
+        bookedById: helpersStudent.userId,
+        proLocationId: PRO_LOCATION_ID,
+        date,
+        startTime: "12:00",
+        endTime: "13:00",
+        participantCount: 1,
+        status: "confirmed",
+        notes: "[TEST] phase-8 charge-no-PM",
+        manageToken: randomBytes(32).toString("hex"),
+        priceCents: 5000,
+        platformFeeCents: calculatePlatformFee(5000),
+        paymentStatus: "pending",
+      })
+      .returning({ id: lessonBookings.id });
+    createdBookingIds.push(booking.id);
+
+    await db.insert(lessonParticipants).values({
+      bookingId: booking.id,
+      firstName: "Dummy",
+      lastName: "Student",
+      email: STUDENT_EMAIL,
+      phone: "+32471000000",
+    });
+
+    await runOffSessionCharge({
+      bookingId: booking.id,
+      userId: helpersStudent.userId,
+      proProfileId: PRO_PROFILE_ID,
+      priceCents: 5000,
+      date,
+      startTime: "12:00",
+      endTime: "13:00",
+    });
+
+    const [row] = await db
+      .select({ paymentStatus: lessonBookings.paymentStatus })
+      .from(lessonBookings)
+      .where(eq(lessonBookings.id, booking.id))
+      .limit(1);
+
+    expect(row?.paymentStatus).toBe("failed");
+  });
+});

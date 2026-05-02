@@ -26,6 +26,8 @@ import {
   type AvailabilityOverride,
   type ExistingBooking,
 } from "@/lib/lesson-slots";
+import { loadBookingPricing } from "@/lib/booking-charge";
+import { calculatePlatformFee } from "@/lib/stripe";
 
 // ─── DB Setup ────────────────────────────────────────
 
@@ -481,6 +483,141 @@ describe("concurrent booking / slot re-validation", () => {
 
     const slotsAfter = await getAvailableSlotsFromDb(TEST_PRO_PROFILE_ID, TEST_PRO_LOCATION_ID, date, 60);
     expect(slotsAfter.find((s) => s.startTime === slot.startTime)).toBeUndefined();
+  });
+});
+
+// ─── Tests: loadBookingPricing (DB integration) ──────
+//
+// `decideBookingPricing` is unit-tested at booking-charge.test.ts;
+// these cases prove the DB-loading wrapper produces the same answer
+// when reading from real `pro_profiles` rows. Mutates the test pro's
+// `lessonPricing` / `allowBookingWithoutPayment` / `subscriptionStatus`
+// per case and restores at the end.
+
+describe("loadBookingPricing (DB integration)", () => {
+  const baselinePricing = { "60": 6500 } as Record<string, number>;
+
+  async function setProPricing(opts: {
+    lessonPricing?: Record<string, number> | null;
+    extraStudentPricing?: Record<string, number> | null;
+    allowBookingWithoutPayment?: boolean;
+    subscriptionStatus?: string;
+  }) {
+    // jsonb columns are notNull with default({}); store an empty
+    // object for "no pricing" rather than null so the column-type
+    // contract holds. `decideBookingPricing` treats `{}` as "no
+    // entries" identically to null via `?.[String(duration)]`.
+    await db
+      .update(proProfiles)
+      .set({
+        lessonPricing: opts.lessonPricing ?? {},
+        extraStudentPricing: opts.extraStudentPricing ?? {},
+        allowBookingWithoutPayment: opts.allowBookingWithoutPayment ?? false,
+        subscriptionStatus: opts.subscriptionStatus ?? "active",
+      })
+      .where(eq(proProfiles.id, TEST_PRO_PROFILE_ID));
+  }
+
+  it("online pro with priced 60-min slot returns paymentStatus=pending + online fee", async () => {
+    await setProPricing({ lessonPricing: baselinePricing });
+    const r = await loadBookingPricing(TEST_PRO_PROFILE_ID, 60, 1);
+    expect(r.ok).toBe(true);
+    if (!r.ok) return;
+    expect(r.priceCents).toBe(6500);
+    expect(r.cashOnly).toBe(false);
+    expect(r.paymentStatus).toBe("pending");
+    expect(r.platformFeeCents).toBe(
+      calculatePlatformFee(6500, { online: true }),
+    );
+  });
+
+  it("online pro without a price for the duration returns noPriceForDuration", async () => {
+    await setProPricing({ lessonPricing: baselinePricing });
+    // 30-min request against a 60-min-only pricing table.
+    const r = await loadBookingPricing(TEST_PRO_PROFILE_ID, 30, 1);
+    expect(r.ok).toBe(false);
+    if (r.ok) return;
+    expect(r.errorKey).toBe("noPriceForDuration");
+  });
+
+  it("cash-only pro returns paymentStatus=manual + cash-only fee (no Stripe surcharge)", async () => {
+    await setProPricing({
+      lessonPricing: baselinePricing,
+      allowBookingWithoutPayment: true,
+    });
+    const r = await loadBookingPricing(TEST_PRO_PROFILE_ID, 60, 1);
+    expect(r.ok).toBe(true);
+    if (!r.ok) return;
+    expect(r.cashOnly).toBe(true);
+    expect(r.paymentStatus).toBe("manual");
+    expect(r.platformFeeCents).toBe(
+      calculatePlatformFee(6500, { online: false }),
+    );
+  });
+
+  it("comp pro waives platformFee but still records priceCents", async () => {
+    await setProPricing({
+      lessonPricing: baselinePricing,
+      subscriptionStatus: "comp",
+    });
+    const r = await loadBookingPricing(TEST_PRO_PROFILE_ID, 60, 1);
+    expect(r.ok).toBe(true);
+    if (!r.ok) return;
+    expect(r.isComp).toBe(true);
+    expect(r.platformFeeCents).toBeNull();
+    expect(r.priceCents).toBe(6500);
+  });
+
+  it("group rate adds extra-student price to base", async () => {
+    await setProPricing({
+      lessonPricing: baselinePricing,
+      extraStudentPricing: { "60": 1500 },
+    });
+    const r = await loadBookingPricing(TEST_PRO_PROFILE_ID, 60, 3);
+    expect(r.ok).toBe(true);
+    if (!r.ok) return;
+    expect(r.priceCents).toBe(6500 + 2 * 1500);
+  });
+
+  it("cash-only pro without a price still succeeds with priceCents=null", async () => {
+    // Cash-only pros are allowed to take bookings even when they
+    // haven't priced a duration — they settle offline at "to be
+    // agreed" terms. paymentStatus stays "manual", platformFee null,
+    // no commission claimed.
+    await setProPricing({
+      lessonPricing: {},
+      allowBookingWithoutPayment: true,
+    });
+    const r = await loadBookingPricing(TEST_PRO_PROFILE_ID, 60, 1);
+    expect(r.ok).toBe(true);
+    if (!r.ok) return;
+    expect(r.priceCents).toBeNull();
+    expect(r.platformFeeCents).toBeNull();
+    expect(r.paymentStatus).toBe("manual");
+    expect(r.cashOnly).toBe(true);
+  });
+
+  it("cleans up pricing fields after the suite", async () => {
+    // Belt-and-suspenders teardown so subsequent suites in the same
+    // process see the baseline (empty pricing object — the schema
+    // notNull default). Other tests in this file don't read the pro's
+    // pricing, but explicit > tacit.
+    await setProPricing({
+      lessonPricing: {},
+      extraStudentPricing: {},
+      allowBookingWithoutPayment: false,
+      subscriptionStatus: "active",
+    });
+    const [row] = await db
+      .select({
+        lessonPricing: proProfiles.lessonPricing,
+        allowBookingWithoutPayment: proProfiles.allowBookingWithoutPayment,
+      })
+      .from(proProfiles)
+      .where(eq(proProfiles.id, TEST_PRO_PROFILE_ID))
+      .limit(1);
+    expect(row?.lessonPricing).toEqual({});
+    expect(row?.allowBookingWithoutPayment).toBe(false);
   });
 });
 

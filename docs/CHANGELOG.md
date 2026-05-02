@@ -4,6 +4,18 @@ End-user-visible changes shipped to the platform. Engineering details
 that don't affect what students or pros see live in `docs/gaps.md` and
 the git history. Newest first.
 
+## 2026-05-02 — v1.1.1
+
+- **Late-evening "today" boundary fixed.** Bookings just before midnight
+  Brussels time used to drift between "Upcoming" and "Past" lists for
+  an hour or two depending on the server's clock. The lists now resolve
+  "today" in each booking's location timezone, so the categorisation
+  stays stable regardless of when you open the app.
+- **Quick Book suggestion no longer skips a day.** When you opened
+  Quick Book late in the evening, the suggested date could land a day
+  before the actual availability window and silently jump forward.
+  Both anchors now use the same location timezone.
+
 ## 2026-05-02 — v1.1.0
 
 - **Version + changelog now visible at `/about`.** Lists the running

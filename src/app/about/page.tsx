@@ -3,6 +3,11 @@ import path from "node:path";
 import { getLocale } from "@/lib/locale";
 import { t } from "@/lib/i18n/translations";
 import { formatDate } from "@/lib/format-date";
+import {
+  parseChangelog,
+  renderItem,
+  type ChangelogEntry,
+} from "@/lib/changelog";
 import { CheckForUpdatesButton } from "./CheckForUpdatesButton";
 
 export const metadata = { title: "About — Golf Lessons" };
@@ -13,68 +18,6 @@ const BUILD_COMMIT_SHA = process.env.NEXT_PUBLIC_BUILD_COMMIT_SHA ?? "";
 const BUILD_BRANCH = process.env.NEXT_PUBLIC_BUILD_BRANCH ?? "local";
 const BUILD_TIME = process.env.NEXT_PUBLIC_BUILD_TIME ?? "";
 const VERCEL_ENV = process.env.NEXT_PUBLIC_VERCEL_ENV ?? "development";
-
-interface ChangelogEntry {
-  date: string; // YYYY-MM-DD
-  /** Bullet items, each one a paragraph of HTML-escaped text with a
-   *  leading **bold** preserved when present in the source. */
-  items: string[];
-}
-
-/**
- * Minimal parser for the changelog's hand-curated format. Source is
- * `docs/CHANGELOG.md`; sections start with `## YYYY-MM-DD ...`, items
- * are top-level `- ...` bullets that may wrap onto continuation lines.
- * Anything before the first `##` heading is the file intro and gets
- * dropped. Inline `**bold**` is recognised; everything else is treated
- * as plain text (no link / code / list-nesting support — the format is
- * flat by convention).
- */
-function parseChangelog(md: string): ChangelogEntry[] {
-  const out: ChangelogEntry[] = [];
-  const lines = md.split("\n");
-  let current: ChangelogEntry | null = null;
-  let buffer: string[] = [];
-
-  function flushBullet() {
-    if (!current || buffer.length === 0) return;
-    current.items.push(buffer.join(" ").trim());
-    buffer = [];
-  }
-
-  for (const raw of lines) {
-    const line = raw.trimEnd();
-    const heading = /^##\s+(\d{4}-\d{2}-\d{2})/.exec(line);
-    if (heading) {
-      flushBullet();
-      if (current) out.push(current);
-      current = { date: heading[1], items: [] };
-      continue;
-    }
-    if (!current) continue; // skip pre-first-heading intro
-    if (line.startsWith("- ")) {
-      flushBullet();
-      buffer.push(line.slice(2));
-    } else if (line.trim() === "") {
-      flushBullet();
-    } else if (buffer.length > 0) {
-      // continuation line of the current bullet
-      buffer.push(line.trim());
-    }
-  }
-  flushBullet();
-  if (current) out.push(current);
-  return out;
-}
-
-/** Escape HTML and turn `**bold**` runs into `<strong>` markers. */
-function renderItem(text: string): string {
-  const esc = text
-    .replaceAll("&", "&amp;")
-    .replaceAll("<", "&lt;")
-    .replaceAll(">", "&gt;");
-  return esc.replace(/\*\*([^*]+)\*\*/g, "<strong>$1</strong>");
-}
 
 async function loadChangelog(): Promise<ChangelogEntry[]> {
   try {
