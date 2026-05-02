@@ -17,6 +17,14 @@ If any role inside the brackets is unknown (typo), the parser falls
 back to treating the brackets as literal text — better to over-show
 than silently hide.
 
+## 2026-05-02 — v1.1.15
+
+- [admin] **Sidebar Admin section now lists Manual refund + Feedback.**
+  Both links existed on the /admin dashboard tile grid but were
+  missing from the persistent left sidebar's Admin section. Now
+  match — admins can jump to either page without going through the
+  dashboard.
+
 ## 2026-05-02 — v1.1.14
 
 - **Send us feedback right from the app.** A new Feedback page in
