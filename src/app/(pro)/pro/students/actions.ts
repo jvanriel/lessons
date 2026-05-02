@@ -1,7 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { db } from "@/lib/db";
+import { db, isSlotConflictError } from "@/lib/db";
 import {
   users,
   userEmails,
@@ -33,6 +33,7 @@ import {
   todayInTZ,
 } from "@/lib/local-date";
 import { getProLocationTimezone } from "@/lib/pro";
+import { fromZonedTime } from "date-fns-tz";
 import { resolveLocale } from "@/lib/i18n";
 import { createNotification } from "@/lib/notifications";
 import {
@@ -919,32 +920,46 @@ export async function proQuickBookForStudent(data: {
     return { error: "This time slot is no longer available." };
   }
 
-  // Create booking (booked by the student, initiated by pro)
+  // Create booking (booked by the student, initiated by pro). Atomic
+  // insert + participant — the pro/student relationship already
+  // exists (this is a pro-initiated booking against an existing
+  // student row), so no proStudents upsert is needed.
   const manageToken = crypto.randomBytes(32).toString("hex");
 
-  const [booking] = await db
-    .insert(lessonBookings)
-    .values({
-      proProfileId: profile.id,
-      bookedById: rel.userId,
-      proLocationId: data.proLocationId,
-      date: data.date,
-      startTime: data.startTime,
-      endTime: data.endTime,
-      participantCount: 1,
-      status: "confirmed",
-      manageToken,
-    })
-    .returning({ id: lessonBookings.id });
+  let booking: { id: number };
+  try {
+    booking = await db.transaction(async (tx) => {
+      const [b] = await tx
+        .insert(lessonBookings)
+        .values({
+          proProfileId: profile.id,
+          bookedById: rel.userId,
+          proLocationId: data.proLocationId,
+          date: data.date,
+          startTime: data.startTime,
+          endTime: data.endTime,
+          participantCount: 1,
+          status: "confirmed",
+          manageToken,
+        })
+        .returning({ id: lessonBookings.id });
 
-  // Create participant
-  await db.insert(lessonParticipants).values({
-    bookingId: booking.id,
-    firstName: rel.firstName,
-    lastName: rel.lastName,
-    email: rel.email,
-    phone: rel.phone,
-  });
+      await tx.insert(lessonParticipants).values({
+        bookingId: b.id,
+        firstName: rel.firstName,
+        lastName: rel.lastName,
+        email: rel.email,
+        phone: rel.phone,
+      });
+
+      return b;
+    });
+  } catch (err) {
+    if (isSlotConflictError(err)) {
+      return { error: "This time slot is no longer available." };
+    }
+    throw err;
+  }
 
   // Update student preferences
   const dayOfWeek = jsDayToIso(new Date(data.date + "T00:00:00").getDay());
@@ -1182,6 +1197,19 @@ export async function getStudentBookings(proStudentId: number) {
 
 /**
  * Cancel a booking (pro-initiated).
+ *
+ * Pros can cancel any of their bookings, including ones that already
+ * happened — useful for housekeeping (e.g. the student no-showed and
+ * the row sat as `confirmed`). Two paths:
+ *
+ *   - **Future lesson** → notify the student in-app, email both
+ *     parties, attach a `METHOD:CANCEL` ICS so the event disappears
+ *     from calendars.
+ *   - **Past lesson** → pure administrative cleanup. Flip the row to
+ *     `cancelled` and stop. No notification, no email, no ICS — the
+ *     student already lived through the booking and a "your lesson
+ *     was cancelled" email about a date in the past would be
+ *     confusing. Confirmed with product (gaps.md §0).
  */
 export async function proCancelBooking(bookingId: number) {
   const { profile } = await requireProProfile();
@@ -1208,17 +1236,59 @@ export async function proCancelBooking(bookingId: number) {
 
   if (!booking) return { error: "Booking not found." };
 
+  // Decide BEFORE the row update whether the lesson is in the past,
+  // so we can short-circuit the notification+email pipeline. Resolve
+  // the lesson start in the location's TZ — same pattern as
+  // `cancelBooking` in (member)/member/bookings/actions.ts. Reading
+  // the location row also gives us name + tz for the email path.
+  const [loc] = await db
+    .select({
+      name: locations.name,
+      city: locations.city,
+      timezone: locations.timezone,
+    })
+    .from(proLocations)
+    .innerJoin(locations, eq(proLocations.locationId, locations.id))
+    .where(eq(proLocations.id, booking.proLocationId))
+    .limit(1);
+  if (!loc) {
+    throw new Error(
+      `proCancelBooking: location lookup missing for proLocationId=${booking.proLocationId} (booking ${booking.id})`,
+    );
+  }
+  const locationName = loc.city ? `${loc.name}, ${loc.city}` : loc.name;
+  const locationTz = loc.timezone;
+  const lessonStart = fromZonedTime(
+    `${booking.date}T${booking.startTime}:00`,
+    locationTz,
+  );
+  const isPast = lessonStart.getTime() <= Date.now();
+
   await db
     .update(lessonBookings)
     .set({
       status: "cancelled",
       cancelledAt: new Date(),
-      cancellationReason: "Cancelled by pro",
+      cancellationReason: isPast
+        ? "Cancelled by pro (admin cleanup, lesson already past)"
+        : "Cancelled by pro",
       updatedAt: new Date(),
     })
     .where(eq(lessonBookings.id, bookingId));
 
-  // Notify the student (in-app)
+  revalidatePath("/pro/students");
+  revalidatePath("/pro/bookings");
+
+  // Past lesson: stop here. No emails, no notification, no ICS — the
+  // student doesn't need to hear about a cancellation of a lesson
+  // they already attended (or didn't).
+  if (isPast) {
+    return { success: true, silent: true };
+  }
+
+  // Future lesson: notify + email both parties with a CANCEL ics.
+  // Mirror of the member-side cancelBooking flow, but with the
+  // "by: pro" copy variant.
   await createNotification({
     type: "booking_cancelled",
     priority: "high",
@@ -1229,9 +1299,6 @@ export async function proCancelBooking(bookingId: number) {
     actionLabel: "View bookings",
   }).catch(() => {});
 
-  // Email both parties (best-effort) with a CANCEL ics so the event
-  // disappears from their calendars. Mirror of the member-side
-  // cancelBooking flow, but with the "by: pro" copy variant.
   const [student] = await db
     .select({
       firstName: users.firstName,
@@ -1253,24 +1320,6 @@ export async function proCancelBooking(bookingId: number) {
     .innerJoin(users, eq(proProfiles.userId, users.id))
     .where(eq(proProfiles.id, profile.id))
     .limit(1);
-
-  const [loc] = await db
-    .select({
-      name: locations.name,
-      city: locations.city,
-      timezone: locations.timezone,
-    })
-    .from(proLocations)
-    .innerJoin(locations, eq(proLocations.locationId, locations.id))
-    .where(eq(proLocations.id, booking.proLocationId))
-    .limit(1);
-  if (!loc) {
-    throw new Error(
-      `proCancelBooking: location lookup missing for proLocationId=${booking.proLocationId} (booking ${booking.id})`,
-    );
-  }
-  const locationName = loc.city ? `${loc.name}, ${loc.city}` : loc.name;
-  const locationTz = loc.timezone;
 
   const studentName = student
     ? `${student.firstName} ${student.lastName}`
@@ -1337,7 +1386,5 @@ export async function proCancelBooking(bookingId: number) {
     }).catch(() => {});
   }
 
-  revalidatePath("/pro/students");
-  revalidatePath("/pro/bookings");
   return { success: true };
 }

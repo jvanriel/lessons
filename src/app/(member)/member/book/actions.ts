@@ -464,70 +464,77 @@ export async function createBooking(formData: FormData) {
   }
   const { priceCents, platformFeeCents, paymentStatus: initialPaymentStatus, cashOnly } = pricing;
 
-  // NOTE: would ideally be wrapped in db.transaction() for atomicity, but
-  // the @neondatabase/serverless HTTP driver does not support multi-statement
-  // transactions. Revisit when we move to the WebSocket / pg driver.
-  // See docs/gaps.md "data integrity" item.
   const manageToken = crypto.randomBytes(32).toString("hex");
 
-  // The DB-level partial unique index `lesson_bookings_slot_confirmed_idx`
-  // is the race-safe gate against two students grabbing the same slot
-  // between the `getAvailableSlots` snapshot above and this insert.
-  // Translate the duplicate-key error into the same friendly message
-  // the slot-staleness check returns.
+  // Atomic row-consistency block:
+  //   1. INSERT lesson_bookings (race-gated by the partial unique
+  //      index `lesson_bookings_slot_confirmed_idx`).
+  //   2. INSERT lesson_participants for the booker.
+  //   3. UPSERT-style insert into pro_students (skip if relationship
+  //      already exists).
+  //
+  // All three commit together — a failure on participant or
+  // pro_students rolls the booking back, so the slot stays free for
+  // a re-book attempt. Stripe + email side-effects run AFTER the
+  // transaction commits (see below), so a Stripe error doesn't
+  // rollback the booking — the row persists with paymentStatus =
+  // "failed" and the student can retry from /member/bookings.
   let booking: { id: number };
   try {
-    [booking] = await db
-      .insert(lessonBookings)
-      .values({
-        proProfileId,
-        bookedById: session.userId,
-        proLocationId,
-        date,
-        startTime,
-        endTime,
-        participantCount,
-        status: "confirmed",
-        notes,
-        manageToken,
-        priceCents,
-        platformFeeCents,
-        paymentStatus: initialPaymentStatus,
-      })
-      .returning({ id: lessonBookings.id });
+    booking = await db.transaction(async (tx) => {
+      const [b] = await tx
+        .insert(lessonBookings)
+        .values({
+          proProfileId,
+          bookedById: session.userId,
+          proLocationId,
+          date,
+          startTime,
+          endTime,
+          participantCount,
+          status: "confirmed",
+          notes,
+          manageToken,
+          priceCents,
+          platformFeeCents,
+          paymentStatus: initialPaymentStatus,
+        })
+        .returning({ id: lessonBookings.id });
+
+      await tx.insert(lessonParticipants).values({
+        bookingId: b.id,
+        firstName,
+        lastName,
+        email,
+        phone,
+      });
+
+      const [existingRelation] = await tx
+        .select({ id: proStudents.id })
+        .from(proStudents)
+        .where(
+          and(
+            eq(proStudents.proProfileId, proProfileId),
+            eq(proStudents.userId, session.userId),
+          ),
+        )
+        .limit(1);
+      if (!existingRelation) {
+        await tx.insert(proStudents).values({
+          proProfileId: proProfileId,
+          userId: session.userId,
+          source: "self",
+          status: "active",
+        });
+      }
+
+      return b;
+    });
   } catch (err) {
     if (isSlotConflictError(err)) {
       return { error: t("bookErr.slotUnavailable", locale) };
     }
     throw err;
-  }
-
-  await db.insert(lessonParticipants).values({
-    bookingId: booking.id,
-    firstName,
-    lastName,
-    email,
-    phone,
-  });
-
-  const [existingRelation] = await db
-    .select({ id: proStudents.id })
-    .from(proStudents)
-    .where(
-      and(
-        eq(proStudents.proProfileId, proProfileId),
-        eq(proStudents.userId, session.userId)
-      )
-    )
-    .limit(1);
-
-  if (!existingRelation) {
-    await db.insert(proStudents).values({
-      proProfileId: proProfileId,
-      userId: session.userId,
-      source: "self",
-      status: "active",
-    });
   }
 
   // Charge the student's saved payment method off-session, or claim
@@ -1071,43 +1078,50 @@ export async function quickCreateBooking(data: {
   }
   const { priceCents, platformFeeCents, paymentStatus: initialPaymentStatus, cashOnly } = pricing;
 
-  // Create booking — same race-safe gate as `createBooking` above.
+  // Atomic block — same shape as `createBooking`. Quick Book skips
+  // the proStudents upsert because Quick Book is only reachable from
+  // the dashboard, which means the relationship already exists (the
+  // pro is on the student's "My pros" list). Bare booking +
+  // participant is enough.
   const manageToken = crypto.randomBytes(32).toString("hex");
 
   let booking: { id: number };
   try {
-    [booking] = await db
-      .insert(lessonBookings)
-      .values({
-        proProfileId: data.proProfileId,
-        bookedById: session.userId,
-        proLocationId: data.proLocationId,
-        date: data.date,
-        startTime: data.startTime,
-        endTime: data.endTime,
-        participantCount: 1,
-        status: "confirmed",
-        manageToken,
-        priceCents,
-        platformFeeCents,
-        paymentStatus: initialPaymentStatus,
-      })
-      .returning({ id: lessonBookings.id });
+    booking = await db.transaction(async (tx) => {
+      const [b] = await tx
+        .insert(lessonBookings)
+        .values({
+          proProfileId: data.proProfileId,
+          bookedById: session.userId,
+          proLocationId: data.proLocationId,
+          date: data.date,
+          startTime: data.startTime,
+          endTime: data.endTime,
+          participantCount: 1,
+          status: "confirmed",
+          manageToken,
+          priceCents,
+          platformFeeCents,
+          paymentStatus: initialPaymentStatus,
+        })
+        .returning({ id: lessonBookings.id });
+
+      await tx.insert(lessonParticipants).values({
+        bookingId: b.id,
+        firstName: user.firstName,
+        lastName: user.lastName,
+        email: user.email,
+        phone: user.phone,
+      });
+
+      return b;
+    });
   } catch (err) {
     if (isSlotConflictError(err)) {
       return { error: t("bookErr.slotUnavailable", locale) };
     }
     throw err;
   }
-
-  // Create participant
-  await db.insert(lessonParticipants).values({
-    bookingId: booking.id,
-    firstName: user.firstName,
-    lastName: user.lastName,
-    email: user.email,
-    phone: user.phone,
-  });
 
   // Charge online or claim cash commission — same shared helpers as
   // `createBooking`. Errors are Sentry-captured + the booking row

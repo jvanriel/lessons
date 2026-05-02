@@ -33,53 +33,26 @@ The platform CMS (`cms_blocks`) has per-locale rows but is operated by the platf
 
 ### Booking engine — open audit items
 
-- **`subtractWindow` doesn't pre-merge overlapping availability
-  windows** (`src/lib/lesson-slots.ts:71-89, 151-160`). Two overlapping
-  templates → duplicate slots, and a single booking only subtracts
-  from one window. Templates from the editor's grid-projection don't
-  overlap in practice, but `proAvailabilityOverrides` of
-  `type='available'` is hand-typed and could. Add a `merge(windows)`
-  pass before slicing.
-- **`proCancelBooking` has no time guard at all**
-  (`src/app/(pro)/pro/students/actions.ts:1179-1212`). Pros can
-  cancel past bookings and still trigger student emails +
-  `METHOD:CANCEL` ics. Probably intentional but worth confirming with
-  product.
-- **Two duplicated `jsDayToIso` helpers** —
-  `lesson-slots.ts:67` (canonical) + `booking-preferences.ts:8`.
-  Easy follow-up: delete the booking-preferences copy + import from
-  lesson-slots.
 - **`BookingsCalendar` hard-codes a 07:00–21:00 grid**
   (`BookingsCalendar.tsx:63-68`); a 22:00 winter lesson silently
   renders off-grid.
-- **Lint guard for the new pattern.** Extend
-  `src/lib/__tests__/local-date-guard.test.ts` to also flag
-  `new Date(\`${...}T${...}\`)` so regressions of the cancel-deadline
-  bug get caught at CI time.
 
 ### Test coverage gaps
 
-- **Concurrency / double-booking integration test.** The partial
-  unique index gates the race at the DB; an end-to-end test that
-  spawns two parallel `createBooking` calls would prove the catch in
-  the actions surfaces the friendly message rather than crashing.
-- **Reminder cron route handler.** No tests; the per-booking TZ
-  filter is exercised via `lesson-slots.test.ts` indirectly but the
-  route's idempotency / window-widening logic isn't pinned.
+(All booking-engine test gaps closed as of 2026-05-02 — see Recently
+shipped sweep below for the slot-uniqueness + cron route handler
+integration tests.)
 
-### `db.transaction()` wrapping
+### ~~`db.transaction()` wrapping~~ — done (2026-05-02)
 
-Multi-step inserts (booking + participant + relationship) can leave
-partial state on failure. **Blocked**: the current
-`drizzle-orm/neon-http` driver doesn't support multi-statement
-transactions. Move to `neon-serverless` (WebSocket) or `pg` first,
-then re-introduce. Initial attempt in commit `ea60e63` broke the
-booking flow (Nadine's task #12) and was reverted in `b95dc35`. The
-proper fix is a driver migration — see Open Questions #4. **Note**:
-the partial unique index on slot uniqueness shipped 2026-05-02 is the
-deployable mitigation that doesn't need the driver swap; the rest of
-the row consistency (participant + pro_students upsert) still benefits
-from a real transaction.
+Driver swapped from `neon-http` to `neon-serverless` in v1.1.6. Then
+v1.1.7 wrapped all four booking-insert paths (`createBooking`,
+`quickCreateBooking`, `createPublicBooking`, `proCreateBooking`) in
+`db.transaction()` so booking + participant + (where applicable)
+proStudents upsert commit together. Stripe / commission /
+notification side-effects stay outside the transaction so a Stripe
+error doesn't roll back the booking — the row persists with
+`paymentStatus="failed"` for retry, same as before.
 
 ### Public booking flow — production readiness
 

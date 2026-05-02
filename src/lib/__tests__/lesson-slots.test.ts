@@ -4,6 +4,7 @@ import {
   minutesToTime,
   jsDayToIso,
   subtractWindow,
+  mergeWindows,
   computeAvailableSlots,
   formatDate,
   buildIcs,
@@ -199,6 +200,97 @@ describe("subtractWindow", () => {
     expect(result).toEqual([
       { start: 100, end: 250 },
       { start: 450, end: 600 },
+    ]);
+  });
+});
+
+// ─── Helper: mergeWindows ──────────────────────────
+
+describe("mergeWindows", () => {
+  it("returns empty for empty input", () => {
+    expect(mergeWindows([])).toEqual([]);
+  });
+
+  it("returns the same single window untouched", () => {
+    expect(mergeWindows([{ start: 100, end: 300 }])).toEqual([
+      { start: 100, end: 300 },
+    ]);
+  });
+
+  it("drops zero-or-negative-length windows", () => {
+    expect(
+      mergeWindows([
+        { start: 100, end: 100 },
+        { start: 200, end: 150 },
+        { start: 300, end: 400 },
+      ]),
+    ).toEqual([{ start: 300, end: 400 }]);
+  });
+
+  it("keeps disjoint windows separate, sorted", () => {
+    expect(
+      mergeWindows([
+        { start: 400, end: 600 },
+        { start: 100, end: 300 },
+      ]),
+    ).toEqual([
+      { start: 100, end: 300 },
+      { start: 400, end: 600 },
+    ]);
+  });
+
+  it("merges two overlapping windows into one", () => {
+    expect(
+      mergeWindows([
+        { start: 0, end: 600 },
+        { start: 500, end: 700 },
+      ]),
+    ).toEqual([{ start: 0, end: 700 }]);
+  });
+
+  it("merges directly-touching windows (end == next.start)", () => {
+    // Touching is treated as overlap — without this, slot slicing
+    // emits a 30-min gap on a continuous template.
+    expect(
+      mergeWindows([
+        { start: 0, end: 600 },
+        { start: 600, end: 900 },
+      ]),
+    ).toEqual([{ start: 0, end: 900 }]);
+  });
+
+  it("merges a chain of overlapping windows", () => {
+    expect(
+      mergeWindows([
+        { start: 0, end: 200 },
+        { start: 100, end: 400 },
+        { start: 350, end: 500 },
+      ]),
+    ).toEqual([{ start: 0, end: 500 }]);
+  });
+
+  it("handles a window fully contained in another", () => {
+    expect(
+      mergeWindows([
+        { start: 0, end: 1000 },
+        { start: 200, end: 400 },
+      ]),
+    ).toEqual([{ start: 0, end: 1000 }]);
+  });
+
+  it("preserves multiple disjoint groups", () => {
+    expect(
+      mergeWindows([
+        { start: 0, end: 200 },
+        { start: 100, end: 300 },
+        { start: 500, end: 700 },
+        { start: 600, end: 800 },
+        { start: 900, end: 1000 },
+      ]),
+    ).toEqual([
+      { start: 0, end: 300 },
+      { start: 500, end: 800 },
+      { start: 900, end: 1000 },
     ]);
   });
 });
@@ -781,6 +873,111 @@ describe("multi-period schedules (exclusive timeline)", () => {
     ]);
   });
 
+});
+
+// ─── Overlap-merge regression (engine end-to-end) ────
+//
+// Pre-fix, a hand-typed `available` override that overlapped a
+// template produced two parallel windows. A single booking only
+// subtracted from one of them, so the slot list emitted the same
+// time twice — and a "double-book" only consumed one of the two
+// duplicate slots. The pre-merge step in step 2b of the engine
+// fixes this. These cases pin the behaviour at the engine boundary
+// (the unit tests above cover `mergeWindows` in isolation).
+
+describe("overlap merge in computeAvailableSlots", () => {
+  const pastNow = new Date("2020-01-01T00:00:00");
+  const monday = "2026-03-09";
+
+  it("an `available` override overlapping a template produces no duplicate slots", () => {
+    const template: AvailabilityTemplate = {
+      dayOfWeek: 0,
+      startTime: "09:00",
+      endTime: "11:00",
+      validFrom: null,
+      validUntil: null,
+    };
+    // Override 10:00-12:00 overlaps the 09:00-11:00 template.
+    // After merge: one continuous 09:00-12:00 window. 60-min slots:
+    // 09:00, 09:30, 10:00, 10:30, 11:00.
+    const override: AvailabilityOverride = {
+      type: "available",
+      startTime: "10:00",
+      endTime: "12:00",
+      proLocationId: null,
+    };
+    const slots = compute(monday, [template], [override], [], 0, 60, pastNow);
+    expect(slots.map((s) => s.startTime)).toEqual([
+      "09:00",
+      "09:30",
+      "10:00",
+      "10:30",
+      "11:00",
+    ]);
+  });
+
+  it("a booking removes from the merged window — no duplicate offered", () => {
+    // Same overlapping template + override as above. Booking 10:00-
+    // 11:00 should remove that hour from the merged 09:00-12:00
+    // window, leaving 09:00-10:00 and 11:00-12:00. 60-min slots:
+    // 09:00 and 11:00 (no duplicates).
+    const template: AvailabilityTemplate = {
+      dayOfWeek: 0,
+      startTime: "09:00",
+      endTime: "11:00",
+      validFrom: null,
+      validUntil: null,
+    };
+    const override: AvailabilityOverride = {
+      type: "available",
+      startTime: "10:00",
+      endTime: "12:00",
+      proLocationId: null,
+    };
+    const booking: ExistingBooking = {
+      startTime: "10:00",
+      endTime: "11:00",
+    };
+    const slots = compute(
+      monday,
+      [template],
+      [override],
+      [booking],
+      0,
+      60,
+      pastNow,
+    );
+    expect(slots.map((s) => s.startTime)).toEqual(["09:00", "11:00"]);
+  });
+
+  it("two adjacent templates merge into one continuous window", () => {
+    // Templates 09:00-11:00 + 11:00-13:00 (touching). Without merge,
+    // a 90-min slot starting at 10:30 wouldn't fit (would cross the
+    // boundary). With merge, the boundary disappears.
+    const t1: AvailabilityTemplate = {
+      dayOfWeek: 0,
+      startTime: "09:00",
+      endTime: "11:00",
+      validFrom: null,
+      validUntil: null,
+    };
+    const t2: AvailabilityTemplate = {
+      dayOfWeek: 0,
+      startTime: "11:00",
+      endTime: "13:00",
+      validFrom: null,
+      validUntil: null,
+    };
+    const slots = compute(monday, [t1, t2], [], [], 0, 90, pastNow);
+    expect(slots.map((s) => s.startTime)).toEqual([
+      "09:00",
+      "09:30",
+      "10:00",
+      "10:30",
+      "11:00",
+      "11:30",
+    ]);
+  });
 });
 
 // ─── Edge cases ──────────────────────────────────────
