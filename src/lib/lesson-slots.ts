@@ -90,6 +90,39 @@ export function subtractWindow(
   return result;
 }
 
+/**
+ * Merge overlapping or directly-adjacent windows into the smallest
+ * disjoint covering set. Used before slicing in `computeAvailableSlots`
+ * so a hand-typed `available` override that overlaps a template — or
+ * two template windows on the same day that happen to touch — produces
+ * one continuous range, not duplicated slots.
+ *
+ * Example: `[{0..600}, {500..700}, {800..900}]` →
+ *          `[{0..700}, {800..900}]`.
+ *
+ * The slot engine's pre-merge invariants:
+ *   1. No window has `start >= end` (zero-or-negative-length is dropped).
+ *   2. Windows are returned sorted by `start`.
+ *   3. No two windows in the output overlap or touch.
+ */
+export function mergeWindows(windows: TimeWindow[]): TimeWindow[] {
+  const cleaned = windows.filter((w) => w.start < w.end);
+  if (cleaned.length <= 1) return cleaned.slice();
+  const sorted = cleaned.slice().sort((a, b) => a.start - b.start);
+  const out: TimeWindow[] = [{ ...sorted[0] }];
+  for (let i = 1; i < sorted.length; i++) {
+    const last = out[out.length - 1];
+    const next = sorted[i];
+    if (next.start <= last.end) {
+      // Overlap or touch — extend the last window's end to cover both.
+      if (next.end > last.end) last.end = next.end;
+    } else {
+      out.push({ ...next });
+    }
+  }
+  return out;
+}
+
 // ─── Core Engine ─────────────────────────────────────
 
 export function computeAvailableSlots(
@@ -138,6 +171,14 @@ export function computeAvailableSlots(
       });
     }
   }
+
+  // 2b. Merge overlapping / touching windows into a disjoint set.
+  // The editor's grid-projection produces non-overlapping templates,
+  // but `available` overrides are hand-typed and can overlap a
+  // template (or each other). Without the merge, a single booking
+  // would only subtract from one of two duplicates and the slot
+  // engine would emit the same time twice.
+  windows = mergeWindows(windows);
 
   // 3. Subtract existing bookings
   for (const b of bookings) {

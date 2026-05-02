@@ -33,29 +33,9 @@ The platform CMS (`cms_blocks`) has per-locale rows but is operated by the platf
 
 ### Booking engine — open audit items
 
-- **`subtractWindow` doesn't pre-merge overlapping availability
-  windows** (`src/lib/lesson-slots.ts:71-89, 151-160`). Two overlapping
-  templates → duplicate slots, and a single booking only subtracts
-  from one window. Templates from the editor's grid-projection don't
-  overlap in practice, but `proAvailabilityOverrides` of
-  `type='available'` is hand-typed and could. Add a `merge(windows)`
-  pass before slicing.
-- **`proCancelBooking` has no time guard at all**
-  (`src/app/(pro)/pro/students/actions.ts:1179-1212`). Pros can
-  cancel past bookings and still trigger student emails +
-  `METHOD:CANCEL` ics. Probably intentional but worth confirming with
-  product.
-- **Two duplicated `jsDayToIso` helpers** —
-  `lesson-slots.ts:67` (canonical) + `booking-preferences.ts:8`.
-  Easy follow-up: delete the booking-preferences copy + import from
-  lesson-slots.
 - **`BookingsCalendar` hard-codes a 07:00–21:00 grid**
   (`BookingsCalendar.tsx:63-68`); a 22:00 winter lesson silently
   renders off-grid.
-- **Lint guard for the new pattern.** Extend
-  `src/lib/__tests__/local-date-guard.test.ts` to also flag
-  `new Date(\`${...}T${...}\`)` so regressions of the cancel-deadline
-  bug get caught at CI time.
 
 ### Test coverage gaps
 

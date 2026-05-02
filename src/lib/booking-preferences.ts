@@ -1,13 +1,7 @@
 import { db } from "@/lib/db";
 import { lessonBookings, proStudents } from "@/lib/db/schema";
 import { and, desc, eq } from "drizzle-orm";
-
-/**
- * Convert JS Date.getDay() (0=Sun) to ISO weekday (0=Mon..6=Sun).
- */
-function jsDayToIso(jsDay: number): number {
-  return jsDay === 0 ? 6 : jsDay - 1;
-}
+import { jsDayToIso } from "@/lib/lesson-slots";
 
 /**
  * Silently learn/refresh the student's scheduling preferences on the

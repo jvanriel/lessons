@@ -4,6 +4,19 @@ End-user-visible changes shipped to the platform. Engineering details
 that don't affect what students or pros see live in `docs/gaps.md` and
 the git history. Newest first.
 
+## 2026-05-02 — v1.1.4
+
+- **Cancelling a past lesson on the pro side is silent.** When a pro
+  cleans up an old `confirmed` row that should have been cancelled
+  (e.g. after a no-show), the system now treats it as administrative
+  cleanup: the booking flips to `cancelled` but the student gets no
+  email or calendar update. Cancellations of upcoming lessons still
+  notify both parties as before.
+- **Slot computation handles overlapping availability cleanly.** If a
+  pro adds an "available" override that overlaps a regular template
+  (or two templates touch each other), the slot list no longer
+  duplicates entries or skips the boundary minute.
+
 ## 2026-05-02 — v1.1.3
 
 - **About page no longer warns about duplicate keys.** When multiple
