@@ -17,6 +17,15 @@ If any role inside the brackets is unknown (typo), the parser falls
 back to treating the brackets as literal text — better to over-show
 than silently hide.
 
+## 2026-05-02 — v1.1.23
+
+- [admin,dev] **Booking-edit: tests + a real fix to the slot-conflict
+  check.** The Phase 1 edit feature now ships with 19 unit tests +
+  10 DB-integration tests against preview. The integration tests
+  caught a closed-interval overlap bug that would have rejected
+  back-to-back lessons (10:00–11:00 then 11:00–12:00) as a conflict
+  during a reschedule — fixed.
+
 ## 2026-05-02 — v1.1.22
 
 - **You can now edit an existing booking.** From the bookings list

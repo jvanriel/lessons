@@ -7,7 +7,7 @@ import {
   locations,
   users,
 } from "@/lib/db/schema";
-import { and, eq, ne, gte, lte, isNull } from "drizzle-orm";
+import { and, eq, ne, gt, lt, isNull } from "drizzle-orm";
 import { alias } from "drizzle-orm/pg-core";
 import { sendEmail } from "@/lib/mail";
 import { buildIcs, checkCancellationAllowed } from "@/lib/lesson-slots";
@@ -158,6 +158,10 @@ export async function isSlotTakenByOther(
   // simple range-overlap rather than relying on the unique-slot index
   // because the index is exact-start-time only — and an edit can
   // shift to a non-identical start that still overlaps.
+  //
+  // Half-open intervals: a back-to-back chain (10:00-11:00 then
+  // 11:00-12:00) does NOT overlap. Treating the boundary as a clash
+  // would block normal pro behaviour of stacking lessons.
   const rows = await db
     .select({ id: lessonBookings.id })
     .from(lessonBookings)
@@ -168,9 +172,9 @@ export async function isSlotTakenByOther(
         eq(lessonBookings.date, date),
         eq(lessonBookings.status, "confirmed"),
         ne(lessonBookings.id, excludeBookingId),
-        // Half-open overlap: existing.start < new.end AND existing.end > new.start
-        lte(lessonBookings.startTime, endTime),
-        gte(lessonBookings.endTime, startTime),
+        // existing.start < new.end AND existing.end > new.start
+        lt(lessonBookings.startTime, endTime),
+        gt(lessonBookings.endTime, startTime),
       ),
     )
     .limit(1);
