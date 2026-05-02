@@ -7,221 +7,7 @@ Cross-reference for sprint planning and Nadine's testing feedback.
 
 ## 🔴 Go-live blockers
 
-### ~~1. V1 payment flow (Sprint B)~~ — **done** (follow-ups in 🟡)
-
-Shipped in commits `6e4ac54`, `07ad6e2`, `fd9bc90` on 2026-04-13. End-
-to-end flow:
-
-1. **Pro side** — per-duration lesson prices live on
-   `pro_profiles.lesson_pricing` (jsonb `{ "30": 3500, "60": 6500 }`
-   in cents). Onboarding wizard + profile editor both render a per-
-   duration € input grid with pro-rated pre-fill on toggle and
-   cents↔EUR conversion at the form boundary. DB migration backfilled
-   5 preview pros + 3 prod pros with €50/h pro-rated defaults.
-2. **Student side** — booking wizard Confirm step shows the computed
-   Total in locale-aware currency (`formatPrice(cents/100, locale)`).
-   Confirm button is disabled if the pro hasn't priced the selected
-   duration, with a "pick another duration" message.
-3. **Charge** — `createBooking()` computes `priceCents = lessonPricing
-   [duration] * participantCount` plus `platformFeeCents` (from
-   `calculatePlatformFee`, now env-var driven via
-   `NEXT_PUBLIC_PLATFORM_FEE_PERCENT`, default 2.5%). Inserts the
-   booking row with `paymentStatus="pending"`, then fires
-   `stripe.paymentIntents.create` with `off_session: true`,
-   `confirm: true`, and `idempotencyKey: booking-{id}-v1`. On success
-   → `paymentStatus="paid"` + `paidAt`. On 3DS → `"requires_action"`
-   (retry UI still TBD). On failure → `"failed"` + Sentry capture,
-   booking row retained so the slot stays reserved.
-4. **Webhook reconciliation** — `payment_intent.succeeded` idempotently
-   flips to `paid`; `payment_intent.payment_failed` flips to `failed`
-   and fires `buildPaymentFailedEmail` to the student.
-5. **Refund on cancel** — `cancelBooking` checks `paymentStatus` +
-   cancellation window; if paid-and-inside-window, fires
-   `stripe.refunds.create` with `idempotencyKey: refund-{id}-v1`,
-   then flips to `paymentStatus="refunded"` + `refundedAt`. Outside-
-   window cancels were already blocked by the cancel-deadline guard
-   from the earlier locale-aware error work.
-6. **Confirmation email** — `buildStudentBookingConfirmationEmail`
-   now includes an "Amount charged" row formatted with
-   `Intl.NumberFormat` in the recipient's locale (en-GB / nl-BE /
-   fr-BE currency). Pro notification email unchanged — pros see
-   amounts in `/pro/earnings`.
-
-**Already in place from earlier sessions** (not touched this sprint):
-`MIN_LESSON_PRICE_CENTS`, Bancontact on the student SetupIntent,
-admin payouts view at `/admin/payouts` with CSV export aggregated
-per pro + IBAN, `/pro/earnings` revenue/fee display, `checkPaymentGate`
-payment-required guard during booking, `users.stripeCustomerId` on
-Stripe customer creation.
-
-**Commission decision**: stays 2.5% for now, driven by
-`NEXT_PUBLIC_PLATFORM_FEE_PERCENT` env var. Change the env var + redeploy
-to adjust without code.
-
-### 0. Date/time/timezone audit findings (2026-05-02)
-
-Audit of `src/lib/lesson-slots.ts`, `local-date.ts`, both booking-action
-files, the reminder cron and the bookings calendar surfaced several
-correctness bugs in shipped code. The slot engine itself + ICS path are
-clean (proper `fromZonedTime` use, full DST coverage in tests). The
-problems are at the *callers* that re-implement local-time parsing or
-that compare booking dates against `todayLocal()` (server TZ).
-
-**Pass 1 — engine + critical callers tightened (2026-05-02, ~done):**
-
-- ~~**`cancelBooking` lets students cancel after the lesson started.**~~
-  Fixed: `cancelBooking` now resolves `tz = getProLocationTimezone(...)`
-  and uses `fromZonedTime` for the lesson-passed guard. The two cancel
-  client components (`CancelBookingButton`, dashboard
-  `CancelBookingDialog`) take a `timezone` prop and pass it to
-  `checkCancellationAllowed`. Parents (`/member/bookings`,
-  `/member/dashboard`) read `locations.timezone` and forward it.
-- ~~**No transactional / unique-constraint guard against double-booking.**~~
-  Fixed: partial unique index `lesson_bookings_slot_confirmed_idx` on
-  `(pro_profile_id, pro_location_id, date, start_time) WHERE status='confirmed'`
-  applied to preview + prod via `scripts/migrate-booking-slot-unique.ts`.
-  Both `createBooking`/`quickCreateBooking`/`createPublicBooking` wrap
-  the insert in try/catch using `isSlotConflictError(err)` and return
-  the existing translated `slotUnavailable` message.
-- ~~**24 h reminder cron treats stored start time as UTC.**~~
-  Fixed: cron joins `locations` once for the candidate set,
-  `fromZonedTime(\`${b.date}T${b.startTime}:00\`, b.locationTz)` for
-  the per-booking window check, and passes `tz: b.locationTz` into
-  `buildIcs`. SQL pre-filter widened by ±1 day so any UTC-12 to UTC+14
-  TZ is fully covered.
-- ~~**Engine signatures + `getProLocationTimezone` had silent Brussels
-  fallbacks.**~~ Fixed: `computeAvailableSlots`, `checkCancellationAllowed`,
-  `buildIcs`, `buildCancelIcs` now require `tz` (no default).
-  `getProLocationTimezone` throws on missing row instead of returning
-  Brussels. `BookingsCalendar` `timezone` prop required. Every caller
-  (member/pro booking actions, account-deletion mailer, admin resend
-  route, both cancel client components) updated to resolve `tz` from
-  `locations.timezone`. Where the location lookup happens for the ICS
-  email, a missing `loc` row throws (was silently `""` for the name +
-  Brussels for the tz). 7 new cross-TZ tests in `lesson-slots.test.ts`
-  prove the algorithms hold for London/Tokyo/NYC/DST end-to-end.
-
-**Pass 2 — locations form work (2026-05-02, ~done):**
-
-- ~~TZ picker in the onboarding wizard's locations step + `/pro/locations`
-  create/edit forms.~~ Shipped: `src/components/TimezonePicker.tsx`
-  auto-detects the browser TZ on mount, infers from country when set
-  (`defaultTimezoneForCountry()`), shows a curated `COMMON_TIMEZONES`
-  list + the full `Intl.supportedValuesOf("timeZone")` set behind a
-  "change" link.
-- ~~`createLocation` / `updateProLocation` / `/api/pro/onboarding`
-  validate + persist the picked TZ.~~ Server-side validation via
-  `isValidIanaTimezone()` (rejects empty, fixed-offset, and unknown
-  zones — restricted to the canonical IANA civil-zone set so DST
-  rules always apply correctly).
-- ~~Surface `timezone` on `getMyLocations` / `getPublicLocations` /
-  `getProLocations` / `getAllBookablePros`.~~ Done.
-- ~~Backfill existing rows.~~ Done via
-  `scripts/migrate-location-timezones.ts` on preview (22 rows, 0
-  updates needed) + prod (6 rows, 0 updates needed). Every existing
-  Belgian location already had `Europe/Brussels` from the prior DB
-  default, which was the right answer.
-- ~~Update all seed scripts (`seed-claude-dummies`, `seed-pros`,
-  `seed-test-dummies`, `lesson-booking-integration.test.ts`) to write
-  explicit `timezone: "Europe/Brussels"` so they don't depend on the
-  DB default.~~ Done.
-
-**Pass 3 — schema + residual cleanup (2026-05-02, done):**
-
-- ~~Drop `default("Europe/Brussels")` from `locations.timezone`.~~
-  Schema updated, applied to preview + prod via
-  `scripts/migrate-drop-location-tz-default.ts`. A future code path
-  that forgets to set `timezone` now fails loudly at INSERT instead
-  of silently landing on Brussels for a non-Brussels pro.
-- ~~Remove the residual `?? "Europe/Brussels"` fallbacks on
-  `proProfiles.defaultTimezone` in `/pro/{bookings,dashboard,students,availability}/page.tsx`.~~
-  Replaced with direct reads — the column is `notNull` and the pages
-  already redirect on `!profile`, so the `??` was dead defensive code.
-  `proProfiles.defaultTimezone` keeps its DB default for now (it's a
-  display-only TZ for the pro's own dashboard; per-location `timezone`
-  is the source of truth for booking-time wall clocks).
-
-**High:**
-
-- ~~**`quickCreateBooking` bypasses pricing, payment status, and
-  platform fee.**~~ Fixed (2026-05-02): extracted the pricing /
-  charge / commission logic into `src/lib/booking-charge.ts` and
-  routed both `createBooking` and `quickCreateBooking` through it.
-  Quick Book now persists `priceCents` / `platformFeeCents` /
-  `paymentStatus`, fires the off-session PaymentIntent for online
-  pros, claims the cash commission via invoice item for cash-only
-  pros, and the pro email shows the actual current payment status
-  instead of the hardcoded "manual" placeholder. 10 unit tests cover
-  `decideBookingPricing` (online/cash-only/comp/group-rate/missing
-  row) so the shared decision rules are pinned.
-- **`BookingsCalendar` ignores schedule-period validity windows.**
-  `src/app/(pro)/pro/bookings/BookingsCalendar.tsx:128-136` groups
-  availability by `dayOfWeek` only, so multi-period schedules (task 78)
-  paint the wrong green band on weeks where a different period is in
-  effect. Either filter `validFrom`/`validUntil` per `weekDates[i]` here,
-  or precompute the projected per-date grid server-side (see
-  `projectGridForDate` in `AvailabilityEditor.tsx:175`).
-- ~~**"Today" in upcoming/past lists uses server TZ.**~~ Fixed
-  (2026-05-02): `member/bookings/page.tsx` now does per-booking
-  `todayInTZ(b.locationTimezone)` (cached per TZ) so each row's cutoff
-  matches its location's wall clock. `member/dashboard/page.tsx` (SQL
-  pre-filter for "next 5 upcoming") and `admin/page.tsx` (aggregate
-  count) use `todayInTZ("Europe/Brussels")` — coarse but correct for
-  the current Brussels-only data set, with comment pointing at the
-  per-location TZ option.
-- ~~**`computeSuggestedDate` (Quick Book suggestion) uses server TZ.**~~
-  Fixed (2026-05-02): function now takes `tz: string`, uses
-  `todayInTZ(tz)` + `addDaysToDateString`, and computes day-of-week
-  from the resulting `YYYY-MM-DD` string (TZ-independent because the
-  string has no time component). Caller `getQuickBookData` resolves
-  the location TZ once at the top and passes it both to the
-  suggestion and to the `windowStart`, so they can no longer drift
-  apart. Removed the now-dead `formatLocalDate` import + the local
-  `jsDayToIso` helper (one of the three duplicates flagged below).
-
-**Medium / hygiene:**
-
-- **`subtractWindow` doesn't pre-merge overlapping availability
-  windows** (`src/lib/lesson-slots.ts:71-89, 151-160`). Two overlapping
-  templates → duplicate slots, and a single booking only subtracts from
-  one window. Templates from the editor's grid-projection don't overlap
-  in practice, but `proAvailabilityOverrides` of `type='available'` is
-  hand-typed and could. Add a `merge(windows)` pass before slicing.
-- **`proCancelBooking` has no time guard at all**
-  (`src/app/(pro)/pro/students/actions.ts:1179-1212`). Pros can cancel
-  past bookings and still trigger student emails + `METHOD:CANCEL` ics.
-  Probably intentional but worth confirming.
-- **Two duplicated `jsDayToIso` helpers remain** —
-  `lesson-slots.ts:67` (canonical) + `booking-preferences.ts:8`.
-  The third (in `(member)/member/book/actions.ts`) was removed
-  alongside the `computeSuggestedDate` rewrite. Easy follow-up:
-  delete the booking-preferences copy + import from lesson-slots.
-- ~~**Dead `winStartTime` / `winEndTime` in the cron**~~ — removed
-  alongside the pass-1 cron rewrite.
-- **`BookingsCalendar` hard-codes a 07:00–21:00 grid**
-  (`BookingsCalendar.tsx:63-68`); a 22:00 winter lesson silently
-  renders off-grid.
-- **Lint guard for the new pattern.** Extend
-  `src/lib/__tests__/local-date-guard.test.ts` to also flag
-  `new Date(\`${...}T${...}\`)` so regressions of the cancel-deadline
-  bug get caught at CI time.
-
-**Test coverage gaps surfaced:**
-concurrency / double-booking, the cancel-deadline guard at the *caller*
-(the engine itself is well-tested), the reminder cron route handler,
-period-aware BookingsCalendar rendering, and the Quick Book pricing
-path.
-
-### 1. Pre-launch site password hardcoded
-
-- `src/middleware.ts:12` — `SITE_PASSWORD = "prolessons"`. Rotate or remove gate before public launch.
-- **Coupled with the new public booking flow**: `/book/[slug]` and `/booked/t/[token]` are not in the middleware bypass matcher (`src/middleware.ts:84-87`), so they sit behind the password gate today. Removing the gate at launch automatically opens them. If we want public booking to go live earlier, either add `book` and `booked` to the matcher exclusion, or rotate the password and share with early-access pros.
-
-### ~~2. DNS Belgium registrant fix~~ — **resolved 2026-04-17**
-
-Registrant info corrected via Vercel before the 2026-04-24 deadline.
-
-### 3. Pro-authored content + translations + CMS architecture review
+### 1. Pro-authored content + translations + CMS architecture review
 
 Pros author content in **multiple places** with no translation story:
 
@@ -245,21 +31,59 @@ The platform CMS (`cms_blocks`) has per-locale rows but is operated by the platf
 
 ## 🟡 Should-fix before launch
 
-- **`db.transaction()` wrapping in `createBooking()`** — multi-step inserts (booking + participant + relationship) can leave partial state on failure. **Blocked**: the current `drizzle-orm/neon-http` driver doesn't support multi-statement transactions. Move to `neon-serverless` (WebSocket) or `pg` first, then re-introduce. Initial attempt in commit `ea60e63` broke the booking flow (Nadine's task #12) and was reverted in `b95dc35`. The proper fix is a driver migration — see Open Questions #4. **Note**: the public booking action `/book/[slug]/actions.ts` has the same multi-row insert pattern (user + booking + participant + pro_students) and inherits this gap. **Cross-ref**: 🔴 §0 also calls out the slot-uniqueness bug — a partial unique index is the immediately deployable mitigation that doesn't need the driver swap.
+### Booking engine — open audit items
 
-### Pro slug → ID migration — run on production
+- **`subtractWindow` doesn't pre-merge overlapping availability
+  windows** (`src/lib/lesson-slots.ts:71-89, 151-160`). Two overlapping
+  templates → duplicate slots, and a single booking only subtracts
+  from one window. Templates from the editor's grid-projection don't
+  overlap in practice, but `proAvailabilityOverrides` of
+  `type='available'` is hand-typed and could. Add a `merge(windows)`
+  pass before slicing.
+- **`proCancelBooking` has no time guard at all**
+  (`src/app/(pro)/pro/students/actions.ts:1179-1212`). Pros can
+  cancel past bookings and still trigger student emails +
+  `METHOD:CANCEL` ics. Probably intentional but worth confirming with
+  product.
+- **Two duplicated `jsDayToIso` helpers** —
+  `lesson-slots.ts:67` (canonical) + `booking-preferences.ts:8`.
+  Easy follow-up: delete the booking-preferences copy + import from
+  lesson-slots.
+- **`BookingsCalendar` hard-codes a 07:00–21:00 grid**
+  (`BookingsCalendar.tsx:63-68`); a 22:00 winter lesson silently
+  renders off-grid.
+- **Lint guard for the new pattern.** Extend
+  `src/lib/__tests__/local-date-guard.test.ts` to also flag
+  `new Date(\`${...}T${...}\`)` so regressions of the cancel-deadline
+  bug get caught at CI time.
 
-Drop `pro_profiles.slug` on the production DB before deploying the slug-refactor code; otherwise the deployed code will reference a non-existent column and every pro insert will fail (slug was `NOT NULL UNIQUE` and the new code doesn't supply it). Already applied to preview.
+### Test coverage gaps
 
-```bash
-POSTGRES_URL="postgres://prod-..." pnpm tsx scripts/drop-pro-slug-column.ts
-```
+- **Concurrency / double-booking integration test.** The partial
+  unique index gates the race at the DB; an end-to-end test that
+  spawns two parallel `createBooking` calls would prove the catch in
+  the actions surfaces the friendly message rather than crashing.
+- **Reminder cron route handler.** No tests; the per-booking TZ
+  filter is exercised via `lesson-slots.test.ts` indirectly but the
+  route's idempotency / window-widening logic isn't pinned.
 
-The script is idempotent (it noop's if the column is already gone). After this runs, the existing pro rows keep their `id` and the new URL pattern (`/book/24`, `/pros/24`, `/member/book/24`) takes effect on next deploy. No redirect table for old slugs — pre-launch only, no real student traffic depended on them.
+### `db.transaction()` wrapping
+
+Multi-step inserts (booking + participant + relationship) can leave
+partial state on failure. **Blocked**: the current
+`drizzle-orm/neon-http` driver doesn't support multi-statement
+transactions. Move to `neon-serverless` (WebSocket) or `pg` first,
+then re-introduce. Initial attempt in commit `ea60e63` broke the
+booking flow (Nadine's task #12) and was reverted in `b95dc35`. The
+proper fix is a driver migration — see Open Questions #4. **Note**:
+the partial unique index on slot uniqueness shipped 2026-05-02 is the
+deployable mitigation that doesn't need the driver swap; the rest of
+the row consistency (participant + pro_students upsert) still benefits
+from a real transaction.
 
 ### Public booking flow — production readiness
 
-Shipped 2026-04-15 → 04-17 (see Recently shipped). Items to verify before flipping the password gate:
+Shipped 2026-04-15 → 04-17. Items to verify before flipping the password gate:
 
 - **Production env vars not in `.env.example`.** The new flow needs four vars in Vercel `production` env:
   - `NEXT_PUBLIC_RECAPTCHA_SITE_KEY` (client) and `RECAPTCHA_SECRET_KEY` (server) — Google reCAPTCHA v3
@@ -271,27 +95,23 @@ Shipped 2026-04-15 → 04-17 (see Recently shipped). Items to verify before flip
 - **Upstash failover not handled.** If KV is unreachable the rate limiter throws and the booking action fails. Acceptable given Upstash's SLA, but worth a Sentry alert on `tags.area = "rate-limit"` so we notice quickly.
 - **Test suite preconditions are implicit.** `src/lib/__tests__/public-booking-flow.test.ts` requires `DUMMY_PRO` and `DUMMY_STUDENT` env vars + a valid Gmail service account; failures are quiet if either is missing. Document in CI setup before wiring tests into a pipeline.
 
-### Sprint B follow-ups (payment flow)
+### Payment flow follow-ups
 
 - **Student "retry payment" UI on a failed booking.** When `createBooking` fires the PaymentIntent off-session and Stripe returns `requires_action` (3DS / SCA) or `failed`, the booking is marked `paymentStatus="requires_action"` or `"failed"` and retained. There's no student-facing UI to complete the 3DS flow or retry a declined card. Needs a small client component on `/member/bookings/[id]` that takes the PaymentIntent `client_secret` and runs `stripe.confirmCardPayment`. Lower priority since off-session usually succeeds on the first try, but the row will sit in limbo until the student interacts.
 - **Admin "mark as manually refunded" fallback.** `stripe.refunds.create` can fail (network hiccup, already-refunded, payment too old). Today that's surfaced as a console error in `cancelBooking` but the refund has to be reconciled manually in the Stripe dashboard. Add a button in `/admin/payouts` or `/admin/bookings` to set `paymentStatus="refunded"` + `refundedAt` on a booking after a manual Stripe-side refund.
-- ~~**Cash-only pros (`allowBookingWithoutPayment`)**~~ — **done**. Cash-only pros (with `allowBookingWithoutPayment=true`) now get `paymentStatus="manual"` on the booking row, the PaymentIntent is skipped entirely, and the confirmation email shows "Payable on site" instead of "Amount charged" (translated in EN/NL/FR). The refund-on-cancel path skips these since `paymentStatus === "manual"` never matches the `"paid"` branch. `/pro/earnings` was already filtering by `paymentStatus = 'paid'`, so manual bookings correctly don't count toward the pro's platform-charged revenue.
-- ~~**Cash-only commission collection**~~ — **done**. Cash-only bookings now bill our commission to the pro automatically via `stripe.invoiceItems.create()` attached to the pro's existing subscription customer. The item rolls onto their next monthly/annual invoice alongside the subscription fee — no separate charge, no new pro-side UX. `lesson_bookings.stripe_invoice_item_id` stores the returned ID for reversal at cancel-within-window time via `stripe.invoiceItems.del()`. `calculatePlatformFee` is env-var driven (`NEXT_PUBLIC_PLATFORM_FEE_PERCENT`, default 2.5%). Failures are captured to Sentry with `tags.area = "cash-commission"` and swallowed.
-- **Cash-only commission — edge case handling**. The happy path works but a few corners need follow-up:
+- **Cash-only commission — edge case handling.** The happy path works but a few corners need follow-up:
   - **Pros without an active subscription** (cancelled / expired / past_due). `stripe.invoiceItems.create` still succeeds — the item sits pending on the customer until the next invoice is generated. If the pro never re-subscribes, we need a way to collect standalone. Low frequency since cash-only pros almost always have active subs.
   - **Cancel after invoice has finalised.** `stripe.invoiceItems.del` returns a 400 "cannot delete finalised item" once the item has been attached to an invoice (monthly/annual cycle fired). Today we log + swallow. Needs a manual credit note from the Stripe dashboard. Low frequency since cancellations usually happen within hours or days of booking.
   - **Pending commission visibility for the pro.** No UI currently surfaces "you owe €N in pending cash-only commissions before your next invoice". Pro will see the line items when the invoice arrives. A `/pro/billing` display of pending commissions is a polish item.
   - **Dedicated commission card on `/pro/earnings`.** Separate from the existing "revenue" card (which tracks online-paid bookings), add a "Commission owed" / "Commission paid" card summarising cash-only commission flowing through the invoice-item path. Purely reporting.
   - **Admin manual-reconciliation UI.** For the Sentry-captured failures above (invoice item creation failed, deletion failed post-finalisation, no stripeCustomerId, etc.), give admin a button in `/admin/payouts` or `/admin/bookings` to (a) manually create an invoice item after the fact, (b) mark a booking's commission as "reconciled manually" without touching Stripe, or (c) trigger a one-off standalone invoice for a pro without an active subscription.
-- **Smoke-test with a Stripe test card on preview** before merging Sprint B to main. Use a 4242 card on `/member/book/[slug]` with dummy student + dummy pro, then walk through: confirm → see Total → hit Confirm → watch Sentry + Stripe dashboard → check `/pro/earnings` after the webhook lands. Then cancel from `/member/bookings` within the window and verify the refund fires.
-- **Stripe webhook on production** needs the live-mode signing secret set (`STRIPE_WEBHOOK_SECRET`) and the endpoint registered in the Stripe dashboard pointing at `/api/webhooks/stripe` once Sprint B merges to main. Sandbox webhook secret is already in `.env.local` for preview.
+- **Stripe webhook on production** needs the live-mode signing secret set (`STRIPE_WEBHOOK_SECRET`) and the endpoint registered in the Stripe dashboard pointing at `/api/webhooks/stripe`. Sandbox webhook secret is already in `.env.local` for preview.
 
 ## 🟢 Polish / post-launch
 
 - More empty states (anywhere with a list that can be empty — `/pro/bookings` calendar, coaching chat, pro/students filter views beyond "all").
 - Loading skeletons / optimistic UI in booking wizard and chat.
 - Accessibility audit: ARIA on icon buttons, contrast on gold-on-cream, keyboard nav on calendar grids.
-- Test coverage beyond `src/lib/__tests__/lesson-slots.test.ts` — API endpoints, payment flow, webhooks.
 - Comment moderation tools (flagging + admin review).
 - Image optimization (`next/image` audit).
 - **Promote `/dev/gdpr` to user-facing self-service** — add "Export my data" and "Delete my account" buttons to `/member/profile`. The dev-only tool at `/dev/gdpr` is enough for now (manual lookup + export/delete on request).
@@ -307,50 +127,65 @@ Shipped 2026-04-15 → 04-17 (see Recently shipped). Items to verify before flip
   - Embedded `/pros` browser in onboarding instead of flat list.
   - Re-enabling email field after registration (requires verify-new-email flow). **Note**: shipped as a typo-fix-only path in commit 66125d2 (task #23). A full email-change-after-verification flow is still post-launch.
 
-## Recently shipped (sweep — 2026-04-17, ID-based pro URLs)
+## Recently shipped (sweep — 2026-05-02, v1.1.0 + v1.1.1 — timezone correctness + version surface)
 
-- **Vanity slugs replaced with sequence-number URLs** — `pro_profiles.slug` column dropped; route directories renamed from `[slug]` to `[proId]` for `/book/`, `/pros/`, `/(member)/member/book/`. URLs go from `/book/claude-test-pro` to `/book/24`. `pickUniqueProSlug` and `slugifyProName` helpers in `src/lib/pro.ts` deleted. Sitemap, internal Link refs, onboarding, profile editor, register, choose-pros, dashboard quick-rebook, ProPagesList, JoinButton, both seed scripts, and both integration test suites all updated. Migration: `scripts/drop-pro-slug-column.ts` (idempotent). **Run on production before deploy** — see should-fix.
+End-to-end timezone audit + the supporting infrastructure to keep the booking engine honest as non-Brussels pros land.
 
-## Recently shipped (sweep — 2026-04-15 → 2026-04-17, public booking flow)
+- **Cancel-deadline TZ bug.** `cancelBooking` parsed lessonStart in server TZ; on Vercel UTC, a 10:00 Brussels lesson stayed cancellable until 12:00 Brussels. Now uses `getProLocationTimezone` + `fromZonedTime`. Cancel client components take a `timezone` prop and pass it to `checkCancellationAllowed`.
+- **Slot-uniqueness race.** Partial unique index `lesson_bookings_slot_confirmed_idx` on `(pro_profile_id, pro_location_id, date, start_time) WHERE status='confirmed'` applied to preview + prod. `createBooking`/`quickCreateBooking`/`createPublicBooking` all wrap inserts in try/catch with `isSlotConflictError` and return the friendly "slot just got taken" message.
+- **24 h reminder cron TZ.** Cron joins `locations`, uses `fromZonedTime(b.date+b.startTime, b.locationTz)` per booking, passes `tz` through to `buildIcs`. SQL pre-filter widened by ±1 day so any UTC-12..+14 zone is covered.
+- **Engine signatures require `tz`.** `computeAvailableSlots`, `checkCancellationAllowed`, `buildIcs`, `buildCancelIcs` no longer default to Brussels. `getProLocationTimezone` throws on missing rows instead of returning Brussels. `BookingsCalendar` `timezone` prop required. 7 cross-TZ tests prove correctness end-to-end (London, Tokyo, NYC, Brussels-DST, NYC-DST).
+- **Locations form: real timezone field.** New `<TimezonePicker />` wired into `/pro/locations` (add + edit) and the onboarding wizard. Country-derived inference, validates against `Intl.supportedValuesOf("timeZone")` server-side, no browser-TZ guessing. All read paths (`getMyLocations`, `getProLocations`, `getPublicLocations`, `getAllBookablePros`) surface `timezone`.
+- **Schema cleanup.** `locations.timezone` `DEFAULT 'Europe/Brussels'` dropped on both DBs after backfill. Future inserts must specify; a missing value fails loudly at INSERT. Residual `?? "Europe/Brussels"` fallbacks on `proProfiles.defaultTimezone` removed (column is notNull, dead defensive code).
+- **Quick Book pricing parity.** `quickCreateBooking` was inserting bookings without `priceCents` / `platformFeeCents` / `paymentStatus`, never firing a PaymentIntent; the pro email hardcoded "Cash on the day" regardless of the pro's setting. Both `createBooking` and `quickCreateBooking` now route through the shared `loadBookingPricing` + `runOffSessionCharge` + `claimCashCommission` helpers in `src/lib/booking-charge.ts`. Pro email re-reads the booking row after the charge so the actual `paymentStatus` lands in the notification.
+- **`todayLocal()` callers** (member/bookings, member/dashboard, admin) switched to TZ-aware "today". `member/bookings/page.tsx` does per-booking `todayInTZ(b.locationTimezone)` (cached per TZ); the coarse pages anchor to Europe/Brussels with a comment.
+- **`computeSuggestedDate` TZ-aware.** Quick Book suggestion now anchors to the same location TZ as the availability window; late-evening users no longer see a suggestion drift a day before windowStart and get silently stomped.
+- **`BookingsCalendar` period filtering.** Pro week view now filters availability by each slot's `validFrom`/`validUntil` window per rendered date, not just by `dayOfWeek`. Multi-period schedules (task 78) no longer paint a summer-only green band on winter weeks. 6 new RTL regression tests pin the boundary cases.
+- **PWA version detection.** `/sw.js` is now a Next.js route that bakes `BUILD_ID` into both file content and `CACHE_NAME` (per-deploy byte difference → reliable `updatefound`). `/api/version` is `force-dynamic`. `DeploymentChecker` cache-busts the fetch URL on top of `cache: "no-store"` to defeat iOS Safari quirks.
+- **About page + changelog.** New `/about` shows app version (semver from `package.json.version`, starting at v1.1.0), build ID, build time, branch + environment in non-prod, manual update-check button, and the rendered `docs/CHANGELOG.md`. Linked from sidebar + mobile More for every authenticated user.
+- **Migrations applied to preview + prod:**
+  - `lesson_bookings_slot_confirmed_idx` (race-safe slot reservation)
+  - `locations.timezone` backfill (no rows changed)
+  - `locations.timezone` `DEFAULT` dropped
+  - `scripts/verify-tz-migrations.ts` regression-check committed
+- **Tests:** 247 cases across 12 pure/UI suites + 20 cases in the Stripe integration suite, 267 total. New unit tests for `decideBookingPricing` (10), `computeSuggestedDate` + `isoDayOfWeekFromDate` (26), `parseChangelog` + `renderItem` (15), `TimezonePicker` (12 RTL), `DeploymentChecker` (4 RTL). Integration adds: `loadBookingPricing` (7) + Phase 8 helper coverage in `stripe-flows.test.ts` (3).
+- **Tooling:** `.claude/skills/stage` + `.claude/skills/ship` codify the commit/CHANGELOG/version-bump and merge-to-main flows.
 
-- **Public booking at `/book/[slug]`** — zero-friction wizard, no account required. Multi-location pros get a location step (auto-skipped for single-location); single-duration pros skip the duration step. Phone field uses `libphonenumber-js` (Belgium default, E.164 storage). Bookings confirmed immediately, `paymentStatus="manual"` (Phase A — payment integration on the public path is post-launch).
-- **Claim flow at `/api/auth/claim-booking`** — email-verify-only token (7-day JWT, no auto-login). Verified students land on a token-based read-only booking page `/booked/t/[token]` with a register CTA.
-- **Pre-fill registration from booking** — `/register` wizard pre-populates name/email/phone from the booking row; scheduling step dropped.
-- **Pro-side "email unverified" badge** — surfaces on `/pro/bookings` (list + calendar), in-app notification, and the pro confirmation email when the student hasn't verified.
-- **reCAPTCHA v3 + Upstash rate limit** — `book_lesson` action with 0.5 score threshold; 5 bookings/hour per IP+email via `Ratelimit.slidingWindow`. Both fail-tolerant: 3s timeout on `grecaptcha.ready()` (mobile / content blockers), missing token treated as score 0.
-- **Case-insensitive email uniqueness** — functional `UNIQUE INDEX on LOWER(email)` on `users` and `user_emails`. One-shot migration `scripts/migrate-email-lower-unique.ts`, applied to preview + prod.
-- **Public-booking test suite** — 185 cases in `src/lib/__tests__/public-booking-flow.test.ts` covering scenarios 1-9 (new/unverified/verified branches, honeypot, double-booking, multi-location), with Gmail API integration for end-to-end email verification. Seed via `pnpm tsx scripts/seed-claude-dummies.ts` (creates `dummy-pro-claude@golflessons.be` + `dummy-student-claude@golflessons.be` with 2 locations).
-- **Build perf** — removed `lucide-react` (-38 MB) and 3 dead mockup pages (`booking`, `pro-profile`, `student-page`); added `.vercelignore` to skip `docs/`, `scripts/`, and `src/lib/__tests__/` during Vercel upload.
-- **Docs**: `docs/public-booking-flow.md` (10 scenarios + FAQ + email checklist + multi-location), `docs/money-flows.md` (full payment flows for student + pro + cash-only paths).
+## Recently shipped (sweep — 2026-04-13 → 2026-04-17)
 
-## Recently shipped (sweep — 2026-04-13)
+Earlier work that landed before the timezone audit:
 
-- Four-pass i18n audit — every user-visible string in member/* and pro/* translated in EN / NL / FR, including app shell (sidebar, bottom nav, install-guide dialog), full booking wizard, all pro-side editors (profile, locations, availability, students incl. help dialog, quick book, cancel booking), `/pro/billing`, `/pro/earnings`, `/pro/bookings` (list + calendar + detail), `/pro/pages`, `/pro/mailings`, `/pro/tasks` chrome, `/pro/onboarding` wizard, `/pro/subscribe`, `/pro/register`, `/member/dashboard` + help dialog + quick rebook, `/member/bookings`, `/member/coaching`, `/member/choose-pros`, `/pros/[slug]`, error boundaries.
-- Welcome-as-pro email — 4-step onboarding guide (verify → subscribe → profile → publish) wired into `/pro/register`. Three email locale call-site bugs fixed (old register action, pro-invites-student, pro-resets-student-password).
-- Subscription prices centralised in `src/lib/pricing.ts`, sourced from `NEXT_PUBLIC_PRO_PRICE_MONTHLY` / `_ANNUAL` env vars. All hardcoded €12.50 / €125 / €25 / 17% references removed. Locale-aware currency formatting via `formatPrice(amount, locale)`.
-- Locale-aware date formatting sweep (helper + migration of all call sites). `/member/bookings/actions.ts` cancel-deadline error and `TimezoneNote.tsx` were the last stragglers.
-- Sentry `price_per_hour` numeric→text schema fix (production + preview DB).
-- Tasks Kanban: dropped the `description` column (data migrated to comments thread); added a full **New task** modal with title + initial comment + assignees + priority + color + due date + checklist, replacing the inline one-row bar.
-- `/dev/gdpr` tool — dev-only GDPR Article 15 / 17 / 20 handling (lookup + JSON export + soft-delete-and-anonymise with audit log).
-- Mobile responsiveness audit — Playwright-verified on 375×812. Booking wizard, pro dashboard, pro billing clean. Fixed: KanbanBoard 3-col grid stacks on mobile, StudentManager help-dialog table gets horizontal scroll, availability + bookings calendars got visible "scroll →" hints.
-- Stripe webhook type narrowing — replaced `type StripeObject = any` with proper SDK types + a local `SubscriptionWithPeriod` helper.
-- Health check — now validates both configured Stripe price IDs via `stripe.prices.retrieve()` and asserts `.active === true` (would have caught SENTRY-ORANGE-ZEBRA-A).
-- Transient-error retries — Gmail `sendEmail` retries once on socket hang up / ECONNRESET / 5xx; Stripe SDK gets `maxNetworkRetries: 2`; new shared `src/lib/retry.ts` helper wraps `@vercel/blob` `put` calls on both upload routes.
-- Trial-ending + payment-failed webhook emails (already wired in an earlier session — the previous `gaps.md` entry was stale).
-- Sentry source map upload — `silent: !SENTRY_AUTH_TOKEN` was already correct.
-- PWA install bootstrap — swapped raw `<script dangerouslySetInnerHTML>` for `next/script` to quiet a Next.js 16 warning.
-- First-comment seeding on task creation + `tasks.description` column removed (data migrated to comments).
+- **V1 payment flow** — pros set per-duration prices; booking flow charges the student's saved Stripe payment method off-session (`paymentStatus: pending → paid / requires_action / failed`); 3DS / SCA path leaves the row in `requires_action` for retry; webhook reconciliation; refund-on-cancel-within-window via `stripe.refunds.create`. Confirmation email shows "Amount charged" (locale-aware EUR).
+- **Cash-only pros** — `allowBookingWithoutPayment=true` skips the PaymentIntent entirely; the platform commission is billed via `stripe.invoiceItems.create` against the pro's subscription customer and rolls onto their next monthly invoice. Cancel within window deletes the pending invoice item.
+- **Public booking at `/book/[proId]`** — zero-friction wizard, no account required. Multi-location pros get a location step (auto-skipped for single-location); single-duration pros skip the duration step. Bookings confirmed immediately; first email is a claim-and-verify magic link.
+- **Claim-and-verify flow at `/api/auth/claim-booking`** — 7-day JWT token, no auto-login; verified students land on a token-based read-only booking page `/booked/t/[token]` with a register CTA. Pre-fill registration with name/email/phone from the booking row.
+- **Pro-side "email unverified" badge** on `/pro/bookings` (list + calendar) + in-app notification + pro confirmation email when the student hasn't verified yet.
+- **reCAPTCHA v3 + Upstash rate limit** — `book_lesson` action with 0.5 score threshold; 5 bookings/hour per IP+email via `Ratelimit.slidingWindow`. Both fail-tolerant.
+- **ID-based pro URLs** — `pro_profiles.slug` dropped; routes renamed from `[slug]` to `[proId]`. Already applied to preview + prod.
+- **Case-insensitive email uniqueness** — functional `UNIQUE INDEX on LOWER(email)` on `users` and `user_emails`. Applied to preview + prod.
+- **Public-booking test suite** — 185 cases in `public-booking-flow.test.ts` covering scenarios 1-9 incl. honeypot, double-booking, multi-location, with Gmail API integration for end-to-end email verification.
+- **Four-pass i18n audit** — every user-visible string in member/* and pro/* translated in EN / NL / FR.
+- **Welcome-as-pro email** — 4-step onboarding guide wired into `/pro/register`.
+- **Subscription prices centralised in `src/lib/pricing.ts`** sourced from `NEXT_PUBLIC_PRO_PRICE_MONTHLY` / `_ANNUAL` env vars.
+- **Locale-aware date formatting sweep** (helper + migration of all call sites).
+- **Tasks Kanban** — full New-task modal + first-comment-on-create + `tasks.description` column dropped (data migrated to comments).
+- **`/dev/gdpr` tool** — dev-only GDPR Article 15 / 17 / 20 handling.
+- **Mobile responsiveness audit** — Playwright-verified on 375×812.
+- **Health check** — validates configured Stripe price IDs via `stripe.prices.retrieve()` and asserts `.active === true`.
+- **Transient-error retries** — Gmail `sendEmail` retries once on socket hang up / ECONNRESET / 5xx; Stripe SDK gets `maxNetworkRetries: 2`; new shared `src/lib/retry.ts` helper wraps `@vercel/blob` `put` calls.
+- **Trial-ending + payment-failed webhook emails** wired in.
+- **Sentry source map upload** — `silent: !SENTRY_AUTH_TOKEN`.
+- **PWA install bootstrap** — swapped raw `<script dangerouslySetInnerHTML>` for `next/script`.
+- **`.vercelignore`** — skip `docs/`, `scripts/`, `src/lib/__tests__/` during Vercel upload.
 
 ## Open questions
 
-1. **Site password** — keep gate post-launch or open up?
-2. **Commission %** — 0% with higher subscription, or % cut?
-3. **Refund policy** — auto-refund within cancellation window, no refund outside?
-4. **DB driver migration** — green-light moving from `neon-http` to `neon-serverless` (WebSocket) post-launch so we can use transactions? This is the one blocker on real `db.transaction()` support.
+1. **Commission %** — 0% with higher subscription, or % cut?
+2. **Refund policy** — auto-refund within cancellation window, no refund outside?
+3. **DB driver migration** — green-light moving from `neon-http` to `neon-serverless` (WebSocket) post-launch so we can use transactions? This is the one blocker on real `db.transaction()` support.
 
 ## Cross-references
 
 - Nadine's testing feedback lives in the in-app admin Kanban (DB-backed `tasks` + `comments` tables). Read via `/admin/tasks`.
 - Payment model decision: `memory/project_payments_model.md`
 - Testing accounts: `memory/feedback_testing_accounts.md`
-- DNS deadline: `memory/project_dns_belgium.md`

@@ -145,3 +145,126 @@ describe.each(CASES)("BookingsCalendar [$name]", (c) => {
     ).toBe(0);
   });
 });
+
+// ─── Period-filtering regression (gaps.md §0) ──────────
+//
+// Pre-fix `BookingsCalendar` grouped availability by `dayOfWeek` only,
+// so a slot bounded to e.g. April 1 – April 30 (multi-period schedules,
+// task 78) leaked into every Wednesday on every other week — the green
+// availability band painted dates the slot doesn't actually cover.
+// These tests pin three cases:
+//   1. A slot within its `validFrom..validUntil` window paints.
+//   2. The same slot does NOT paint on a week BEFORE `validFrom`.
+//   3. The same slot does NOT paint on a week AFTER `validUntil`.
+// We assert against the green-band div count per day cell. Each
+// matching slot renders one `bg-green-100/40` div in its day column.
+
+describe("BookingsCalendar — schedule-period validity", () => {
+  const TZ = "Europe/Brussels";
+  // Pin "now" to a Wednesday in April 2026 (CEST).
+  // Mon 2026-04-13 is the start of this week; Wed is 2026-04-15.
+  const APRIL_NOW = "2026-04-15T12:00:00+02:00";
+
+  beforeEach(() => {
+    vi.setSystemTime(new Date(APRIL_NOW));
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  function renderWithSlot(slot: {
+    dayOfWeek: number;
+    validFrom: string | null;
+    validUntil: string | null;
+  }) {
+    return render(
+      <BookingsCalendar
+        bookings={[]}
+        availability={[
+          {
+            dayOfWeek: slot.dayOfWeek,
+            startTime: "10:00",
+            endTime: "12:00",
+            proLocationId: 1,
+            validFrom: slot.validFrom,
+            validUntil: slot.validUntil,
+          },
+        ]}
+        locale="nl"
+        timezone={TZ}
+      />,
+    );
+  }
+
+  function bandCountInWednesdayColumn(container: HTMLElement): number {
+    const grids = container.querySelectorAll(
+      ".grid-cols-\\[60px_repeat\\(7\\,1fr\\)\\]",
+    );
+    const body = grids[grids.length - 1];
+    const wednesday = body.children[3]; // Mon=1, Tue=2, Wed=3
+    return (
+      wednesday as HTMLElement
+    ).querySelectorAll(".bg-green-100\\/40").length;
+  }
+
+  it("paints the green band when the date falls inside [validFrom, validUntil]", () => {
+    // Wed 2026-04-15 is inside April → 1 band.
+    const { container } = renderWithSlot({
+      dayOfWeek: 2, // Wednesday in ISO
+      validFrom: "2026-04-01",
+      validUntil: "2026-04-30",
+    });
+    expect(bandCountInWednesdayColumn(container)).toBe(1);
+  });
+
+  it("does NOT paint when the date is BEFORE validFrom", () => {
+    // Slot only valid 2026-05-01 onwards; Wed 2026-04-15 is before.
+    const { container } = renderWithSlot({
+      dayOfWeek: 2,
+      validFrom: "2026-05-01",
+      validUntil: null,
+    });
+    expect(bandCountInWednesdayColumn(container)).toBe(0);
+  });
+
+  it("does NOT paint when the date is AFTER validUntil", () => {
+    // Slot only valid through 2026-03-31; Wed 2026-04-15 is after.
+    const { container } = renderWithSlot({
+      dayOfWeek: 2,
+      validFrom: null,
+      validUntil: "2026-03-31",
+    });
+    expect(bandCountInWednesdayColumn(container)).toBe(0);
+  });
+
+  it("paints when both bounds are null (unbounded period)", () => {
+    const { container } = renderWithSlot({
+      dayOfWeek: 2,
+      validFrom: null,
+      validUntil: null,
+    });
+    expect(bandCountInWednesdayColumn(container)).toBe(1);
+  });
+
+  it("respects the boundary: validUntil = today's date is INCLUSIVE", () => {
+    // Wed 2026-04-15 with validUntil = 2026-04-15 → still paints.
+    const { container } = renderWithSlot({
+      dayOfWeek: 2,
+      validFrom: null,
+      validUntil: "2026-04-15",
+    });
+    expect(bandCountInWednesdayColumn(container)).toBe(1);
+  });
+
+  it("does not paint on a different day-of-week even within the date range", () => {
+    // Slot is Monday-only, but its date range covers this whole week.
+    // Wednesday column should stay empty.
+    const { container } = renderWithSlot({
+      dayOfWeek: 0, // Monday in ISO
+      validFrom: "2026-04-01",
+      validUntil: "2026-04-30",
+    });
+    expect(bandCountInWednesdayColumn(container)).toBe(0);
+  });
+});

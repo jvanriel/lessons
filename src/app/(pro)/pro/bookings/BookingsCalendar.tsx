@@ -43,6 +43,10 @@ interface AvailabilitySlot {
   startTime: string;
   endTime: string;
   proLocationId: number;
+  /** YYYY-MM-DD or null. When set, slot only applies on/after this date. */
+  validFrom: string | null;
+  /** YYYY-MM-DD or null. When set, slot only applies on/before this date. */
+  validUntil: string | null;
 }
 
 interface Props {
@@ -124,16 +128,32 @@ export function BookingsCalendar({
     return map;
   }, [bookings]);
 
-  // Group availability by dayOfWeek
-  const availByDay = useMemo(() => {
-    const map = new Map<number, AvailabilitySlot[]>();
-    for (const a of availability) {
-      const existing = map.get(a.dayOfWeek) ?? [];
-      existing.push(a);
-      map.set(a.dayOfWeek, existing);
+  // Per-date availability projection. Filters by `dayOfWeek` AND by
+  // each slot's `validFrom` / `validUntil` window so multi-period
+  // schedules (task 78) paint the correct band on each week — the
+  // pre-fix grouping used `dayOfWeek` only, which leaked, e.g., a
+  // summer-only template into winter weeks. Pre-computing once per
+  // (week, availability) keeps the render loop trivial.
+  const availByDate = useMemo(() => {
+    const map = new Map<string, AvailabilitySlot[]>();
+    for (const date of weekDates) {
+      const dateStr = formatLocalDateInTZ(date, timezone);
+      // Day-of-week from a YYYY-MM-DD string is TZ-independent —
+      // parse as UTC to keep getUTCDay() honest regardless of the
+      // server / browser zone.
+      const [y, m, d] = dateStr.split("-").map(Number);
+      const jsDay = new Date(Date.UTC(y, m - 1, d)).getUTCDay();
+      const isoDow = jsDay === 0 ? 6 : jsDay - 1;
+      const slots = availability.filter(
+        (a) =>
+          a.dayOfWeek === isoDow &&
+          (!a.validFrom || dateStr >= a.validFrom) &&
+          (!a.validUntil || dateStr <= a.validUntil),
+      );
+      map.set(dateStr, slots);
     }
     return map;
-  }, [availability]);
+  }, [availability, weekDates, timezone]);
 
   // Navigation
   function goToPrevWeek() {
@@ -235,7 +255,7 @@ export function BookingsCalendar({
               const dateStr = formatLocalDateInTZ(date, timezone);
               const isToday = dateStr === today;
               const dayBookings = bookingsByDate.get(dateStr) ?? [];
-              const dayAvail = availByDay.get(dayIdx) ?? [];
+              const dayAvail = availByDate.get(dateStr) ?? [];
 
               return (
                 <div
