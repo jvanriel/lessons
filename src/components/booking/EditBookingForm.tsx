@@ -219,9 +219,29 @@ export default function EditBookingForm({
           </p>
           {extraParticipants.map((p, i) => (
             <div key={i} className="space-y-2">
-              <p className="text-xs font-medium text-green-700">
-                Participant {i + 2}
-              </p>
+              <div className="flex items-center justify-between">
+                <p className="text-xs font-medium text-green-700">
+                  Participant {i + 2}
+                </p>
+                <button
+                  type="button"
+                  onClick={() => {
+                    // Drop this row AND decrement the count together,
+                    // so the participantCount selector + the rows
+                    // stay in sync. We pin the participantCount to
+                    // the new length explicitly to avoid the
+                    // syncing useEffect re-padding from the bottom.
+                    setExtraParticipants((prev) =>
+                      prev.filter((_, j) => j !== i),
+                    );
+                    setParticipantCount((c) => Math.max(1, c - 1));
+                  }}
+                  className="text-xs text-red-500 hover:text-red-600"
+                  aria-label={`Remove participant ${i + 2}`}
+                >
+                  × Remove
+                </button>
+              </div>
               <div className="grid grid-cols-2 gap-2">
                 <input
                   type="text"

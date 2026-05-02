@@ -17,6 +17,21 @@ If any role inside the brackets is unknown (typo), the parser falls
 back to treating the brackets as literal text — better to over-show
 than silently hide.
 
+## 2026-05-02 — v1.1.25
+
+- **Edit booking: remove a specific participant.** Previously
+  lowering the participant count always dropped the *last* person in
+  the list — if you wanted to remove someone in the middle you had
+  to edit names around. Each additional-participant row now has its
+  own "× Remove" button.
+- **"New version available" toast really fires only once now.**
+  v1.1.20 fixed the cached-HTML reload but a second trigger remained:
+  the service worker download lags the page reload by one tick, so a
+  freshly-loaded page (already on the new BUILD_ID) still saw an
+  `updatefound` event when the SW caught up — and re-fired the toast.
+  The SW trigger now re-checks the actual server build id and only
+  shows the toast on a real mismatch.
+
 ## 2026-05-02 — v1.1.24
 
 - **Edit a booking and the payment is now adjusted automatically.**
