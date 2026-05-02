@@ -340,6 +340,14 @@ export const lessonBookings = pgTable("lesson_bookings", {
   googleEventId: varchar("google_event_id", { length: 255 }),
   cancelledAt: timestamp("cancelled_at"),
   cancellationReason: text("cancellation_reason"),
+  /**
+   * Number of times this booking has been edited (reschedule,
+   * participant change, etc.). Used as the ICS `SEQUENCE` value so
+   * that updated calendar invites supersede earlier ones for the
+   * same UID. Bumped inside `updateBooking` / `proUpdateBooking`.
+   * Pure cancellations don't bump this — they emit METHOD:CANCEL.
+   */
+  editCount: integer("edit_count").notNull().default(0),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });

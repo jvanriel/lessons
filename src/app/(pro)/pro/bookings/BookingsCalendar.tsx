@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useMemo, useTransition } from "react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
@@ -543,7 +544,14 @@ export function BookingsCalendar({
             )}
 
             {booking.status === "confirmed" && (
-              <div className="mt-4 border-t border-green-100 pt-3">
+              <div className="mt-4 flex items-center gap-3 border-t border-green-100 pt-3">
+                <Link
+                  href={`/pro/bookings/${booking.id}/edit`}
+                  className="text-xs font-medium text-green-700 hover:text-green-800"
+                >
+                  Edit
+                </Link>
+                <span className="text-xs text-green-300">·</span>
                 <button
                   type="button"
                   onClick={() => setCancelTargetId(booking.id)}

@@ -173,14 +173,22 @@ export default async function MemberBookingsPage() {
                       </div>
                     )}
                   </div>
-                  <CancelBookingButton
-                    bookingId={booking.id}
-                    date={booking.date}
-                    startTime={booking.startTime}
-                    cancellationHours={booking.cancellationHours}
-                    locale={locale}
-                    timezone={booking.locationTimezone}
-                  />
+                  <div className="flex items-center gap-2">
+                    <Link
+                      href={`/member/bookings/${booking.id}/edit`}
+                      className="rounded-md border border-green-300 bg-white px-3 py-1.5 text-xs font-medium text-green-800 hover:bg-green-50"
+                    >
+                      Edit
+                    </Link>
+                    <CancelBookingButton
+                      bookingId={booking.id}
+                      date={booking.date}
+                      startTime={booking.startTime}
+                      cancellationHours={booking.cancellationHours}
+                      locale={locale}
+                      timezone={booking.locationTimezone}
+                    />
+                  </div>
                 </div>
               </div>
             ))}

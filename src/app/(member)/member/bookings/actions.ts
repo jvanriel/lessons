@@ -17,6 +17,18 @@ import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import { sendEmail } from "@/lib/mail";
 import { sendParticipantCancellationNotifications } from "@/lib/booking-participants";
+import {
+  parseEditBookingChanges,
+  validateEditAllowed,
+  validateEditParticipants,
+  isNoOpEdit,
+  isSlotTakenByOther,
+  applyBookingEdit,
+  sendBookingUpdatedNotifications,
+} from "@/lib/booking-edit";
+import { lessonParticipants } from "@/lib/db/schema";
+import { isSlotConflictError } from "@/lib/db";
+import { after } from "next/server";
 import { getStripe } from "@/lib/stripe";
 import { resolveLocale } from "@/lib/i18n";
 import { getLocale } from "@/lib/locale";
@@ -309,6 +321,135 @@ export async function cancelBooking(bookingId: number) {
       startTime: booking.startTime,
       proId: booking.proProfileId,
     },
+  });
+
+  revalidatePath("/member/bookings");
+  return { success: true };
+}
+
+
+// ─── Edit ──────────────────────────────────────────────
+
+/**
+ * Member-side booking edit. Reschedule (date/time/duration), update
+ * participant roster, or both. Pricing is NOT recomputed in Phase 1
+ * — see docs/new-features.md for the Phase 2 payment-delta scope.
+ *
+ * Auth: must be the booker. Cancellation-window gate applies.
+ */
+export async function updateBooking(formData: FormData) {
+  const session = await getSession();
+  if (!session || !hasRole(session, "member")) {
+    return { error: "Unauthorized" };
+  }
+  const bookingId = Number(formData.get("bookingId"));
+  if (!bookingId) return { error: "Invalid booking ID" };
+
+  const changes = parseEditBookingChanges(formData);
+  const participantError = validateEditParticipants(changes.extraParticipants);
+  if (participantError) return { error: participantError };
+
+  // Load the booking + the booker's own lesson_participants row so we
+  // can preserve it across the participant-list rewrite.
+  const [booking] = await db
+    .select({
+      id: lessonBookings.id,
+      bookedById: lessonBookings.bookedById,
+      proProfileId: lessonBookings.proProfileId,
+      proLocationId: lessonBookings.proLocationId,
+      date: lessonBookings.date,
+      startTime: lessonBookings.startTime,
+      endTime: lessonBookings.endTime,
+      participantCount: lessonBookings.participantCount,
+      status: lessonBookings.status,
+      cancelledAt: lessonBookings.cancelledAt,
+    })
+    .from(lessonBookings)
+    .where(
+      and(
+        eq(lessonBookings.id, bookingId),
+        eq(lessonBookings.bookedById, session.userId),
+      ),
+    )
+    .limit(1);
+  if (!booking) return { error: "Booking not found" };
+
+  // Cancellation-window gate. Resolve location TZ + the pro's policy.
+  const tz = await getProLocationTimezone(booking.proLocationId);
+  const [proRow] = await db
+    .select({ cancellationHours: proProfiles.cancellationHours })
+    .from(proProfiles)
+    .where(eq(proProfiles.id, booking.proProfileId))
+    .limit(1);
+  const cancellationHours = proRow?.cancellationHours ?? 24;
+  const editError = validateEditAllowed(booking, cancellationHours, tz);
+  if (editError) return { error: editError };
+
+  // Existing participants (booker is participant #1, by id-asc order).
+  const currentParticipants = await db
+    .select({
+      id: lessonParticipants.id,
+      firstName: lessonParticipants.firstName,
+      lastName: lessonParticipants.lastName,
+      email: lessonParticipants.email,
+    })
+    .from(lessonParticipants)
+    .where(eq(lessonParticipants.bookingId, bookingId))
+    .orderBy(lessonParticipants.id);
+  const bookerParticipant = currentParticipants[0];
+  if (!bookerParticipant) {
+    return { error: "Booking participant row missing — please contact support." };
+  }
+
+  if (
+    isNoOpEdit(
+      {
+        date: booking.date,
+        startTime: booking.startTime,
+        endTime: booking.endTime,
+        participantCount: booking.participantCount,
+        participants: currentParticipants,
+      },
+      changes,
+    )
+  ) {
+    return { success: true, noop: true };
+  }
+
+  // New-slot availability (excluding ourselves).
+  if (
+    booking.date !== changes.date ||
+    booking.startTime !== changes.startTime ||
+    booking.endTime !== changes.endTime
+  ) {
+    const taken = await isSlotTakenByOther(
+      booking.proProfileId,
+      booking.proLocationId,
+      changes.date,
+      changes.startTime,
+      changes.endTime,
+      booking.id,
+    );
+    if (taken) {
+      const locale = await getLocale();
+      return { error: t("bookErr.slotUnavailable", locale) };
+    }
+  }
+
+  try {
+    await applyBookingEdit(booking.id, changes, bookerParticipant.id);
+  } catch (err) {
+    if (isSlotConflictError(err)) {
+      const locale = await getLocale();
+      return { error: t("bookErr.slotUnavailable", locale) };
+    }
+    throw err;
+  }
+
+  // Notification fanout runs post-response so the UI returns
+  // immediately. Vercel keeps the function alive via `after()`.
+  after(async () => {
+    await sendBookingUpdatedNotifications(booking.id);
   });
 
   revalidatePath("/member/bookings");

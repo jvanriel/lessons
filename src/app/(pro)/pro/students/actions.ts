@@ -20,6 +20,15 @@ import { hashPassword } from "@/lib/auth";
 import { sendEmail } from "@/lib/mail";
 import { sendParticipantCancellationNotifications } from "@/lib/booking-participants";
 import {
+  parseEditBookingChanges,
+  validateEditAllowed,
+  validateEditParticipants,
+  isNoOpEdit,
+  isSlotTakenByOther,
+  applyBookingEdit,
+  sendBookingUpdatedNotifications,
+} from "@/lib/booking-edit";
+import {
   buildInviteEmail,
   getEmailStrings,
   buildStudentBookingConfirmationEmail,
@@ -1394,5 +1403,120 @@ export async function proCancelBooking(bookingId: number) {
     sendParticipantCancellationNotifications(booking.id).catch(() => {});
   }
 
+  return { success: true };
+}
+
+
+// ─── Edit (pro side) ───────────────────────────────────
+
+/**
+ * Pro-side booking edit. Same shape as the member-side `updateBooking`
+ * but the auth gate is "the booking belongs to my pro profile" rather
+ * than "I'm the booker". Cancellation-window check still applies — the
+ * pro can rebook a past-window lesson out of band by cancelling +
+ * recreating, but `proUpdateBooking` follows the policy.
+ *
+ * Phase 1: no payment delta. The booking's priceCents stays whatever
+ * it was when the booking was first created.
+ */
+export async function proUpdateBooking(formData: FormData) {
+  const { profile } = await requireProProfile();
+  if (!profile) return { error: "No pro profile found." };
+
+  const bookingId = Number(formData.get("bookingId"));
+  if (!bookingId) return { error: "Invalid booking ID" };
+
+  const changes = parseEditBookingChanges(formData);
+  const participantError = validateEditParticipants(changes.extraParticipants);
+  if (participantError) return { error: participantError };
+
+  const [booking] = await db
+    .select({
+      id: lessonBookings.id,
+      proProfileId: lessonBookings.proProfileId,
+      proLocationId: lessonBookings.proLocationId,
+      date: lessonBookings.date,
+      startTime: lessonBookings.startTime,
+      endTime: lessonBookings.endTime,
+      participantCount: lessonBookings.participantCount,
+      status: lessonBookings.status,
+      cancelledAt: lessonBookings.cancelledAt,
+    })
+    .from(lessonBookings)
+    .where(
+      and(
+        eq(lessonBookings.id, bookingId),
+        eq(lessonBookings.proProfileId, profile.id),
+      ),
+    )
+    .limit(1);
+  if (!booking) return { error: "Booking not found" };
+
+  const tz = await getProLocationTimezone(booking.proLocationId);
+  const cancellationHours = profile.cancellationHours ?? 24;
+  const editError = validateEditAllowed(booking, cancellationHours, tz);
+  if (editError) return { error: editError };
+
+  const currentParticipants = await db
+    .select({
+      id: lessonParticipants.id,
+      firstName: lessonParticipants.firstName,
+      lastName: lessonParticipants.lastName,
+      email: lessonParticipants.email,
+    })
+    .from(lessonParticipants)
+    .where(eq(lessonParticipants.bookingId, bookingId))
+    .orderBy(lessonParticipants.id);
+  const bookerParticipant = currentParticipants[0];
+  if (!bookerParticipant) {
+    return { error: "Booking participant row missing — please contact support." };
+  }
+
+  if (
+    isNoOpEdit(
+      {
+        date: booking.date,
+        startTime: booking.startTime,
+        endTime: booking.endTime,
+        participantCount: booking.participantCount,
+        participants: currentParticipants,
+      },
+      changes,
+    )
+  ) {
+    return { success: true, noop: true };
+  }
+
+  if (
+    booking.date !== changes.date ||
+    booking.startTime !== changes.startTime ||
+    booking.endTime !== changes.endTime
+  ) {
+    const taken = await isSlotTakenByOther(
+      booking.proProfileId,
+      booking.proLocationId,
+      changes.date,
+      changes.startTime,
+      changes.endTime,
+      booking.id,
+    );
+    if (taken) return { error: "This time slot is no longer available." };
+  }
+
+  try {
+    await applyBookingEdit(booking.id, changes, bookerParticipant.id);
+  } catch (err) {
+    if (isSlotConflictError(err)) {
+      return { error: "This time slot is no longer available." };
+    }
+    throw err;
+  }
+
+  after(async () => {
+    await sendBookingUpdatedNotifications(booking.id);
+  });
+
+  revalidatePath("/pro/bookings");
+  revalidatePath("/pro/students");
   return { success: true };
 }

@@ -17,6 +17,25 @@ If any role inside the brackets is unknown (typo), the parser falls
 back to treating the brackets as literal text — better to over-show
 than silently hide.
 
+## 2026-05-02 — v1.1.22
+
+- **You can now edit an existing booking.** From the bookings list
+  (member side at /member/bookings, pro side via the booking detail
+  on /pro/bookings) an "Edit" link opens a form where you can change
+  the date, start time, duration, or participant list. The change
+  follows the same window as cancellations — past the cancellation
+  deadline the lesson can no longer be edited.
+
+  When the change saves, both the booker and the pro get an updated
+  confirmation email + an .ics calendar attachment that supersedes
+  the original event in the calendar app. Extra participants get the
+  same.
+
+  Phase 1 limitation: the original price is retained — payment is
+  not adjusted automatically yet for changes in duration or
+  participant count. The Stripe charge / refund / invoice-item
+  rewrite for price deltas comes in Phase 2.
+
 ## 2026-05-02 — v1.1.21
 
 - **Extra participants on a group lesson now get their own emails +

@@ -287,6 +287,16 @@ export interface IcsParams {
    * METHOD:PUBLISH comment is specifically REQUEST without ATTENDEE.
    */
   attendees?: { name: string; email: string }[];
+  /**
+   * Monotonic version counter for this UID. Bumped each time the
+   * booking is edited (reschedule, participant change). Calendar
+   * apps treat a higher SEQUENCE on the same UID as superseding the
+   * earlier one — without this, an "updated" invite is rendered as a
+   * duplicate event. Defaults to 0 for the original creation. Cancel
+   * ICS uses `editCount + 1` so the cancel always supersedes the
+   * latest update.
+   */
+  sequence?: number;
 }
 
 function escapeIcsText(s: string): string {
@@ -326,6 +336,7 @@ export function buildCancelIcs(params: IcsParams): string {
     bookingId,
     tz,
     attendees,
+    sequence,
   } = params;
   const dtStart = toIcsUtc(date, startTime, tz);
   const dtEnd = toIcsUtc(date, endTime, tz);
@@ -348,7 +359,9 @@ export function buildCancelIcs(params: IcsParams): string {
     `LOCATION:${escapeIcsText(location)}`,
     `DESCRIPTION:${escapeIcsText(description)}`,
     "STATUS:CANCELLED",
-    "SEQUENCE:1",
+    // Cancels always supersede the latest update — bump past whatever
+    // SEQUENCE was last published.
+    `SEQUENCE:${(sequence ?? 0) + 1}`,
     `ORGANIZER;CN=Golf Lessons:mailto:${process.env.GMAIL_SEND_AS || "noreply@golflessons.be"}`,
     ...attendeeLines(attendees),
     "END:VEVENT",
@@ -367,6 +380,7 @@ export function buildIcs(params: IcsParams): string {
     bookingId,
     tz,
     attendees,
+    sequence,
   } = params;
   const dtStart = toIcsUtc(date, startTime, tz);
   const dtEnd = toIcsUtc(date, endTime, tz);
@@ -393,6 +407,7 @@ export function buildIcs(params: IcsParams): string {
     `LOCATION:${escapeIcsText(location)}`,
     `DESCRIPTION:${escapeIcsText(description)}`,
     "STATUS:CONFIRMED",
+    `SEQUENCE:${sequence ?? 0}`,
     `ORGANIZER;CN=Golf Lessons:mailto:${process.env.GMAIL_SEND_AS || "noreply@golflessons.be"}`,
     ...attendeeLines(attendees),
     "BEGIN:VALARM",

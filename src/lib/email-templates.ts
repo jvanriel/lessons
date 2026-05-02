@@ -1060,6 +1060,198 @@ export function getParticipantBookingCancelledSubject(
   );
 }
 
+// ─── Booking-updated emails ─────────────────────────────
+//
+// Sent after `updateBooking` / `proUpdateBooking` succeeds. Mirrors
+// the confirmation email layout but uses an "updated" subject + body
+// and shows the new lesson details. Phase 1 of booking-edit doesn't
+// adjust price, so no payment line in the body.
+
+const BOOKING_UPDATED_STRINGS: Record<Locale, {
+  subject: (proName: string) => string;
+  greeting: string;
+  body: string;
+  pro: string;
+  proEmail: string;
+  proPhone: string;
+  location: string;
+  date: string;
+  time: string;
+  duration: string;
+  durationUnit: string;
+  participants: string;
+  cta: string;
+  helper: string;
+  // Participant-side variants (booker re-invited an extra participant
+  // when the lesson was rescheduled).
+  participantSubject: (proName: string, bookerName: string) => string;
+  participantBody: (bookerName: string, proName: string) => string;
+  participantHelper: (bookerName: string) => string;
+}> = {
+  en: {
+    subject: (pro) => `Updated: your golf lesson with ${pro}`,
+    greeting: "Hi",
+    body: "Your lesson has been updated. Here are the new details:",
+    pro: "Pro",
+    proEmail: "Pro email",
+    proPhone: "Pro phone",
+    location: "Location",
+    date: "Date",
+    time: "Time",
+    duration: "Duration",
+    durationUnit: "minutes",
+    participants: "Participants",
+    cta: "View my bookings",
+    helper:
+      "The original price is retained — no payment adjustment was made for this change.",
+    participantSubject: (pro, booker) =>
+      `Updated: your golf lesson with ${pro} (booked by ${booker})`,
+    participantBody: (booker, pro) =>
+      `${booker} updated the golf lesson with ${pro} you're joining. Here are the new details:`,
+    participantHelper: (booker) =>
+      `If the new time doesn't work for you, let ${booker} know — only the booker can change or cancel the lesson.`,
+  },
+  nl: {
+    subject: (pro) => `Bijgewerkt: je golfles bij ${pro}`,
+    greeting: "Hallo",
+    body: "Je les is bijgewerkt. Hier zijn de nieuwe details:",
+    pro: "Pro",
+    proEmail: "E-mail pro",
+    proPhone: "Telefoon pro",
+    location: "Locatie",
+    date: "Datum",
+    time: "Tijd",
+    duration: "Duur",
+    durationUnit: "minuten",
+    participants: "Deelnemers",
+    cta: "Mijn boekingen bekijken",
+    helper:
+      "De oorspronkelijke prijs blijft behouden — er is geen betalingsaanpassing gedaan voor deze wijziging.",
+    participantSubject: (pro, booker) =>
+      `Bijgewerkt: je golfles bij ${pro} (geboekt door ${booker})`,
+    participantBody: (booker, pro) =>
+      `${booker} heeft de golfles bij ${pro} waaraan je meedoet bijgewerkt. Hier zijn de nieuwe details:`,
+    participantHelper: (booker) =>
+      `Past het nieuwe moment niet? Laat het ${booker} weten — alleen wie boekte kan wijzigen of annuleren.`,
+  },
+  fr: {
+    subject: (pro) => `Mise à jour : votre cours de golf avec ${pro}`,
+    greeting: "Bonjour",
+    body: "Votre cours a été mis à jour. Voici les nouveaux détails :",
+    pro: "Pro",
+    proEmail: "E-mail du pro",
+    proPhone: "Téléphone du pro",
+    location: "Lieu",
+    date: "Date",
+    time: "Heure",
+    duration: "Durée",
+    durationUnit: "minutes",
+    participants: "Participants",
+    cta: "Voir mes réservations",
+    helper:
+      "Le prix d'origine est conservé — aucun ajustement de paiement n'a été effectué pour ce changement.",
+    participantSubject: (pro, booker) =>
+      `Mise à jour : votre cours de golf avec ${pro} (réservé par ${booker})`,
+    participantBody: (booker, pro) =>
+      `${booker} a mis à jour le cours de golf avec ${pro} auquel vous participez. Voici les nouveaux détails :`,
+    participantHelper: (booker) =>
+      `Si le nouvel horaire ne vous convient pas, prévenez ${booker} — seule la personne qui a réservé peut modifier ou annuler.`,
+  },
+};
+
+export function buildBookingUpdatedEmail(opts: {
+  recipientFirstName: string;
+  proName: string;
+  proEmail?: string | null;
+  proPhone?: string | null;
+  locationName: string;
+  date: string;
+  startTime: string;
+  endTime: string;
+  duration: number;
+  participantCount: number;
+  locale: Locale;
+}): string {
+  const s = BOOKING_UPDATED_STRINGS[opts.locale] ?? BOOKING_UPDATED_STRINGS.en;
+  const rows: Array<DetailRow> = [[s.pro, opts.proName]];
+  if (opts.proEmail) rows.push([s.proEmail, opts.proEmail, `mailto:${opts.proEmail}`]);
+  if (opts.proPhone)
+    rows.push([s.proPhone, opts.proPhone, `tel:${opts.proPhone.replace(/\s+/g, "")}`]);
+  rows.push(
+    [s.location, opts.locationName],
+    [s.date, formatLessonDate(opts.date, opts.locale)],
+    [s.time, `${opts.startTime} – ${opts.endTime}`],
+    [s.duration, `${opts.duration} ${s.durationUnit}`],
+  );
+  if (opts.participantCount > 1) {
+    rows.push([s.participants, String(opts.participantCount)]);
+  }
+  const body = `
+    <h2 style="font-family:Georgia,'Times New Roman',serif;font-size:22px;color:${COLORS.green950};margin:0 0 16px 0;font-weight:normal;">
+      ${formatGreeting(s.greeting, opts.recipientFirstName, opts.locale)}
+    </h2>
+    <p style="margin:0 0 20px 0;">${s.body}</p>
+    ${detailsTable(rows)}
+    <p style="margin:0 0 24px 0;">
+      <a href="${getBaseUrl()}/member/bookings" style="display:inline-block;background:${COLORS.gold600};color:${COLORS.white};padding:12px 28px;border-radius:6px;text-decoration:none;font-weight:500;font-size:14px;">
+        ${s.cta}
+      </a>
+    </p>
+    <p style="color:#666;font-size:13px;margin:0;">${s.helper}</p>
+  `;
+  return emailLayout(body, undefined, opts.locale);
+}
+
+export function getBookingUpdatedSubject(proName: string, locale: Locale): string {
+  return (BOOKING_UPDATED_STRINGS[locale] ?? BOOKING_UPDATED_STRINGS.en).subject(proName);
+}
+
+export function buildParticipantBookingUpdatedEmail(opts: {
+  participantFirstName: string;
+  bookerName: string;
+  proName: string;
+  proEmail?: string | null;
+  proPhone?: string | null;
+  locationName: string;
+  date: string;
+  startTime: string;
+  endTime: string;
+  duration: number;
+  locale: Locale;
+}): string {
+  const s = BOOKING_UPDATED_STRINGS[opts.locale] ?? BOOKING_UPDATED_STRINGS.en;
+  const rows: Array<DetailRow> = [[s.pro, opts.proName]];
+  if (opts.proEmail) rows.push([s.proEmail, opts.proEmail, `mailto:${opts.proEmail}`]);
+  if (opts.proPhone)
+    rows.push([s.proPhone, opts.proPhone, `tel:${opts.proPhone.replace(/\s+/g, "")}`]);
+  rows.push(
+    [s.location, opts.locationName],
+    [s.date, formatLessonDate(opts.date, opts.locale)],
+    [s.time, `${opts.startTime} – ${opts.endTime}`],
+    [s.duration, `${opts.duration} ${s.durationUnit}`],
+  );
+  const body = `
+    <h2 style="font-family:Georgia,'Times New Roman',serif;font-size:22px;color:${COLORS.green950};margin:0 0 16px 0;font-weight:normal;">
+      ${formatGreeting(s.greeting, opts.participantFirstName, opts.locale)}
+    </h2>
+    <p style="margin:0 0 20px 0;">${s.participantBody(opts.bookerName, opts.proName)}</p>
+    ${detailsTable(rows)}
+    <p style="color:#666;font-size:13px;margin:0;">${s.participantHelper(opts.bookerName)}</p>
+  `;
+  return emailLayout(body, undefined, opts.locale);
+}
+
+export function getParticipantBookingUpdatedSubject(
+  proName: string,
+  bookerName: string,
+  locale: Locale,
+): string {
+  return (BOOKING_UPDATED_STRINGS[locale] ?? BOOKING_UPDATED_STRINGS.en).participantSubject(
+    proName,
+    bookerName,
+  );
+}
+
 const BOOKING_PRO_STRINGS: Record<Locale, {
   subject: (studentName: string) => string;
   greeting: string;
