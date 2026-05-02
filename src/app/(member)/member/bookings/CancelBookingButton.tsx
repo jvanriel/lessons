@@ -4,6 +4,7 @@ import { useState, useTransition } from "react";
 import { Button } from "@/components/ui/button";
 import { cancelBooking } from "./actions";
 import { checkCancellationAllowed } from "@/lib/lesson-slots";
+import { fromZonedTime } from "date-fns-tz";
 import { t } from "@/lib/i18n/translations";
 import type { Locale } from "@/lib/i18n";
 
@@ -13,6 +14,14 @@ interface Props {
   startTime: string;
   cancellationHours: number;
   locale: Locale;
+  /**
+   * IANA timezone of the lesson location. Required so the
+   * deadline + lesson-passed checks resolve in the location's wall
+   * clock, not the browser's. The server-side `cancelBooking` uses
+   * the same TZ via `getProLocationTimezone(booking.proLocationId)`,
+   * so the button state and the action stay in agreement.
+   */
+  timezone: string;
 }
 
 export function CancelBookingButton({
@@ -21,6 +30,7 @@ export function CancelBookingButton({
   startTime,
   cancellationHours,
   locale,
+  timezone,
 }: Props) {
   const [isPending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
@@ -30,11 +40,13 @@ export function CancelBookingButton({
     date,
     startTime,
     cancellationHours,
-    "confirmed"
+    "confirmed",
+    undefined,
+    timezone,
   );
 
   // The lesson has already started (or ended) — nothing to cancel.
-  const lessonStart = new Date(`${date}T${startTime}:00`);
+  const lessonStart = fromZonedTime(`${date}T${startTime}:00`, timezone);
   const lessonPassed = lessonStart.getTime() <= Date.now();
 
   if (lessonPassed) {

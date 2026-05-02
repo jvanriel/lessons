@@ -42,7 +42,7 @@ export default async function AvailabilityPage() {
   // Date range: Monday of this week through 5 weeks ahead, in the
   // pro's operational timezone so the availability editor lines up
   // with the pro's calendar view.
-  const tz = profile.defaultTimezone ?? "Europe/Brussels";
+  const tz = profile.defaultTimezone;
   const monday = getMondayInTZ(new Date(), tz);
   const startStr = formatLocalDateInTZ(monday, tz);
   const endStr = addDaysToDateString(startStr, 35);

@@ -340,13 +340,18 @@ export default function AppSidebar({
       <nav className="flex-1 overflow-y-auto px-2 py-4">
         {visibleSections.map((section, si) => {
           const isClosed = closedSections.has(section.label);
-          // Auto-expand if active page is inside this section
-          const showItems = !isClosed;
+          // When the user only ever sees one section, the collapsible
+          // header adds no value (there's nothing else to collapse it
+          // against). Hoist the items up and skip the header.
+          const hideHeader = visibleSections.length === 1;
+          // Auto-expand if active page is inside this section, or when
+          // the header is suppressed (no way to toggle without it).
+          const showItems = hideHeader ? true : !isClosed;
 
           return (
             <div key={section.label} className={si > 0 ? "mt-4" : ""}>
               {/* Section header — clickable toggle when sidebar is expanded */}
-              {!collapsed && (
+              {!collapsed && !hideHeader && (
                 <button
                   onClick={() => toggleSection(section.label)}
                   className="group mb-1 flex w-full items-center justify-between rounded-md px-3 py-1 text-[10px] font-medium uppercase tracking-wider text-green-100/30 transition-colors hover:text-green-100/50"

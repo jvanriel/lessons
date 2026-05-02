@@ -1020,16 +1020,22 @@ export async function proQuickBookForStudent(data: {
     .limit(1);
 
   const [loc] = await db
-    .select({ name: locations.name, city: locations.city })
+    .select({
+      name: locations.name,
+      city: locations.city,
+      timezone: locations.timezone,
+    })
     .from(proLocations)
     .innerJoin(locations, eq(proLocations.locationId, locations.id))
     .where(eq(proLocations.id, data.proLocationId))
     .limit(1);
-  const locationName = loc
-    ? loc.city
-      ? `${loc.name}, ${loc.city}`
-      : loc.name
-    : "";
+  if (!loc) {
+    throw new Error(
+      `proCreateBooking: location lookup missing for proLocationId=${data.proLocationId} (booking ${booking.id})`,
+    );
+  }
+  const locationName = loc.city ? `${loc.name}, ${loc.city}` : loc.name;
+  const locationTz = loc.timezone;
 
   const [studentRow] = await db
     .select({ preferredLocale: users.preferredLocale })
@@ -1055,6 +1061,7 @@ export async function proQuickBookForStudent(data: {
     location: locationName,
     description: `Booked via golflessons.be — ${rel.firstName} ${rel.lastName}`,
     bookingId: booking.id,
+    tz: locationTz,
   });
   const icsAttachment = {
     filename: "lesson.ics",
@@ -1135,7 +1142,7 @@ export async function getStudentBookings(proStudentId: number) {
   const { profile } = await requireProProfile();
   if (!profile) return [];
 
-  const today = todayInTZ(profile.defaultTimezone ?? "Europe/Brussels");
+  const today = todayInTZ(profile.defaultTimezone);
 
   // Get the student's userId from the proStudents relationship
   const [rel] = await db
@@ -1248,16 +1255,22 @@ export async function proCancelBooking(bookingId: number) {
     .limit(1);
 
   const [loc] = await db
-    .select({ name: locations.name, city: locations.city })
+    .select({
+      name: locations.name,
+      city: locations.city,
+      timezone: locations.timezone,
+    })
     .from(proLocations)
     .innerJoin(locations, eq(proLocations.locationId, locations.id))
     .where(eq(proLocations.id, booking.proLocationId))
     .limit(1);
-  const locationName = loc
-    ? loc.city
-      ? `${loc.name}, ${loc.city}`
-      : loc.name
-    : "";
+  if (!loc) {
+    throw new Error(
+      `proCancelBooking: location lookup missing for proLocationId=${booking.proLocationId} (booking ${booking.id})`,
+    );
+  }
+  const locationName = loc.city ? `${loc.name}, ${loc.city}` : loc.name;
+  const locationTz = loc.timezone;
 
   const studentName = student
     ? `${student.firstName} ${student.lastName}`
@@ -1273,6 +1286,7 @@ export async function proCancelBooking(bookingId: number) {
     location: locationName,
     description: `Cancelled by ${profile.displayName}`,
     bookingId: booking.id,
+    tz: locationTz,
   });
   const icsAttachment = {
     filename: "lesson-cancelled.ics",

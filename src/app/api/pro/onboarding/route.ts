@@ -3,6 +3,7 @@ import { getSession, hasRole } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { proProfiles, locations, proLocations } from "@/lib/db/schema";
 import { eq } from "drizzle-orm";
+import { isValidIanaTimezone } from "@/lib/timezones";
 
 const IBAN_REGEX = /^[A-Z]{2}\d{2}[A-Z0-9]{4,30}$/;
 
@@ -52,6 +53,7 @@ export async function POST(request: Request) {
         name: string;
         address: string;
         city: string;
+        timezone?: string;
       }>;
       if (!locs || locs.length === 0) {
         return NextResponse.json({ error: "At least one location is required" }, { status: 400 });
@@ -59,6 +61,18 @@ export async function POST(request: Request) {
       for (const loc of locs) {
         if (!loc.name?.trim()) {
           return NextResponse.json({ error: "Location name is required" }, { status: 400 });
+        }
+        // The wizard's TimezonePicker auto-fills the browser TZ on
+        // mount and surfaces an explicit value via React state; an
+        // empty / invalid string reaching here means a stale client
+        // bundle or a hand-crafted POST. Reject so the column never
+        // holds a silent Brussels-default for a non-Brussels pro.
+        const tz = (loc.timezone ?? "").trim();
+        if (!isValidIanaTimezone(tz)) {
+          return NextResponse.json(
+            { error: "A valid timezone is required for each location" },
+            { status: 400 },
+          );
         }
         // Create location and link to pro
         const [inserted] = await db
@@ -68,6 +82,7 @@ export async function POST(request: Request) {
             address: loc.address?.trim() || null,
             city: loc.city?.trim() || null,
             country: "Belgium",
+            timezone: tz,
           })
           .returning({ id: locations.id });
 

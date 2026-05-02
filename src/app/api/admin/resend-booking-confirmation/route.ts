@@ -49,6 +49,7 @@ export async function GET(request: NextRequest) {
       studentEmail: users.email,
       studentLocale: users.preferredLocale,
       locationName: locations.name,
+      locationTz: locations.timezone,
     })
     .from(lessonBookings)
     .innerJoin(proProfiles, eq(lessonBookings.proProfileId, proProfiles.id))
@@ -82,6 +83,7 @@ export async function GET(request: NextRequest) {
     location: row.locationName,
     description: `Booked via golflessons.be — ${row.studentFirstName} ${row.studentLastName}${row.notes ? ` — Notes: ${row.notes}` : ""}`,
     bookingId: row.id,
+    tz: row.locationTz,
   });
 
   const result = await sendEmail({

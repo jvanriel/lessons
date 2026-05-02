@@ -15,6 +15,12 @@ interface Props {
   proName: string;
   cancellationHours: number;
   locale: Locale;
+  /**
+   * IANA timezone of the lesson location — required so the late-cancel
+   * detection resolves the deadline in the location's wall clock,
+   * not the browser's.
+   */
+  timezone: string;
 }
 
 export function CancelBookingButton({
@@ -24,6 +30,7 @@ export function CancelBookingButton({
   proName,
   cancellationHours,
   locale,
+  timezone,
 }: Props) {
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
@@ -34,7 +41,14 @@ export function CancelBookingButton({
   // Late-cancel detection — same logic as the bookings list page so
   // the dashboard's quick cancel button doesn't silently let a
   // student into the no-refund branch without warning them (task 37).
-  const check = checkCancellationAllowed(date, startTime, cancellationHours, "confirmed");
+  const check = checkCancellationAllowed(
+    date,
+    startTime,
+    cancellationHours,
+    "confirmed",
+    undefined,
+    timezone,
+  );
   const lateCancel = !check.canCancel;
 
   function handleCancel() {

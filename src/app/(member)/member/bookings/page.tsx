@@ -45,6 +45,7 @@ export default async function MemberBookingsPage() {
       proPhone: proProfiles.contactPhone,
       locationName: locations.name,
       locationCity: locations.city,
+      locationTimezone: locations.timezone,
       cancellationHours: proProfiles.cancellationHours,
     })
     .from(lessonBookings)
@@ -164,6 +165,7 @@ export default async function MemberBookingsPage() {
                     startTime={booking.startTime}
                     cancellationHours={booking.cancellationHours}
                     locale={locale}
+                    timezone={booking.locationTimezone}
                   />
                 </div>
               </div>

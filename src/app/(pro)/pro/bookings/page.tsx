@@ -67,7 +67,10 @@ export default async function ProBookingsPage() {
       .orderBy(proAvailability.dayOfWeek, proAvailability.startTime),
   ]);
 
-  const tz = profile.defaultTimezone ?? "Europe/Brussels";
+  // Schema: `proProfiles.defaultTimezone` is `notNull default "Europe/Brussels"`,
+  // so a non-empty value is always present after the redirect guard above.
+  // No silent fallback needed.
+  const tz = profile.defaultTimezone;
   const today = todayInTZ(tz);
   const past = bookings.filter(
     (b) => b.date < today || b.status !== "confirmed"

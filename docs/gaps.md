@@ -1,6 +1,6 @@
 # Gap Analysis — Pre-Launch
 
-Last updated: 2026-04-17
+Last updated: 2026-05-02
 
 Living document tracking what's left before golflessons.be can go live.
 Cross-reference for sprint planning and Nadine's testing feedback.
@@ -58,6 +58,155 @@ Stripe customer creation.
 `NEXT_PUBLIC_PLATFORM_FEE_PERCENT` env var. Change the env var + redeploy
 to adjust without code.
 
+### 0. Date/time/timezone audit findings (2026-05-02)
+
+Audit of `src/lib/lesson-slots.ts`, `local-date.ts`, both booking-action
+files, the reminder cron and the bookings calendar surfaced several
+correctness bugs in shipped code. The slot engine itself + ICS path are
+clean (proper `fromZonedTime` use, full DST coverage in tests). The
+problems are at the *callers* that re-implement local-time parsing or
+that compare booking dates against `todayLocal()` (server TZ).
+
+**Pass 1 — engine + critical callers tightened (2026-05-02, ~done):**
+
+- ~~**`cancelBooking` lets students cancel after the lesson started.**~~
+  Fixed: `cancelBooking` now resolves `tz = getProLocationTimezone(...)`
+  and uses `fromZonedTime` for the lesson-passed guard. The two cancel
+  client components (`CancelBookingButton`, dashboard
+  `CancelBookingDialog`) take a `timezone` prop and pass it to
+  `checkCancellationAllowed`. Parents (`/member/bookings`,
+  `/member/dashboard`) read `locations.timezone` and forward it.
+- ~~**No transactional / unique-constraint guard against double-booking.**~~
+  Fixed: partial unique index `lesson_bookings_slot_confirmed_idx` on
+  `(pro_profile_id, pro_location_id, date, start_time) WHERE status='confirmed'`
+  applied to preview + prod via `scripts/migrate-booking-slot-unique.ts`.
+  Both `createBooking`/`quickCreateBooking`/`createPublicBooking` wrap
+  the insert in try/catch using `isSlotConflictError(err)` and return
+  the existing translated `slotUnavailable` message.
+- ~~**24 h reminder cron treats stored start time as UTC.**~~
+  Fixed: cron joins `locations` once for the candidate set,
+  `fromZonedTime(\`${b.date}T${b.startTime}:00\`, b.locationTz)` for
+  the per-booking window check, and passes `tz: b.locationTz` into
+  `buildIcs`. SQL pre-filter widened by ±1 day so any UTC-12 to UTC+14
+  TZ is fully covered.
+- ~~**Engine signatures + `getProLocationTimezone` had silent Brussels
+  fallbacks.**~~ Fixed: `computeAvailableSlots`, `checkCancellationAllowed`,
+  `buildIcs`, `buildCancelIcs` now require `tz` (no default).
+  `getProLocationTimezone` throws on missing row instead of returning
+  Brussels. `BookingsCalendar` `timezone` prop required. Every caller
+  (member/pro booking actions, account-deletion mailer, admin resend
+  route, both cancel client components) updated to resolve `tz` from
+  `locations.timezone`. Where the location lookup happens for the ICS
+  email, a missing `loc` row throws (was silently `""` for the name +
+  Brussels for the tz). 7 new cross-TZ tests in `lesson-slots.test.ts`
+  prove the algorithms hold for London/Tokyo/NYC/DST end-to-end.
+
+**Pass 2 — locations form work (2026-05-02, ~done):**
+
+- ~~TZ picker in the onboarding wizard's locations step + `/pro/locations`
+  create/edit forms.~~ Shipped: `src/components/TimezonePicker.tsx`
+  auto-detects the browser TZ on mount, infers from country when set
+  (`defaultTimezoneForCountry()`), shows a curated `COMMON_TIMEZONES`
+  list + the full `Intl.supportedValuesOf("timeZone")` set behind a
+  "change" link.
+- ~~`createLocation` / `updateProLocation` / `/api/pro/onboarding`
+  validate + persist the picked TZ.~~ Server-side validation via
+  `isValidIanaTimezone()` (rejects empty, fixed-offset, and unknown
+  zones — restricted to the canonical IANA civil-zone set so DST
+  rules always apply correctly).
+- ~~Surface `timezone` on `getMyLocations` / `getPublicLocations` /
+  `getProLocations` / `getAllBookablePros`.~~ Done.
+- ~~Backfill existing rows.~~ Done via
+  `scripts/migrate-location-timezones.ts` on preview (22 rows, 0
+  updates needed) + prod (6 rows, 0 updates needed). Every existing
+  Belgian location already had `Europe/Brussels` from the prior DB
+  default, which was the right answer.
+- ~~Update all seed scripts (`seed-claude-dummies`, `seed-pros`,
+  `seed-test-dummies`, `lesson-booking-integration.test.ts`) to write
+  explicit `timezone: "Europe/Brussels"` so they don't depend on the
+  DB default.~~ Done.
+
+**Pass 3 — schema + residual cleanup (2026-05-02, done):**
+
+- ~~Drop `default("Europe/Brussels")` from `locations.timezone`.~~
+  Schema updated, applied to preview + prod via
+  `scripts/migrate-drop-location-tz-default.ts`. A future code path
+  that forgets to set `timezone` now fails loudly at INSERT instead
+  of silently landing on Brussels for a non-Brussels pro.
+- ~~Remove the residual `?? "Europe/Brussels"` fallbacks on
+  `proProfiles.defaultTimezone` in `/pro/{bookings,dashboard,students,availability}/page.tsx`.~~
+  Replaced with direct reads — the column is `notNull` and the pages
+  already redirect on `!profile`, so the `??` was dead defensive code.
+  `proProfiles.defaultTimezone` keeps its DB default for now (it's a
+  display-only TZ for the pro's own dashboard; per-location `timezone`
+  is the source of truth for booking-time wall clocks).
+
+**High:**
+
+- **`quickCreateBooking` bypasses pricing, payment status, and
+  platform fee.** `src/app/(member)/member/book/actions.ts:1253-1269`
+  inserts a booking with no `priceCents`, no `platformFeeCents`, no
+  `paymentStatus`, and never fires a PaymentIntent or commission
+  invoice item. The pro email then hard-codes `paymentStatus: "manual"`
+  (line 1393), so a pro with `allowBookingWithoutPayment=false` thinks
+  they got paid in cash even though no charge happened. Mirror the
+  full path from `createBooking`, or reject Quick Book for online-only
+  pros.
+- **`BookingsCalendar` ignores schedule-period validity windows.**
+  `src/app/(pro)/pro/bookings/BookingsCalendar.tsx:128-136` groups
+  availability by `dayOfWeek` only, so multi-period schedules (task 78)
+  paint the wrong green band on weeks where a different period is in
+  effect. Either filter `validFrom`/`validUntil` per `weekDates[i]` here,
+  or precompute the projected per-date grid server-side (see
+  `projectGridForDate` in `AvailabilityEditor.tsx:175`).
+- **"Today" in upcoming/past lists uses server TZ.**
+  `src/app/(member)/member/bookings/page.tsx:31`,
+  `(member)/member/dashboard/page.tsx:39`,
+  `(admin)/admin/page.tsx:10` all call `todayLocal()` and compare to
+  `bookings.date`. Between 22:00 and 24:00 Brussels (Vercel UTC) "today"
+  is yesterday-in-Brussels, so categories flip wrongly for late-evening
+  bookings. Switch to `todayInTZ("Europe/Brussels")` as the immediate
+  fix; per-pro / per-location TZ is the longer-term answer.
+- **`computeSuggestedDate` (Quick Book suggestion) uses server TZ.**
+  `src/app/(member)/member/book/actions.ts:928-962` builds `today` from
+  `new Date()` + `formatLocalDate`. After 22:00 UTC the suggestion can
+  fall a day before `windowStart = todayInTZ(tz)` and gets silently
+  stomped by the `availableDates.find(d => d >= suggestedDate)` fallback.
+  Use `todayInTZ(tz)` and a tz-aware day-of-week (parse via
+  `formatInTimeZone(..., "i")` like `getMondayInTZ` does).
+
+**Medium / hygiene:**
+
+- **`subtractWindow` doesn't pre-merge overlapping availability
+  windows** (`src/lib/lesson-slots.ts:71-89, 151-160`). Two overlapping
+  templates → duplicate slots, and a single booking only subtracts from
+  one window. Templates from the editor's grid-projection don't overlap
+  in practice, but `proAvailabilityOverrides` of `type='available'` is
+  hand-typed and could. Add a `merge(windows)` pass before slicing.
+- **`proCancelBooking` has no time guard at all**
+  (`src/app/(pro)/pro/students/actions.ts:1179-1212`). Pros can cancel
+  past bookings and still trigger student emails + `METHOD:CANCEL` ics.
+  Probably intentional but worth confirming.
+- **Three duplicated `jsDayToIso` helpers** —
+  `lesson-slots.ts:67`, `booking-preferences.ts:8`,
+  `(member)/member/book/actions.ts:894`. Import the one in
+  `lesson-slots.ts`.
+- ~~**Dead `winStartTime` / `winEndTime` in the cron**~~ — removed
+  alongside the pass-1 cron rewrite.
+- **`BookingsCalendar` hard-codes a 07:00–21:00 grid**
+  (`BookingsCalendar.tsx:63-68`); a 22:00 winter lesson silently
+  renders off-grid.
+- **Lint guard for the new pattern.** Extend
+  `src/lib/__tests__/local-date-guard.test.ts` to also flag
+  `new Date(\`${...}T${...}\`)` so regressions of the cancel-deadline
+  bug get caught at CI time.
+
+**Test coverage gaps surfaced:**
+concurrency / double-booking, the cancel-deadline guard at the *caller*
+(the engine itself is well-tested), the reminder cron route handler,
+period-aware BookingsCalendar rendering, and the Quick Book pricing
+path.
+
 ### 1. Pre-launch site password hardcoded
 
 - `src/middleware.ts:12` — `SITE_PASSWORD = "prolessons"`. Rotate or remove gate before public launch.
@@ -91,7 +240,7 @@ The platform CMS (`cms_blocks`) has per-locale rows but is operated by the platf
 
 ## 🟡 Should-fix before launch
 
-- **`db.transaction()` wrapping in `createBooking()`** — multi-step inserts (booking + participant + relationship) can leave partial state on failure. **Blocked**: the current `drizzle-orm/neon-http` driver doesn't support multi-statement transactions. Move to `neon-serverless` (WebSocket) or `pg` first, then re-introduce. Initial attempt in commit `ea60e63` broke the booking flow (Nadine's task #12) and was reverted in `b95dc35`. The proper fix is a driver migration — see Open Questions #4. **Note**: the public booking action `/book/[slug]/actions.ts` has the same multi-row insert pattern (user + booking + participant + pro_students) and inherits this gap.
+- **`db.transaction()` wrapping in `createBooking()`** — multi-step inserts (booking + participant + relationship) can leave partial state on failure. **Blocked**: the current `drizzle-orm/neon-http` driver doesn't support multi-statement transactions. Move to `neon-serverless` (WebSocket) or `pg` first, then re-introduce. Initial attempt in commit `ea60e63` broke the booking flow (Nadine's task #12) and was reverted in `b95dc35`. The proper fix is a driver migration — see Open Questions #4. **Note**: the public booking action `/book/[slug]/actions.ts` has the same multi-row insert pattern (user + booking + participant + pro_students) and inherits this gap. **Cross-ref**: 🔴 §0 also calls out the slot-uniqueness bug — a partial unique index is the immediately deployable mitigation that doesn't need the driver swap.
 
 ### Pro slug → ID migration — run on production
 

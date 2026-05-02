@@ -19,7 +19,7 @@ export default async function ProDashboard() {
 
   const locale = await getLocale();
 
-  const today = todayInTZ(profile.defaultTimezone ?? "Europe/Brussels");
+  const today = todayInTZ(profile.defaultTimezone);
 
   // Count upcoming bookings
   const [upcomingResult] = await db

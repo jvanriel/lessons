@@ -21,3 +21,23 @@ if (vercelEnv === "production") {
 }
 const sql = neon(databaseUrl);
 export const db = drizzle(sql, { schema });
+
+/**
+ * True when `err` is the Postgres `unique_violation` (23505) raised by
+ * the partial unique index `lesson_bookings_slot_confirmed_idx`. Used
+ * by the booking actions to translate the duplicate-key error into a
+ * user-facing "slot just got taken" message instead of crashing.
+ *
+ * The neon-http driver surfaces PG errors with `.code` on the thrown
+ * object (and a `.constraint` field for the index name). We check both
+ * to avoid swallowing other 23505s (e.g. the manage-token unique).
+ */
+export function isSlotConflictError(err: unknown): boolean {
+  if (!err || typeof err !== "object") return false;
+  const e = err as { code?: string; constraint?: string; constraint_name?: string; message?: string };
+  if (e.code !== "23505") return false;
+  const constraint = e.constraint ?? e.constraint_name ?? "";
+  if (constraint === "lesson_bookings_slot_confirmed_idx") return true;
+  // Neon HTTP sometimes packs the constraint into the message instead.
+  return typeof e.message === "string" && e.message.includes("lesson_bookings_slot_confirmed_idx");
+}

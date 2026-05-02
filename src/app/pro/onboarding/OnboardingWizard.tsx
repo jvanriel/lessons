@@ -12,6 +12,8 @@ import PhoneField, { isValidPhoneNumber } from "@/components/PhoneField";
 import PasswordField from "@/components/PasswordField";
 import { isValidIban } from "@/lib/iban";
 import { isValidVatShape } from "@/lib/vat";
+import { TimezonePicker } from "@/components/TimezonePicker";
+import { defaultTimezoneForCountry } from "@/lib/timezones";
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 import {
@@ -309,6 +311,10 @@ interface Location {
   name: string;
   address: string;
   city: string;
+  /** IANA timezone — every wall-clock booking time is in this zone.
+   * Defaults to the browser TZ when the form first renders, but the
+   * pro can override via the `<TimezonePicker />`. */
+  timezone: string;
 }
 
 function LocationsStep({
@@ -321,7 +327,16 @@ function LocationsStep({
   locale: Locale;
 }) {
   function addLocation() {
-    onChange([...locations, { name: "", address: "", city: "" }]);
+    // New rows inherit the previous row's TZ when present (most pros
+    // who add multiple locations are in the same country); fall back
+    // to the browser TZ via the picker's auto-detect when the list
+    // starts empty.
+    const inheritTz =
+      locations[locations.length - 1]?.timezone ?? "";
+    onChange([
+      ...locations,
+      { name: "", address: "", city: "", timezone: inheritTz },
+    ]);
   }
 
   function updateLocation(i: number, field: keyof Location, value: string) {
@@ -396,6 +411,27 @@ function LocationsStep({
                 className={inputClass}
               />
             </div>
+          </div>
+          <div>
+            <label className="block text-xs font-medium text-green-700">
+              {t("proLocations.timezone", locale)}
+            </label>
+            <TimezonePicker
+              locale={locale}
+              value={loc.timezone || undefined}
+              onChange={(tz) => updateLocation(i, "timezone", tz)}
+              // The onboarding API hardcodes `country: "Belgium"` for
+              // each new location, so the picker's natural inference
+              // is Brussels. The pro can override via "change" — most
+              // never need to.
+              inferred={defaultTimezoneForCountry("Belgium")}
+              inferredFromLabel="Belgium"
+              // No `name` so the picker doesn't try to submit via
+              // form-action — this wizard POSTs JSON, the timezone
+              // travels through React state.
+              name=""
+              required={false}
+            />
           </div>
         </div>
       ))}
@@ -1108,7 +1144,10 @@ export default function OnboardingWizard({
   const [step, setStep] = useState(initialStep);
   const [data, setData] = useState<InitialData>(initialData);
   const [locations, setLocations] = useState<Location[]>([
-    { name: "", address: "", city: "" },
+    // First row's TZ left empty so the picker auto-fills from the
+    // browser TZ on mount (most pros never have to interact with the
+    // picker in the common-case "I'm at home" flow).
+    { name: "", address: "", city: "", timezone: "" },
   ]);
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");

@@ -8,6 +8,8 @@ import {
 } from "./actions";
 import { t } from "@/lib/i18n/translations";
 import type { Locale } from "@/lib/i18n";
+import { TimezonePicker } from "@/components/TimezonePicker";
+import { defaultTimezoneForCountry } from "@/lib/timezones";
 
 interface ProLocation {
   proLocationId: number;
@@ -16,6 +18,7 @@ interface ProLocation {
   address: string | null;
   city: string | null;
   country: string | null;
+  timezone: string;
   notes: string | null;
   sortOrder: number;
   active: boolean;
@@ -95,6 +98,9 @@ export default function LocationManager({
                         .join(", ")}
                     </p>
                   )}
+                  <p className="mt-0.5 text-xs text-green-500">
+                    {t("proLocations.timezone", locale)}: {loc.timezone}
+                  </p>
                   {loc.notes && (
                     <p className="mt-1 text-xs text-green-500">{loc.notes}</p>
                   )}
@@ -127,83 +133,13 @@ export default function LocationManager({
 
       {/* Add location */}
       {showAdd ? (
-        <div className="rounded-xl border border-gold-300 bg-white p-5">
-          <h3 className="mb-4 font-medium text-green-900">
-            {t("proLocations.addHeading", locale)}
-          </h3>
-          <form action={createAction} className="space-y-3">
-            <div className="grid gap-3 sm:grid-cols-2">
-              <div>
-                <label className="block text-xs font-medium text-green-700">
-                  {t("proLocations.name", locale)} *
-                </label>
-                <input
-                  name="name"
-                  required
-                  placeholder={t("proLocations.namePlaceholder", locale)}
-                  className={inputClass}
-                />
-              </div>
-              <div>
-                <label className="block text-xs font-medium text-green-700">
-                  {t("proLocations.city", locale)}
-                </label>
-                <input
-                  name="city"
-                  placeholder={t("proLocations.cityPlaceholder", locale)}
-                  className={inputClass}
-                />
-              </div>
-              <div className="sm:col-span-2">
-                <label className="block text-xs font-medium text-green-700">
-                  {t("proLocations.address", locale)}
-                </label>
-                <input
-                  name="address"
-                  placeholder={t("proLocations.addressPlaceholder", locale)}
-                  className={inputClass}
-                />
-              </div>
-              <div>
-                <label className="block text-xs font-medium text-green-700">
-                  {t("proLocations.country", locale)}
-                </label>
-                <input
-                  name="country"
-                  defaultValue="Belgium"
-                  className={inputClass}
-                />
-              </div>
-              <div className="sm:col-span-2">
-                <label className="block text-xs font-medium text-green-700">
-                  {t("proLocations.notesInternal", locale)}
-                </label>
-                <input name="notes" className={inputClass} />
-              </div>
-            </div>
-            {createState?.error && (
-              <p className="text-sm text-red-600">{createState.error}</p>
-            )}
-            <div className="flex gap-3">
-              <button
-                type="submit"
-                disabled={createPending}
-                className="rounded-lg bg-gold-600 px-4 py-2 text-sm font-medium text-white hover:bg-gold-500 disabled:opacity-50"
-              >
-                {createPending
-                  ? t("proLocations.adding", locale)
-                  : t("proLocations.add", locale)}
-              </button>
-              <button
-                type="button"
-                onClick={() => setShowAdd(false)}
-                className="rounded-lg border border-green-200 px-4 py-2 text-sm font-medium text-green-700 hover:bg-green-50"
-              >
-                {t("proLocations.cancel", locale)}
-              </button>
-            </div>
-          </form>
-        </div>
+        <AddLocationForm
+          locale={locale}
+          createAction={createAction}
+          createState={createState}
+          createPending={createPending}
+          onCancel={() => setShowAdd(false)}
+        />
       ) : (
         <button
           onClick={() => setShowAdd(true)}
@@ -215,6 +151,118 @@ export default function LocationManager({
           {t("proLocations.addCta", locale)}
         </button>
       )}
+    </div>
+  );
+}
+
+function AddLocationForm({
+  locale,
+  createAction,
+  createState,
+  createPending,
+  onCancel,
+}: {
+  locale: Locale;
+  createAction: (formData: FormData) => void;
+  createState: { error?: string; success?: boolean } | null;
+  createPending: boolean;
+  onCancel: () => void;
+}) {
+  // Track country in React state so the TZ picker can re-infer when the
+  // pro types a country (Belgium → Europe/Brussels, France →
+  // Europe/Paris, etc.). The picker still gives the pro full override
+  // power; this is just a smarter starting value.
+  const [country, setCountry] = useState("Belgium");
+  const inferredTz = defaultTimezoneForCountry(country);
+
+  return (
+    <div className="rounded-xl border border-gold-300 bg-white p-5">
+      <h3 className="mb-4 font-medium text-green-900">
+        {t("proLocations.addHeading", locale)}
+      </h3>
+      <form action={createAction} className="space-y-3">
+        <div className="grid gap-3 sm:grid-cols-2">
+          <div>
+            <label className="block text-xs font-medium text-green-700">
+              {t("proLocations.name", locale)} *
+            </label>
+            <input
+              name="name"
+              required
+              placeholder={t("proLocations.namePlaceholder", locale)}
+              className={inputClass}
+            />
+          </div>
+          <div>
+            <label className="block text-xs font-medium text-green-700">
+              {t("proLocations.city", locale)}
+            </label>
+            <input
+              name="city"
+              placeholder={t("proLocations.cityPlaceholder", locale)}
+              className={inputClass}
+            />
+          </div>
+          <div className="sm:col-span-2">
+            <label className="block text-xs font-medium text-green-700">
+              {t("proLocations.address", locale)}
+            </label>
+            <input
+              name="address"
+              placeholder={t("proLocations.addressPlaceholder", locale)}
+              className={inputClass}
+            />
+          </div>
+          <div>
+            <label className="block text-xs font-medium text-green-700">
+              {t("proLocations.country", locale)}
+            </label>
+            <input
+              name="country"
+              value={country}
+              onChange={(e) => setCountry(e.target.value)}
+              className={inputClass}
+            />
+          </div>
+          <div>
+            <label className="block text-xs font-medium text-green-700">
+              {t("proLocations.timezone", locale)} *
+            </label>
+            <TimezonePicker
+              locale={locale}
+              inferred={inferredTz}
+              inferredFromLabel={inferredTz ? country.trim() : null}
+            />
+          </div>
+          <div className="sm:col-span-2">
+            <label className="block text-xs font-medium text-green-700">
+              {t("proLocations.notesInternal", locale)}
+            </label>
+            <input name="notes" className={inputClass} />
+          </div>
+        </div>
+        {createState?.error && (
+          <p className="text-sm text-red-600">{createState.error}</p>
+        )}
+        <div className="flex gap-3">
+          <button
+            type="submit"
+            disabled={createPending}
+            className="rounded-lg bg-gold-600 px-4 py-2 text-sm font-medium text-white hover:bg-gold-500 disabled:opacity-50"
+          >
+            {createPending
+              ? t("proLocations.adding", locale)
+              : t("proLocations.add", locale)}
+          </button>
+          <button
+            type="button"
+            onClick={onCancel}
+            className="rounded-lg border border-green-200 px-4 py-2 text-sm font-medium text-green-700 hover:bg-green-50"
+          >
+            {t("proLocations.cancel", locale)}
+          </button>
+        </div>
+      </form>
     </div>
   );
 }
@@ -240,6 +288,12 @@ function EditLocationForm({
     null
   );
   const [active, setActive] = useState(location.active);
+  const [country, setCountry] = useState(location.country ?? "");
+  // Edit form: prefer the row's stored timezone as the explicit
+  // value (so the picker shows what's persisted, not the country
+  // inference). The inferred fallback only matters when `value` is
+  // absent — here it always exists.
+  const inferredFromCountry = defaultTimezoneForCountry(country);
 
   return (
     <form action={action} className="space-y-3">
@@ -307,8 +361,20 @@ function EditLocationForm({
           </label>
           <input
             name="country"
-            defaultValue={location.country ?? ""}
+            value={country}
+            onChange={(e) => setCountry(e.target.value)}
             className={inputClass}
+          />
+        </div>
+        <div>
+          <label className="block text-xs font-medium text-green-700">
+            {t("proLocations.timezone", locale)} *
+          </label>
+          <TimezonePicker
+            locale={locale}
+            value={location.timezone}
+            inferred={inferredFromCountry}
+            inferredFromLabel={inferredFromCountry ? country.trim() : null}
           />
         </div>
         <div className="sm:col-span-2">

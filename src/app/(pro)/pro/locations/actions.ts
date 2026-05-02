@@ -5,6 +5,7 @@ import { db } from "@/lib/db";
 import { locations, proLocations, proProfiles } from "@/lib/db/schema";
 import { eq, and } from "drizzle-orm";
 import { getSession, hasRole } from "@/lib/auth";
+import { isValidIanaTimezone } from "@/lib/timezones";
 
 async function getProProfileId(): Promise<number | null> {
   const session = await getSession();
@@ -30,6 +31,7 @@ export async function getMyLocations() {
       address: locations.address,
       city: locations.city,
       country: locations.country,
+      timezone: locations.timezone,
       notes: proLocations.notes,
       sortOrder: proLocations.sortOrder,
       active: proLocations.active,
@@ -52,10 +54,21 @@ export async function createLocation(
   const city = (formData.get("city") as string)?.trim() || null;
   const country = (formData.get("country") as string)?.trim() || null;
   const notes = (formData.get("notes") as string)?.trim() || null;
+  const timezoneRaw = (formData.get("timezone") as string)?.trim() || "";
 
   if (!name) return { error: "Location name is required." };
+  // The TZ picker submits a value via a hidden input on every render
+  // (browser-detected default if the pro never opened the dropdown).
+  // A missing/invalid value is either an old form or a hand-crafted
+  // POST — reject either way so we never silently default to Brussels.
+  if (!isValidIanaTimezone(timezoneRaw)) {
+    return { error: "A valid timezone is required for this location." };
+  }
+  const timezone: string = timezoneRaw;
 
-  // Check if location already exists (by name + city)
+  // Check if location already exists (by name + city). If so, the new
+  // pro joins the existing row; we don't overwrite its timezone since
+  // another pro may have set it correctly already.
   let locationId: number;
   const [existing] = await db
     .select({ id: locations.id })
@@ -68,7 +81,7 @@ export async function createLocation(
   } else {
     const [inserted] = await db
       .insert(locations)
-      .values({ name, address, city, country })
+      .values({ name, address, city, country, timezone })
       .returning({ id: locations.id });
     locationId = inserted.id;
   }
@@ -120,8 +133,13 @@ export async function updateProLocation(
   const address = (formData.get("address") as string)?.trim() || null;
   const city = (formData.get("city") as string)?.trim() || null;
   const country = (formData.get("country") as string)?.trim() || null;
+  const timezoneRaw = (formData.get("timezone") as string)?.trim() || "";
 
   if (!name) return { error: "Location name is required." };
+  if (!isValidIanaTimezone(timezoneRaw)) {
+    return { error: "A valid timezone is required for this location." };
+  }
+  const timezone: string = timezoneRaw;
 
   // Look up the shared locations row via the pro_locations junction,
   // scoped to the current pro so one pro can't edit another's row.
@@ -139,7 +157,7 @@ export async function updateProLocation(
 
   await db
     .update(locations)
-    .set({ name, address, city, country })
+    .set({ name, address, city, country, timezone })
     .where(eq(locations.id, link.locationId));
   await db
     .update(proLocations)

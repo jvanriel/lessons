@@ -118,9 +118,9 @@ async function main() {
   // ─── Locations ────────────────────────────────────────
 
   const locationData = [
-    { name: "Kempense Golf", city: "Mol", address: "Balen-Neetweg 100, 2400 Mol", country: "Belgium" },
-    { name: "The National Golf Brussels", city: "Sterrebeek", address: "Tervuursesteenweg 346, 1933 Sterrebeek", country: "Belgium" },
-    { name: "Drie Eycken Golf", city: "Edegem", address: "Edegemse Baan 9, 2540 Hove", country: "Belgium" },
+    { name: "Kempense Golf", city: "Mol", address: "Balen-Neetweg 100, 2400 Mol", country: "Belgium", timezone: "Europe/Brussels" },
+    { name: "The National Golf Brussels", city: "Sterrebeek", address: "Tervuursesteenweg 346, 1933 Sterrebeek", country: "Belgium", timezone: "Europe/Brussels" },
+    { name: "Drie Eycken Golf", city: "Edegem", address: "Edegemse Baan 9, 2540 Hove", country: "Belgium", timezone: "Europe/Brussels" },
   ];
 
   for (const loc of locationData) {

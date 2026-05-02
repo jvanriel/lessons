@@ -5,11 +5,18 @@ import { getSession, hasRole } from "@/lib/auth";
 import { redirect } from "next/navigation";
 
 /**
- * Resolve the IANA timezone for a `pro_locations` row. Slot computation,
- * availability windows and calendar rendering need this so that a pro
- * teaching outside Europe/Brussels gets correct day boundaries and
- * notice thresholds. Falls back to Europe/Brussels when the row is
- * missing — matches the historical default before multi-TZ support.
+ * Resolve the IANA timezone for a `pro_locations` row. Every wall-clock
+ * time we store on lessons / availability / overrides is in this TZ;
+ * slot computation, notice thresholds, cancellation deadlines and
+ * calendar rendering all need it. The `locations.timezone` column is
+ * NOT NULL with a Brussels DB default. Today (2026-05) every existing
+ * row has the default value because the onboarding wizard + locations
+ * editor don't yet ask for a TZ — that's pass 2 of this work. Once
+ * those forms ship + the existing rows are backfilled, the default
+ * stops mattering. Until then, a missing row here is a real lookup
+ * error (bad `proLocationId`); we throw instead of silently returning
+ * Brussels because that fallback masked non-Brussels pros' bugs in
+ * the slot engine and ICS generation (gaps.md §0).
  */
 export async function getProLocationTimezone(
   proLocationId: number,
@@ -20,7 +27,12 @@ export async function getProLocationTimezone(
     .innerJoin(locations, eq(proLocations.locationId, locations.id))
     .where(eq(proLocations.id, proLocationId))
     .limit(1);
-  return row?.tz ?? "Europe/Brussels";
+  if (!row?.tz) {
+    throw new Error(
+      `getProLocationTimezone: pro_location ${proLocationId} not found or has empty timezone`,
+    );
+  }
+  return row.tz;
 }
 
 /**

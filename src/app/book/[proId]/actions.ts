@@ -1,6 +1,6 @@
 "use server";
 
-import { db } from "@/lib/db";
+import { db, isSlotConflictError } from "@/lib/db";
 import {
   proProfiles,
   proLocations,
@@ -105,6 +105,7 @@ export async function getAllBookablePros() {
       name: locations.name,
       city: locations.city,
       address: locations.address,
+      timezone: locations.timezone,
       lessonDuration: proLocations.lessonDuration,
       sortOrder: proLocations.sortOrder,
     })
@@ -178,6 +179,7 @@ export async function getPublicLocations(proProfileId: number) {
       name: locations.name,
       city: locations.city,
       address: locations.address,
+      timezone: locations.timezone,
       lessonDuration: proLocations.lessonDuration,
     })
     .from(proLocations)
@@ -579,26 +581,41 @@ export async function createPublicBooking(formData: FormData) {
   }
 
   // ─── Insert the booking ──────────────────────────────
+  // The DB-level partial unique index `lesson_bookings_slot_confirmed_idx`
+  // is the race-safe gate against two visitors grabbing the same slot
+  // between the `getPublicSlots` snapshot above and this insert.
+  // Translate the duplicate-key error into the same friendly message
+  // the slot-staleness check returns. The user row created above is
+  // intentionally left in place — it's a benign stub, identical to
+  // what we'd have if the user had just visited the wizard.
   const manageToken = crypto.randomBytes(32).toString("hex");
 
-  const [booking] = await db
-    .insert(lessonBookings)
-    .values({
-      proProfileId: pro.id,
-      bookedById: userId,
-      proLocationId,
-      date,
-      startTime,
-      endTime,
-      participantCount,
-      status: "confirmed",
-      notes,
-      manageToken,
-      priceCents,
-      platformFeeCents: null, // Phase A: pay-later only, no commission snapshot.
-      paymentStatus: "manual",
-    })
-    .returning({ id: lessonBookings.id });
+  let booking: { id: number };
+  try {
+    [booking] = await db
+      .insert(lessonBookings)
+      .values({
+        proProfileId: pro.id,
+        bookedById: userId,
+        proLocationId,
+        date,
+        startTime,
+        endTime,
+        participantCount,
+        status: "confirmed",
+        notes,
+        manageToken,
+        priceCents,
+        platformFeeCents: null, // Phase A: pay-later only, no commission snapshot.
+        paymentStatus: "manual",
+      })
+      .returning({ id: lessonBookings.id });
+  } catch (err) {
+    if (isSlotConflictError(err)) {
+      return { error: t("publicBook.err.slotUnavailable", uiLocale) };
+    }
+    throw err;
+  }
 
   await db.insert(lessonParticipants).values({
     bookingId: booking.id,
@@ -646,16 +663,22 @@ export async function createPublicBooking(formData: FormData) {
     .limit(1);
 
   const [loc] = await db
-    .select({ name: locations.name, city: locations.city })
+    .select({
+      name: locations.name,
+      city: locations.city,
+      timezone: locations.timezone,
+    })
     .from(proLocations)
     .innerJoin(locations, eq(proLocations.locationId, locations.id))
     .where(eq(proLocations.id, proLocationId))
     .limit(1);
-  const locationName = loc
-    ? loc.city
-      ? `${loc.name}, ${loc.city}`
-      : loc.name
-    : "";
+  if (!loc) {
+    throw new Error(
+      `createPublicBooking: location lookup missing for proLocationId=${proLocationId} (booking ${booking.id})`,
+    );
+  }
+  const locationName = loc.city ? `${loc.name}, ${loc.city}` : loc.name;
+  const locationTz = loc.timezone;
 
   // Single .ics shared between the student and pro emails — both
   // sides deserve a calendar invite they can drop into Google/Apple/
@@ -672,6 +695,7 @@ export async function createPublicBooking(formData: FormData) {
           location: locationName,
           description: `Booked via golflessons.be — ${firstName} ${lastName}${notes ? ` — Notes: ${notes}` : ""}`,
           bookingId: booking.id,
+          tz: locationTz,
         }),
         method: "PUBLISH" as const,
       }

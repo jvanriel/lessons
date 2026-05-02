@@ -28,8 +28,7 @@ export default async function ProStudentsPage() {
   } | null = null;
 
   if (profile) {
-    const tz = profile.defaultTimezone ?? "Europe/Brussels";
-    const today = todayInTZ(tz);
+    const today = todayInTZ(profile.defaultTimezone);
 
     const [nextLesson] = await db
       .select({

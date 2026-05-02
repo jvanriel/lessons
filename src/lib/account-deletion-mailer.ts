@@ -196,16 +196,25 @@ export async function notifyCounterpartOfAccountDeletion(
       .limit(1);
 
     const [loc] = await db
-      .select({ name: locations.name, city: locations.city })
+      .select({
+        name: locations.name,
+        city: locations.city,
+        timezone: locations.timezone,
+      })
       .from(proLocations)
       .innerJoin(locations, eq(proLocations.locationId, locations.id))
       .where(eq(proLocations.id, booking.proLocationId))
       .limit(1);
-    const locationName = loc
-      ? loc.city
-        ? `${loc.name}, ${loc.city}`
-        : loc.name
-      : "";
+    if (!loc) {
+      // Per-booking helper; account deletion sweeps every active
+      // booking individually. Missing location = DB integrity issue,
+      // but we don't want one bad row to abort the deletion sweep.
+      // Skip the cancellation email entirely for this row — the
+      // calling sweep will move on to the next booking.
+      return;
+    }
+    const locationName = loc.city ? `${loc.name}, ${loc.city}` : loc.name;
+    const locationTz = loc.timezone;
 
     const studentName = student
       ? `${student.firstName} ${student.lastName}`
@@ -223,6 +232,7 @@ export async function notifyCounterpartOfAccountDeletion(
           ? `Cancelled — student account removed`
           : `Cancelled — pro account removed`,
       bookingId: booking.id,
+      tz: locationTz,
     });
     const icsAttachment = {
       filename: "lesson-cancelled.ics",

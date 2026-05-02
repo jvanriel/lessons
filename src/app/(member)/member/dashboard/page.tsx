@@ -48,6 +48,7 @@ export default async function MemberDashboard() {
       proName: proProfiles.displayName,
       proId: proProfiles.id,
       locationName: locations.name,
+      locationTimezone: locations.timezone,
       cancellationHours: proProfiles.cancellationHours,
     })
     .from(lessonBookings)
@@ -288,6 +289,7 @@ export default async function MemberDashboard() {
                   startTime={booking.startTime}
                   proName={booking.proName}
                   cancellationHours={booking.cancellationHours}
+                  timezone={booking.locationTimezone}
                 />
               </div>
             ))}
