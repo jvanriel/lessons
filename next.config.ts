@@ -1,13 +1,37 @@
 import type { NextConfig } from "next";
 import { withSentryConfig } from "@sentry/nextjs";
+import { readFileSync } from "node:fs";
+import path from "node:path";
+
+// Read the semver from package.json at config-load time. Bumping the
+// version is a deliberate manual action (tied to CHANGELOG entries) —
+// no auto-bump on every commit. See docs/CHANGELOG.md for the
+// human-readable history; the BUILD_ID below is the per-deploy
+// fingerprint (commit SHA short).
+const pkg = JSON.parse(
+  readFileSync(path.join(process.cwd(), "package.json"), "utf8"),
+) as { version?: string };
+const APP_VERSION = pkg.version ?? "0.0.0";
 
 const nextConfig: NextConfig = {
   turbopack: {
     root: ".",
   },
   env: {
+    // Build metadata exposed to the client. Every Vercel build re-
+    // evaluates next.config.ts so each of these is fresh per deploy.
+    // `BUILD_TIME` uses the build server's clock at config-load time
+    // — not the commit timestamp — so a re-deploy of an unchanged
+    // commit still produces a new value (useful for cache busting).
+    NEXT_PUBLIC_APP_VERSION: APP_VERSION,
     NEXT_PUBLIC_BUILD_ID:
       process.env.VERCEL_GIT_COMMIT_SHA?.slice(0, 8) ?? "dev",
+    NEXT_PUBLIC_BUILD_COMMIT_SHA:
+      process.env.VERCEL_GIT_COMMIT_SHA ?? "",
+    NEXT_PUBLIC_BUILD_BRANCH:
+      process.env.VERCEL_GIT_COMMIT_REF ?? "local",
+    NEXT_PUBLIC_BUILD_TIME: new Date().toISOString(),
+    NEXT_PUBLIC_VERCEL_ENV: process.env.VERCEL_ENV ?? "development",
   },
   // The /sw.js route used to be a static file under `public/sw.js`
   // and needed an explicit `Cache-Control` + `Service-Worker-Allowed`
