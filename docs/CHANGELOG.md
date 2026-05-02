@@ -17,6 +17,14 @@ If any role inside the brackets is unknown (typo), the parser falls
 back to treating the brackets as literal text — better to over-show
 than silently hide.
 
+## 2026-05-02 — v1.1.13
+
+- **Loading spinner now appears when a page is slow to open.** When
+  the backend is busy or right after a software upgrade, navigating
+  between pages used to leave you staring at the previous screen
+  with no feedback. A small spinner now appears immediately to show
+  the new page is on its way.
+
 ## 2026-05-02 — v1.1.12
 
 - [admin,dev] **Changelog entries can now be tagged by role.**

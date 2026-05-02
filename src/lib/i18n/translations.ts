@@ -62,6 +62,7 @@ const translations: Record<Locale, Record<string, string>> = {
     // About page
     "about.title": "About",
     "about.subtitle": "Version + recent changes.",
+    "common.loading": "Loading…",
     "about.versionHeading": "Version",
     "about.buildId": "Build",
     "about.buildTime": "Built",
@@ -1508,6 +1509,7 @@ const translations: Record<Locale, Record<string, string>> = {
     "appNav.earnings": "Inkomsten",
     "about.title": "Info",
     "about.subtitle": "Versie + recente wijzigingen.",
+    "common.loading": "Bezig met laden…",
     "about.versionHeading": "Versie",
     "about.buildId": "Build",
     "about.buildTime": "Gebouwd",
@@ -2921,6 +2923,7 @@ const translations: Record<Locale, Record<string, string>> = {
     "appNav.earnings": "Revenus",
     "about.title": "À propos",
     "about.subtitle": "Version + changements récents.",
+    "common.loading": "Chargement…",
     "about.versionHeading": "Version",
     "about.buildId": "Build",
     "about.buildTime": "Compilé",
