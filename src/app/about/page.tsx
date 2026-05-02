@@ -139,12 +139,25 @@ export default async function AboutPage() {
                 </h3>
                 <ul className="mt-2 list-disc space-y-1.5 pl-5 text-sm text-green-700 marker:text-green-300">
                   {e.items.map((item, i) => (
-                    <li
-                      key={i}
-                      // Tiny well-defined parser output, not user content.
-                      // Restricted to escaped text + <strong>.
-                      dangerouslySetInnerHTML={{ __html: renderItem(item.text) }}
-                    />
+                    <li key={i}>
+                      {item.roles && item.roles.length > 0 && (
+                        <span className="mr-2 inline-flex flex-wrap gap-1 align-middle">
+                          {item.roles.map((r) => (
+                            <span
+                              key={r}
+                              className="rounded-full bg-green-100 px-2 py-0.5 text-[10px] font-medium uppercase tracking-wide text-green-700"
+                            >
+                              {r}
+                            </span>
+                          ))}
+                        </span>
+                      )}
+                      <span
+                        // Tiny well-defined parser output, not user content.
+                        // Restricted to escaped text + <strong>.
+                        dangerouslySetInnerHTML={{ __html: renderItem(item.text) }}
+                      />
+                    </li>
                   ))}
                 </ul>
               </li>
