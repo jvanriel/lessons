@@ -17,6 +17,19 @@ If any role inside the brackets is unknown (typo), the parser falls
 back to treating the brackets as literal text — better to over-show
 than silently hide.
 
+## 2026-05-02 — v1.1.14
+
+- **Send us feedback right from the app.** A new Feedback page in
+  the App menu lets you tell us what's working, what's broken, or
+  what you'd like next. Each message goes to our inbox and to our
+  notifications system, and we'll reply by email — you'll also see
+  the conversation history under your previous messages.
+- [admin] **Admin feedback inbox at /admin → Feedback.** New
+  submissions fan out a high-priority admin notification + email
+  to contact@golflessons.be. Filter by status (new / in progress /
+  responded / closed), respond inline, and the user gets emailed
+  back in their preferred locale.
+
 ## 2026-05-02 — v1.1.13
 
 - **Loading spinner now appears when a page is slow to open.** When
