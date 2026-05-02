@@ -68,6 +68,7 @@ export default function AppLayout({
     <div className="flex h-dvh flex-col">
       <AppTopBar
         firstName={firstName}
+        roles={roles}
         onSidebarToggle={handleToggle}
         showNotifications={showNotifications}
         sessionToken={sessionToken}

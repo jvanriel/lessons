@@ -33,6 +33,7 @@ const TABLES = [
   "locations",
   "pro_locations",
   "pro_availability",
+  "pro_schedule_periods",
   "pro_availability_overrides",
   "lesson_bookings",
   "lesson_participants",
@@ -40,11 +41,14 @@ const TABLES = [
   "pro_students",
   "pro_mailing_contacts",
   "pro_mailings",
+  "feedback",
   "tasks",
   "task_notes",
   "comments",
   "comment_reactions",
+  "events",
   "stripe_events",
+  "webauthn_credentials",
 ] as const;
 
 const KEY_MAP: Record<string, string> = {
@@ -59,6 +63,7 @@ const KEY_MAP: Record<string, string> = {
   locations: "locations",
   pro_locations: "proLocations",
   pro_availability: "proAvailability",
+  pro_schedule_periods: "proSchedulePeriods",
   pro_availability_overrides: "proAvailabilityOverrides",
   lesson_bookings: "lessonBookings",
   lesson_participants: "lessonParticipants",
@@ -66,11 +71,14 @@ const KEY_MAP: Record<string, string> = {
   pro_students: "proStudents",
   pro_mailing_contacts: "proMailingContacts",
   pro_mailings: "proMailings",
+  feedback: "feedback",
   tasks: "tasks",
   task_notes: "taskNotes",
   comments: "comments",
   comment_reactions: "commentReactions",
+  events: "events",
   stripe_events: "stripeEvents",
+  webauthn_credentials: "webauthnCredentials",
 };
 
 type Counts = Record<string, number>;

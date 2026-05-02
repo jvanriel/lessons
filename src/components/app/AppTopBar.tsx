@@ -7,6 +7,7 @@ import Logo from "@/components/Logo";
 import LanguageSwitcher from "@/components/LanguageSwitcher";
 import NotificationBell from "@/components/notifications/NotificationBell";
 import HelpDialog from "@/components/app/HelpDialog";
+import { dashboardHrefFor } from "./dashboard-href";
 import type { Locale } from "@/lib/i18n";
 import { t } from "@/lib/i18n/translations";
 
@@ -19,6 +20,13 @@ interface ImpersonableUser {
 
 interface AppTopBarProps {
   firstName: string | null;
+  /**
+   * Viewer's roles. Drives the brand link's destination so clicking
+   * "Golf Lessons" lands the user on whichever dashboard is "home"
+   * for them (admin → /admin, pro → /pro/dashboard, member →
+   * /member/dashboard) instead of the public marketing /.
+   */
+  roles: string[];
   onSidebarToggle: () => void;
   showNotifications: boolean;
   sessionToken?: string;
@@ -31,6 +39,7 @@ interface AppTopBarProps {
 
 export default function AppTopBar({
   firstName,
+  roles,
   onSidebarToggle,
   showNotifications,
   sessionToken,
@@ -199,7 +208,7 @@ export default function AppTopBar({
           </svg>
         </button>
         <Link
-          href="/"
+          href={dashboardHrefFor(roles)}
           className="flex items-center gap-2 font-display text-base font-medium tracking-tight text-gold-200"
         >
           <Logo size={22} variant="cream" />
