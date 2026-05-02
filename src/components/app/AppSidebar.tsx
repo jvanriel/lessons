@@ -27,7 +27,12 @@ interface NavSection {
   label: string;
   /** Translation key for the section heading. When set, label is ignored. */
   labelKey?: string;
-  role: string;
+  /**
+   * Required role to see this section. Omit to show the section to
+   * every authenticated user regardless of role — used for utility
+   * entries (About, Help) that aren't role-scoped.
+   */
+  role?: string;
   items: NavItem[];
   /**
    * When true and the user has never interacted with this section, start
@@ -279,6 +284,22 @@ const sections: NavSection[] = [
       },
     ],
   },
+  {
+    // Utility section — always visible regardless of role. Currently
+    // just the About page (version + changelog + manual update check).
+    label: "App",
+    labelKey: "appNav.section.app",
+    items: [
+      {
+        href: "/about",
+        label: "About",
+        labelKey: "appNav.about",
+        icon: (
+          <Icon d="M11.25 11.25l.041-.02a.75.75 0 0 1 1.063.852l-.708 2.836a.75.75 0 0 0 1.063.853l.041-.021M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Zm-9-3.75h.008v.008H12V8.25Z" />
+        ),
+      },
+    ],
+  },
 ];
 
 export default function AppSidebar({
@@ -289,7 +310,9 @@ export default function AppSidebar({
 }: AppSidebarProps) {
   const pathname = usePathname();
   const visibleSections = sections.filter((s) => {
-    if (!roles.includes(s.role)) return false;
+    // `role` is optional: a section without one (e.g. utility entries
+    // like About) is visible to every authenticated user.
+    if (s.role && !roles.includes(s.role)) return false;
     if (s.hideIfRole) {
       const hideRoles = Array.isArray(s.hideIfRole)
         ? s.hideIfRole
@@ -340,18 +363,12 @@ export default function AppSidebar({
       <nav className="flex-1 overflow-y-auto px-2 py-4">
         {visibleSections.map((section, si) => {
           const isClosed = closedSections.has(section.label);
-          // When the user only ever sees one section, the collapsible
-          // header adds no value (there's nothing else to collapse it
-          // against). Hoist the items up and skip the header.
-          const hideHeader = visibleSections.length === 1;
-          // Auto-expand if active page is inside this section, or when
-          // the header is suppressed (no way to toggle without it).
-          const showItems = hideHeader ? true : !isClosed;
+          const showItems = !isClosed;
 
           return (
             <div key={section.label} className={si > 0 ? "mt-4" : ""}>
               {/* Section header — clickable toggle when sidebar is expanded */}
-              {!collapsed && !hideHeader && (
+              {!collapsed && (
                 <button
                   onClick={() => toggleSection(section.label)}
                   className="group mb-1 flex w-full items-center justify-between rounded-md px-3 py-1 text-[10px] font-medium uppercase tracking-wider text-green-100/30 transition-colors hover:text-green-100/50"
