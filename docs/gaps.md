@@ -33,9 +33,8 @@ The platform CMS (`cms_blocks`) has per-locale rows but is operated by the platf
 
 ### Booking engine — open audit items
 
-- **`BookingsCalendar` hard-codes a 07:00–21:00 grid**
-  (`BookingsCalendar.tsx:63-68`); a 22:00 winter lesson silently
-  renders off-grid.
+(All open audit items closed as of 2026-05-02 — see Recently shipped
+sweep below for the dynamic hour-range fix.)
 
 ### Test coverage gaps
 
@@ -114,6 +113,7 @@ End-to-end timezone audit + the supporting infrastructure to keep the booking en
 - **`todayLocal()` callers** (member/bookings, member/dashboard, admin) switched to TZ-aware "today". `member/bookings/page.tsx` does per-booking `todayInTZ(b.locationTimezone)` (cached per TZ); the coarse pages anchor to Europe/Brussels with a comment.
 - **`computeSuggestedDate` TZ-aware.** Quick Book suggestion now anchors to the same location TZ as the availability window; late-evening users no longer see a suggestion drift a day before windowStart and get silently stomped.
 - **`BookingsCalendar` period filtering.** Pro week view now filters availability by each slot's `validFrom`/`validUntil` window per rendered date, not just by `dayOfWeek`. Multi-period schedules (task 78) no longer paint a summer-only green band on winter weeks. 6 new RTL regression tests pin the boundary cases.
+- **`BookingsCalendar` dynamic hour range.** Replaced the hardcoded 07:00–21:00 grid with `computeHourRange(bookings, availability)` that defaults to 07–21 but expands to fit any booking or availability slot outside that band, clamped 0..24 with end-minute round-up so a 21:30 booking widens to 22. 7 new tests (6 unit + 1 render-level for a 22:00 booking on-grid).
 - **PWA version detection.** `/sw.js` is now a Next.js route that bakes `BUILD_ID` into both file content and `CACHE_NAME` (per-deploy byte difference → reliable `updatefound`). `/api/version` is `force-dynamic`. `DeploymentChecker` cache-busts the fetch URL on top of `cache: "no-store"` to defeat iOS Safari quirks.
 - **About page + changelog.** New `/about` shows app version (semver from `package.json.version`, starting at v1.1.0), build ID, build time, branch + environment in non-prod, manual update-check button, and the rendered `docs/CHANGELOG.md`. Linked from sidebar + mobile More for every authenticated user.
 - **Migrations applied to preview + prod:**

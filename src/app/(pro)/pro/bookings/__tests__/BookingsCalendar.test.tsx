@@ -32,7 +32,7 @@ vi.mock("next/navigation", () => ({
   }),
 }));
 
-import { BookingsCalendar } from "../BookingsCalendar";
+import { BookingsCalendar, computeHourRange } from "../BookingsCalendar";
 
 type Case = {
   name: string;
@@ -266,5 +266,103 @@ describe("BookingsCalendar — schedule-period validity", () => {
       validUntil: "2026-04-30",
     });
     expect(bandCountInWednesdayColumn(container)).toBe(0);
+  });
+});
+
+// ─── Dynamic hour-range regression (gaps.md) ───────────
+//
+// Pre-fix the calendar grid was hardcoded to 07:00-21:00. A 22:00
+// winter lesson rendered off-grid (top offset past the day column's
+// height). `computeHourRange` widens the window when bookings or
+// availability fall outside the default — and otherwise stays at
+// 07-21 to keep the typical pro's calendar compact.
+
+describe("computeHourRange", () => {
+  it("returns the 07-21 default when nothing falls outside", () => {
+    expect(
+      computeHourRange(
+        [{ startTime: "10:00", endTime: "11:00" }],
+        [{ startTime: "08:00", endTime: "20:00" }],
+      ),
+    ).toEqual({ startHour: 7, endHour: 21 });
+  });
+
+  it("widens the end hour for late-evening bookings", () => {
+    expect(
+      computeHourRange([{ startTime: "21:00", endTime: "22:00" }], []),
+    ).toEqual({ startHour: 7, endHour: 22 });
+  });
+
+  it("widens the start hour for early-morning availability", () => {
+    expect(
+      computeHourRange([], [{ startTime: "05:30", endTime: "08:00" }]),
+    ).toEqual({ startHour: 5, endHour: 21 });
+  });
+
+  it("rounds non-zero end-minutes UP so a 21:30 booking pushes end to 22", () => {
+    expect(
+      computeHourRange([{ startTime: "20:00", endTime: "21:30" }], []),
+    ).toEqual({ startHour: 7, endHour: 22 });
+  });
+
+  it("keeps end at 21 when end-time is exactly 21:00", () => {
+    expect(
+      computeHourRange([{ startTime: "20:00", endTime: "21:00" }], []),
+    ).toEqual({ startHour: 7, endHour: 21 });
+  });
+
+  it("clamps to 0..24", () => {
+    expect(
+      computeHourRange(
+        [{ startTime: "23:00", endTime: "23:59" }],
+        [{ startTime: "00:00", endTime: "01:00" }],
+      ),
+    ).toEqual({ startHour: 0, endHour: 24 });
+  });
+});
+
+describe("BookingsCalendar — grid widens for late-evening bookings", () => {
+  beforeEach(() => {
+    // Pin to a Thursday so the booking date below is in the visible week.
+    vi.setSystemTime(new Date("2026-04-16T12:00:00+02:00"));
+  });
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  it("renders a 22:00 booking on-grid (top within the day column's height)", () => {
+    const { container } = render(
+      <BookingsCalendar
+        bookings={[
+          {
+            id: 99,
+            date: "2026-04-16",
+            startTime: "22:00",
+            endTime: "23:00",
+            status: "confirmed",
+            participantCount: 1,
+            notes: null,
+            paymentStatus: "paid",
+            studentFirstName: "late",
+            studentLastName: "owl",
+            studentEmail: "l@example.com",
+            studentPhone: null,
+            studentEmailVerified: new Date(),
+            locationName: "Test",
+            locationCity: null,
+            proLocationId: 1,
+          },
+        ]}
+        availability={[]}
+        locale="nl"
+        timezone="Europe/Brussels"
+      />,
+    );
+
+    // Pre-fix the time gutter only listed 07..20. With the dynamic
+    // range, 22:00 should now appear as a hour label.
+    expect(container.textContent).toContain("22:00");
+    // And the booking's "22:00 - 23:00" block should be present.
+    expect(container.textContent).toContain("22:00 - 23:00");
   });
 });

@@ -4,6 +4,15 @@ End-user-visible changes shipped to the platform. Engineering details
 that don't affect what students or pros see live in `docs/gaps.md` and
 the git history. Newest first.
 
+## 2026-05-02 — v1.1.8
+
+- **Pro week calendar shows early-morning and late-evening lessons.**
+  The grid was previously fixed at 07:00–21:00, so a 06:30 sunrise
+  lesson or a 22:00 winter slot rendered off-screen. The grid now
+  expands automatically to fit any booking or availability slot
+  outside that range, and stays compact at 07–21 when nothing falls
+  outside it.
+
 ## 2026-05-02 — v1.1.5
 
 - **"Slot just got taken" message now actually appears.** When two
