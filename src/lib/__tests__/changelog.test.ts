@@ -28,6 +28,7 @@ describe("parseChangelog", () => {
     expect(parseChangelog(md)).toEqual([
       {
         date: "2026-05-02",
+        label: "",
         items: ["First bullet.", "Second bullet.", "Third bullet."],
       },
     ]);
@@ -46,9 +47,9 @@ describe("parseChangelog", () => {
 - Oldest.
 `;
     expect(parseChangelog(md)).toEqual([
-      { date: "2026-05-02", items: ["Newest."] },
-      { date: "2026-04-17", items: ["Middle."] },
-      { date: "2026-04-13", items: ["Oldest."] },
+      { date: "2026-05-02", label: "", items: ["Newest."] },
+      { date: "2026-04-17", label: "", items: ["Middle."] },
+      { date: "2026-04-13", label: "", items: ["Oldest."] },
     ]);
   });
 
@@ -65,6 +66,7 @@ describe("parseChangelog", () => {
     expect(parseChangelog(md)).toEqual([
       {
         date: "2026-05-02",
+        label: "",
         items: [
           "**Bold lead.** First sentence on a wrapped line. And a third line.",
           "Second bullet (single line).",
@@ -73,15 +75,53 @@ describe("parseChangelog", () => {
     ]);
   });
 
-  it("treats `## YYYY-MM-DD — title` heading line as the date heading", () => {
-    // We sometimes append " — v1.1.0" or similar after the date in
-    // the heading line. The parser must still capture the date.
+  it("captures the heading suffix after `—` as the entry label", () => {
+    // Same-day entries with different versions are common; the label
+    // is what distinguishes them in the React key (and surfaces as a
+    // version badge on the About page).
     const md = `## 2026-05-02 — v1.1.0
 
 - Entry under v1.1.0.
 `;
     expect(parseChangelog(md)).toEqual([
-      { date: "2026-05-02", items: ["Entry under v1.1.0."] },
+      { date: "2026-05-02", label: "v1.1.0", items: ["Entry under v1.1.0."] },
+    ]);
+  });
+
+  it("captures the suffix after a hyphen separator", () => {
+    const md = `## 2026-05-02 - v1.1.0
+- Entry.
+`;
+    expect(parseChangelog(md)).toEqual([
+      { date: "2026-05-02", label: "v1.1.0", items: ["Entry."] },
+    ]);
+  });
+
+  it("captures the suffix after a colon separator", () => {
+    const md = `## 2026-05-02: launch
+- Launch entry.
+`;
+    expect(parseChangelog(md)).toEqual([
+      { date: "2026-05-02", label: "launch", items: ["Launch entry."] },
+    ]);
+  });
+
+  it("multiple entries on the same date keep distinct labels", () => {
+    // The whole point of the label field — drives unique React keys
+    // on the About page's `<li key={date-label}>`.
+    const md = `## 2026-05-02 — v1.1.2
+- Newest.
+
+## 2026-05-02 — v1.1.1
+- Older.
+
+## 2026-05-02 — v1.1.0
+- Oldest.
+`;
+    expect(parseChangelog(md)).toEqual([
+      { date: "2026-05-02", label: "v1.1.2", items: ["Newest."] },
+      { date: "2026-05-02", label: "v1.1.1", items: ["Older."] },
+      { date: "2026-05-02", label: "v1.1.0", items: ["Oldest."] },
     ]);
   });
 
@@ -98,6 +138,7 @@ describe("parseChangelog", () => {
     expect(parseChangelog(md)).toEqual([
       {
         date: "2026-05-02",
+        label: "",
         items: ["A bullet.", "Another bullet."],
       },
     ]);
@@ -107,7 +148,7 @@ describe("parseChangelog", () => {
     const md = `## 2026-05-02
 - Just one bullet`;
     expect(parseChangelog(md)).toEqual([
-      { date: "2026-05-02", items: ["Just one bullet"] },
+      { date: "2026-05-02", label: "", items: ["Just one bullet"] },
     ]);
   });
 
@@ -120,7 +161,7 @@ describe("parseChangelog", () => {
 - Real entry.
 `;
     expect(parseChangelog(md)).toEqual([
-      { date: "2026-05-02", items: ["Real entry."] },
+      { date: "2026-05-02", label: "", items: ["Real entry."] },
     ]);
   });
 });

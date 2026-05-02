@@ -20,6 +20,15 @@ export interface ChangelogEntry {
   /** ISO date string from the heading (`YYYY-MM-DD`). */
   date: string;
   /**
+   * Optional text following the date in the heading, with the leading
+   * separator (em-dash, hyphen, colon) and surrounding whitespace
+   * stripped. For `## 2026-05-02 — v1.1.2` this is `"v1.1.2"`. Empty
+   * string when the heading is just a bare date. Used together with
+   * `date` to give each entry a unique key when multiple versions
+   * ship on the same day.
+   */
+  label: string;
+  /**
    * Bullet items in order of appearance under this heading. Each item
    * is the raw markdown — call `renderItem()` to turn it into safe
    * HTML for display.
@@ -47,11 +56,17 @@ export function parseChangelog(md: string): ChangelogEntry[] {
 
   for (const raw of lines) {
     const line = raw.trimEnd();
-    const heading = /^##\s+(\d{4}-\d{2}-\d{2})/.exec(line);
+    // Capture the date AND any trailing text after a separator
+    // (em-dash `—`, hyphen `-`, or colon `:`). The trailing text is
+    // typically a version like `v1.1.2`, used as part of the entry's
+    // unique React key so multiple same-date entries don't collide.
+    const heading = /^##\s+(\d{4}-\d{2}-\d{2})\s*(?:[—\-:]\s*(.+?))?\s*$/.exec(
+      line,
+    );
     if (heading) {
       flushBullet();
       if (current) out.push(current);
-      current = { date: heading[1], items: [] };
+      current = { date: heading[1], label: (heading[2] ?? "").trim(), items: [] };
       continue;
     }
     if (!current) continue; // skip pre-first-heading intro
