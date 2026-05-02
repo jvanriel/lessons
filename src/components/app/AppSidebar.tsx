@@ -5,6 +5,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import type { Locale } from "@/lib/i18n";
 import { t } from "@/lib/i18n/translations";
+import { dashboardHrefFor } from "./dashboard-href";
 
 interface AppSidebarProps {
   roles: string[];
@@ -17,6 +18,13 @@ const SECTIONS_KEY = "app-sidebar-sections";
 
 interface NavItem {
   href: string;
+  /**
+   * Marker that the item's href should be resolved at render time
+   * based on the viewer's roles. Currently only "dashboard" is
+   * supported — see `dashboardHrefFor()`. The static `href` is the
+   * fallback if the marker doesn't match a known resolver.
+   */
+  dynamic?: "dashboard";
   label: string;
   /** Translation key. When set, label is ignored at render time. */
   labelKey?: string;
@@ -299,11 +307,24 @@ const sections: NavSection[] = [
     ],
   },
   {
-    // Utility section — always visible regardless of role. Currently
-    // just the About page (version + changelog + manual update check).
+    // Utility section — always visible regardless of role. Holds the
+    // role-resolved Dashboard entry plus Feedback + About (the only
+    // other things that don't fit a role section).
     label: "App",
     labelKey: "appNav.section.app",
     items: [
+      {
+        // `href` is the fallback if `dynamic` doesn't resolve. For
+        // Dashboard the component overrides this per role —
+        // admin → /admin, pro → /pro/dashboard, member → /member/dashboard.
+        href: "/member/dashboard",
+        dynamic: "dashboard",
+        label: "Dashboard",
+        labelKey: "appNav.dashboard",
+        icon: (
+          <Icon d="M3 13.125C3 12.504 3.504 12 4.125 12h2.25c.621 0 1.125.504 1.125 1.125v6.75C7.5 20.496 6.996 21 6.375 21h-2.25A1.125 1.125 0 0 1 3 19.875v-6.75ZM9.75 8.625c0-.621.504-1.125 1.125-1.125h2.25c.621 0 1.125.504 1.125 1.125v11.25c0 .621-.504 1.125-1.125 1.125h-2.25a1.125 1.125 0 0 1-1.125-1.125V8.625ZM16.5 4.125c0-.621.504-1.125 1.125-1.125h2.25C20.496 3 21 3.504 21 4.125v15.75c0 .621-.504 1.125-1.125 1.125h-2.25a1.125 1.125 0 0 1-1.125-1.125V4.125Z" />
+        ),
+      },
       {
         href: "/feedback",
         label: "Feedback",
@@ -323,6 +344,7 @@ const sections: NavSection[] = [
     ],
   },
 ];
+
 
 export default function AppSidebar({
   roles,
@@ -419,12 +441,20 @@ export default function AppSidebar({
               >
                 <ul className="space-y-0.5">
                   {section.items.map((item) => {
-                    const active = pathname === item.href || pathname.startsWith(item.href + "/");
+                    // Resolve dynamic hrefs (e.g. role-aware Dashboard
+                    // entry in the App section) per the viewer's roles.
+                    const resolvedHref =
+                      item.dynamic === "dashboard"
+                        ? dashboardHrefFor(roles)
+                        : item.href;
+                    const active =
+                      pathname === resolvedHref ||
+                      pathname.startsWith(resolvedHref + "/");
                     const itemLabel = item.labelKey ? t(item.labelKey, locale) : item.label;
                     return (
                       <li key={item.href}>
                         <Link
-                          href={item.href}
+                          href={resolvedHref}
                           title={collapsed ? itemLabel : undefined}
                           className={`group relative flex items-center gap-3 rounded-lg px-3 py-2 text-sm transition-colors duration-150 ${
                             active
