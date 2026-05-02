@@ -55,10 +55,7 @@ error doesn't roll back the booking — the row persists with
 
 ### Public booking flow — production readiness
 
-Shipped 2026-04-15 → 04-17. Items to verify before flipping the password gate:
-
-- **Verify production env vars in Vercel.** The flow needs `NEXT_PUBLIC_RECAPTCHA_SITE_KEY` + `RECAPTCHA_SECRET_KEY` (Google reCAPTCHA v3) and `KV_REST_API_URL` + `KV_REST_API_TOKEN` (Upstash Redis, marketplace-injected). Already documented in `.env.example`. Verify all four are set in Vercel: `vercel env ls --environment=production`. Without Upstash the rate limiter throws (does NOT fail open) and bookings break; without reCAPTCHA the verifier returns score 0 and bookings still go through (intentional graceful degrade).
-- **No password validation surface on register-from-claim.** The post-claim register flow at `/register?email=…&pro=…` should enforce minimum strength on the password field. Verify the `/api/register` POST already validates (it should from earlier work) and that the wizard surfaces the error inline.
+Shipped 2026-04-15 → 04-17. (All known items closed as of 2026-05-02 — see Recently shipped sweep below for the env-vars verification, password-validation audit, and Stripe webhook health check.)
 
 ### Payment flow follow-ups
 
@@ -70,7 +67,7 @@ Shipped 2026-04-15 → 04-17. Items to verify before flipping the password gate:
   - **Pending commission visibility for the pro.** No UI currently surfaces "you owe €N in pending cash-only commissions before your next invoice". Pro will see the line items when the invoice arrives. A `/pro/billing` display of pending commissions is a polish item.
   - **Dedicated commission card on `/pro/earnings`.** Separate from the existing "revenue" card (which tracks online-paid bookings), add a "Commission owed" / "Commission paid" card summarising cash-only commission flowing through the invoice-item path. Purely reporting.
   - **Admin manual-reconciliation UI.** For the Sentry-captured failures above (invoice item creation failed, deletion failed post-finalisation, no stripeCustomerId, etc.), give admin a button in `/admin/payouts` or `/admin/bookings` to (a) manually create an invoice item after the fact, (b) mark a booking's commission as "reconciled manually" without touching Stripe, or (c) trigger a one-off standalone invoice for a pro without an active subscription.
-- **Stripe webhook on production** needs the live-mode signing secret set (`STRIPE_WEBHOOK_SECRET`) and the endpoint registered in the Stripe dashboard pointing at `/api/webhooks/stripe`. Sandbox webhook secret is already in `.env.local` for preview.
+- **Stripe webhook on production** — `STRIPE_WEBHOOK_SECRET` is set (verified via `/api/health?deep=1` returning all-green Stripe check 2026-05-02) and `STRIPE_SECRET_KEY` is `sk_live_*`. Both live `STRIPE_PRICE_MONTHLY` and `STRIPE_PRICE_ANNUAL` resolve as `active` against live Stripe. Final dashboard check needed: confirm Stripe Dashboard → Developers → Webhooks lists an endpoint pointing at `https://golflessons.be/api/webhooks/stripe` for the live-mode environment with the matching signing secret. The deep health check verifies the secret is present + valid Stripe-API access; it does NOT verify the inbound endpoint registration.
 
 ## 🟢 Polish / post-launch
 
@@ -110,6 +107,8 @@ End-to-end timezone audit + the supporting infrastructure to keep the booking en
 - **`/booked/t/[token]` per-IP rate limit.** New `bookedTokenLimiter` (30/min/IP) on the public booking confirmation page. Token entropy was already high (32 bytes), so this isn't anti-brute-force — it's an anti-scanner DB-query cap. Renders a friendly "slow down" page in EN/NL/FR when exceeded.
 - **Rate-limit Sentry alerting.** `limitByIp`/`limitByKey` now route Upstash failures through `Sentry.captureException(..., { tags: { area: "rate-limit" } })` before re-throwing. Wire a Sentry alert on `tags.area:"rate-limit"` to get paged on KV outages instead of finding out via failed bookings.
 - **`public-booking-flow` test preconditions.** `beforeAll` now fails loud with a named-vars error if `GOOGLE_SERVICE_ACCOUNT_*` or `POSTGRES_URL[_PREVIEW]` are missing, instead of crashing midway through Phase 1. Sets up CI wiring without needing a separate setup doc.
+- **Production env vars verified.** `vercel env ls --environment=production` + `/api/health?deep=1` both green: all four public-booking vars (`NEXT_PUBLIC_RECAPTCHA_SITE_KEY`, `RECAPTCHA_SECRET_KEY`, `KV_REST_API_URL`, `KV_REST_API_TOKEN`) populated; Stripe live mode confirmed (`sk_live_*`) with both `STRIPE_PRICE_MONTHLY` and `STRIPE_PRICE_ANNUAL` resolving as `active`; Gmail SA JWT authorizes; Sentry DSN + ORG present. Note: `vercel env pull` returns empty strings for "sensitive" vars locally — the runtime values exist; trust the deep health check, not the pull output.
+- **Password validation on register-from-claim audit.** The `/register?email=…&pro=…` post-claim path routes to `StudentOnboardingWizard`, which has both inline pw-too-short / pw-mismatch hints AND surfaces server-side `/api/register` errors via `state?.error`. Server-side validates min-8 + match. Removed the orphaned `RegisterForm.tsx` + `register` server action that had zero callers (the page hasn't used them in months).
 - **PWA version detection.** `/sw.js` is now a Next.js route that bakes `BUILD_ID` into both file content and `CACHE_NAME` (per-deploy byte difference → reliable `updatefound`). `/api/version` is `force-dynamic`. `DeploymentChecker` cache-busts the fetch URL on top of `cache: "no-store"` to defeat iOS Safari quirks.
 - **About page + changelog.** New `/about` shows app version (semver from `package.json.version`, starting at v1.1.0), build ID, build time, branch + environment in non-prod, manual update-check button, and the rendered `docs/CHANGELOG.md`. Linked from sidebar + mobile More for every authenticated user.
 - **Migrations applied to preview + prod:**

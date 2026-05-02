@@ -4,6 +4,13 @@ End-user-visible changes shipped to the platform. Engineering details
 that don't affect what students or pros see live in `docs/gaps.md` and
 the git history. Newest first.
 
+## 2026-05-02 — v1.1.10
+
+- **Behind-the-scenes cleanup.** Removed an old, unused registration
+  form from the codebase. Visible registration is unchanged — the
+  guided wizard at /register is the only path and it's been the only
+  one for months.
+
 ## 2026-05-02 — v1.1.9
 
 - **Public booking confirmation page is now rate-limited.** A friendly
