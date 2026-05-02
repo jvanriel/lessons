@@ -1136,6 +1136,42 @@ describe("buildIcs", () => {
     expect(ics).toContain("TRIGGER:-PT1H");
   });
 
+  it("emits one ATTENDEE line per supplied attendee", () => {
+    const ics = buildIcs({
+      ...baseParams,
+      attendees: [
+        { name: "Alice Anders", email: "alice@example.com" },
+        { name: "Bob Beck", email: "bob@example.com" },
+      ],
+    });
+    expect(ics).toContain(
+      "ATTENDEE;CN=Alice Anders;ROLE=REQ-PARTICIPANT;PARTSTAT=ACCEPTED:mailto:alice@example.com",
+    );
+    expect(ics).toContain(
+      "ATTENDEE;CN=Bob Beck;ROLE=REQ-PARTICIPANT;PARTSTAT=ACCEPTED:mailto:bob@example.com",
+    );
+  });
+
+  it("escapes commas/semicolons/backslashes in summary, location, and CN", () => {
+    // RFC 5545 §3.3.11 — those three chars are reserved separators.
+    // Pre-fix, an ATTENDEE CN like "Smith, Bob" would emit a stray
+    // comma that some parsers interpret as a parameter delimiter.
+    const ics = buildIcs({
+      ...baseParams,
+      summary: "Lesson with Alice; Bob",
+      location: "Club, North Wing",
+      attendees: [{ name: "Smith, Bob", email: "bob@example.com" }],
+    });
+    expect(ics).toContain("SUMMARY:Lesson with Alice\\; Bob");
+    expect(ics).toContain("LOCATION:Club\\, North Wing");
+    expect(ics).toContain("ATTENDEE;CN=Smith\\, Bob;");
+  });
+
+  it("emits no ATTENDEE lines when none supplied (back-compat)", () => {
+    const ics = buildIcs(baseParams);
+    expect(ics).not.toContain("ATTENDEE");
+  });
+
   it("emits DTSTART in UTC with trailing Z", () => {
     // Wall-clock local times in TZID-less DTSTART get treated as UTC by
     // many calendar apps and shifted by the recipient's offset (Outlook,

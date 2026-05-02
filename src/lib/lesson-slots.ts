@@ -278,6 +278,30 @@ export interface IcsParams {
    * pro (gaps.md §0).
    */
   tz: string;
+  /**
+   * Optional list of attendees to include in the ICS file. Emits one
+   * `ATTENDEE` line per entry; recipients see the participant list in
+   * their calendar UI. Safe under METHOD:PUBLISH (informational, not
+   * RSVP-required) per RFC 5545 — Outlook on Mac handles ATTENDEE in
+   * a PUBLISH-method calendar, the issue called out in the
+   * METHOD:PUBLISH comment is specifically REQUEST without ATTENDEE.
+   */
+  attendees?: { name: string; email: string }[];
+}
+
+function escapeIcsText(s: string): string {
+  // RFC 5545 §3.3.11: backslash, comma, semicolon must be escaped;
+  // newlines become literal \n. Matters for SUMMARY/LOCATION/
+  // DESCRIPTION/CN values that the user can supply.
+  return s.replaceAll("\\", "\\\\").replaceAll(",", "\\,").replaceAll(";", "\\;").replaceAll("\n", "\\n");
+}
+
+function attendeeLines(attendees: IcsParams["attendees"]): string[] {
+  if (!attendees || attendees.length === 0) return [];
+  return attendees.map(
+    (a) =>
+      `ATTENDEE;CN=${escapeIcsText(a.name)};ROLE=REQ-PARTICIPANT;PARTSTAT=ACCEPTED:mailto:${a.email}`,
+  );
 }
 
 /**
@@ -301,6 +325,7 @@ export function buildCancelIcs(params: IcsParams): string {
     description,
     bookingId,
     tz,
+    attendees,
   } = params;
   const dtStart = toIcsUtc(date, startTime, tz);
   const dtEnd = toIcsUtc(date, endTime, tz);
@@ -319,12 +344,13 @@ export function buildCancelIcs(params: IcsParams): string {
     `DTSTAMP:${dtStamp}`,
     `DTSTART:${dtStart}`,
     `DTEND:${dtEnd}`,
-    `SUMMARY:${summary}`,
-    `LOCATION:${location}`,
-    `DESCRIPTION:${description}`,
+    `SUMMARY:${escapeIcsText(summary)}`,
+    `LOCATION:${escapeIcsText(location)}`,
+    `DESCRIPTION:${escapeIcsText(description)}`,
     "STATUS:CANCELLED",
     "SEQUENCE:1",
     `ORGANIZER;CN=Golf Lessons:mailto:${process.env.GMAIL_SEND_AS || "noreply@golflessons.be"}`,
+    ...attendeeLines(attendees),
     "END:VEVENT",
     "END:VCALENDAR",
   ].join("\r\n");
@@ -340,6 +366,7 @@ export function buildIcs(params: IcsParams): string {
     description,
     bookingId,
     tz,
+    attendees,
   } = params;
   const dtStart = toIcsUtc(date, startTime, tz);
   const dtEnd = toIcsUtc(date, endTime, tz);
@@ -362,11 +389,12 @@ export function buildIcs(params: IcsParams): string {
     `DTSTAMP:${dtStamp}`,
     `DTSTART:${dtStart}`,
     `DTEND:${dtEnd}`,
-    `SUMMARY:${summary}`,
-    `LOCATION:${location}`,
-    `DESCRIPTION:${description}`,
+    `SUMMARY:${escapeIcsText(summary)}`,
+    `LOCATION:${escapeIcsText(location)}`,
+    `DESCRIPTION:${escapeIcsText(description)}`,
     "STATUS:CONFIRMED",
     `ORGANIZER;CN=Golf Lessons:mailto:${process.env.GMAIL_SEND_AS || "noreply@golflessons.be"}`,
+    ...attendeeLines(attendees),
     "BEGIN:VALARM",
     "TRIGGER:-PT1H",
     "ACTION:DISPLAY",

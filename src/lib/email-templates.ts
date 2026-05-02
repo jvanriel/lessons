@@ -893,6 +893,173 @@ export function getStudentBookingConfirmationSubject(
   return (BOOKING_STUDENT_STRINGS[locale] ?? BOOKING_STUDENT_STRINGS.en).subject(proName);
 }
 
+// ─── Participant emails ────────────────────────────────
+//
+// Sent to additional participants on a booking (when participantCount
+// > 1). Mirrors the booker's confirmation email but: (a) reframes the
+// body as "you're joining a lesson booked by X", (b) drops the
+// "View my bookings" CTA — additional participants don't necessarily
+// have an account, and even if they do the booking lives on the
+// booker's dashboard, not theirs.
+
+const PARTICIPANT_BOOKING_STRINGS: Record<Locale, {
+  subject: (proName: string, bookerName: string) => string;
+  greeting: string;
+  body: (bookerName: string, proName: string) => string;
+  pro: string;
+  proEmail: string;
+  proPhone: string;
+  location: string;
+  date: string;
+  time: string;
+  duration: string;
+  durationUnit: string;
+  helper: (bookerName: string) => string;
+  cancelSubject: (proName: string, bookerName: string) => string;
+  cancelBody: (bookerName: string, proName: string) => string;
+}> = {
+  en: {
+    subject: (pro, booker) => `You're joining a golf lesson with ${pro} (booked by ${booker})`,
+    greeting: "Hi",
+    body: (booker, pro) =>
+      `${booker} added you as a participant on a golf lesson with ${pro}. Here are the details:`,
+    pro: "Pro",
+    proEmail: "Pro email",
+    proPhone: "Pro phone",
+    location: "Location",
+    date: "Date",
+    time: "Time",
+    duration: "Duration",
+    durationUnit: "minutes",
+    helper: (booker) =>
+      `If you can't attend, let ${booker} know — only the person who booked the lesson can cancel or reschedule.`,
+    cancelSubject: (pro, booker) => `Cancelled: golf lesson with ${pro} (booked by ${booker})`,
+    cancelBody: (booker, pro) =>
+      `${booker} cancelled the golf lesson with ${pro} you were joining. The calendar invite is being removed.`,
+  },
+  nl: {
+    subject: (pro, booker) => `Je doet mee aan een golfles bij ${pro} (geboekt door ${booker})`,
+    greeting: "Hallo",
+    body: (booker, pro) =>
+      `${booker} heeft jou toegevoegd als deelnemer aan een golfles bij ${pro}. Hier zijn de details:`,
+    pro: "Pro",
+    proEmail: "E-mail pro",
+    proPhone: "Telefoon pro",
+    location: "Locatie",
+    date: "Datum",
+    time: "Tijd",
+    duration: "Duur",
+    durationUnit: "minuten",
+    helper: (booker) =>
+      `Kan je niet komen? Laat het ${booker} weten — alleen wie de les boekte kan annuleren of verzetten.`,
+    cancelSubject: (pro, booker) => `Geannuleerd: golfles bij ${pro} (geboekt door ${booker})`,
+    cancelBody: (booker, pro) =>
+      `${booker} heeft de golfles bij ${pro} waaraan je zou meedoen geannuleerd. De kalenderafspraak wordt verwijderd.`,
+  },
+  fr: {
+    subject: (pro, booker) => `Vous participez à un cours de golf avec ${pro} (réservé par ${booker})`,
+    greeting: "Bonjour",
+    body: (booker, pro) =>
+      `${booker} vous a ajouté comme participant à un cours de golf avec ${pro}. Voici les détails :`,
+    pro: "Pro",
+    proEmail: "E-mail du pro",
+    proPhone: "Téléphone du pro",
+    location: "Lieu",
+    date: "Date",
+    time: "Heure",
+    duration: "Durée",
+    durationUnit: "minutes",
+    helper: (booker) =>
+      `Empêché ? Prévenez ${booker} — seule la personne qui a réservé peut annuler ou reprogrammer.`,
+    cancelSubject: (pro, booker) => `Annulé : cours de golf avec ${pro} (réservé par ${booker})`,
+    cancelBody: (booker, pro) =>
+      `${booker} a annulé le cours de golf avec ${pro} auquel vous deviez participer. L'invitation au calendrier est en cours de suppression.`,
+  },
+};
+
+export function buildParticipantBookingNotificationEmail(opts: {
+  participantFirstName: string;
+  bookerName: string;
+  proName: string;
+  proEmail?: string | null;
+  proPhone?: string | null;
+  locationName: string;
+  date: string;
+  startTime: string;
+  endTime: string;
+  duration: number;
+  locale: Locale;
+}): string {
+  const s = PARTICIPANT_BOOKING_STRINGS[opts.locale] ?? PARTICIPANT_BOOKING_STRINGS.en;
+  const rows: Array<DetailRow> = [[s.pro, opts.proName]];
+  if (opts.proEmail) rows.push([s.proEmail, opts.proEmail, `mailto:${opts.proEmail}`]);
+  if (opts.proPhone) rows.push([s.proPhone, opts.proPhone, `tel:${opts.proPhone.replace(/\s+/g, "")}`]);
+  rows.push(
+    [s.location, opts.locationName],
+    [s.date, formatLessonDate(opts.date, opts.locale)],
+    [s.time, `${opts.startTime} – ${opts.endTime}`],
+    [s.duration, `${opts.duration} ${s.durationUnit}`],
+  );
+  const body = `
+    <h2 style="font-family:Georgia,'Times New Roman',serif;font-size:22px;color:${COLORS.green950};margin:0 0 16px 0;font-weight:normal;">
+      ${formatGreeting(s.greeting, opts.participantFirstName, opts.locale)}
+    </h2>
+    <p style="margin:0 0 20px 0;">${s.body(opts.bookerName, opts.proName)}</p>
+    ${detailsTable(rows)}
+    <p style="color:#666;font-size:13px;margin:0;">${s.helper(opts.bookerName)}</p>
+  `;
+  return emailLayout(body, undefined, opts.locale);
+}
+
+export function getParticipantBookingNotificationSubject(
+  proName: string,
+  bookerName: string,
+  locale: Locale
+): string {
+  return (PARTICIPANT_BOOKING_STRINGS[locale] ?? PARTICIPANT_BOOKING_STRINGS.en).subject(
+    proName,
+    bookerName,
+  );
+}
+
+export function buildParticipantBookingCancelledEmail(opts: {
+  participantFirstName: string;
+  bookerName: string;
+  proName: string;
+  locationName: string;
+  date: string;
+  startTime: string;
+  endTime: string;
+  locale: Locale;
+}): string {
+  const s = PARTICIPANT_BOOKING_STRINGS[opts.locale] ?? PARTICIPANT_BOOKING_STRINGS.en;
+  const rows: Array<DetailRow> = [
+    [s.pro, opts.proName],
+    [s.location, opts.locationName],
+    [s.date, formatLessonDate(opts.date, opts.locale)],
+    [s.time, `${opts.startTime} – ${opts.endTime}`],
+  ];
+  const body = `
+    <h2 style="font-family:Georgia,'Times New Roman',serif;font-size:22px;color:${COLORS.green950};margin:0 0 16px 0;font-weight:normal;">
+      ${formatGreeting(s.greeting, opts.participantFirstName, opts.locale)}
+    </h2>
+    <p style="margin:0 0 20px 0;">${s.cancelBody(opts.bookerName, opts.proName)}</p>
+    ${detailsTable(rows)}
+  `;
+  return emailLayout(body, undefined, opts.locale);
+}
+
+export function getParticipantBookingCancelledSubject(
+  proName: string,
+  bookerName: string,
+  locale: Locale
+): string {
+  return (PARTICIPANT_BOOKING_STRINGS[locale] ?? PARTICIPANT_BOOKING_STRINGS.en).cancelSubject(
+    proName,
+    bookerName,
+  );
+}
+
 const BOOKING_PRO_STRINGS: Record<Locale, {
   subject: (studentName: string) => string;
   greeting: string;

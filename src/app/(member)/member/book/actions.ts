@@ -45,6 +45,11 @@ import { addDaysToDateString, todayInTZ } from "@/lib/local-date";
 import { computeSuggestedDate } from "@/lib/booking-suggestion";
 import { getProLocationTimezone } from "@/lib/pro";
 import { updateBookingPreferences } from "@/lib/booking-preferences";
+import {
+  parseExtraParticipants,
+  validateExtraParticipants,
+  sendParticipantBookingNotifications,
+} from "@/lib/booking-participants";
 import { excludeDummiesOnProduction } from "@/lib/pro-visibility";
 
 /**
@@ -422,6 +427,7 @@ export async function createBooking(formData: FormData) {
   const email = ((formData.get("email") as string) || "").trim().toLowerCase();
   const phone = (formData.get("phone") as string) || null;
   const duration = Number(formData.get("duration"));
+  const extraParticipants = parseExtraParticipants(formData, participantCount);
 
   // Validate required fields
   if (
@@ -439,6 +445,11 @@ export async function createBooking(formData: FormData) {
   }
 
   const locale = await getUiLocale();
+
+  const participantValidationError = validateExtraParticipants(extraParticipants);
+  if (participantValidationError) {
+    return { error: participantValidationError };
+  }
 
   // Payment gate: check if pro requires payment method
   const paymentError = await checkPaymentGate(proProfileId, session.userId, locale);
@@ -501,13 +512,16 @@ export async function createBooking(formData: FormData) {
         })
         .returning({ id: lessonBookings.id });
 
-      await tx.insert(lessonParticipants).values({
-        bookingId: b.id,
-        firstName,
-        lastName,
-        email,
-        phone,
-      });
+      await tx.insert(lessonParticipants).values([
+        { bookingId: b.id, firstName, lastName, email, phone },
+        ...extraParticipants.map((p) => ({
+          bookingId: b.id,
+          firstName: p.firstName,
+          lastName: p.lastName,
+          email: p.email,
+          phone: p.phone ?? null,
+        })),
+      ]);
 
       const [existingRelation] = await tx
         .select({ id: proStudents.id })
@@ -719,6 +733,11 @@ export async function createBooking(formData: FormData) {
         });
       } catch {
         /* ditto */
+      }
+      // Fan out to extra participants (own template + ICS).
+      // Internally Sentry-tagged + best-effort.
+      if (extraParticipants.length > 0) {
+        await sendParticipantBookingNotifications(booking.id);
       }
     });
   }

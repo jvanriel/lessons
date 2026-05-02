@@ -16,6 +16,7 @@ import { checkCancellationAllowed, buildCancelIcs } from "@/lib/lesson-slots";
 import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import { sendEmail } from "@/lib/mail";
+import { sendParticipantCancellationNotifications } from "@/lib/booking-participants";
 import { getStripe } from "@/lib/stripe";
 import { resolveLocale } from "@/lib/i18n";
 import { getLocale } from "@/lib/locale";
@@ -290,6 +291,12 @@ export async function cancelBooking(bookingId: number) {
       }),
       attachments: [icsAttachment],
     }).catch(() => {});
+  }
+
+  // Fan out cancellation to extra participants (best-effort + Sentry-tagged
+  // inside the helper). Skipped automatically when participantCount === 1.
+  if ((booking.participantCount ?? 1) > 1) {
+    sendParticipantCancellationNotifications(bookingId).catch(() => {});
   }
 
   await logEvent({

@@ -17,6 +17,16 @@ If any role inside the brackets is unknown (typo), the parser falls
 back to treating the brackets as literal text — better to over-show
 than silently hide.
 
+## 2026-05-02 — v1.1.21
+
+- **Extra participants on a group lesson now get their own emails +
+  calendar invites.** When you book a lesson for more than one
+  person (member booking or public booking), the form now asks for
+  each additional participant's first name, last name, and (optional)
+  email. If they have an email, they receive their own confirmation
+  with the lesson details and an .ics calendar invite — same goes
+  for cancellations.
+
 ## 2026-05-02 — v1.1.20
 
 - **"New version available" toast no longer shows up twice.** Clicking

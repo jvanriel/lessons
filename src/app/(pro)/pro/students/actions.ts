@@ -18,6 +18,7 @@ import { eq, and, asc, desc, gte, lte } from "drizzle-orm";
 import { requireProProfile } from "@/lib/pro";
 import { hashPassword } from "@/lib/auth";
 import { sendEmail } from "@/lib/mail";
+import { sendParticipantCancellationNotifications } from "@/lib/booking-participants";
 import {
   buildInviteEmail,
   getEmailStrings,
@@ -1223,6 +1224,7 @@ export async function proCancelBooking(bookingId: number) {
       endTime: lessonBookings.endTime,
       bookedById: lessonBookings.bookedById,
       proLocationId: lessonBookings.proLocationId,
+      participantCount: lessonBookings.participantCount,
     })
     .from(lessonBookings)
     .where(
@@ -1384,6 +1386,12 @@ export async function proCancelBooking(bookingId: number) {
       }),
       attachments: [icsAttachment],
     }).catch(() => {});
+  }
+
+  // Fan out cancellation to extra participants. Skipped automatically
+  // when participantCount === 1.
+  if ((booking.participantCount ?? 1) > 1) {
+    sendParticipantCancellationNotifications(booking.id).catch(() => {});
   }
 
   return { success: true };
