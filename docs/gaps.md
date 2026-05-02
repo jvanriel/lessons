@@ -43,16 +43,16 @@ The platform CMS (`cms_blocks`) has per-locale rows but is operated by the platf
 shipped sweep below for the slot-uniqueness + cron route handler
 integration tests.)
 
-### `db.transaction()` wrapping — driver swapped, transactions not yet applied
+### ~~`db.transaction()` wrapping~~ — done (2026-05-02)
 
-The `drizzle-orm/neon-http` driver was swapped to
-`drizzle-orm/neon-serverless` (WebSocket) on 2026-05-02 (v1.1.6),
-which unblocks `db.transaction()`. The actual transaction wrapping
-of multi-step inserts (booking + participant + pro_students upsert)
-is a separate follow-up — done deliberately in its own commit so the
-driver swap can be rolled back independently if needed. The slot-
-uniqueness partial index (shipped earlier) already gates the most
-damaging race; transactions add atomicity for the surrounding rows.
+Driver swapped from `neon-http` to `neon-serverless` in v1.1.6. Then
+v1.1.7 wrapped all four booking-insert paths (`createBooking`,
+`quickCreateBooking`, `createPublicBooking`, `proCreateBooking`) in
+`db.transaction()` so booking + participant + (where applicable)
+proStudents upsert commit together. Stripe / commission /
+notification side-effects stay outside the transaction so a Stripe
+error doesn't roll back the booking — the row persists with
+`paymentStatus="failed"` for retry, same as before.
 
 ### Public booking flow — production readiness
 

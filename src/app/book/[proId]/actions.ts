@@ -588,62 +588,71 @@ export async function createPublicBooking(formData: FormData) {
   // the slot-staleness check returns. The user row created above is
   // intentionally left in place — it's a benign stub, identical to
   // what we'd have if the user had just visited the wizard.
+  //
+  // Atomic block — booking + participant + pro_students upsert
+  // commit together. The user row + verify-email trail above are
+  // outside the transaction (the user existed before the booking
+  // attempt, or got created above whether or not the slot was free).
   const manageToken = crypto.randomBytes(32).toString("hex");
 
   let booking: { id: number };
   try {
-    [booking] = await db
-      .insert(lessonBookings)
-      .values({
-        proProfileId: pro.id,
-        bookedById: userId,
-        proLocationId,
-        date,
-        startTime,
-        endTime,
-        participantCount,
-        status: "confirmed",
-        notes,
-        manageToken,
-        priceCents,
-        platformFeeCents: null, // Phase A: pay-later only, no commission snapshot.
-        paymentStatus: "manual",
-      })
-      .returning({ id: lessonBookings.id });
+    booking = await db.transaction(async (tx) => {
+      const [b] = await tx
+        .insert(lessonBookings)
+        .values({
+          proProfileId: pro.id,
+          bookedById: userId,
+          proLocationId,
+          date,
+          startTime,
+          endTime,
+          participantCount,
+          status: "confirmed",
+          notes,
+          manageToken,
+          priceCents,
+          platformFeeCents: null, // Phase A: pay-later only, no commission snapshot.
+          paymentStatus: "manual",
+        })
+        .returning({ id: lessonBookings.id });
+
+      await tx.insert(lessonParticipants).values({
+        bookingId: b.id,
+        firstName,
+        lastName,
+        email,
+        phone,
+      });
+
+      // Upsert the pro↔student relationship so the booking shows up
+      // in the pro's student list.
+      const [existingRelation] = await tx
+        .select({ id: proStudents.id })
+        .from(proStudents)
+        .where(
+          and(
+            eq(proStudents.proProfileId, pro.id),
+            eq(proStudents.userId, userId),
+          ),
+        )
+        .limit(1);
+      if (!existingRelation) {
+        await tx.insert(proStudents).values({
+          proProfileId: pro.id,
+          userId,
+          source: "self",
+          status: "active",
+        });
+      }
+
+      return b;
+    });
   } catch (err) {
     if (isSlotConflictError(err)) {
       return { error: t("publicBook.err.slotUnavailable", uiLocale) };
     }
     throw err;
-  }
-
-  await db.insert(lessonParticipants).values({
-    bookingId: booking.id,
-    firstName,
-    lastName,
-    email,
-    phone,
-  });
-
-  // Upsert the pro↔student relationship so the booking shows up in the
-  // pro's student list.
-  const [existingRelation] = await db
-    .select({ id: proStudents.id })
-    .from(proStudents)
-    .where(
-      and(
-        eq(proStudents.proProfileId, pro.id),
-        eq(proStudents.userId, userId)
-      )
-    )
-    .limit(1);
-  if (!existingRelation) {
-    await db.insert(proStudents).values({
-      proProfileId: pro.id,
-      userId,
-      source: "self",
-      status: "active",
-    });
   }
 
   // ─── Emails ──────────────────────────────────────────

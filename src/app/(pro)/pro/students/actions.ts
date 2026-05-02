@@ -1,7 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { db } from "@/lib/db";
+import { db, isSlotConflictError } from "@/lib/db";
 import {
   users,
   userEmails,
@@ -920,32 +920,46 @@ export async function proQuickBookForStudent(data: {
     return { error: "This time slot is no longer available." };
   }
 
-  // Create booking (booked by the student, initiated by pro)
+  // Create booking (booked by the student, initiated by pro). Atomic
+  // insert + participant — the pro/student relationship already
+  // exists (this is a pro-initiated booking against an existing
+  // student row), so no proStudents upsert is needed.
   const manageToken = crypto.randomBytes(32).toString("hex");
 
-  const [booking] = await db
-    .insert(lessonBookings)
-    .values({
-      proProfileId: profile.id,
-      bookedById: rel.userId,
-      proLocationId: data.proLocationId,
-      date: data.date,
-      startTime: data.startTime,
-      endTime: data.endTime,
-      participantCount: 1,
-      status: "confirmed",
-      manageToken,
-    })
-    .returning({ id: lessonBookings.id });
+  let booking: { id: number };
+  try {
+    booking = await db.transaction(async (tx) => {
+      const [b] = await tx
+        .insert(lessonBookings)
+        .values({
+          proProfileId: profile.id,
+          bookedById: rel.userId,
+          proLocationId: data.proLocationId,
+          date: data.date,
+          startTime: data.startTime,
+          endTime: data.endTime,
+          participantCount: 1,
+          status: "confirmed",
+          manageToken,
+        })
+        .returning({ id: lessonBookings.id });
 
-  // Create participant
-  await db.insert(lessonParticipants).values({
-    bookingId: booking.id,
-    firstName: rel.firstName,
-    lastName: rel.lastName,
-    email: rel.email,
-    phone: rel.phone,
-  });
+      await tx.insert(lessonParticipants).values({
+        bookingId: b.id,
+        firstName: rel.firstName,
+        lastName: rel.lastName,
+        email: rel.email,
+        phone: rel.phone,
+      });
+
+      return b;
+    });
+  } catch (err) {
+    if (isSlotConflictError(err)) {
+      return { error: "This time slot is no longer available." };
+    }
+    throw err;
+  }
 
   // Update student preferences
   const dayOfWeek = jsDayToIso(new Date(data.date + "T00:00:00").getDay());
