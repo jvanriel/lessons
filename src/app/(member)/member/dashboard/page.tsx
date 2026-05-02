@@ -11,7 +11,7 @@ import { eq, and, gte, asc, isNull } from "drizzle-orm";
 import { getSession, hasRole } from "@/lib/auth";
 import { getLocale } from "@/lib/locale";
 import { formatDate } from "@/lib/format-date";
-import { todayLocal } from "@/lib/local-date";
+import { todayInTZ } from "@/lib/local-date";
 import { t } from "@/lib/i18n/translations";
 import { redirect } from "next/navigation";
 import Link from "next/link";
@@ -36,7 +36,12 @@ export default async function MemberDashboard() {
   }
   const locale = await getLocale();
 
-  const today = todayLocal();
+  // SQL filter is anchored to Europe/Brussels — bookings.date holds
+  // a wall-clock date in the location's TZ, and every existing
+  // location is Brussels. Per-location TZ is the longer-term answer
+  // when non-Brussels pros land; the cancel deadline + reminder
+  // already use the location TZ correctly. (gaps.md §0)
+  const today = todayInTZ("Europe/Brussels");
 
   // Fetch upcoming bookings
   const upcomingBookings = await db

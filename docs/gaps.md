@@ -161,21 +161,23 @@ that compare booking dates against `todayLocal()` (server TZ).
   effect. Either filter `validFrom`/`validUntil` per `weekDates[i]` here,
   or precompute the projected per-date grid server-side (see
   `projectGridForDate` in `AvailabilityEditor.tsx:175`).
-- **"Today" in upcoming/past lists uses server TZ.**
-  `src/app/(member)/member/bookings/page.tsx:31`,
-  `(member)/member/dashboard/page.tsx:39`,
-  `(admin)/admin/page.tsx:10` all call `todayLocal()` and compare to
-  `bookings.date`. Between 22:00 and 24:00 Brussels (Vercel UTC) "today"
-  is yesterday-in-Brussels, so categories flip wrongly for late-evening
-  bookings. Switch to `todayInTZ("Europe/Brussels")` as the immediate
-  fix; per-pro / per-location TZ is the longer-term answer.
-- **`computeSuggestedDate` (Quick Book suggestion) uses server TZ.**
-  `src/app/(member)/member/book/actions.ts:928-962` builds `today` from
-  `new Date()` + `formatLocalDate`. After 22:00 UTC the suggestion can
-  fall a day before `windowStart = todayInTZ(tz)` and gets silently
-  stomped by the `availableDates.find(d => d >= suggestedDate)` fallback.
-  Use `todayInTZ(tz)` and a tz-aware day-of-week (parse via
-  `formatInTimeZone(..., "i")` like `getMondayInTZ` does).
+- ~~**"Today" in upcoming/past lists uses server TZ.**~~ Fixed
+  (2026-05-02): `member/bookings/page.tsx` now does per-booking
+  `todayInTZ(b.locationTimezone)` (cached per TZ) so each row's cutoff
+  matches its location's wall clock. `member/dashboard/page.tsx` (SQL
+  pre-filter for "next 5 upcoming") and `admin/page.tsx` (aggregate
+  count) use `todayInTZ("Europe/Brussels")` — coarse but correct for
+  the current Brussels-only data set, with comment pointing at the
+  per-location TZ option.
+- ~~**`computeSuggestedDate` (Quick Book suggestion) uses server TZ.**~~
+  Fixed (2026-05-02): function now takes `tz: string`, uses
+  `todayInTZ(tz)` + `addDaysToDateString`, and computes day-of-week
+  from the resulting `YYYY-MM-DD` string (TZ-independent because the
+  string has no time component). Caller `getQuickBookData` resolves
+  the location TZ once at the top and passes it both to the
+  suggestion and to the `windowStart`, so they can no longer drift
+  apart. Removed the now-dead `formatLocalDate` import + the local
+  `jsDayToIso` helper (one of the three duplicates flagged below).
 
 **Medium / hygiene:**
 
@@ -189,10 +191,11 @@ that compare booking dates against `todayLocal()` (server TZ).
   (`src/app/(pro)/pro/students/actions.ts:1179-1212`). Pros can cancel
   past bookings and still trigger student emails + `METHOD:CANCEL` ics.
   Probably intentional but worth confirming.
-- **Three duplicated `jsDayToIso` helpers** —
-  `lesson-slots.ts:67`, `booking-preferences.ts:8`,
-  `(member)/member/book/actions.ts:894`. Import the one in
-  `lesson-slots.ts`.
+- **Two duplicated `jsDayToIso` helpers remain** —
+  `lesson-slots.ts:67` (canonical) + `booking-preferences.ts:8`.
+  The third (in `(member)/member/book/actions.ts`) was removed
+  alongside the `computeSuggestedDate` rewrite. Easy follow-up:
+  delete the booking-preferences copy + import from lesson-slots.
 - ~~**Dead `winStartTime` / `winEndTime` in the cron**~~ — removed
   alongside the pass-1 cron rewrite.
 - **`BookingsCalendar` hard-codes a 07:00–21:00 grid**

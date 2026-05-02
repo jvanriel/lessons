@@ -2,12 +2,16 @@ import Link from "next/link";
 import { db } from "@/lib/db";
 import { users, proProfiles, lessonBookings, tasks } from "@/lib/db/schema";
 import { eq, isNull, gte, and, ne } from "drizzle-orm";
-import { todayLocal } from "@/lib/local-date";
+import { todayInTZ } from "@/lib/local-date";
 
 export const metadata = { title: "Admin — Golf Lessons" };
 
 export default async function AdminDashboard() {
-  const today = todayLocal();
+  // Aggregate count, anchored to Europe/Brussels — the dominant
+  // operating zone for the platform's bookings. Per-location TZ
+  // matters only when bookings start landing in non-Brussels zones;
+  // the admin count is a coarse summary anyway. (gaps.md §0)
+  const today = todayInTZ("Europe/Brussels");
 
   const [totalUsers, memberCount, proCount, bookingCount, openTaskCount] = await Promise.all([
     db.select({ id: users.id }).from(users).where(isNull(users.deletedAt)).then((r) => r.length),

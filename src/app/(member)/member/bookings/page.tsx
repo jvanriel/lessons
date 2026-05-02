@@ -14,7 +14,7 @@ import { CancelBookingButton } from "./CancelBookingButton";
 import { BookingRefreshListener } from "@/components/BookingRefreshListener";
 import { getLocale } from "@/lib/locale";
 import { formatDate } from "@/lib/format-date";
-import { todayLocal } from "@/lib/local-date";
+import { todayInTZ } from "@/lib/local-date";
 import { t } from "@/lib/i18n/translations";
 import PageHeading from "@/components/app/PageHeading";
 
@@ -27,8 +27,6 @@ export default async function MemberBookingsPage() {
   }
 
   const locale = await getLocale();
-
-  const today = todayLocal();
 
   const allBookings = await db
     .select({
@@ -59,11 +57,27 @@ export default async function MemberBookingsPage() {
     .where(eq(lessonBookings.bookedById, session.userId))
     .orderBy(asc(lessonBookings.date), asc(lessonBookings.startTime));
 
+  // Per-booking "today" — each booking's date column is wall-clock in
+  // its location's TZ, so the cutoff for upcoming/past has to be
+  // computed in that same TZ. Cache `todayInTZ()` per timezone string
+  // so we don't re-compute Brussels-today for every booking in the
+  // common case. (gaps.md §0)
+  const todayCache = new Map<string, string>();
+  function todayFor(tz: string): string {
+    let cached = todayCache.get(tz);
+    if (cached === undefined) {
+      cached = todayInTZ(tz);
+      todayCache.set(tz, cached);
+    }
+    return cached;
+  }
   const upcoming = allBookings.filter(
-    (b) => b.status === "confirmed" && b.date >= today
+    (b) =>
+      b.status === "confirmed" && b.date >= todayFor(b.locationTimezone),
   );
   const past = allBookings.filter(
-    (b) => b.date < today || b.status !== "confirmed"
+    (b) =>
+      b.date < todayFor(b.locationTimezone) || b.status !== "confirmed",
   );
 
   return (
