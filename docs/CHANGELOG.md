@@ -17,6 +17,13 @@ If any role inside the brackets is unknown (typo), the parser falls
 back to treating the brackets as literal text — better to over-show
 than silently hide.
 
+## 2026-05-02 — v1.1.16
+
+- [admin] **New-feedback count on the admin dashboard.** A sixth stat
+  card next to Users / Students / Pros / Bookings / Open tasks shows
+  how many feedback rows are still in `new` status. Highlighted
+  amber when > 0 and clicks through to the filtered feedback list.
+
 ## 2026-05-02 — v1.1.15
 
 - [admin] **Sidebar Admin section now lists Manual refund + Feedback.**
