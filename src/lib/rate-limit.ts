@@ -1,6 +1,7 @@
 import { Ratelimit } from "@upstash/ratelimit";
 import { Redis } from "@upstash/redis";
 import { headers } from "next/headers";
+import * as Sentry from "@sentry/nextjs";
 
 // Vercel's Upstash marketplace integration uses the legacy KV_* env vars.
 // @upstash/redis's Redis.fromEnv() expects UPSTASH_REDIS_REST_URL/_TOKEN,
@@ -73,6 +74,19 @@ export const resendClaimLimiter = new Ratelimit({
   analytics: true,
 });
 
+// Per-IP cap on the public booking confirmation page at
+// /booked/t/[token]. Token entropy is high (32 bytes = 256 bits) so
+// brute-force enumeration isn't realistic, but we still cap to limit
+// DB query volume from anyone scanning the URL space. A legit user
+// hits the page once on email-claim and maybe a handful of times when
+// re-opening from history; 30/min is generous.
+export const bookedTokenLimiter = new Ratelimit({
+  redis,
+  limiter: Ratelimit.slidingWindow(30, "1 m"),
+  prefix: "rl:booked-token",
+  analytics: true,
+});
+
 /**
  * Get the client IP from request headers. Returns "unknown" if none present
  * (e.g. local dev). Vercel sets x-forwarded-for; x-real-ip is a fallback.
@@ -87,26 +101,44 @@ export async function getClientIp(): Promise<string> {
 /**
  * Rate limit by IP. Returns { ok: true } if allowed, or
  * { ok: false, retryAfter } with seconds until the window resets.
+ *
+ * Underlying Upstash failures (network timeout, KV down, auth)
+ * propagate to the caller after being captured under
+ * `tags.area = "rate-limit"` so an alert fires on the first incident.
+ * The action will then surface a 500 to the user — we deliberately do
+ * not fail open, since a permissive rate limiter is worse than a brief
+ * outage for spam-sensitive endpoints (public booking, login).
  */
 export async function limitByIp(
   limiter: Ratelimit
 ): Promise<{ ok: true } | { ok: false; retryAfter: number }> {
   const ip = await getClientIp();
-  const result = await limiter.limit(ip);
-  if (result.success) return { ok: true };
-  const retryAfter = Math.max(1, Math.ceil((result.reset - Date.now()) / 1000));
-  return { ok: false, retryAfter };
+  return runLimiter(() => limiter.limit(ip));
 }
 
 /**
  * Rate limit by a specific key (e.g. IP+email for forgot-password to
  * prevent enumeration). Returns same shape as limitByIp.
+ *
+ * See `limitByIp` for failure-mode notes — same Sentry tagging applies.
  */
 export async function limitByKey(
   limiter: Ratelimit,
   key: string
 ): Promise<{ ok: true } | { ok: false; retryAfter: number }> {
-  const result = await limiter.limit(key);
+  return runLimiter(() => limiter.limit(key));
+}
+
+async function runLimiter(
+  call: () => Promise<{ success: boolean; reset: number }>
+): Promise<{ ok: true } | { ok: false; retryAfter: number }> {
+  let result;
+  try {
+    result = await call();
+  } catch (err) {
+    Sentry.captureException(err, { tags: { area: "rate-limit" } });
+    throw err;
+  }
   if (result.success) return { ok: true };
   const retryAfter = Math.max(1, Math.ceil((result.reset - Date.now()) / 1000));
   return { ok: false, retryAfter };

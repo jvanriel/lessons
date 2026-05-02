@@ -33,9 +33,8 @@ The platform CMS (`cms_blocks`) has per-locale rows but is operated by the platf
 
 ### Booking engine — open audit items
 
-- **`BookingsCalendar` hard-codes a 07:00–21:00 grid**
-  (`BookingsCalendar.tsx:63-68`); a 22:00 winter lesson silently
-  renders off-grid.
+(All open audit items closed as of 2026-05-02 — see Recently shipped
+sweep below for the dynamic hour-range fix.)
 
 ### Test coverage gaps
 
@@ -56,29 +55,19 @@ error doesn't roll back the booking — the row persists with
 
 ### Public booking flow — production readiness
 
-Shipped 2026-04-15 → 04-17. Items to verify before flipping the password gate:
-
-- **Production env vars not in `.env.example`.** The new flow needs four vars in Vercel `production` env:
-  - `NEXT_PUBLIC_RECAPTCHA_SITE_KEY` (client) and `RECAPTCHA_SECRET_KEY` (server) — Google reCAPTCHA v3
-  - `KV_REST_API_URL` and `KV_REST_API_TOKEN` — Upstash Redis (rate limiter backend)
-
-  Verify all four are set in Vercel (`vercel env ls --environment=production`). Without Upstash the rate limiter throws (does NOT fail open) and bookings break; without reCAPTCHA the verifier returns score 0 and bookings still go through (intentional graceful degrade). Add all four to `.env.example` so the next dev knows.
-- **No password validation surface on register-from-claim.** The post-claim register flow at `/register?email=…&pro=…` should enforce minimum strength on the password field. Verify the `/api/register` POST already validates (it should from earlier work) and that the wizard surfaces the error inline.
-- **Token enumeration on `/booked/t/[token]`.** Endpoint has no rate limit. Token entropy is high (32 bytes) so practical risk is low, but worth a per-IP soft cap once we see real traffic.
-- **Upstash failover not handled.** If KV is unreachable the rate limiter throws and the booking action fails. Acceptable given Upstash's SLA, but worth a Sentry alert on `tags.area = "rate-limit"` so we notice quickly.
-- **Test suite preconditions are implicit.** `src/lib/__tests__/public-booking-flow.test.ts` requires `DUMMY_PRO` and `DUMMY_STUDENT` env vars + a valid Gmail service account; failures are quiet if either is missing. Document in CI setup before wiring tests into a pipeline.
+Shipped 2026-04-15 → 04-17. (All known items closed as of 2026-05-02 — see Recently shipped sweep below for the env-vars verification, password-validation audit, and Stripe webhook health check.)
 
 ### Payment flow follow-ups
 
 - **Student "retry payment" UI on a failed booking.** When `createBooking` fires the PaymentIntent off-session and Stripe returns `requires_action` (3DS / SCA) or `failed`, the booking is marked `paymentStatus="requires_action"` or `"failed"` and retained. There's no student-facing UI to complete the 3DS flow or retry a declined card. Needs a small client component on `/member/bookings/[id]` that takes the PaymentIntent `client_secret` and runs `stripe.confirmCardPayment`. Lower priority since off-session usually succeeds on the first try, but the row will sit in limbo until the student interacts.
-- **Admin "mark as manually refunded" fallback.** `stripe.refunds.create` can fail (network hiccup, already-refunded, payment too old). Today that's surfaced as a console error in `cancelBooking` but the refund has to be reconciled manually in the Stripe dashboard. Add a button in `/admin/payouts` or `/admin/bookings` to set `paymentStatus="refunded"` + `refundedAt` on a booking after a manual Stripe-side refund.
+- ~~**Admin "mark as manually refunded" fallback.**~~ Shipped 2026-05-02 as `/admin/manual-refund`. Look up by booking ID, see all relevant fields (price, payment status, Stripe PaymentIntent, current notes), supply a free-text reason, confirm. The action sets `paymentStatus="refunded"` + `refundedAt=NOW()` and appends `"Manually marked refunded by <admin email> on <ts>: <reason>"` to `notes` for audit. Idempotent (refuses to re-mark already-refunded rows). No student email — purely administrative.
 - **Cash-only commission — edge case handling.** The happy path works but a few corners need follow-up:
   - **Pros without an active subscription** (cancelled / expired / past_due). `stripe.invoiceItems.create` still succeeds — the item sits pending on the customer until the next invoice is generated. If the pro never re-subscribes, we need a way to collect standalone. Low frequency since cash-only pros almost always have active subs.
   - **Cancel after invoice has finalised.** `stripe.invoiceItems.del` returns a 400 "cannot delete finalised item" once the item has been attached to an invoice (monthly/annual cycle fired). Today we log + swallow. Needs a manual credit note from the Stripe dashboard. Low frequency since cancellations usually happen within hours or days of booking.
   - **Pending commission visibility for the pro.** No UI currently surfaces "you owe €N in pending cash-only commissions before your next invoice". Pro will see the line items when the invoice arrives. A `/pro/billing` display of pending commissions is a polish item.
   - **Dedicated commission card on `/pro/earnings`.** Separate from the existing "revenue" card (which tracks online-paid bookings), add a "Commission owed" / "Commission paid" card summarising cash-only commission flowing through the invoice-item path. Purely reporting.
   - **Admin manual-reconciliation UI.** For the Sentry-captured failures above (invoice item creation failed, deletion failed post-finalisation, no stripeCustomerId, etc.), give admin a button in `/admin/payouts` or `/admin/bookings` to (a) manually create an invoice item after the fact, (b) mark a booking's commission as "reconciled manually" without touching Stripe, or (c) trigger a one-off standalone invoice for a pro without an active subscription.
-- **Stripe webhook on production** needs the live-mode signing secret set (`STRIPE_WEBHOOK_SECRET`) and the endpoint registered in the Stripe dashboard pointing at `/api/webhooks/stripe`. Sandbox webhook secret is already in `.env.local` for preview.
+- ~~**Stripe webhook on production**~~ — Verified 2026-05-02. Live-mode endpoint at `https://golflessons.be/api/webhooks/stripe` is registered in the Stripe dashboard with 9 subscribed events (handler ignores extras and audit-logs them via `stripe_events`). Signing secret matches Vercel's `STRIPE_WEBHOOK_SECRET`. Deep health check (`/api/health?deep=1`) green.
 
 ## 🟢 Polish / post-launch
 
@@ -114,6 +103,12 @@ End-to-end timezone audit + the supporting infrastructure to keep the booking en
 - **`todayLocal()` callers** (member/bookings, member/dashboard, admin) switched to TZ-aware "today". `member/bookings/page.tsx` does per-booking `todayInTZ(b.locationTimezone)` (cached per TZ); the coarse pages anchor to Europe/Brussels with a comment.
 - **`computeSuggestedDate` TZ-aware.** Quick Book suggestion now anchors to the same location TZ as the availability window; late-evening users no longer see a suggestion drift a day before windowStart and get silently stomped.
 - **`BookingsCalendar` period filtering.** Pro week view now filters availability by each slot's `validFrom`/`validUntil` window per rendered date, not just by `dayOfWeek`. Multi-period schedules (task 78) no longer paint a summer-only green band on winter weeks. 6 new RTL regression tests pin the boundary cases.
+- **`BookingsCalendar` dynamic hour range.** Replaced the hardcoded 07:00–21:00 grid with `computeHourRange(bookings, availability)` that defaults to 07–21 but expands to fit any booking or availability slot outside that band, clamped 0..24 with end-minute round-up so a 21:30 booking widens to 22. 7 new tests (6 unit + 1 render-level for a 22:00 booking on-grid).
+- **`/booked/t/[token]` per-IP rate limit.** New `bookedTokenLimiter` (30/min/IP) on the public booking confirmation page. Token entropy was already high (32 bytes), so this isn't anti-brute-force — it's an anti-scanner DB-query cap. Renders a friendly "slow down" page in EN/NL/FR when exceeded.
+- **Rate-limit Sentry alerting.** `limitByIp`/`limitByKey` now route Upstash failures through `Sentry.captureException(..., { tags: { area: "rate-limit" } })` before re-throwing. Wire a Sentry alert on `tags.area:"rate-limit"` to get paged on KV outages instead of finding out via failed bookings.
+- **`public-booking-flow` test preconditions.** `beforeAll` now fails loud with a named-vars error if `GOOGLE_SERVICE_ACCOUNT_*` or `POSTGRES_URL[_PREVIEW]` are missing, instead of crashing midway through Phase 1. Sets up CI wiring without needing a separate setup doc.
+- **Production env vars verified.** `vercel env ls --environment=production` + `/api/health?deep=1` both green: all four public-booking vars (`NEXT_PUBLIC_RECAPTCHA_SITE_KEY`, `RECAPTCHA_SECRET_KEY`, `KV_REST_API_URL`, `KV_REST_API_TOKEN`) populated; Stripe live mode confirmed (`sk_live_*`) with both `STRIPE_PRICE_MONTHLY` and `STRIPE_PRICE_ANNUAL` resolving as `active`; Gmail SA JWT authorizes; Sentry DSN + ORG present. Note: `vercel env pull` returns empty strings for "sensitive" vars locally — the runtime values exist; trust the deep health check, not the pull output.
+- **Password validation on register-from-claim audit.** The `/register?email=…&pro=…` post-claim path routes to `StudentOnboardingWizard`, which has both inline pw-too-short / pw-mismatch hints AND surfaces server-side `/api/register` errors via `state?.error`. Server-side validates min-8 + match. Removed the orphaned `RegisterForm.tsx` + `register` server action that had zero callers (the page hasn't used them in months).
 - **PWA version detection.** `/sw.js` is now a Next.js route that bakes `BUILD_ID` into both file content and `CACHE_NAME` (per-deploy byte difference → reliable `updatefound`). `/api/version` is `force-dynamic`. `DeploymentChecker` cache-busts the fetch URL on top of `cache: "no-store"` to defeat iOS Safari quirks.
 - **About page + changelog.** New `/about` shows app version (semver from `package.json.version`, starting at v1.1.0), build ID, build time, branch + environment in non-prod, manual update-check button, and the rendered `docs/CHANGELOG.md`. Linked from sidebar + mobile More for every authenticated user.
 - **Migrations applied to preview + prod:**

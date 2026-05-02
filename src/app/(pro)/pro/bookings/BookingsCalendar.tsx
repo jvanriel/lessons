@@ -64,12 +64,12 @@ interface Props {
 
 // ─── Constants ──────────────────────────────────────
 
-const START_HOUR = 7;
-const END_HOUR = 21;
-const HOURS: number[] = [];
-for (let h = START_HOUR; h < END_HOUR; h++) {
-  HOURS.push(h);
-}
+// Default visible window. The actual hours rendered widen
+// dynamically when bookings or availability slots fall outside this
+// range — see `computeHourRange()` below. Pre-fix this was a fixed
+// 07:00–21:00 grid; a 22:00 winter lesson rendered off-grid (gaps.md).
+const DEFAULT_START_HOUR = 7;
+const DEFAULT_END_HOUR = 21;
 
 const DAY_KEYS = [
   "proBookingsCal.day.mon",
@@ -88,9 +88,54 @@ function timeToMinutes(time: string): number {
   return h * 60 + m;
 }
 
-function timeToGridRow(time: string): number {
+/**
+ * Pixel-row offset for a `HH:MM` time, anchored to `startHour`. The
+ * caller closes over the dynamic start hour computed by
+ * `computeHourRange()` so the grid can widen for early-morning or
+ * late-evening bookings.
+ */
+function timeToGridRow(time: string, startHour: number): number {
   const mins = timeToMinutes(time);
-  return mins - START_HOUR * 60;
+  return mins - startHour * 60;
+}
+
+/**
+ * Compute the visible hour range for the week's calendar. Returns
+ * `[startHour, endHour]` in 24h ints (0..24). Defaults to the
+ * 07–21 window most pros teach in, but expands when any booking
+ * starts before 07:00 or ends after 21:00, or when an availability
+ * slot pokes outside that range. Result is clamped to 0..24.
+ *
+ * The bias toward the default keeps the calendar compact for typical
+ * pros; the data-driven expansion ensures a 22:00 winter lesson
+ * actually renders on-grid (gaps.md "BookingsCalendar 07-21 hardcoded").
+ */
+export function computeHourRange(
+  bookings: Pick<Booking, "startTime" | "endTime">[],
+  availability: Pick<AvailabilitySlot, "startTime" | "endTime">[],
+): { startHour: number; endHour: number } {
+  let start = DEFAULT_START_HOUR;
+  let end = DEFAULT_END_HOUR;
+  function expand(timeStr: string, isEnd: boolean) {
+    const mins = timeToMinutes(timeStr);
+    const hour = Math.floor(mins / 60);
+    if (isEnd) {
+      // Round up so a 21:30 end-time bumps `end` to 22.
+      const ceil = mins % 60 === 0 ? hour : hour + 1;
+      if (ceil > end) end = Math.min(24, ceil);
+    } else {
+      if (hour < start) start = Math.max(0, hour);
+    }
+  }
+  for (const b of bookings) {
+    expand(b.startTime, false);
+    expand(b.endTime, true);
+  }
+  for (const a of availability) {
+    expand(a.startTime, false);
+    expand(a.endTime, true);
+  }
+  return { startHour: start, endHour: end };
 }
 
 // ─── Component ──────────────────────────────────────
@@ -166,7 +211,19 @@ export function BookingsCalendar({
     setWeekStart(getMondayInTZ(new Date(), timezone));
   }
 
-  const totalMinutes = (END_HOUR - START_HOUR) * 60;
+  // Visible hour range — defaults to 07–21, expands when bookings or
+  // availability fall outside that band. Pre-fix the range was a
+  // hardcoded 07–21 grid, so a 22:00 winter lesson silently rendered
+  // off-grid (gaps.md).
+  const { startHour, endHour } = useMemo(
+    () => computeHourRange(bookings, availability),
+    [bookings, availability],
+  );
+  const HOURS = useMemo(() => {
+    const out: number[] = [];
+    for (let h = startHour; h < endHour; h++) out.push(h);
+    return out;
+  }, [startHour, endHour]);
 
   // Format week range for header
   const weekLabel = `${formatDateLocale(weekDates[0], locale, { month: "short", day: "numeric", timeZone: timezone })} - ${formatDateLocale(weekDates[6], locale, { month: "short", day: "numeric", year: "numeric", timeZone: timezone })}`;
@@ -271,14 +328,14 @@ export function BookingsCalendar({
                     <div
                       key={h}
                       className="absolute left-0 right-0 border-b border-green-100/50"
-                      style={{ top: `${(h - START_HOUR) * 48}px`, height: "48px" }}
+                      style={{ top: `${(h - startHour) * 48}px`, height: "48px" }}
                     />
                   ))}
 
                   {/* Availability background */}
                   {dayAvail.map((slot, slotIdx) => {
-                    const topMin = timeToGridRow(slot.startTime);
-                    const bottomMin = timeToGridRow(slot.endTime);
+                    const topMin = timeToGridRow(slot.startTime, startHour);
+                    const bottomMin = timeToGridRow(slot.endTime, startHour);
                     const topPx = (topMin / 60) * 48;
                     const heightPx = ((bottomMin - topMin) / 60) * 48;
 
@@ -296,8 +353,8 @@ export function BookingsCalendar({
 
                   {/* Booking blocks */}
                   {dayBookings.map((booking) => {
-                    const topMin = timeToGridRow(booking.startTime);
-                    const bottomMin = timeToGridRow(booking.endTime);
+                    const topMin = timeToGridRow(booking.startTime, startHour);
+                    const bottomMin = timeToGridRow(booking.endTime, startHour);
                     const topPx = (topMin / 60) * 48;
                     const heightPx = Math.max(((bottomMin - topMin) / 60) * 48, 20);
                     const isExpanded = expandedBookingId === booking.id;

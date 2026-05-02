@@ -455,6 +455,33 @@ export const proMailings = pgTable("pro_mailings", {
 
 // ─── Tasks ──────────────────────────────────────────────
 
+// ─── Feedback ──────────────────────────────────────────
+//
+// User-submitted feedback messages with an admin response thread.
+// Submitting fans out a high-priority admin notification AND mails
+// contact@golflessons.be (so we hear about it even when no admin is
+// online). When an admin responds, the user gets an email back so the
+// loop closes without forcing them to re-open the app.
+//
+// Status values:
+//   - "new"         freshly submitted, no admin action yet
+//   - "in_progress" admin has triaged but not responded yet
+//   - "responded"   admin response sent (visible to user on /feedback)
+//   - "closed"      no further action needed; user can still re-open
+export const feedback = pgTable("feedback", {
+  id: serial("id").primaryKey(),
+  userId: integer("user_id")
+    .references(() => users.id)
+    .notNull(),
+  message: text("message").notNull(),
+  status: varchar("status", { length: 20 }).notNull().default("new"),
+  adminResponse: text("admin_response"),
+  respondedById: integer("responded_by_id").references(() => users.id),
+  respondedAt: timestamp("responded_at"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
 export const tasks = pgTable("tasks", {
   id: serial("id").primaryKey(),
   title: varchar("title", { length: 255 }).notNull(),
