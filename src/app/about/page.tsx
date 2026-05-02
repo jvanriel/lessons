@@ -6,8 +6,10 @@ import { formatDate } from "@/lib/format-date";
 import {
   parseChangelog,
   renderItem,
+  isItemVisibleTo,
   type ChangelogEntry,
 } from "@/lib/changelog";
+import { getSession } from "@/lib/auth";
 import { CheckForUpdatesButton } from "./CheckForUpdatesButton";
 
 export const metadata = { title: "About — Golf Lessons" };
@@ -31,7 +33,21 @@ async function loadChangelog(): Promise<ChangelogEntry[]> {
 
 export default async function AboutPage() {
   const locale = await getLocale();
-  const entries = await loadChangelog();
+  const session = await getSession();
+  const userRoles = session?.roles ?? [];
+  const allEntries = await loadChangelog();
+
+  // Filter items per the viewer's roles. Untagged items are visible
+  // to everyone (including signed-out visitors); tagged items only
+  // to users with one of the listed roles. Hide a whole entry when
+  // every item under it is filtered out, so we don't render an
+  // empty card "v1.1.X" with no bullets.
+  const entries = allEntries
+    .map((e) => ({
+      ...e,
+      items: e.items.filter((i) => isItemVisibleTo(i, userRoles)),
+    }))
+    .filter((e) => e.items.length > 0);
 
   const isProduction = VERCEL_ENV === "production";
 
@@ -127,7 +143,7 @@ export default async function AboutPage() {
                       key={i}
                       // Tiny well-defined parser output, not user content.
                       // Restricted to escaped text + <strong>.
-                      dangerouslySetInnerHTML={{ __html: renderItem(item) }}
+                      dangerouslySetInnerHTML={{ __html: renderItem(item.text) }}
                     />
                   ))}
                 </ul>

@@ -7,6 +7,9 @@
  *     the date is treated as part of the heading line and ignored).
  *   - Items are top-level `- ...` bullets that may wrap across
  *     continuation lines.
+ *   - An optional `[role]` or `[role1,role2]` prefix on a bullet
+ *     restricts visibility to users with one of those roles. Untagged
+ *     bullets are visible to everyone. See `parseItemRoles`.
  *   - Anything before the first `## YYYY-MM-DD` heading is the file
  *     intro and gets dropped (it's there for human readers of the
  *     raw file, not for the rendered About page).
@@ -15,6 +18,21 @@
  * Pulled out of `src/app/about/page.tsx` so the parsing rules can be
  * unit-tested without spinning up Next.js + the file-system reader.
  */
+
+import type { UserRole } from "@/lib/auth";
+
+export interface ChangelogItem {
+  /** Bullet text with the role tag stripped. */
+  text: string;
+  /**
+   * Roles allowed to see this item. `null` means "everyone" (the
+   * untagged default). An empty array would mean "no one" but the
+   * parser never produces that — at least one valid role is required
+   * inside the brackets, otherwise the brackets are treated as plain
+   * text and `roles` falls back to `null`.
+   */
+  roles: UserRole[] | null;
+}
 
 export interface ChangelogEntry {
   /** ISO date string from the heading (`YYYY-MM-DD`). */
@@ -30,10 +48,55 @@ export interface ChangelogEntry {
   label: string;
   /**
    * Bullet items in order of appearance under this heading. Each item
-   * is the raw markdown — call `renderItem()` to turn it into safe
-   * HTML for display.
+   * carries the cleaned text and an optional role-restriction list.
+   * Call `renderItem()` on `text` to turn it into safe HTML.
    */
-  items: string[];
+  items: ChangelogItem[];
+}
+
+const VALID_ROLES: ReadonlySet<UserRole> = new Set([
+  "member",
+  "pro",
+  "admin",
+  "dev",
+]);
+
+/**
+ * Split a `[role,role2] body text` prefix off a bullet. Returns the
+ * original text + `roles=null` when the bullet has no valid prefix
+ * (so plain `[note]` or `[TODO]` text passes through unchanged).
+ */
+export function parseItemRoles(raw: string): ChangelogItem {
+  const m = /^\[([a-z,\s]+)\]\s+(.+)$/i.exec(raw);
+  if (!m) return { text: raw, roles: null };
+  const candidates = m[1]
+    .split(",")
+    .map((r) => r.trim().toLowerCase())
+    .filter(Boolean);
+  const roles = candidates.filter((r): r is UserRole =>
+    VALID_ROLES.has(r as UserRole),
+  );
+  // If any candidate failed to validate, treat the whole prefix as
+  // plain text — better to over-show a typo'd entry than to silently
+  // drop it for everyone.
+  if (roles.length === 0 || roles.length !== candidates.length) {
+    return { text: raw, roles: null };
+  }
+  return { text: m[2], roles };
+}
+
+/**
+ * True if a user with `userRoles` should see `item`. Untagged items
+ * (`item.roles === null`) are visible to everyone, including signed-
+ * out visitors. Tagged items require the viewer to have at least one
+ * of the listed roles.
+ */
+export function isItemVisibleTo(
+  item: ChangelogItem,
+  userRoles: readonly UserRole[],
+): boolean {
+  if (item.roles === null) return true;
+  return item.roles.some((r) => userRoles.includes(r));
 }
 
 /**
@@ -50,7 +113,8 @@ export function parseChangelog(md: string): ChangelogEntry[] {
 
   function flushBullet() {
     if (!current || buffer.length === 0) return;
-    current.items.push(buffer.join(" ").trim());
+    const raw = buffer.join(" ").trim();
+    current.items.push(parseItemRoles(raw));
     buffer = [];
   }
 
