@@ -106,11 +106,20 @@ export default async function AboutPage() {
         ) : (
           <ol className="mt-4 space-y-6">
             {entries.map((e) => (
-              <li key={e.date} className="rounded-xl border border-green-200 bg-white p-5">
+              <li
+                // `date` alone collides when multiple versions ship the
+                // same day — combine with the heading label (e.g.
+                // version string) for a stable unique key.
+                key={`${e.date}-${e.label}`}
+                className="rounded-xl border border-green-200 bg-white p-5"
+              >
                 <h3 className="font-display text-base font-medium text-green-800">
-                  {formatDate(e.date, locale, {
-                    dateStyle: "long",
-                  })}
+                  {formatDate(e.date, locale, { dateStyle: "long" })}
+                  {e.label && (
+                    <span className="ml-2 text-sm font-normal text-green-500">
+                      {e.label}
+                    </span>
+                  )}
                 </h3>
                 <ul className="mt-2 list-disc space-y-1.5 pl-5 text-sm text-green-700 marker:text-green-300">
                   {e.items.map((item, i) => (

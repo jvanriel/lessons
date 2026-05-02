@@ -4,6 +4,13 @@ End-user-visible changes shipped to the platform. Engineering details
 that don't affect what students or pros see live in `docs/gaps.md` and
 the git history. Newest first.
 
+## 2026-05-02 — v1.1.3
+
+- **About page no longer warns about duplicate keys.** When multiple
+  versions ship on the same day, the changelog list now uses each
+  entry's date + version as the unique identifier, and the version
+  appears as a small label next to the date.
+
 ## 2026-05-02 — v1.1.2
 
 - **Pro week calendar now respects schedule periods.** When you set up
