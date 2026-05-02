@@ -486,6 +486,224 @@ describe("concurrent booking / slot re-validation", () => {
   });
 });
 
+// ─── Tests: Slot-uniqueness DB index + isSlotConflictError ──
+//
+// Pre-2026-05 the booking flow did `getAvailableSlots → some(...) →
+// INSERT` with no atomicity, so two students grabbing the same slot
+// at the same time both succeeded (double-book). The deployable
+// mitigation was a partial unique index
+// (`lesson_bookings_slot_confirmed_idx`) + an `isSlotConflictError`
+// catch in the action that translates the 23505 to the friendly
+// "slot just got taken" message. These cases prove:
+//
+//   1. Two parallel `INSERT`s for the same confirmed slot — exactly
+//      one wins, the other rejects with PG's unique_violation.
+//   2. The thrown error is recognised by `isSlotConflictError`, so
+//      the action's catch surfaces the friendly message instead of
+//      crashing.
+//   3. The index is partial on `status='confirmed'` — a `cancelled`
+//      row at the same slot doesn't block a new `confirmed` row.
+
+import { isSlotConflictError } from "@/lib/db";
+
+describe("slot-uniqueness index + isSlotConflictError", () => {
+  it("two parallel INSERTs for the same confirmed slot — exactly one wins", async () => {
+    // Pick a slot far in the future to avoid colliding with anything
+    // the rest of the suite inserts. 50 days ahead, fixed time.
+    const future = new Date();
+    future.setDate(future.getDate() + 50);
+    // Force a Monday so the test pro's availability template covers it.
+    while (future.getDay() !== 1) future.setDate(future.getDate() + 1);
+    const date = format(future, "yyyy-MM-dd");
+    const startTime = "11:00";
+    const endTime = "12:00";
+
+    const insertOne = (note: string) =>
+      db
+        .insert(lessonBookings)
+        .values({
+          proProfileId: TEST_PRO_PROFILE_ID,
+          bookedById: TEST_USER_ID,
+          proLocationId: TEST_PRO_LOCATION_ID,
+          date,
+          startTime,
+          endTime,
+          status: "confirmed",
+          participantCount: 1,
+          notes: `[TEST] slot-uniqueness ${note}`,
+          manageToken: generateManageToken(),
+        })
+        .returning({ id: lessonBookings.id });
+
+    // Fire both inserts in parallel and collect outcomes.
+    const results = await Promise.allSettled([
+      insertOne("a"),
+      insertOne("b"),
+    ]);
+    const wins = results.filter((r) => r.status === "fulfilled");
+    const losses = results.filter((r) => r.status === "rejected");
+
+    expect(wins).toHaveLength(1);
+    expect(losses).toHaveLength(1);
+
+    const winnerId = (wins[0] as PromiseFulfilledResult<{ id: number }[]>)
+      .value[0].id;
+    createdBookingIds.push(winnerId);
+
+    // The rejected error must be recognised by `isSlotConflictError`,
+    // because the action's catch relies on it to translate to a
+    // user-facing "slot just got taken" message rather than crashing.
+    const rejectedReason = (losses[0] as PromiseRejectedResult).reason;
+    expect(isSlotConflictError(rejectedReason)).toBe(true);
+  });
+
+  it("a third sequential INSERT for the same slot also rejects", async () => {
+    // Same date as test above but a different time window so the
+    // tests don't depend on each other's runtime ordering.
+    const future = new Date();
+    future.setDate(future.getDate() + 50);
+    while (future.getDay() !== 1) future.setDate(future.getDate() + 1);
+    const date = format(future, "yyyy-MM-dd");
+    const startTime = "13:00";
+    const endTime = "14:00";
+
+    const [first] = await db
+      .insert(lessonBookings)
+      .values({
+        proProfileId: TEST_PRO_PROFILE_ID,
+        bookedById: TEST_USER_ID,
+        proLocationId: TEST_PRO_LOCATION_ID,
+        date,
+        startTime,
+        endTime,
+        status: "confirmed",
+        participantCount: 1,
+        notes: "[TEST] slot-uniqueness sequential a",
+        manageToken: generateManageToken(),
+      })
+      .returning({ id: lessonBookings.id });
+    createdBookingIds.push(first.id);
+
+    let caught: unknown = null;
+    try {
+      await db.insert(lessonBookings).values({
+        proProfileId: TEST_PRO_PROFILE_ID,
+        bookedById: TEST_USER_ID,
+        proLocationId: TEST_PRO_LOCATION_ID,
+        date,
+        startTime,
+        endTime,
+        status: "confirmed",
+        participantCount: 1,
+        notes: "[TEST] slot-uniqueness sequential b",
+        manageToken: generateManageToken(),
+      });
+    } catch (err) {
+      caught = err;
+    }
+    expect(caught).not.toBeNull();
+    expect(isSlotConflictError(caught)).toBe(true);
+  });
+
+  it("partial index: a cancelled row at the same slot does NOT block a new confirmed row", async () => {
+    // The unique index has `WHERE status='confirmed'`, so soft-deleting
+    // a booking (status → cancelled) frees the slot for re-booking.
+    const future = new Date();
+    future.setDate(future.getDate() + 50);
+    while (future.getDay() !== 1) future.setDate(future.getDate() + 1);
+    const date = format(future, "yyyy-MM-dd");
+    const startTime = "15:00";
+    const endTime = "16:00";
+
+    const [orig] = await db
+      .insert(lessonBookings)
+      .values({
+        proProfileId: TEST_PRO_PROFILE_ID,
+        bookedById: TEST_USER_ID,
+        proLocationId: TEST_PRO_LOCATION_ID,
+        date,
+        startTime,
+        endTime,
+        status: "cancelled",
+        participantCount: 1,
+        notes: "[TEST] slot-uniqueness cancelled-then-rebooked a",
+        manageToken: generateManageToken(),
+      })
+      .returning({ id: lessonBookings.id });
+    createdBookingIds.push(orig.id);
+
+    // Same slot — cancelled doesn't count, this should succeed.
+    const [rebook] = await db
+      .insert(lessonBookings)
+      .values({
+        proProfileId: TEST_PRO_PROFILE_ID,
+        bookedById: TEST_USER_ID,
+        proLocationId: TEST_PRO_LOCATION_ID,
+        date,
+        startTime,
+        endTime,
+        status: "confirmed",
+        participantCount: 1,
+        notes: "[TEST] slot-uniqueness cancelled-then-rebooked b",
+        manageToken: generateManageToken(),
+      })
+      .returning({ id: lessonBookings.id });
+    createdBookingIds.push(rebook.id);
+
+    expect(rebook.id).toBeGreaterThan(0);
+  });
+
+  it("isSlotConflictError ignores other unique-violation errors (e.g. manageToken)", async () => {
+    // The catch must not swallow unrelated 23505s. Insert a row,
+    // then try to insert another with the same `manageToken` — that's
+    // a different unique constraint and the helper should report
+    // false so the action surfaces the original error.
+    const future = new Date();
+    future.setDate(future.getDate() + 50);
+    while (future.getDay() !== 1) future.setDate(future.getDate() + 1);
+    const date = format(future, "yyyy-MM-dd");
+
+    const sharedToken = generateManageToken();
+    const [first] = await db
+      .insert(lessonBookings)
+      .values({
+        proProfileId: TEST_PRO_PROFILE_ID,
+        bookedById: TEST_USER_ID,
+        proLocationId: TEST_PRO_LOCATION_ID,
+        date,
+        startTime: "08:00",
+        endTime: "09:00",
+        status: "confirmed",
+        participantCount: 1,
+        notes: "[TEST] slot-uniqueness token-clash a",
+        manageToken: sharedToken,
+      })
+      .returning({ id: lessonBookings.id });
+    createdBookingIds.push(first.id);
+
+    let caught: unknown = null;
+    try {
+      await db.insert(lessonBookings).values({
+        proProfileId: TEST_PRO_PROFILE_ID,
+        bookedById: TEST_USER_ID,
+        proLocationId: TEST_PRO_LOCATION_ID,
+        date,
+        startTime: "16:00",
+        endTime: "17:00",
+        status: "confirmed",
+        participantCount: 1,
+        notes: "[TEST] slot-uniqueness token-clash b",
+        manageToken: sharedToken,
+      });
+    } catch (err) {
+      caught = err;
+    }
+    expect(caught).not.toBeNull();
+    // Different unique constraint — should NOT match.
+    expect(isSlotConflictError(caught)).toBe(false);
+  });
+});
+
 // ─── Tests: loadBookingPricing (DB integration) ──────
 //
 // `decideBookingPricing` is unit-tested at booking-charge.test.ts;

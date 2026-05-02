@@ -4,6 +4,14 @@ End-user-visible changes shipped to the platform. Engineering details
 that don't affect what students or pros see live in `docs/gaps.md` and
 the git history. Newest first.
 
+## 2026-05-02 — v1.1.5
+
+- **"Slot just got taken" message now actually appears.** When two
+  students raced for the same slot at the same instant, the friendly
+  in-app message was meant to fire but a missing line in the error
+  detector caused a generic crash page instead. Both browsers now
+  see the soft "pick another time" message as designed.
+
 ## 2026-05-02 — v1.1.4
 
 - **Cancelling a past lesson on the pro side is silent.** When a pro

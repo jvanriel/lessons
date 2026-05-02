@@ -39,13 +39,9 @@ The platform CMS (`cms_blocks`) has per-locale rows but is operated by the platf
 
 ### Test coverage gaps
 
-- **Concurrency / double-booking integration test.** The partial
-  unique index gates the race at the DB; an end-to-end test that
-  spawns two parallel `createBooking` calls would prove the catch in
-  the actions surfaces the friendly message rather than crashing.
-- **Reminder cron route handler.** No tests; the per-booking TZ
-  filter is exercised via `lesson-slots.test.ts` indirectly but the
-  route's idempotency / window-widening logic isn't pinned.
+(All booking-engine test gaps closed as of 2026-05-02 — see Recently
+shipped sweep below for the slot-uniqueness + cron route handler
+integration tests.)
 
 ### `db.transaction()` wrapping
 

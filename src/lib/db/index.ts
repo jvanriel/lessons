@@ -23,21 +23,49 @@ const sql = neon(databaseUrl);
 export const db = drizzle(sql, { schema });
 
 /**
- * True when `err` is the Postgres `unique_violation` (23505) raised by
- * the partial unique index `lesson_bookings_slot_confirmed_idx`. Used
- * by the booking actions to translate the duplicate-key error into a
- * user-facing "slot just got taken" message instead of crashing.
+ * True when `err` is the Postgres `unique_violation` (23505) raised
+ * by the partial unique index `lesson_bookings_slot_confirmed_idx`.
+ * Used by the booking actions to translate the duplicate-key error
+ * into a user-facing "slot just got taken" message instead of
+ * crashing.
  *
- * The neon-http driver surfaces PG errors with `.code` on the thrown
- * object (and a `.constraint` field for the index name). We check both
- * to avoid swallowing other 23505s (e.g. the manage-token unique).
+ * Two layers to unwrap:
+ *
+ *   1. Drizzle wraps the underlying `NeonDbError` in its own
+ *      `DrizzleQueryError` and stores the original on `.cause`. The
+ *      raw neon driver, when called directly via the `sql` template
+ *      tag, throws the `NeonDbError` un-wrapped.
+ *   2. Both error shapes carry PG's `.code` ("23505") and the
+ *      `.constraint` field with the index name.
+ *
+ * We check both the top-level error AND `err.cause` so the catch
+ * works whether the action is called via drizzle (the production
+ * path) or against the raw driver (some integration tests). Any
+ * other 23505 (e.g. the `manage_token` unique) deliberately returns
+ * false so the action surfaces the original error rather than
+ * silently mis-translating.
  */
 export function isSlotConflictError(err: unknown): boolean {
   if (!err || typeof err !== "object") return false;
-  const e = err as { code?: string; constraint?: string; constraint_name?: string; message?: string };
-  if (e.code !== "23505") return false;
-  const constraint = e.constraint ?? e.constraint_name ?? "";
-  if (constraint === "lesson_bookings_slot_confirmed_idx") return true;
-  // Neon HTTP sometimes packs the constraint into the message instead.
-  return typeof e.message === "string" && e.message.includes("lesson_bookings_slot_confirmed_idx");
+  const SLOT_INDEX = "lesson_bookings_slot_confirmed_idx";
+
+  function matches(candidate: unknown): boolean {
+    if (!candidate || typeof candidate !== "object") return false;
+    const c = candidate as {
+      code?: string;
+      constraint?: string;
+      constraint_name?: string;
+      message?: string;
+    };
+    if (c.code !== "23505") return false;
+    const constraint = c.constraint ?? c.constraint_name ?? "";
+    if (constraint === SLOT_INDEX) return true;
+    return typeof c.message === "string" && c.message.includes(SLOT_INDEX);
+  }
+
+  // Direct shape (raw neon driver throws here).
+  if (matches(err)) return true;
+  // Drizzle wraps the original in `.cause`.
+  const wrapper = err as { cause?: unknown };
+  return matches(wrapper.cause);
 }
