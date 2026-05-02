@@ -220,7 +220,13 @@ export const locations = pgTable("locations", {
   country: varchar("country", { length: 100 }),
   lat: numeric("lat"),
   lng: numeric("lng"),
-  timezone: varchar("timezone", { length: 50 }).notNull().default("Europe/Brussels"),
+  // No DB default. Every insert path (onboarding wizard, locations
+  // form, seed scripts, integration tests) now writes an explicit
+  // IANA zone validated by `isValidIanaTimezone()`. Removing the
+  // default closes the loop so a future code path that forgets to
+  // pass `timezone` fails loudly at INSERT instead of silently
+  // landing on Brussels (gaps.md §0 pass 3).
+  timezone: varchar("timezone", { length: 50 }).notNull(),
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
 

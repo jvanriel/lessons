@@ -6,14 +6,16 @@
  * matching the availability editor grid ["Mon","Tue","Wed","Thu","Fri","Sat","Sun"].
  * JavaScript's Date.getDay() uses Sunday=0 — callers must convert.
  *
- * All slot times are in Europe/Brussels timezone. The engine uses date-fns-tz
- * to ensure correct behavior on both localhost (CEST/CET) and Vercel (UTC).
+ * Every slot time and booking time is a wall-clock time in the
+ * **location's** IANA timezone (`locations.timezone`). The engine uses
+ * date-fns-tz to convert to absolute UTC instants for any
+ * cross-timezone comparison (notice cutoff, cancellation deadline,
+ * ICS DTSTART/DTEND). `tz` is REQUIRED on every public function — we
+ * removed the silent Brussels fallback in 2026-05 because it was
+ * masking missing-tz bugs in the caller (gaps.md §0).
  */
 
 import { fromZonedTime } from "date-fns-tz";
-
-/** Default timezone — used when no location timezone is specified */
-export const DEFAULT_TZ = "Europe/Brussels";
 
 // ─── Types ───────────────────────────────────────────
 
@@ -97,8 +99,8 @@ export function computeAvailableSlots(
   bookings: ExistingBooking[],
   bookingNoticeHours: number,
   duration: number,
-  now?: Date, // injectable for testing; defaults to new Date()
-  timezone: string = DEFAULT_TZ,
+  now: Date | undefined, // injectable for testing; pass undefined for "real now"
+  timezone: string,
 ): AvailableSlot[] {
   const date = new Date(dateStr + "T00:00:00");
   const jsDay = date.getDay();
@@ -159,14 +161,13 @@ export function computeAvailableSlots(
     }
   }
 
-  // 5. Filter by bookingNotice
-  // All slot times are in Europe/Brussels. Use TZDate to correctly
-  // compare regardless of server timezone (UTC on Vercel, CEST locally).
+  // 5. Filter by bookingNotice. Slot wall-clock times are in the
+  // location's `timezone` argument; convert each candidate to a UTC
+  // instant and drop everything inside the notice window.
   const currentTime = now ?? new Date();
   const thresholdMs = currentTime.getTime() + bookingNoticeHours * 60 * 60 * 1000;
 
   return slots.filter((s) => {
-    // Parse slot start as Brussels local time → UTC milliseconds
     const slotUtc = fromZonedTime(
       `${dateStr}T${s.startTime}:00`,
       timezone,
@@ -196,8 +197,8 @@ export function checkCancellationAllowed(
   lessonStart: string,
   cancellationHours: number,
   status: string,
-  now?: Date,
-  timezone: string = DEFAULT_TZ,
+  now: Date | undefined,
+  timezone: string,
 ): CancellationCheck {
   const start = fromZonedTime(`${lessonDate}T${lessonStart}:00`, timezone);
   const deadline = new Date(start.getTime() - cancellationHours * 60 * 60 * 1000);
@@ -228,9 +229,14 @@ export interface IcsParams {
   location: string;
   description: string;
   bookingId: number;
-  /** IANA timezone the date/time strings are expressed in. Defaults to
-   * Europe/Brussels. */
-  tz?: string;
+  /**
+   * IANA timezone the `date`/`startTime`/`endTime` strings are
+   * expressed in. The location's `timezone` column is the source of
+   * truth — pass it explicitly. We removed the Brussels fallback
+   * because it produced silently-wrong DTSTART for any non-Brussels
+   * pro (gaps.md §0).
+   */
+  tz: string;
 }
 
 /**
@@ -253,7 +259,7 @@ export function buildCancelIcs(params: IcsParams): string {
     location,
     description,
     bookingId,
-    tz = DEFAULT_TZ,
+    tz,
   } = params;
   const dtStart = toIcsUtc(date, startTime, tz);
   const dtEnd = toIcsUtc(date, endTime, tz);
@@ -292,7 +298,7 @@ export function buildIcs(params: IcsParams): string {
     location,
     description,
     bookingId,
-    tz = DEFAULT_TZ,
+    tz,
   } = params;
   const dtStart = toIcsUtc(date, startTime, tz);
   const dtEnd = toIcsUtc(date, endTime, tz);

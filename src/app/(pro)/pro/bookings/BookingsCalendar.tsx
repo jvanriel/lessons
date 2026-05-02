@@ -52,10 +52,10 @@ interface Props {
   /**
    * IANA timezone the calendar renders in — typically the pro's
    * `defaultTimezone`. Drives "today" highlighting and the Monday-
-   * start boundary of the week grid. Defaults to Europe/Brussels for
-   * safety if not passed.
+   * start boundary of the week grid. Required: any callsite must
+   * pass an explicit value resolved from a real location/profile.
    */
-  timezone?: string;
+  timezone: string;
 }
 
 // ─── Constants ──────────────────────────────────────
@@ -95,7 +95,7 @@ export function BookingsCalendar({
   bookings,
   availability,
   locale,
-  timezone = "Europe/Brussels",
+  timezone,
 }: Props) {
   const router = useRouter();
   const [weekStart, setWeekStart] = useState(() =>

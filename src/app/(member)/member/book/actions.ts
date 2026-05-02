@@ -1,6 +1,6 @@
 "use server";
 
-import { db } from "@/lib/db";
+import { db, isSlotConflictError } from "@/lib/db";
 import {
   proProfiles,
   proLocations,
@@ -104,6 +104,7 @@ export async function getProLocations(proProfileId: number) {
       name: locations.name,
       city: locations.city,
       address: locations.address,
+      timezone: locations.timezone,
       lessonDuration: proLocations.lessonDuration,
     })
     .from(proLocations)
@@ -522,24 +523,37 @@ export async function createBooking(formData: FormData) {
       ? "pending"
       : "paid";
 
-  const [booking] = await db
-    .insert(lessonBookings)
-    .values({
-      proProfileId,
-      bookedById: session.userId,
-      proLocationId,
-      date,
-      startTime,
-      endTime,
-      participantCount,
-      status: "confirmed",
-      notes,
-      manageToken,
-      priceCents,
-      platformFeeCents,
-      paymentStatus: initialPaymentStatus,
-    })
-    .returning({ id: lessonBookings.id });
+  // The DB-level partial unique index `lesson_bookings_slot_confirmed_idx`
+  // is the race-safe gate against two students grabbing the same slot
+  // between the `getAvailableSlots` snapshot above and this insert.
+  // Translate the duplicate-key error into the same friendly message
+  // the slot-staleness check returns.
+  let booking: { id: number };
+  try {
+    [booking] = await db
+      .insert(lessonBookings)
+      .values({
+        proProfileId,
+        bookedById: session.userId,
+        proLocationId,
+        date,
+        startTime,
+        endTime,
+        participantCount,
+        status: "confirmed",
+        notes,
+        manageToken,
+        priceCents,
+        platformFeeCents,
+        paymentStatus: initialPaymentStatus,
+      })
+      .returning({ id: lessonBookings.id });
+  } catch (err) {
+    if (isSlotConflictError(err)) {
+      return { error: t("bookErr.slotUnavailable", locale) };
+    }
+    throw err;
+  }
 
   await db.insert(lessonParticipants).values({
     bookingId: booking.id,
@@ -755,18 +769,30 @@ export async function createBooking(formData: FormData) {
     .limit(1);
   const studentLocale = resolveLocale(student?.preferredLocale);
 
-  // Fetch location name for the email + ics
+  // Fetch location name + tz for the email + ics. The `tz` is the
+  // location's IANA zone — every wall-clock time in the booking row
+  // is in that zone, so the ICS DTSTART/DTEND must convert via it.
+  // The booking we just inserted references this `proLocationId`, so
+  // the row must exist — we throw on the impossible-but-defensive
+  // missing case instead of silently falling back to Brussels (the
+  // prior fallback masked non-Brussels-pro bugs; gaps.md §0).
   const [loc] = await db
-    .select({ name: locations.name, city: locations.city })
+    .select({
+      name: locations.name,
+      city: locations.city,
+      timezone: locations.timezone,
+    })
     .from(proLocations)
     .innerJoin(locations, eq(proLocations.locationId, locations.id))
     .where(eq(proLocations.id, proLocationId))
     .limit(1);
-  const locationName = loc
-    ? loc.city
-      ? `${loc.name}, ${loc.city}`
-      : loc.name
-    : "";
+  if (!loc) {
+    throw new Error(
+      `createBooking: location lookup missing for proLocationId=${proLocationId} (booking ${booking.id})`,
+    );
+  }
+  const locationName = loc.city ? `${loc.name}, ${loc.city}` : loc.name;
+  const locationTz = loc.timezone;
 
   if (pro) {
     // Re-read paymentStatus — the PI flow above may have flipped it from
@@ -810,6 +836,7 @@ export async function createBooking(formData: FormData) {
       location: locationName,
       description: `Booked via golflessons.be — ${firstName} ${lastName}${notes ? ` — Notes: ${notes}` : ""}`,
       bookingId: booking.id,
+      tz: locationTz,
     });
     const icsAttachment = {
       filename: "lesson.ics",
@@ -1250,23 +1277,31 @@ export async function quickCreateBooking(data: {
     return { error: t("bookErr.slotUnavailable", locale) };
   }
 
-  // Create booking
+  // Create booking — same race-safe gate as `createBooking` above.
   const manageToken = crypto.randomBytes(32).toString("hex");
 
-  const [booking] = await db
-    .insert(lessonBookings)
-    .values({
-      proProfileId: data.proProfileId,
-      bookedById: session.userId,
-      proLocationId: data.proLocationId,
-      date: data.date,
-      startTime: data.startTime,
-      endTime: data.endTime,
-      participantCount: 1,
-      status: "confirmed",
-      manageToken,
-    })
-    .returning({ id: lessonBookings.id });
+  let booking: { id: number };
+  try {
+    [booking] = await db
+      .insert(lessonBookings)
+      .values({
+        proProfileId: data.proProfileId,
+        bookedById: session.userId,
+        proLocationId: data.proLocationId,
+        date: data.date,
+        startTime: data.startTime,
+        endTime: data.endTime,
+        participantCount: 1,
+        status: "confirmed",
+        manageToken,
+      })
+      .returning({ id: lessonBookings.id });
+  } catch (err) {
+    if (isSlotConflictError(err)) {
+      return { error: t("bookErr.slotUnavailable", locale) };
+    }
+    throw err;
+  }
 
   // Create participant
   await db.insert(lessonParticipants).values({
@@ -1296,16 +1331,22 @@ export async function quickCreateBooking(data: {
     .limit(1);
 
   const [loc] = await db
-    .select({ name: locations.name, city: locations.city })
+    .select({
+      name: locations.name,
+      city: locations.city,
+      timezone: locations.timezone,
+    })
     .from(proLocations)
     .innerJoin(locations, eq(proLocations.locationId, locations.id))
     .where(eq(proLocations.id, data.proLocationId))
     .limit(1);
-  const locationName = loc
-    ? loc.city
-      ? `${loc.name}, ${loc.city}`
-      : loc.name
-    : "";
+  if (!loc) {
+    throw new Error(
+      `quickCreateBooking: location lookup missing for proLocationId=${data.proLocationId} (booking ${booking.id})`,
+    );
+  }
+  const locationName = loc.city ? `${loc.name}, ${loc.city}` : loc.name;
+  const locationTz = loc.timezone;
 
   if (pro) {
     await createNotification({
@@ -1336,6 +1377,7 @@ export async function quickCreateBooking(data: {
       location: locationName,
       description: `Booked via golflessons.be — ${user.firstName} ${user.lastName}`,
       bookingId: booking.id,
+      tz: locationTz,
     });
     const icsAttachment = {
       filename: "lesson.ics",

@@ -272,7 +272,9 @@ async function getAvailableSlots(
     dayOverrides,
     bookings as ExistingBooking[],
     profile.bookingNotice,
-    duration
+    duration,
+    undefined,
+    "Europe/Brussels",
   );
 }
 

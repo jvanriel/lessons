@@ -82,7 +82,7 @@ async function main() {
   } else {
     const [inserted] = await db
       .insert(schema.locations)
-      .values({ name: "Test Golf Club", city: "Testville", country: "Belgium" })
+      .values({ name: "Test Golf Club", city: "Testville", country: "Belgium", timezone: "Europe/Brussels" })
       .returning({ id: schema.locations.id });
     locationId = inserted.id;
   }

@@ -18,6 +18,8 @@ import {
   getLessonReminderSubject,
 } from "@/lib/email-templates";
 import { buildIcs } from "@/lib/lesson-slots";
+import { fromZonedTime } from "date-fns-tz";
+import { addDaysToDateString } from "@/lib/local-date";
 
 /**
  * GET /api/cron/lesson-reminders
@@ -45,20 +47,24 @@ export async function GET(request: NextRequest) {
   }
 
   const now = new Date();
-  // Window: 23h to 25h from now. Calculated as an ISO date+time so we can
-  // compare against booking.date + booking.startTime stored as YYYY-MM-DD +
-  // HH:mm strings.
+  // Window: 23h to 25h from now (UTC instants). The 2h hourly-cron
+  // safety margin catches everything even if a single fire misses
+  // or runs slightly off-schedule.
   const winStart = new Date(now.getTime() + 23 * 60 * 60 * 1000);
   const winEnd = new Date(now.getTime() + 25 * 60 * 60 * 1000);
 
-  const winStartDate = winStart.toISOString().slice(0, 10);
-  const winEndDate = winEnd.toISOString().slice(0, 10);
-  const winStartTime = winStart.toISOString().slice(11, 16);
-  const winEndTime = winEnd.toISOString().slice(11, 16);
+  // Coarse SQL pre-filter on `lesson_bookings.date`. The column stores
+  // a wall-clock date in the LOCATION's timezone, so the UTC window
+  // can land on different calendar dates depending on the location's
+  // offset. Widen by ±1 day from the UTC date strings so any realistic
+  // TZ (UTC-12 to UTC+14) is fully covered; the per-booking JS filter
+  // below does the precise window check using each booking's location
+  // TZ. Joining `locations` here avoids an N+1 lookup later.
+  const winStartUtcDate = winStart.toISOString().slice(0, 10);
+  const winEndUtcDate = winEnd.toISOString().slice(0, 10);
+  const sqlWindowStart = addDaysToDateString(winStartUtcDate, -1);
+  const sqlWindowEnd = addDaysToDateString(winEndUtcDate, 1);
 
-  // Pull all confirmed bookings whose date is one of the two days the window
-  // touches. JavaScript-side filtering then narrows to the actual time window
-  // (avoids a complex SQL composite comparison on strings).
   const candidates = await db
     .select({
       id: lessonBookings.id,
@@ -68,18 +74,26 @@ export async function GET(request: NextRequest) {
       proProfileId: lessonBookings.proProfileId,
       proLocationId: lessonBookings.proLocationId,
       bookedById: lessonBookings.bookedById,
+      locationTz: locations.timezone,
     })
     .from(lessonBookings)
+    .innerJoin(proLocations, eq(lessonBookings.proLocationId, proLocations.id))
+    .innerJoin(locations, eq(proLocations.locationId, locations.id))
     .where(
       and(
         eq(lessonBookings.status, "confirmed"),
-        gte(lessonBookings.date, winStartDate),
-        lte(lessonBookings.date, winEndDate)
+        gte(lessonBookings.date, sqlWindowStart),
+        lte(lessonBookings.date, sqlWindowEnd)
       )
     );
 
+  // Resolve each candidate's lesson start in the LOCATION's TZ — not
+  // the server's. The previous version parsed `date+startTime` with a
+  // `Z` suffix (treating wall-clock as UTC) and fired Brussels
+  // reminders 1–2h early depending on DST; for any non-Brussels pro it
+  // was completely wrong. See gaps.md §0.
   const inWindow = candidates.filter((b) => {
-    const startsAt = new Date(`${b.date}T${b.startTime}:00.000Z`);
+    const startsAt = fromZonedTime(`${b.date}T${b.startTime}:00`, b.locationTz);
     return startsAt >= winStart && startsAt <= winEnd;
   });
 
@@ -164,7 +178,9 @@ export async function GET(request: NextRequest) {
 
     const studentLocale = resolveLocale(student.preferredLocale);
 
-    // Reuse the REQUEST ics — calendar apps will accept it as an update
+    // Reuse the PUBLISH ics — calendar apps will accept it as an update.
+    // `tz` is the location's timezone, already loaded with the candidate
+    // row (no extra query).
     const ics = buildIcs({
       date: booking.date,
       startTime: booking.startTime,
@@ -173,6 +189,7 @@ export async function GET(request: NextRequest) {
       location: locationName,
       description: `Reminder via golflessons.be`,
       bookingId: booking.id,
+      tz: booking.locationTz,
     });
     const icsAttachment = {
       filename: "lesson.ics",

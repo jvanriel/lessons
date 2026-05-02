@@ -132,6 +132,7 @@ async function main() {
         name: "Claude Test Club",
         city: "Testville",
         country: "Belgium",
+        timezone: "Europe/Brussels",
       })
       .returning({ id: schema.locations.id });
     locationId = inserted.id;
@@ -203,6 +204,7 @@ async function main() {
         name: "Royal Golf Club",
         city: "Brussels",
         country: "Belgium",
+        timezone: "Europe/Brussels",
       })
       .returning({ id: schema.locations.id });
     location2Id = inserted.id;

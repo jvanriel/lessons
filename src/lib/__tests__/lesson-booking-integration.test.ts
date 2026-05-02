@@ -99,7 +99,7 @@ beforeAll(async () => {
   // Create location
   const [loc] = await db
     .insert(locations)
-    .values({ name: `Test Club ${TEST_SUFFIX}`, city: "Testville", country: "Belgium" })
+    .values({ name: `Test Club ${TEST_SUFFIX}`, city: "Testville", country: "Belgium", timezone: "Europe/Brussels" })
     .returning({ id: locations.id });
   TEST_LOCATION_ID = loc.id;
 
@@ -190,7 +190,7 @@ async function getAvailableDatesFromDb(
     const dateStr = format(cursor, "yyyy-MM-dd");
     const dayOverrides = overrides.filter((o) => o.date === dateStr && (o.proLocationId === proLocationId || o.proLocationId === null));
     const dayBookings = bookings.filter((b) => b.date === dateStr);
-    const slots = computeAvailableSlots(dateStr, templates as AvailabilityTemplate[], dayOverrides as AvailabilityOverride[], dayBookings as ExistingBooking[], profile.bookingNotice, minDuration);
+    const slots = computeAvailableSlots(dateStr, templates as AvailabilityTemplate[], dayOverrides as AvailabilityOverride[], dayBookings as ExistingBooking[], profile.bookingNotice, minDuration, undefined, "Europe/Brussels");
     if (slots.length > 0) availableDates.push(dateStr);
     cursor = addDays(cursor, 1);
   }
@@ -214,7 +214,7 @@ async function getAvailableSlotsFromDb(proProfileId: number, proLocationId: numb
   ]);
 
   const dayOverrides = (overrides as AvailabilityOverride[]).filter((o) => o.proLocationId === proLocationId || o.proLocationId === null);
-  return computeAvailableSlots(date, templates as AvailabilityTemplate[], dayOverrides, bookings as ExistingBooking[], profile.bookingNotice, duration);
+  return computeAvailableSlots(date, templates as AvailabilityTemplate[], dayOverrides, bookings as ExistingBooking[], profile.bookingNotice, duration, undefined, "Europe/Brussels");
 }
 
 // ─── Tests: DB connectivity ──────────────────────────

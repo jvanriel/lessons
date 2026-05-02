@@ -21,6 +21,8 @@ import { resolveLocale } from "@/lib/i18n";
 import { getLocale } from "@/lib/locale";
 import { t } from "@/lib/i18n/translations";
 import { formatDate as formatDateLocale } from "@/lib/format-date";
+import { getProLocationTimezone } from "@/lib/pro";
+import { fromZonedTime } from "date-fns-tz";
 import {
   CANCEL_STRINGS,
   formatCancelLessonDate,
@@ -68,11 +70,20 @@ export async function cancelBooking(bookingId: number) {
     return { error: "Pro not found." };
   }
 
+  // Resolve everything time-related against the LOCATION's TZ, not the
+  // server's. On Vercel (UTC), parsing "10:00" as a naive local time
+  // shifted the comparison 1–2 h late depending on DST, so a Brussels
+  // lesson at 10:00 CEST stayed cancellable until 12:00 — past the
+  // actual lesson start. See gaps.md §0 (cancel-deadline TZ bug).
+  const tz = await getProLocationTimezone(booking.proLocationId);
+
   const check = checkCancellationAllowed(
     booking.date,
     booking.startTime,
     pro.cancellationHours,
-    booking.status
+    booking.status,
+    undefined,
+    tz,
   );
 
   // Refusing the cancel is narrower than the full cancellation-policy
@@ -80,7 +91,10 @@ export async function cancelBooking(bookingId: number) {
   // they just won't be refunded. We only block when the booking is no
   // longer confirmed (already cancelled/completed) or the lesson has
   // already started/ended.
-  const lessonStart = new Date(`${booking.date}T${booking.startTime}:00`);
+  const lessonStart = fromZonedTime(
+    `${booking.date}T${booking.startTime}:00`,
+    tz,
+  );
   if (booking.status !== "confirmed" || lessonStart.getTime() <= Date.now()) {
     const locale = await getLocale();
     return {
@@ -203,7 +217,9 @@ export async function cancelBooking(bookingId: number) {
       : loc.name
     : "";
 
-  // Build a CANCEL ics that removes the event from both calendars
+  // Build a CANCEL ics that removes the event from both calendars.
+  // Reuse the `tz` resolved at the top of this function — the
+  // location's TZ, same one the booking's wall-clock time is in.
   const cancelIcs = buildCancelIcs({
     date: booking.date,
     startTime: booking.startTime,
@@ -212,6 +228,7 @@ export async function cancelBooking(bookingId: number) {
     location: locationName,
     description: `Cancelled by ${studentName}`,
     bookingId: booking.id,
+    tz,
   });
   const icsAttachment = {
     filename: "lesson-cancelled.ics",
