@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { db } from "@/lib/db";
-import { users, proProfiles, lessonBookings, tasks } from "@/lib/db/schema";
+import { users, proProfiles, lessonBookings, tasks, feedback } from "@/lib/db/schema";
 import { eq, isNull, gte, and, ne } from "drizzle-orm";
 import { todayInTZ } from "@/lib/local-date";
 
@@ -13,12 +13,13 @@ export default async function AdminDashboard() {
   // the admin count is a coarse summary anyway. (gaps.md §0)
   const today = todayInTZ("Europe/Brussels");
 
-  const [totalUsers, memberCount, proCount, bookingCount, openTaskCount] = await Promise.all([
+  const [totalUsers, memberCount, proCount, bookingCount, openTaskCount, newFeedbackCount] = await Promise.all([
     db.select({ id: users.id }).from(users).where(isNull(users.deletedAt)).then((r) => r.length),
     db.select({ id: users.id }).from(users).where(and(isNull(users.deletedAt), eq(users.roles, "member"))).then((r) => r.length),
     db.select({ id: proProfiles.id }).from(proProfiles).where(and(eq(proProfiles.published, true), isNull(proProfiles.deletedAt))).then((r) => r.length),
     db.select({ id: lessonBookings.id }).from(lessonBookings).where(and(eq(lessonBookings.status, "confirmed"), gte(lessonBookings.date, today))).then((r) => r.length),
     db.select({ id: tasks.id }).from(tasks).where(ne(tasks.column, "done")).then((r) => r.length),
+    db.select({ id: feedback.id }).from(feedback).where(eq(feedback.status, "new")).then((r) => r.length),
   ]);
 
   const sections = [
@@ -27,7 +28,7 @@ export default async function AdminDashboard() {
     { href: "/admin/tasks", label: "Tasks", desc: "Kanban board", icon: "M9 12h3.75M9 15h3.75M9 18h3.75m3 .75H18a2.25 2.25 0 0 0 2.25-2.25V6.108c0-1.135-.845-2.098-1.976-2.192a48.424 48.424 0 0 0-1.123-.08m-5.801 0c-.065.21-.1.433-.1.664 0 .414.336.75.75.75h4.5a.75.75 0 0 0 .75-.75 2.25 2.25 0 0 0-.1-.664m-5.8 0A2.251 2.251 0 0 1 13.5 2.25H15a2.25 2.25 0 0 1 2.15 1.586m-5.8 0c-.376.023-.75.05-1.124.08C9.095 4.01 8.25 4.973 8.25 6.108V8.25m0 0H4.875c-.621 0-1.125.504-1.125 1.125v11.25c0 .621.504 1.125 1.125 1.125h9.75c.621 0 1.125-.504 1.125-1.125V9.375c0-.621-.504-1.125-1.125-1.125H8.25Z" },
     { href: "/admin/cms", label: "CMS", desc: "Content editor", icon: "m16.862 4.487 1.687-1.688a1.875 1.875 0 1 1 2.652 2.652L10.582 16.07a4.5 4.5 0 0 1-1.897 1.13L6 18l.8-2.685a4.5 4.5 0 0 1 1.13-1.897l8.932-8.931Zm0 0L19.5 7.125M18 14v4.75A2.25 2.25 0 0 1 15.75 21H5.25A2.25 2.25 0 0 1 3 18.75V8.25A2.25 2.25 0 0 1 5.25 6H10" },
     { href: "/admin/manual-refund", label: "Manual refund", desc: "Mark a booking refunded", icon: "M16 15v-1a4 4 0 0 0-4-4H8m0 0 4 4m-4-4 4-4m9 5a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z" },
-    { href: "/admin/feedback", label: "Feedback", desc: "User-submitted messages", icon: "M2.25 12.76c0 1.6 1.123 2.994 2.707 3.227 1.087.16 2.185.283 3.293.369V21l4.184-4.183a1.14 1.14 0 0 1 .778-.332 48.294 48.294 0 0 0 5.83-.498c1.585-.233 2.708-1.626 2.708-3.228V6.741c0-1.602-1.123-2.995-2.707-3.228A48.394 48.394 0 0 0 12 3c-2.392 0-4.744.175-7.043.513C3.373 3.746 2.25 5.14 2.25 6.741v6.018Z" },
+    { href: "/admin/feedback", label: "Feedback", desc: newFeedbackCount > 0 ? `${newFeedbackCount} new` : "User-submitted messages", icon: "M2.25 12.76c0 1.6 1.123 2.994 2.707 3.227 1.087.16 2.185.283 3.293.369V21l4.184-4.183a1.14 1.14 0 0 1 .778-.332 48.294 48.294 0 0 0 5.83-.498c1.585-.233 2.708-1.626 2.708-3.228V6.741c0-1.602-1.123-2.995-2.707-3.228A48.394 48.394 0 0 0 12 3c-2.392 0-4.744.175-7.043.513C3.373 3.746 2.25 5.14 2.25 6.741v6.018Z" },
   ];
 
   return (
@@ -37,7 +38,7 @@ export default async function AdminDashboard() {
       </h1>
 
       {/* Stats */}
-      <div className="mt-8 grid gap-3 sm:grid-cols-5">
+      <div className="mt-8 grid gap-3 sm:grid-cols-3 lg:grid-cols-6">
         <div className="rounded-xl border border-green-200 bg-white p-5">
           <p className="text-2xl font-bold text-green-900">{totalUsers}</p>
           <p className="text-sm text-green-500">Users</p>
@@ -58,6 +59,29 @@ export default async function AdminDashboard() {
           <p className="text-2xl font-bold text-green-900">{openTaskCount}</p>
           <p className="text-sm text-green-500">Open tasks</p>
         </div>
+        <Link
+          href="/admin/feedback?status=new"
+          className={`rounded-xl border p-5 transition-all ${
+            newFeedbackCount > 0
+              ? "border-amber-300 bg-amber-50 hover:border-amber-400"
+              : "border-green-200 bg-white hover:border-green-300"
+          }`}
+        >
+          <p
+            className={`text-2xl font-bold ${
+              newFeedbackCount > 0 ? "text-amber-700" : "text-green-900"
+            }`}
+          >
+            {newFeedbackCount}
+          </p>
+          <p
+            className={`text-sm ${
+              newFeedbackCount > 0 ? "text-amber-600" : "text-green-500"
+            }`}
+          >
+            New feedback
+          </p>
+        </Link>
       </div>
 
       {/* Quick links */}
