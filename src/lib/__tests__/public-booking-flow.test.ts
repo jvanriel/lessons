@@ -642,6 +642,37 @@ async function createBookingDirect(opts: {
 // ─── Setup & Cleanup ─────────────────────────────────
 
 beforeAll(async () => {
+  // Required preconditions. Fail loud here rather than midway through
+  // a phase: missing creds otherwise surfaces as a 401 from Gmail or
+  // an undefined-row crash buried under a noisy stack. Document what
+  // a CI runner needs to set:
+  //
+  //   - POSTGRES_URL_PREVIEW (or POSTGRES_URL) → preview Neon DB.
+  //   - DUMMY_PRO + DUMMY_STUDENT → seeded by
+  //     `scripts/seed-claude-dummies.ts`. Defaults work when the
+  //     dummies live at `dummy-{pro,student}-claude@golflessons.be`.
+  //   - GOOGLE_SERVICE_ACCOUNT_EMAIL + GOOGLE_SERVICE_ACCOUNT_PRIVATE_KEY
+  //     → Google Workspace SA with domain-wide delegation; needed to
+  //     read it.admin@ inbox via the Gmail API.
+  //
+  // No graceful skip: this suite is the one that exercises the live
+  // booking + email path end-to-end, so missing prereqs is always a
+  // setup bug worth surfacing.
+  const required = [
+    "GOOGLE_SERVICE_ACCOUNT_EMAIL",
+    "GOOGLE_SERVICE_ACCOUNT_PRIVATE_KEY",
+  ];
+  const missing = required.filter((k) => !process.env[k]);
+  if (!process.env.POSTGRES_URL_PREVIEW && !process.env.POSTGRES_URL) {
+    missing.push("POSTGRES_URL_PREVIEW");
+  }
+  if (missing.length > 0) {
+    throw new Error(
+      `public-booking-flow precondition: missing env vars [${missing.join(", ")}]. ` +
+        "See the comment block at the top of beforeAll() for setup details."
+    );
+  }
+
   // Verify pro account exists
   const [proUser] = await db
     .select({ id: users.id })

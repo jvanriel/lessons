@@ -57,15 +57,8 @@ error doesn't roll back the booking — the row persists with
 
 Shipped 2026-04-15 → 04-17. Items to verify before flipping the password gate:
 
-- **Production env vars not in `.env.example`.** The new flow needs four vars in Vercel `production` env:
-  - `NEXT_PUBLIC_RECAPTCHA_SITE_KEY` (client) and `RECAPTCHA_SECRET_KEY` (server) — Google reCAPTCHA v3
-  - `KV_REST_API_URL` and `KV_REST_API_TOKEN` — Upstash Redis (rate limiter backend)
-
-  Verify all four are set in Vercel (`vercel env ls --environment=production`). Without Upstash the rate limiter throws (does NOT fail open) and bookings break; without reCAPTCHA the verifier returns score 0 and bookings still go through (intentional graceful degrade). Add all four to `.env.example` so the next dev knows.
+- **Verify production env vars in Vercel.** The flow needs `NEXT_PUBLIC_RECAPTCHA_SITE_KEY` + `RECAPTCHA_SECRET_KEY` (Google reCAPTCHA v3) and `KV_REST_API_URL` + `KV_REST_API_TOKEN` (Upstash Redis, marketplace-injected). Already documented in `.env.example`. Verify all four are set in Vercel: `vercel env ls --environment=production`. Without Upstash the rate limiter throws (does NOT fail open) and bookings break; without reCAPTCHA the verifier returns score 0 and bookings still go through (intentional graceful degrade).
 - **No password validation surface on register-from-claim.** The post-claim register flow at `/register?email=…&pro=…` should enforce minimum strength on the password field. Verify the `/api/register` POST already validates (it should from earlier work) and that the wizard surfaces the error inline.
-- **Token enumeration on `/booked/t/[token]`.** Endpoint has no rate limit. Token entropy is high (32 bytes) so practical risk is low, but worth a per-IP soft cap once we see real traffic.
-- **Upstash failover not handled.** If KV is unreachable the rate limiter throws and the booking action fails. Acceptable given Upstash's SLA, but worth a Sentry alert on `tags.area = "rate-limit"` so we notice quickly.
-- **Test suite preconditions are implicit.** `src/lib/__tests__/public-booking-flow.test.ts` requires `DUMMY_PRO` and `DUMMY_STUDENT` env vars + a valid Gmail service account; failures are quiet if either is missing. Document in CI setup before wiring tests into a pipeline.
 
 ### Payment flow follow-ups
 
@@ -114,6 +107,9 @@ End-to-end timezone audit + the supporting infrastructure to keep the booking en
 - **`computeSuggestedDate` TZ-aware.** Quick Book suggestion now anchors to the same location TZ as the availability window; late-evening users no longer see a suggestion drift a day before windowStart and get silently stomped.
 - **`BookingsCalendar` period filtering.** Pro week view now filters availability by each slot's `validFrom`/`validUntil` window per rendered date, not just by `dayOfWeek`. Multi-period schedules (task 78) no longer paint a summer-only green band on winter weeks. 6 new RTL regression tests pin the boundary cases.
 - **`BookingsCalendar` dynamic hour range.** Replaced the hardcoded 07:00–21:00 grid with `computeHourRange(bookings, availability)` that defaults to 07–21 but expands to fit any booking or availability slot outside that band, clamped 0..24 with end-minute round-up so a 21:30 booking widens to 22. 7 new tests (6 unit + 1 render-level for a 22:00 booking on-grid).
+- **`/booked/t/[token]` per-IP rate limit.** New `bookedTokenLimiter` (30/min/IP) on the public booking confirmation page. Token entropy was already high (32 bytes), so this isn't anti-brute-force — it's an anti-scanner DB-query cap. Renders a friendly "slow down" page in EN/NL/FR when exceeded.
+- **Rate-limit Sentry alerting.** `limitByIp`/`limitByKey` now route Upstash failures through `Sentry.captureException(..., { tags: { area: "rate-limit" } })` before re-throwing. Wire a Sentry alert on `tags.area:"rate-limit"` to get paged on KV outages instead of finding out via failed bookings.
+- **`public-booking-flow` test preconditions.** `beforeAll` now fails loud with a named-vars error if `GOOGLE_SERVICE_ACCOUNT_*` or `POSTGRES_URL[_PREVIEW]` are missing, instead of crashing midway through Phase 1. Sets up CI wiring without needing a separate setup doc.
 - **PWA version detection.** `/sw.js` is now a Next.js route that bakes `BUILD_ID` into both file content and `CACHE_NAME` (per-deploy byte difference → reliable `updatefound`). `/api/version` is `force-dynamic`. `DeploymentChecker` cache-busts the fetch URL on top of `cache: "no-store"` to defeat iOS Safari quirks.
 - **About page + changelog.** New `/about` shows app version (semver from `package.json.version`, starting at v1.1.0), build ID, build time, branch + environment in non-prod, manual update-check button, and the rendered `docs/CHANGELOG.md`. Linked from sidebar + mobile More for every authenticated user.
 - **Migrations applied to preview + prod:**

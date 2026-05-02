@@ -12,6 +12,7 @@ import { and, eq, isNull } from "drizzle-orm";
 import { getLocale } from "@/lib/locale";
 import { t } from "@/lib/i18n/translations";
 import { formatDate as formatDateLocale } from "@/lib/format-date";
+import { bookedTokenLimiter, limitByIp } from "@/lib/rate-limit";
 
 interface Props {
   params: Promise<{ token: string }>;
@@ -38,6 +39,27 @@ export default async function BookingByTokenPage({
   if (!token || token.length !== 64) notFound();
 
   const locale = await getLocale();
+
+  // Per-IP soft cap on this page. Tokens are 32 bytes (effectively
+  // un-guessable) so brute-force is not the threat — we just don't
+  // want anyone scanning the URL space to burn DB queries. Anyone
+  // who genuinely visits this page hits it once or twice and is
+  // nowhere near the 30/min cap.
+  const limit = await limitByIp(bookedTokenLimiter);
+  if (!limit.ok) {
+    return (
+      <div className="min-h-screen bg-cream">
+        <section className="mx-auto max-w-md px-6 py-24 text-center">
+          <h1 className="font-display text-2xl font-semibold text-green-900">
+            {t("booked.rateLimited.title", locale)}
+          </h1>
+          <p className="mt-3 text-sm text-green-700">
+            {t("booked.rateLimited.body", locale)}
+          </p>
+        </section>
+      </div>
+    );
+  }
 
   const [row] = await db
     .select({
