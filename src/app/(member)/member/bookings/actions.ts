@@ -26,6 +26,13 @@ import {
   applyBookingEdit,
   sendBookingUpdatedNotifications,
 } from "@/lib/booking-edit";
+import {
+  decideEditPaymentAction,
+  applyEditPaymentAction,
+  paymentResultToEmailChange,
+} from "@/lib/booking-edit-payment";
+import { loadBookingPricing } from "@/lib/booking-charge";
+import type { EmailPaymentChange } from "@/lib/email-templates";
 import { lessonParticipants } from "@/lib/db/schema";
 import { isSlotConflictError } from "@/lib/db";
 import { after } from "next/server";
@@ -350,7 +357,8 @@ export async function updateBooking(formData: FormData) {
   if (participantError) return { error: participantError };
 
   // Load the booking + the booker's own lesson_participants row so we
-  // can preserve it across the participant-list rewrite.
+  // can preserve it across the participant-list rewrite. Pricing
+  // columns come along for the Phase 2 payment-delta decision.
   const [booking] = await db
     .select({
       id: lessonBookings.id,
@@ -363,6 +371,11 @@ export async function updateBooking(formData: FormData) {
       participantCount: lessonBookings.participantCount,
       status: lessonBookings.status,
       cancelledAt: lessonBookings.cancelledAt,
+      priceCents: lessonBookings.priceCents,
+      platformFeeCents: lessonBookings.platformFeeCents,
+      paymentStatus: lessonBookings.paymentStatus,
+      stripePaymentIntentId: lessonBookings.stripePaymentIntentId,
+      stripeInvoiceItemId: lessonBookings.stripeInvoiceItemId,
     })
     .from(lessonBookings)
     .where(
@@ -446,10 +459,52 @@ export async function updateBooking(formData: FormData) {
     throw err;
   }
 
+  // Phase 2: recompute pricing for the new (duration, participantCount)
+  // and decide whether to charge a delta, refund a delta, or swap the
+  // pending cash-only commission invoice item. The booking row's
+  // date/time/participant fields are already updated above; this step
+  // brings the financial fields in line. Failures here surface to
+  // Sentry under tags.area="edit-payment" and the booking row keeps
+  // the pre-edit price (admin reconciles).
+  const pricing = await loadBookingPricing(
+    booking.proProfileId,
+    changes.duration,
+    changes.participantCount,
+  );
+  let paymentChange: EmailPaymentChange | undefined;
+  if (pricing.ok) {
+    const action = decideEditPaymentAction(
+      {
+        priceCents: booking.priceCents,
+        platformFeeCents: booking.platformFeeCents,
+        paymentStatus: booking.paymentStatus,
+        stripePaymentIntentId: booking.stripePaymentIntentId,
+        stripeInvoiceItemId: booking.stripeInvoiceItemId,
+      },
+      {
+        priceCents: pricing.priceCents,
+        platformFeeCents: pricing.platformFeeCents,
+      },
+    );
+    const result = await applyEditPaymentAction(booking.id, action, {
+      proProfileId: booking.proProfileId,
+      afterPrice: pricing.priceCents,
+      afterCommission: pricing.platformFeeCents,
+      date: changes.date,
+      startTime: changes.startTime,
+      endTime: changes.endTime,
+    });
+    paymentChange = paymentResultToEmailChange(result);
+  } else {
+    // pricing.ok=false (pro changed config in a way that doesn't
+    // fit) — keep the booking edit but flag for manual reconcile.
+    paymentChange = { kind: "manual_review" };
+  }
+
   // Notification fanout runs post-response so the UI returns
   // immediately. Vercel keeps the function alive via `after()`.
   after(async () => {
-    await sendBookingUpdatedNotifications(booking.id);
+    await sendBookingUpdatedNotifications(booking.id, paymentChange);
   });
 
   revalidatePath("/member/bookings");

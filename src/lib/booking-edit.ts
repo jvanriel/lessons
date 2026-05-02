@@ -16,6 +16,7 @@ import {
   getBookingUpdatedSubject,
   buildParticipantBookingUpdatedEmail,
   getParticipantBookingUpdatedSubject,
+  type EmailPaymentChange,
 } from "@/lib/email-templates";
 import { resolveLocale } from "@/lib/i18n";
 import {
@@ -299,6 +300,12 @@ function durationMinutes(start: string, end: string): number {
  */
 export async function sendBookingUpdatedNotifications(
   bookingId: number,
+  /**
+   * Phase 2: payment delta result from `applyEditPaymentAction`.
+   * Only the booker's email renders this; pro + participant emails
+   * don't get the payment line. Undefined → "no payment change".
+   */
+  paymentChange?: EmailPaymentChange,
 ): Promise<void> {
   try {
     const data = await loadBookingForUpdate(bookingId);
@@ -367,6 +374,7 @@ export async function sendBookingUpdatedNotifications(
         duration,
         participantCount: data.participantCount,
         locale: bookerLocale,
+        paymentChange,
       }),
       attachments: [icsAttachment],
     }).catch((err) => {

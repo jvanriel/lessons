@@ -29,6 +29,13 @@ import {
   sendBookingUpdatedNotifications,
 } from "@/lib/booking-edit";
 import {
+  decideEditPaymentAction,
+  applyEditPaymentAction,
+  paymentResultToEmailChange,
+} from "@/lib/booking-edit-payment";
+import { loadBookingPricing } from "@/lib/booking-charge";
+import type { EmailPaymentChange } from "@/lib/email-templates";
+import {
   buildInviteEmail,
   getEmailStrings,
   buildStudentBookingConfirmationEmail,
@@ -1441,6 +1448,11 @@ export async function proUpdateBooking(formData: FormData) {
       participantCount: lessonBookings.participantCount,
       status: lessonBookings.status,
       cancelledAt: lessonBookings.cancelledAt,
+      priceCents: lessonBookings.priceCents,
+      platformFeeCents: lessonBookings.platformFeeCents,
+      paymentStatus: lessonBookings.paymentStatus,
+      stripePaymentIntentId: lessonBookings.stripePaymentIntentId,
+      stripeInvoiceItemId: lessonBookings.stripeInvoiceItemId,
     })
     .from(lessonBookings)
     .where(
@@ -1512,8 +1524,44 @@ export async function proUpdateBooking(formData: FormData) {
     throw err;
   }
 
+  // Phase 2 payment-delta: same logic as the member side, see
+  // updateBooking in (member)/member/bookings/actions.ts for the
+  // walkthrough. Failures Sentry-tagged "edit-payment".
+  const pricing = await loadBookingPricing(
+    booking.proProfileId,
+    changes.duration,
+    changes.participantCount,
+  );
+  let paymentChange: EmailPaymentChange | undefined;
+  if (pricing.ok) {
+    const action = decideEditPaymentAction(
+      {
+        priceCents: booking.priceCents,
+        platformFeeCents: booking.platformFeeCents,
+        paymentStatus: booking.paymentStatus,
+        stripePaymentIntentId: booking.stripePaymentIntentId,
+        stripeInvoiceItemId: booking.stripeInvoiceItemId,
+      },
+      {
+        priceCents: pricing.priceCents,
+        platformFeeCents: pricing.platformFeeCents,
+      },
+    );
+    const result = await applyEditPaymentAction(booking.id, action, {
+      proProfileId: booking.proProfileId,
+      afterPrice: pricing.priceCents,
+      afterCommission: pricing.platformFeeCents,
+      date: changes.date,
+      startTime: changes.startTime,
+      endTime: changes.endTime,
+    });
+    paymentChange = paymentResultToEmailChange(result);
+  } else {
+    paymentChange = { kind: "manual_review" };
+  }
+
   after(async () => {
-    await sendBookingUpdatedNotifications(booking.id);
+    await sendBookingUpdatedNotifications(booking.id, paymentChange);
   });
 
   revalidatePath("/pro/bookings");

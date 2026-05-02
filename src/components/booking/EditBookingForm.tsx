@@ -271,8 +271,9 @@ export default function EditBookingForm({
       )}
 
       <p className="text-xs text-green-600">
-        Phase 1: the original price is retained. Payment isn&apos;t adjusted
-        for changes in duration or participant count yet.
+        If the change affects the price (different duration or
+        participant count), we&apos;ll automatically charge or refund
+        the difference and email you a confirmation.
       </p>
 
       {error && (

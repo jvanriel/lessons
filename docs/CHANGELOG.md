@@ -17,6 +17,23 @@ If any role inside the brackets is unknown (typo), the parser falls
 back to treating the brackets as literal text — better to over-show
 than silently hide.
 
+## 2026-05-02 — v1.1.24
+
+- **Edit a booking and the payment is now adjusted automatically.**
+  When you change a booking's duration or the number of participants
+  in a way that changes the price, the system handles the difference:
+  - Online payments: the price increase is charged to your saved
+    card; a price decrease is refunded back. You'll see "we charged
+    €X" or "we refunded €X" in the update email.
+  - Cash-only pros: the platform commission line item on the next
+    monthly invoice is swapped for the new amount.
+  - If anything goes wrong, the email says "our team will reconcile
+    manually" — no surprise charges.
+- [admin,dev] If the original payment is in a partial state (failed,
+  3DS pending, refunded), price changes get flagged for manual review
+  in Sentry under `tags.area = "edit-payment"` instead of trying to
+  auto-adjust.
+
 ## 2026-05-02 — v1.1.23
 
 - [admin,dev] **Booking-edit: tests + a real fix to the slot-conflict

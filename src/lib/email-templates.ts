@@ -1081,7 +1081,11 @@ const BOOKING_UPDATED_STRINGS: Record<Locale, {
   durationUnit: string;
   participants: string;
   cta: string;
-  helper: string;
+  helperNoChange: string;
+  helperCharged: (amount: string) => string;
+  helperRefunded: (amount: string) => string;
+  helperManualReview: string;
+  helperCommissionChanged: (amount: string) => string;
   // Participant-side variants (booker re-invited an extra participant
   // when the lesson was rescheduled).
   participantSubject: (proName: string, bookerName: string) => string;
@@ -1102,8 +1106,16 @@ const BOOKING_UPDATED_STRINGS: Record<Locale, {
     durationUnit: "minutes",
     participants: "Participants",
     cta: "View my bookings",
-    helper:
-      "The original price is retained — no payment adjustment was made for this change.",
+    helperNoChange:
+      "No payment change — the price is the same as the original booking.",
+    helperCharged: (amount) =>
+      `We charged ${amount} to your saved payment method to cover the price increase.`,
+    helperRefunded: (amount) =>
+      `We refunded ${amount} to your card for the price decrease.`,
+    helperManualReview:
+      "The price changed on this booking. Our team will reconcile the payment manually and follow up.",
+    helperCommissionChanged: (amount) =>
+      `Updated commission: ${amount}. The change appears on your next monthly invoice.`,
     participantSubject: (pro, booker) =>
       `Updated: your golf lesson with ${pro} (booked by ${booker})`,
     participantBody: (booker, pro) =>
@@ -1125,8 +1137,16 @@ const BOOKING_UPDATED_STRINGS: Record<Locale, {
     durationUnit: "minuten",
     participants: "Deelnemers",
     cta: "Mijn boekingen bekijken",
-    helper:
-      "De oorspronkelijke prijs blijft behouden — er is geen betalingsaanpassing gedaan voor deze wijziging.",
+    helperNoChange:
+      "Geen betalingswijziging — de prijs blijft hetzelfde als bij de oorspronkelijke boeking.",
+    helperCharged: (amount) =>
+      `We hebben ${amount} afgeschreven van je opgeslagen betaalmiddel voor de prijsverhoging.`,
+    helperRefunded: (amount) =>
+      `We hebben ${amount} teruggestort op je kaart voor de prijsverlaging.`,
+    helperManualReview:
+      "De prijs van deze boeking is gewijzigd. Ons team verwerkt de betaling handmatig en neemt contact op.",
+    helperCommissionChanged: (amount) =>
+      `Bijgewerkte commissie: ${amount}. De wijziging verschijnt op je volgende maandfactuur.`,
     participantSubject: (pro, booker) =>
       `Bijgewerkt: je golfles bij ${pro} (geboekt door ${booker})`,
     participantBody: (booker, pro) =>
@@ -1148,8 +1168,16 @@ const BOOKING_UPDATED_STRINGS: Record<Locale, {
     durationUnit: "minutes",
     participants: "Participants",
     cta: "Voir mes réservations",
-    helper:
-      "Le prix d'origine est conservé — aucun ajustement de paiement n'a été effectué pour ce changement.",
+    helperNoChange:
+      "Pas de changement de paiement — le prix reste identique à la réservation initiale.",
+    helperCharged: (amount) =>
+      `Nous avons prélevé ${amount} sur votre moyen de paiement enregistré pour couvrir l'augmentation.`,
+    helperRefunded: (amount) =>
+      `Nous avons remboursé ${amount} sur votre carte pour la baisse de prix.`,
+    helperManualReview:
+      "Le prix de cette réservation a changé. Notre équipe procédera à l'ajustement manuellement et reviendra vers vous.",
+    helperCommissionChanged: (amount) =>
+      `Nouvelle commission : ${amount}. Le changement apparaîtra sur votre prochaine facture mensuelle.`,
     participantSubject: (pro, booker) =>
       `Mise à jour : votre cours de golf avec ${pro} (réservé par ${booker})`,
     participantBody: (booker, pro) =>
@@ -1158,6 +1186,41 @@ const BOOKING_UPDATED_STRINGS: Record<Locale, {
       `Si le nouvel horaire ne vous convient pas, prévenez ${booker} — seule la personne qui a réservé peut modifier ou annuler.`,
   },
 };
+
+/**
+ * Concrete payment-change summary the email template renders. Mirrors
+ * the `EditPaymentResult` shape from `booking-edit-payment.ts` but is
+ * intentionally a plain interface so the email module doesn't pull in
+ * the Stripe SDK or DB layer.
+ */
+export type EmailPaymentChange =
+  | { kind: "noop" }
+  | { kind: "charge"; amountCents: number }
+  | { kind: "refund"; amountCents: number }
+  | { kind: "swap_invoice_item"; commissionCents: number }
+  | { kind: "manual_review" };
+
+function formatEur(cents: number, locale: Locale): string {
+  return new Intl.NumberFormat(
+    locale === "en" ? "en-GB" : locale === "nl" ? "nl-BE" : "fr-BE",
+    { style: "currency", currency: "EUR", minimumFractionDigits: 2 },
+  ).format(cents / 100);
+}
+
+function paymentHelperFor(
+  s: (typeof BOOKING_UPDATED_STRINGS)[Locale],
+  change: EmailPaymentChange | undefined,
+  locale: Locale,
+): string {
+  if (!change || change.kind === "noop") return s.helperNoChange;
+  if (change.kind === "charge")
+    return s.helperCharged(formatEur(change.amountCents, locale));
+  if (change.kind === "refund")
+    return s.helperRefunded(formatEur(change.amountCents, locale));
+  if (change.kind === "swap_invoice_item")
+    return s.helperCommissionChanged(formatEur(change.commissionCents, locale));
+  return s.helperManualReview;
+}
 
 export function buildBookingUpdatedEmail(opts: {
   recipientFirstName: string;
@@ -1171,6 +1234,12 @@ export function buildBookingUpdatedEmail(opts: {
   duration: number;
   participantCount: number;
   locale: Locale;
+  /**
+   * What the payment-delta executor did. Only the booker email needs
+   * this; pro + participant variants don't render it. Undefined →
+   * treated as a no-op (Phase 1-style "no payment change" line).
+   */
+  paymentChange?: EmailPaymentChange;
 }): string {
   const s = BOOKING_UPDATED_STRINGS[opts.locale] ?? BOOKING_UPDATED_STRINGS.en;
   const rows: Array<DetailRow> = [[s.pro, opts.proName]];
@@ -1186,6 +1255,7 @@ export function buildBookingUpdatedEmail(opts: {
   if (opts.participantCount > 1) {
     rows.push([s.participants, String(opts.participantCount)]);
   }
+  const helperLine = paymentHelperFor(s, opts.paymentChange, opts.locale);
   const body = `
     <h2 style="font-family:Georgia,'Times New Roman',serif;font-size:22px;color:${COLORS.green950};margin:0 0 16px 0;font-weight:normal;">
       ${formatGreeting(s.greeting, opts.recipientFirstName, opts.locale)}
@@ -1197,7 +1267,7 @@ export function buildBookingUpdatedEmail(opts: {
         ${s.cta}
       </a>
     </p>
-    <p style="color:#666;font-size:13px;margin:0;">${s.helper}</p>
+    <p style="color:#666;font-size:13px;margin:0;">${helperLine}</p>
   `;
   return emailLayout(body, undefined, opts.locale);
 }
