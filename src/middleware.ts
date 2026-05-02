@@ -131,6 +131,11 @@ export async function middleware(request: NextRequest) {
 
 export const config = {
   matcher: [
-    "/((?!site-access|login|register|forgot-password|reset-password|api|_next|favicon\\.ico|.*\\.(?:png|jpg|jpeg|gif|svg|webp|ico|woff2?|ttf)).*)",
+    // `sw.js` and `manifest.webmanifest` are intentionally excluded:
+    // both are fetched by the browser at PWA install / launch time
+    // *before* the user has any chance to enter the site password,
+    // and a redirect-to-/site-access on either kills the install
+    // (the SW response wouldn't be JS, the manifest wouldn't be JSON).
+    "/((?!site-access|login|register|forgot-password|reset-password|api|_next|sw\\.js|manifest\\.webmanifest|favicon\\.ico|.*\\.(?:png|jpg|jpeg|gif|svg|webp|ico|woff2?|ttf)).*)",
   ],
 };

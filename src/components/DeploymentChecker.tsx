@@ -22,7 +22,13 @@ export default function DeploymentChecker() {
 
   const check = useCallback(async () => {
     try {
-      const res = await fetch("/api/version", { cache: "no-store" });
+      // Cache-bust the URL on top of `cache: "no-store"`. Mobile
+      // Safari (and therefore every iOS PWA) sometimes ignores the
+      // `no-store` request hint after a process resume — the unique
+      // query string forces a real network round-trip every time.
+      const res = await fetch(`/api/version?t=${Date.now()}`, {
+        cache: "no-store",
+      });
       if (!res.ok) return;
       const data = await res.json();
       if (data.buildId && data.buildId !== BUILD_ID) {
