@@ -43,19 +43,16 @@ The platform CMS (`cms_blocks`) has per-locale rows but is operated by the platf
 shipped sweep below for the slot-uniqueness + cron route handler
 integration tests.)
 
-### `db.transaction()` wrapping
+### `db.transaction()` wrapping — driver swapped, transactions not yet applied
 
-Multi-step inserts (booking + participant + relationship) can leave
-partial state on failure. **Blocked**: the current
-`drizzle-orm/neon-http` driver doesn't support multi-statement
-transactions. Move to `neon-serverless` (WebSocket) or `pg` first,
-then re-introduce. Initial attempt in commit `ea60e63` broke the
-booking flow (Nadine's task #12) and was reverted in `b95dc35`. The
-proper fix is a driver migration — see Open Questions #4. **Note**:
-the partial unique index on slot uniqueness shipped 2026-05-02 is the
-deployable mitigation that doesn't need the driver swap; the rest of
-the row consistency (participant + pro_students upsert) still benefits
-from a real transaction.
+The `drizzle-orm/neon-http` driver was swapped to
+`drizzle-orm/neon-serverless` (WebSocket) on 2026-05-02 (v1.1.6),
+which unblocks `db.transaction()`. The actual transaction wrapping
+of multi-step inserts (booking + participant + pro_students upsert)
+is a separate follow-up — done deliberately in its own commit so the
+driver swap can be rolled back independently if needed. The slot-
+uniqueness partial index (shipped earlier) already gates the most
+damaging race; transactions add atomicity for the surrounding rows.
 
 ### Public booking flow — production readiness
 

@@ -1,5 +1,6 @@
-import { neon } from "@neondatabase/serverless";
-import { drizzle } from "drizzle-orm/neon-http";
+import { Pool, neonConfig } from "@neondatabase/serverless";
+import { drizzle } from "drizzle-orm/neon-serverless";
+import ws from "ws";
 import * as schema from "./schema";
 
 // Production uses POSTGRES_URL. Preview deployments require POSTGRES_URL_PREVIEW
@@ -19,8 +20,31 @@ if (vercelEnv === "production") {
   databaseUrl = process.env.POSTGRES_URL_PREVIEW || process.env.POSTGRES_URL || "";
   if (!databaseUrl) throw new Error("No database URL configured. Set POSTGRES_URL_PREVIEW or POSTGRES_URL in .env.local");
 }
-const sql = neon(databaseUrl);
-export const db = drizzle(sql, { schema });
+
+// We use the WebSocket-pooled `neon-serverless` driver instead of the
+// stateless `neon-http` one. The HTTP driver was the original choice
+// (default in Vercel + Neon getting-started docs, lowest cold-start)
+// but it doesn't support multi-statement transactions, which blocked
+// `db.transaction()` for booking + participant + relationship inserts
+// (gaps.md). Swapped 2026-05-02 alongside the audit work.
+//
+// Node runtime needs an explicit WebSocket constructor; Vercel Edge
+// has the global `WebSocket` and doesn't need this line. We have no
+// `runtime: "edge"` routes today; revisit if that changes.
+if (typeof WebSocket === "undefined") {
+  neonConfig.webSocketConstructor = ws;
+}
+
+// `max: 5` allows a handful of in-flight queries within a single
+// function invocation without serializing on one socket — important
+// for `Promise.all([db.select(...), db.select(...)])` patterns that
+// pre-fetch multiple unrelated rows. Connections are short-lived and
+// closed when the function instance shuts down; on Vercel Fluid
+// Compute, the pool persists across requests on a warm instance,
+// which is the desired behaviour (avoids re-establishing the WS on
+// every request).
+const pool = new Pool({ connectionString: databaseUrl, max: 5 });
+export const db = drizzle(pool, { schema });
 
 /**
  * True when `err` is the Postgres `unique_violation` (23505) raised

@@ -261,7 +261,7 @@ describe("lesson-reminders cron — window math + per-booking TZ", () => {
   it("picks a Brussels booking whose start is exactly 24h ahead", async () => {
     // now = 2026-05-04 09:00 UTC. Booking = 2026-05-05 11:00 Brussels
     // CEST = 09:00 UTC = +24h ahead → IN window.
-    vi.useFakeTimers();
+    vi.useFakeTimers({ toFake: ["Date"] });
     vi.setSystemTime(new Date("2026-05-04T09:00:00Z"));
 
     const bookingId = await insertBooking({
@@ -288,7 +288,7 @@ describe("lesson-reminders cron — window math + per-booking TZ", () => {
     // Use a different booking date so we don't collide with other tests.
     // now = 2026-06-01 09:00 UTC. Booking 2026-06-02 09:00 Brussels CEST
     // = 07:00 UTC = +22h ahead → BEFORE window.
-    vi.useFakeTimers();
+    vi.useFakeTimers({ toFake: ["Date"] });
     vi.setSystemTime(new Date("2026-06-01T09:00:00Z"));
 
     await insertBooking({
@@ -308,7 +308,7 @@ describe("lesson-reminders cron — window math + per-booking TZ", () => {
   it("skips a booking 26h ahead (after window)", async () => {
     // now = 2026-07-01 09:00 UTC. Booking 2026-07-02 13:00 Brussels CEST
     // = 11:00 UTC = +26h ahead → AFTER window.
-    vi.useFakeTimers();
+    vi.useFakeTimers({ toFake: ["Date"] });
     vi.setSystemTime(new Date("2026-07-01T09:00:00Z"));
 
     await insertBooking({
@@ -339,7 +339,7 @@ describe("lesson-reminders cron — window math + per-booking TZ", () => {
     //
     // Pre-fix the cron skipped this booking (false negative). Post-fix
     // it fires the reminder.
-    vi.useFakeTimers();
+    vi.useFakeTimers({ toFake: ["Date"] });
     vi.setSystemTime(new Date("2026-08-01T06:00:00Z"));
 
     const bookingId = await insertBooking({
@@ -361,7 +361,7 @@ describe("lesson-reminders cron — idempotency", () => {
   it("a second run for the same booking reports skipped + does not re-send", async () => {
     // Use a fresh date so the slot-uniqueness index doesn't collide
     // with the other window-math tests.
-    vi.useFakeTimers();
+    vi.useFakeTimers({ toFake: ["Date"] });
     vi.setSystemTime(new Date("2026-09-01T09:00:00Z"));
 
     const bookingId = await insertBooking({
@@ -394,7 +394,7 @@ describe("lesson-reminders cron — idempotency", () => {
 
 describe("lesson-reminders cron — empty result", () => {
   it("returns the no-bookings reason when the window is empty", async () => {
-    vi.useFakeTimers();
+    vi.useFakeTimers({ toFake: ["Date"] });
     // Pin to a year with no test bookings inserted.
     vi.setSystemTime(new Date("2030-01-01T00:00:00Z"));
 
