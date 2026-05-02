@@ -61,6 +61,12 @@ export default async function ProBookingsPage() {
         startTime: proAvailability.startTime,
         endTime: proAvailability.endTime,
         proLocationId: proAvailability.proLocationId,
+        // Multi-period schedules (task 78) gate templates by date
+        // range; the calendar must respect them or pros with a
+        // summer/winter split see the wrong green band on weeks the
+        // current period doesn't cover.
+        validFrom: proAvailability.validFrom,
+        validUntil: proAvailability.validUntil,
       })
       .from(proAvailability)
       .where(eq(proAvailability.proProfileId, profile.id))

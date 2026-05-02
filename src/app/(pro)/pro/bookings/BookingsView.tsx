@@ -35,6 +35,10 @@ interface AvailabilitySlot {
   startTime: string;
   endTime: string;
   proLocationId: number;
+  /** YYYY-MM-DD or null. When set, slot only applies on/after this date. */
+  validFrom: string | null;
+  /** YYYY-MM-DD or null. When set, slot only applies on/before this date. */
+  validUntil: string | null;
 }
 
 function BookingsList({
