@@ -17,6 +17,18 @@ If any role inside the brackets is unknown (typo), the parser falls
 back to treating the brackets as literal text — better to over-show
 than silently hide.
 
+## 2026-05-02 — v1.1.19
+
+- **About page now actually shows the changelog in production.**
+  The CHANGELOG.md file was being excluded from the production
+  deploy bundle (alongside the rest of `docs/`), so /about's
+  parser silently fell back to an empty list. Re-included the
+  one file we need at runtime.
+- **Each tagged item now shows a small role badge** (e.g.
+  "ADMIN" or "PRO") next to it, so you can see at a glance who
+  else can read which entry. Untagged items (visible to everyone)
+  show no badge.
+
 ## 2026-05-02 — v1.1.18
 
 - [admin,dev] **Nightly backup now covers the full schema.** Four

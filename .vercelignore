@@ -1,7 +1,10 @@
-docs/
-# `scripts/*` (not `scripts/`) lets us re-include a single file below.
+# `docs/*` (not `docs/`) lets us re-include a single file below.
 # gitignore-style rules refuse to re-include a file whose parent dir
-# was excluded.
+# was excluded — same trick as `scripts/*` below.
+docs/*
+# CHANGELOG.md is read at runtime by /about (parsed + role-filtered).
+!docs/CHANGELOG.md
+# `scripts/*` (not `scripts/`) lets us re-include a single file below.
 scripts/*
 # db-migrate runs as the first step of `pnpm build` — must ship to Vercel.
 !scripts/db-migrate.ts
