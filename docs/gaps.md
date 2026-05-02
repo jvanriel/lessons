@@ -143,15 +143,17 @@ that compare booking dates against `todayLocal()` (server TZ).
 
 **High:**
 
-- **`quickCreateBooking` bypasses pricing, payment status, and
-  platform fee.** `src/app/(member)/member/book/actions.ts:1253-1269`
-  inserts a booking with no `priceCents`, no `platformFeeCents`, no
-  `paymentStatus`, and never fires a PaymentIntent or commission
-  invoice item. The pro email then hard-codes `paymentStatus: "manual"`
-  (line 1393), so a pro with `allowBookingWithoutPayment=false` thinks
-  they got paid in cash even though no charge happened. Mirror the
-  full path from `createBooking`, or reject Quick Book for online-only
-  pros.
+- ~~**`quickCreateBooking` bypasses pricing, payment status, and
+  platform fee.**~~ Fixed (2026-05-02): extracted the pricing /
+  charge / commission logic into `src/lib/booking-charge.ts` and
+  routed both `createBooking` and `quickCreateBooking` through it.
+  Quick Book now persists `priceCents` / `platformFeeCents` /
+  `paymentStatus`, fires the off-session PaymentIntent for online
+  pros, claims the cash commission via invoice item for cash-only
+  pros, and the pro email shows the actual current payment status
+  instead of the hardcoded "manual" placeholder. 10 unit tests cover
+  `decideBookingPricing` (online/cash-only/comp/group-rate/missing
+  row) so the shared decision rules are pinned.
 - **`BookingsCalendar` ignores schedule-period validity windows.**
   `src/app/(pro)/pro/bookings/BookingsCalendar.tsx:128-136` groups
   availability by `dayOfWeek` only, so multi-period schedules (task 78)

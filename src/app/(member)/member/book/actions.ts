@@ -2,6 +2,11 @@
 
 import { db, isSlotConflictError } from "@/lib/db";
 import {
+  loadBookingPricing,
+  runOffSessionCharge,
+  claimCashCommission,
+} from "@/lib/booking-charge";
+import {
   proProfiles,
   proLocations,
   locations,
@@ -25,8 +30,7 @@ import {
 import { redirect } from "next/navigation";
 import { after } from "next/server";
 import crypto from "node:crypto";
-import { getStripe, calculatePlatformFee } from "@/lib/stripe";
-import * as Sentry from "@sentry/nextjs";
+import { getStripe } from "@/lib/stripe";
 import { sendEmail } from "@/lib/mail";
 import {
   buildStudentBookingConfirmationEmail,
@@ -45,7 +49,6 @@ import {
 import { getProLocationTimezone } from "@/lib/pro";
 import { updateBookingPreferences } from "@/lib/booking-preferences";
 import { excludeDummiesOnProduction } from "@/lib/pro-visibility";
-import { computeBookingPriceCents } from "@/lib/pricing";
 
 /**
  * Read the UI locale from the cookie (set by the language switcher), not
@@ -454,74 +457,21 @@ export async function createBooking(formData: FormData) {
     return { error: t("bookErr.slotUnavailable", locale) };
   }
 
-  // Compute the lesson price from the pro's per-duration pricing table.
-  // Price is stored as EUR cents keyed by duration-in-minutes as a string.
-  const [priceRow] = await db
-    .select({
-      lessonPricing: proProfiles.lessonPricing,
-      extraStudentPricing: proProfiles.extraStudentPricing,
-      allowBookingWithoutPayment: proProfiles.allowBookingWithoutPayment,
-      subscriptionStatus: proProfiles.subscriptionStatus,
-    })
-    .from(proProfiles)
-    .where(eq(proProfiles.id, proProfileId))
-    .limit(1);
-  // Group-rate aware: base + extra * (count - 1). Falls back to base
-  // for every extra student when the pro hasn't configured a group
-  // rate (preserves pre-task-76 behaviour).
-  const computedPriceCents = computeBookingPriceCents({
-    lessonPricing: priceRow?.lessonPricing as Record<string, number> | null,
-    extraStudentPricing: priceRow?.extraStudentPricing as
-      | Record<string, number>
-      | null,
-    duration,
-    participantCount,
-  });
-
-  // Cash-only pros: `allowBookingWithoutPayment=true` means the pro settles
-  // with the student offline (cash at the course, bank transfer, whatever).
-  // The platform never touches the lesson money, but we still claim our
-  // commission — see the invoice-item logic below that bills it to the pro
-  // via their existing Stripe subscription.
-  const cashOnly = priceRow?.allowBookingWithoutPayment === true;
-
-  // If the pro charges online but we couldn't compute a price, bail out.
-  if (computedPriceCents === null && !cashOnly) {
-    return { error: t("bookErr.noPriceForDuration", locale) };
+  // Pricing + payment-status resolution — shared with `quickCreateBooking`
+  // via `loadBookingPricing` so both paths apply the same rules
+  // (group-rate, cash-only routing, comp accounts, online-pro-needs-price
+  // bailout). See `src/lib/booking-charge.ts`.
+  const pricing = await loadBookingPricing(proProfileId, duration, participantCount);
+  if (!pricing.ok) {
+    return { error: t(`bookErr.${pricing.errorKey}`, locale) };
   }
-
-  const priceCents = computedPriceCents;
-  // "comp" pros (team / founder accounts) get a full waiver — no
-  // subscription fee, no booking commission. Skip the fee calculation
-  // entirely so the cash-commission invoice block doesn't fire and the
-  // online-payment flow records `platformFeeCents = null`.
-  const isComp = priceRow?.subscriptionStatus === "comp";
-  // Commission is recorded on every priced booking — online or cash-only.
-  // For online bookings we deduct it from the paid lesson amount; for
-  // cash-only bookings we bill it separately to the pro via an invoice
-  // item further down.
-  const platformFeeCents =
-    priceCents !== null && !isComp
-      ? calculatePlatformFee(priceCents, { online: !cashOnly })
-      : null;
+  const { priceCents, platformFeeCents, paymentStatus: initialPaymentStatus, cashOnly } = pricing;
 
   // NOTE: would ideally be wrapped in db.transaction() for atomicity, but
   // the @neondatabase/serverless HTTP driver does not support multi-statement
   // transactions. Revisit when we move to the WebSocket / pg driver.
   // See docs/gaps.md "data integrity" item.
   const manageToken = crypto.randomBytes(32).toString("hex");
-
-  // paymentStatus semantics:
-  //  - "manual"  → cash-only pro, platform never touches the money
-  //  - "pending" → online charge in flight, will flip to "paid" via the
-  //                PaymentIntent response or webhook reconciliation
-  //  - "paid"    → free / zero-price bookings (no price configured,
-  //                no cash-only flag — rare, backstop path)
-  const initialPaymentStatus = cashOnly
-    ? "manual"
-    : priceCents !== null
-      ? "pending"
-      : "paid";
 
   // The DB-level partial unique index `lesson_bookings_slot_confirmed_idx`
   // is the race-safe gate against two students grabbing the same slot
@@ -583,166 +533,33 @@ export async function createBooking(formData: FormData) {
     });
   }
 
-  // Charge the student's saved payment method off-session. Skip entirely
-  // for cash-only pros — the booking row already reflects paymentStatus=
-  // "manual" and the platform never touches the money. The row otherwise
-  // starts as "pending" and this flips it to "paid" on success (plus the
-  // webhook reconciles as belt-and-suspenders) or leaves it as "failed"
-  // so the student can retry from /member/bookings.
+  // Charge the student's saved payment method off-session, or claim
+  // our commission via an invoice item if the pro is cash-only. See
+  // `src/lib/booking-charge.ts` — same helpers used by Quick Book so
+  // both paths fail/succeed in the same way.
   if (!cashOnly && priceCents !== null) {
-    try {
-      // Look up the stripe customer + default payment method
-      const [booker] = await db
-        .select({ stripeCustomerId: users.stripeCustomerId })
-        .from(users)
-        .where(eq(users.id, session.userId))
-        .limit(1);
-      if (!booker?.stripeCustomerId) {
-        throw new Error("Student has no Stripe customer on file");
-      }
-      const stripe = getStripe();
-      const methods = await stripe.paymentMethods.list({
-        customer: booker.stripeCustomerId,
-        limit: 1,
-      });
-      const pm = methods.data[0];
-      if (!pm) {
-        throw new Error("Student has no saved payment method");
-      }
-
-      const intent = await stripe.paymentIntents.create(
-        {
-          amount: priceCents,
-          currency: "eur",
-          customer: booker.stripeCustomerId,
-          payment_method: pm.id,
-          off_session: true,
-          confirm: true,
-          description: `Lesson ${date} ${startTime}–${endTime}`,
-          metadata: {
-            bookingId: String(booking.id),
-            proProfileId: String(proProfileId),
-            userId: String(session.userId),
-          },
-        },
-        { idempotencyKey: `booking-${booking.id}-v1` }
-      );
-
-      if (intent.status === "succeeded") {
-        await db
-          .update(lessonBookings)
-          .set({
-            paymentStatus: "paid",
-            stripePaymentIntentId: intent.id,
-            paidAt: new Date(),
-            updatedAt: new Date(),
-          })
-          .where(eq(lessonBookings.id, booking.id));
-      } else if (intent.status === "requires_action") {
-        // 3D Secure / SCA — mark as requires-action; the UI can redirect
-        // the user to the client_secret flow to complete it. For v1 we
-        // leave the booking pending and tell the student to retry.
-        await db
-          .update(lessonBookings)
-          .set({
-            paymentStatus: "requires_action",
-            stripePaymentIntentId: intent.id,
-            updatedAt: new Date(),
-          })
-          .where(eq(lessonBookings.id, booking.id));
-      } else {
-        // Created but not yet confirmed — unusual but leave it pending.
-        await db
-          .update(lessonBookings)
-          .set({
-            stripePaymentIntentId: intent.id,
-            updatedAt: new Date(),
-          })
-          .where(eq(lessonBookings.id, booking.id));
-      }
-    } catch (err) {
-      // Card declined, network error, no PM on file, etc. Keep the booking
-      // row but flag it as failed so the student can retry + see the error.
-      const message =
-        err instanceof Error ? err.message : "Payment failed";
-      console.error("PaymentIntent failed for booking", booking.id, message);
-      Sentry.captureException(err, {
-        tags: { area: "booking-payment" },
-        extra: { bookingId: booking.id, priceCents, userId: session.userId },
-      });
-      await db
-        .update(lessonBookings)
-        .set({
-          paymentStatus: "failed",
-          updatedAt: new Date(),
-        })
-        .where(eq(lessonBookings.id, booking.id));
-      // Don't rollback the booking — user will see it in "failed" state
-      // and can retry from /member/bookings.
-    }
-  }
-
-  // Cash-only commission claim: for cash-only pros with a priced booking,
-  // add a one-off invoice item to the pro's existing Stripe customer so
-  // our commission rolls into their next subscription invoice automatically.
-  // Failure is logged to Sentry and swallowed — the booking still goes
-  // through and the commission can be reconciled manually from /admin.
-  if (cashOnly && priceCents !== null && platformFeeCents !== null && platformFeeCents > 0) {
-    try {
-      const [proUser] = await db
-        .select({
-          stripeCustomerId: users.stripeCustomerId,
-          displayName: proProfiles.displayName,
-        })
-        .from(proProfiles)
-        .innerJoin(users, eq(users.id, proProfiles.userId))
-        .where(eq(proProfiles.id, proProfileId))
-        .limit(1);
-
-      if (!proUser?.stripeCustomerId) {
-        throw new Error(
-          `Cash-only pro ${proProfileId} has no stripeCustomerId — cannot bill commission`
-        );
-      }
-
-      const stripe = getStripe();
-      const item = await stripe.invoiceItems.create(
-        {
-          customer: proUser.stripeCustomerId,
-          amount: platformFeeCents,
-          currency: "eur",
-          description: `Commission — booking #${booking.id} (${date} ${startTime})`,
-          metadata: {
-            bookingId: String(booking.id),
-            type: "cash_commission",
-          },
-        },
-        { idempotencyKey: `commission-${booking.id}-v1` }
-      );
-
-      await db
-        .update(lessonBookings)
-        .set({
-          stripeInvoiceItemId: item.id,
-          updatedAt: new Date(),
-        })
-        .where(eq(lessonBookings.id, booking.id));
-    } catch (err) {
-      console.error(
-        "Commission invoice item failed for cash-only booking",
-        booking.id,
-        err
-      );
-      Sentry.captureException(err, {
-        tags: { area: "cash-commission" },
-        extra: {
-          bookingId: booking.id,
-          proProfileId,
-          platformFeeCents,
-        },
-      });
-      // Swallow: booking still succeeds, commission needs manual reconciliation.
-    }
+    await runOffSessionCharge({
+      bookingId: booking.id,
+      userId: session.userId,
+      proProfileId,
+      priceCents,
+      date,
+      startTime,
+      endTime,
+    });
+  } else if (
+    cashOnly &&
+    priceCents !== null &&
+    platformFeeCents !== null &&
+    platformFeeCents > 0
+  ) {
+    await claimCashCommission({
+      bookingId: booking.id,
+      proProfileId,
+      platformFeeCents,
+      date,
+      startTime,
+    });
   }
 
   // Fetch the pro (with user details) for the notification + email
@@ -1277,6 +1094,19 @@ export async function quickCreateBooking(data: {
     return { error: t("bookErr.slotUnavailable", locale) };
   }
 
+  // Pricing + payment-status resolution — shared with `createBooking`
+  // via `loadBookingPricing` so Quick Book applies the same rules
+  // (group-rate, cash-only routing, comp accounts, online-pro-needs-price
+  // bailout). Before this, Quick Book inserted a booking with no price /
+  // no PaymentIntent / hardcoded "manual" pro-email — so an online-pay
+  // pro received "Cash on the day" while we never charged the student
+  // (gaps.md §0 High: Quick Book pricing bypass).
+  const pricing = await loadBookingPricing(data.proProfileId, data.duration, 1);
+  if (!pricing.ok) {
+    return { error: t(`bookErr.${pricing.errorKey}`, locale) };
+  }
+  const { priceCents, platformFeeCents, paymentStatus: initialPaymentStatus, cashOnly } = pricing;
+
   // Create booking — same race-safe gate as `createBooking` above.
   const manageToken = crypto.randomBytes(32).toString("hex");
 
@@ -1294,6 +1124,9 @@ export async function quickCreateBooking(data: {
         participantCount: 1,
         status: "confirmed",
         manageToken,
+        priceCents,
+        platformFeeCents,
+        paymentStatus: initialPaymentStatus,
       })
       .returning({ id: lessonBookings.id });
   } catch (err) {
@@ -1312,6 +1145,34 @@ export async function quickCreateBooking(data: {
     phone: user.phone,
   });
 
+  // Charge online or claim cash commission — same shared helpers as
+  // `createBooking`. Errors are Sentry-captured + the booking row
+  // surfaces the result (paymentStatus = "paid" / "failed" / etc).
+  if (!cashOnly && priceCents !== null) {
+    await runOffSessionCharge({
+      bookingId: booking.id,
+      userId: session.userId,
+      proProfileId: data.proProfileId,
+      priceCents,
+      date: data.date,
+      startTime: data.startTime,
+      endTime: data.endTime,
+    });
+  } else if (
+    cashOnly &&
+    priceCents !== null &&
+    platformFeeCents !== null &&
+    platformFeeCents > 0
+  ) {
+    await claimCashCommission({
+      bookingId: booking.id,
+      proProfileId: data.proProfileId,
+      platformFeeCents,
+      date: data.date,
+      startTime: data.startTime,
+    });
+  }
+
   // Notify the pro + email both parties (mirrors `createBooking` —
   // task 67: Quick Book used to be silent, no confirmation mail).
   const [pro] = await db
@@ -1319,8 +1180,6 @@ export async function quickCreateBooking(data: {
       userId: proProfiles.userId,
       displayName: proProfiles.displayName,
       contactPhone: proProfiles.contactPhone,
-      lessonPricing: proProfiles.lessonPricing,
-      allowBookingWithoutPayment: proProfiles.allowBookingWithoutPayment,
       proFirstName: users.firstName,
       proEmail: users.email,
       proLocale: users.preferredLocale,
@@ -1349,25 +1208,41 @@ export async function quickCreateBooking(data: {
   const locationTz = loc.timezone;
 
   if (pro) {
+    // Re-read paymentStatus — `runOffSessionCharge` above may have
+    // flipped it from "pending" to "paid" / "failed" / "requires_action"
+    // since the initial insert. Used by both the in-app notification
+    // and the pro email so the pro sees the actual payment state, not
+    // the placeholder. (Pre-fix this was hardcoded "manual", which
+    // told online-pay pros they got cash even when we charged the
+    // student — gaps.md §0 High: Quick Book pricing bypass.)
+    const [latestBooking] = await db
+      .select({ paymentStatus: lessonBookings.paymentStatus })
+      .from(lessonBookings)
+      .where(eq(lessonBookings.id, booking.id))
+      .limit(1);
+    const currentPaymentStatus =
+      latestBooking?.paymentStatus ?? initialPaymentStatus;
+
+    const PAYMENT_HINT: Record<string, string> = {
+      paid: " — Prepaid",
+      manual: " — Cash on the day",
+      failed: " — Online payment failed, please follow up",
+      requires_action: " — Payment incomplete (3DS pending)",
+    };
+    const hint = PAYMENT_HINT[currentPaymentStatus] ?? "";
+
     await createNotification({
       type: "new_booking",
       priority: "high",
       targetUserId: pro.userId,
       title: "New lesson booking",
-      message: `${user.firstName} ${user.lastName} booked a lesson on ${data.date} at ${data.startTime}.`,
+      message: `${user.firstName} ${user.lastName} booked a lesson on ${data.date} at ${data.startTime}.${hint}`,
       actionUrl: "/pro/bookings",
       actionLabel: "View bookings",
     });
 
     const studentLocale = resolveLocale(user.preferredLocale);
     const proLocale = resolveLocale(pro.proLocale);
-    const perLessonCents = (
-      pro.lessonPricing as Record<string, number> | null
-    )?.[String(data.duration)];
-    const priceCents =
-      typeof perLessonCents === "number" && perLessonCents > 0
-        ? perLessonCents
-        : null;
 
     const ics = buildIcs({
       date: data.date,
@@ -1402,7 +1277,7 @@ export async function quickCreateBooking(data: {
             endTime: data.endTime,
             duration: data.duration,
             priceCents,
-            cashOnly: !!pro.allowBookingWithoutPayment,
+            cashOnly,
             locale: studentLocale,
           }),
           attachments: [icsAttachment],
@@ -1431,8 +1306,7 @@ export async function quickCreateBooking(data: {
             participantCount: 1,
             notes: null,
             locale: proLocale,
-            // Quick Book is pay-later; no PI is run synchronously.
-            paymentStatus: "manual",
+            paymentStatus: currentPaymentStatus,
           }),
           attachments: [icsAttachment],
         });
