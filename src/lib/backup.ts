@@ -18,6 +18,7 @@ export interface BackupData {
     locations: Record<string, unknown>[];
     proLocations: Record<string, unknown>[];
     proAvailability: Record<string, unknown>[];
+    proSchedulePeriods: Record<string, unknown>[];
     proAvailabilityOverrides: Record<string, unknown>[];
     lessonBookings: Record<string, unknown>[];
     lessonParticipants: Record<string, unknown>[];
@@ -25,11 +26,14 @@ export interface BackupData {
     proStudents: Record<string, unknown>[];
     proMailingContacts: Record<string, unknown>[];
     proMailings: Record<string, unknown>[];
+    feedback: Record<string, unknown>[];
     tasks: Record<string, unknown>[];
     taskNotes: Record<string, unknown>[];
     comments: Record<string, unknown>[];
     commentReactions: Record<string, unknown>[];
+    events: Record<string, unknown>[];
     stripeEvents: Record<string, unknown>[];
+    webauthnCredentials: Record<string, unknown>[];
   };
 }
 
@@ -80,6 +84,7 @@ export async function createBackup(): Promise<BackupMeta> {
     locations,
     proLocations,
     proAvailability,
+    proSchedulePeriods,
     proAvailabilityOverrides,
     lessonBookings,
     lessonParticipants,
@@ -87,11 +92,14 @@ export async function createBackup(): Promise<BackupMeta> {
     proStudents,
     proMailingContacts,
     proMailings,
+    feedback,
     tasks,
     taskNotes,
     comments,
     commentReactions,
+    events,
     stripeEvents,
+    webauthnCredentials,
   ] = await Promise.all([
     sql`SELECT * FROM users ORDER BY id`,
     sql`SELECT * FROM user_emails ORDER BY id`,
@@ -104,6 +112,7 @@ export async function createBackup(): Promise<BackupMeta> {
     sql`SELECT * FROM locations ORDER BY id`,
     sql`SELECT * FROM pro_locations ORDER BY id`,
     sql`SELECT * FROM pro_availability ORDER BY id`,
+    sql`SELECT * FROM pro_schedule_periods ORDER BY id`,
     sql`SELECT * FROM pro_availability_overrides ORDER BY id`,
     sql`SELECT * FROM lesson_bookings ORDER BY id`,
     sql`SELECT * FROM lesson_participants ORDER BY id`,
@@ -111,11 +120,14 @@ export async function createBackup(): Promise<BackupMeta> {
     sql`SELECT * FROM pro_students ORDER BY id`,
     sql`SELECT * FROM pro_mailing_contacts ORDER BY id`,
     sql`SELECT * FROM pro_mailings ORDER BY id`,
+    sql`SELECT * FROM feedback ORDER BY id`,
     sql`SELECT * FROM tasks ORDER BY id`,
     sql`SELECT * FROM task_notes ORDER BY id`,
     sql`SELECT * FROM comments ORDER BY id`,
     sql`SELECT * FROM comment_reactions ORDER BY id`,
+    sql`SELECT * FROM events ORDER BY id`,
     sql`SELECT * FROM stripe_events ORDER BY id`,
+    sql`SELECT * FROM webauthn_credentials ORDER BY id`,
   ]);
 
   const now = new Date();
@@ -134,6 +146,7 @@ export async function createBackup(): Promise<BackupMeta> {
       locations,
       proLocations,
       proAvailability,
+      proSchedulePeriods,
       proAvailabilityOverrides,
       lessonBookings,
       lessonParticipants,
@@ -141,11 +154,14 @@ export async function createBackup(): Promise<BackupMeta> {
       proStudents,
       proMailingContacts,
       proMailings,
+      feedback,
       tasks,
       taskNotes,
       comments,
       commentReactions,
+      events,
       stripeEvents,
+      webauthnCredentials,
     },
   };
 
@@ -190,11 +206,17 @@ export async function listBackups(): Promise<BackupMeta[]> {
 // Delete order: children first (top of this list).
 // Insert order: reverse (parents first).
 const TABLE_DEFS = [
+  // Audit/log tables — children of users only, no children of their own.
+  { name: "events", key: "events", seq: "events_id_seq" },
   { name: "stripe_events", key: "stripeEvents", seq: "stripe_events_id_seq" },
+  { name: "webauthn_credentials", key: "webauthnCredentials", seq: "webauthn_credentials_id_seq" },
+  // Existing per-row child tables.
   { name: "comment_reactions", key: "commentReactions", seq: "comment_reactions_id_seq" },
   { name: "comments", key: "comments", seq: "comments_id_seq" },
   { name: "task_notes", key: "taskNotes", seq: "task_notes_id_seq" },
   { name: "tasks", key: "tasks", seq: "tasks_id_seq" },
+  // Feedback references users only — slot above the user/proProfiles parents.
+  { name: "feedback", key: "feedback", seq: "feedback_id_seq" },
   { name: "pro_mailings", key: "proMailings", seq: "pro_mailings_id_seq" },
   { name: "pro_mailing_contacts", key: "proMailingContacts", seq: "pro_mailing_contacts_id_seq" },
   { name: "pro_students", key: "proStudents", seq: "pro_students_id_seq" },
@@ -202,6 +224,8 @@ const TABLE_DEFS = [
   { name: "lesson_participants", key: "lessonParticipants", seq: "lesson_participants_id_seq" },
   { name: "lesson_bookings", key: "lessonBookings", seq: "lesson_bookings_id_seq" },
   { name: "pro_availability_overrides", key: "proAvailabilityOverrides", seq: "pro_availability_overrides_id_seq" },
+  // proSchedulePeriods FK → proProfiles, sits with the other pro_* leaves.
+  { name: "pro_schedule_periods", key: "proSchedulePeriods", seq: "pro_schedule_periods_id_seq" },
   { name: "pro_availability", key: "proAvailability", seq: "pro_availability_id_seq" },
   { name: "pro_locations", key: "proLocations", seq: "pro_locations_id_seq" },
   { name: "locations", key: "locations", seq: "locations_id_seq" },
@@ -227,6 +251,7 @@ const JSONB_COLUMNS = new Set([
   "checklist",
   "attachments",
   "payload",
+  "transports",
 ]);
 
 export async function restoreFromBackup(

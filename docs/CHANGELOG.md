@@ -17,6 +17,15 @@ If any role inside the brackets is unknown (typo), the parser falls
 back to treating the brackets as literal text — better to over-show
 than silently hide.
 
+## 2026-05-02 — v1.1.18
+
+- [admin,dev] **Nightly backup now covers the full schema.** Four
+  tables were missing from the backup payload (`feedback`,
+  `pro_schedule_periods`, `events`, `webauthn_credentials`). They
+  now save and restore alongside everything else, with the right
+  FK ordering and JSONB casts. Pre-fix `events` (~1.7k rows of
+  audit data on preview) would have been lost on every restore.
+
 ## 2026-05-02 — v1.1.17
 
 - **Dashboard now reachable from the App menu and the brand link.**
