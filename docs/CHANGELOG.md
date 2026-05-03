@@ -17,6 +17,15 @@ If any role inside the brackets is unknown (typo), the parser falls
 back to treating the brackets as literal text — better to over-show
 than silently hide.
 
+## 2026-05-03 — v1.1.26
+
+- **QR login now works on Android, not just iPhone.** Previously the
+  QR code on the dashboard encoded a long signed token directly in
+  the URL — fine for the iPhone camera, but most Android cameras
+  couldn't resolve the dense QR. The QR now encodes a short opaque
+  id (8 chars) that the server resolves on scan, so the QR is small
+  and crisp and reads on any default phone camera.
+
 ## 2026-05-02 — v1.1.25
 
 - **Edit booking: remove a specific participant.** Previously

@@ -49,6 +49,7 @@ const TABLES = [
   "events",
   "stripe_events",
   "webauthn_credentials",
+  "qr_login_tokens",
 ] as const;
 
 const KEY_MAP: Record<string, string> = {
@@ -79,6 +80,7 @@ const KEY_MAP: Record<string, string> = {
   events: "events",
   stripe_events: "stripeEvents",
   webauthn_credentials: "webauthnCredentials",
+  qr_login_tokens: "qrLoginTokens",
 };
 
 type Counts = Record<string, number>;

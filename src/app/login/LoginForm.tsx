@@ -144,9 +144,24 @@ function QRScanButton({ locale }: { locale: Locale }) {
         const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
         const code = jsQR(imageData.data, imageData.width, imageData.height);
 
-        if (code && code.data.includes("/api/auth/qr-login")) {
-          stopCamera();
-          window.location.href = code.data;
+        if (code) {
+          // Accept both the new short-id format (`/q/<id>`) and the
+          // legacy JWT-in-query format (`/api/auth/qr-login?token=…`)
+          // so a QR generated just before the v1.1.26 deploy still
+          // works for the remainder of its 5-min TTL.
+          let path = "";
+          try {
+            path = new URL(code.data).pathname;
+          } catch {
+            // Not a URL — ignore.
+          }
+          if (
+            path === "/api/auth/qr-login" ||
+            /^\/q\/[A-Za-z0-9]{4,16}$/.test(path)
+          ) {
+            stopCamera();
+            window.location.href = code.data;
+          }
         }
       }, 250);
     } catch {
