@@ -17,6 +17,20 @@ If any role inside the brackets is unknown (typo), the parser falls
 back to treating the brackets as literal text — better to over-show
 than silently hide.
 
+## 2026-05-04 — v1.1.35
+
+- **"Send test notification" no longer fails when notifications look
+  active.** The toggle was reading the browser's subscription state,
+  but the test send was checking the server's database — and the two
+  could drift out of sync if the user enabled notifications outside
+  the usual flow. The browser subscription is now re-registered
+  with the server on every page load, so the two stay aligned and
+  the test button works without needing to toggle off and on.
+- **Notification error messages are now localized.** Errors from
+  the test-send endpoint used to leak through as English ("No push
+  subscription found. Enable notifications first.") regardless of
+  the user's language. They now appear in NL / FR too.
+
 ## 2026-05-04 — v1.1.34
 
 - **No more duplicate "verify your email" email after registering

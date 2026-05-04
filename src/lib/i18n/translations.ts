@@ -1391,6 +1391,9 @@ const translations: Record<Locale, Record<string, string>> = {
     "notifications.testSending": "Sending...",
     "notifications.testSent": "Sent to {n} device(s). If you don't see a banner, your browser may hide it while this tab is focused — check the bell icon or your OS notification centre.",
     "notifications.testFailed": "Failed ({status})",
+    "notifications.err.noPushSubscription": "No push subscription found. Try turning notifications off and back on.",
+    "notifications.err.vapidNotConfigured": "Notifications aren't configured on the server. Please contact support.",
+    "notifications.err.pushSendFailed": "Couldn't send the test notification. Please try again.",
 
     "proBilling.contactHeading": "Questions about billing?",
     "proBilling.contactBody": "Get in touch — we're happy to help.",
@@ -2849,6 +2852,9 @@ const translations: Record<Locale, Record<string, string>> = {
     "notifications.testSending": "Verzenden...",
     "notifications.testSent": "Verstuurd naar {n} toestel(len). Zie je geen meldingsbalk? Je browser onderdrukt die soms als deze tab open staat — check de bel rechtsboven of je OS-notificatiecentrum.",
     "notifications.testFailed": "Mislukt ({status})",
+    "notifications.err.noPushSubscription": "Geen push-abonnement gevonden. Probeer de meldingen even uit en weer aan te zetten.",
+    "notifications.err.vapidNotConfigured": "Meldingen zijn niet geconfigureerd op de server. Neem contact op met support.",
+    "notifications.err.pushSendFailed": "Kon de testmelding niet versturen. Probeer het opnieuw.",
 
     "proBilling.contactHeading": "Vragen over je facturatie?",
     "proBilling.contactBody": "Neem contact op — we helpen je graag verder.",
@@ -4307,6 +4313,9 @@ const translations: Record<Locale, Record<string, string>> = {
     "notifications.testSending": "Envoi...",
     "notifications.testSent": "Envoyé à {n} appareil(s). Pas de bannière visible ? Votre navigateur peut la masquer quand cet onglet est actif — vérifiez l'icône cloche en haut à droite ou le centre de notifications de votre OS.",
     "notifications.testFailed": "Échec ({status})",
+    "notifications.err.noPushSubscription": "Aucun abonnement push trouvé. Essayez de désactiver puis réactiver les notifications.",
+    "notifications.err.vapidNotConfigured": "Les notifications ne sont pas configurées sur le serveur. Contactez le support.",
+    "notifications.err.pushSendFailed": "Impossible d'envoyer la notification test. Réessayez.",
 
     "proBilling.contactHeading": "Des questions sur la facturation ?",
     "proBilling.contactBody": "Contactez-nous — nous sommes là pour vous aider.",
