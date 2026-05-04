@@ -17,6 +17,14 @@ If any role inside the brackets is unknown (typo), the parser falls
 back to treating the brackets as literal text — better to over-show
 than silently hide.
 
+## 2026-05-04 — v1.1.32
+
+- **NL: registration wizard now uses "Boek direct" everywhere.**
+  Three onboarding strings still said "Quick Book" while the rest
+  of the Dutch UI uses "Boek direct" (the dashboard widget, the
+  profile, the help text). Updated for consistency. EN and FR keep
+  the English brand name throughout — no change there.
+
 ## 2026-05-04 — v1.1.31
 
 - **Clearer "add payment method" message on the dashboard.** When a
