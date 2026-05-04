@@ -12,6 +12,7 @@ import {
 import { PLATFORM_FEE_PERCENT, STRIPE_SURCHARGE_PERCENT } from "@/lib/stripe";
 import { isProSignupOpen } from "@/lib/feature-flags";
 import ProCta from "./ProCta";
+import Link from "next/link";
 
 export const metadata = {
   title: "For Pros — Golf Lessons",
@@ -179,9 +180,9 @@ export default async function ForProsPage() {
       <section className="border-t border-green-100 bg-cream py-20">
         <div className="mx-auto max-w-3xl px-6 text-center">
           <CmsBlock page={PAGE} block="cta.title" content={cms["cta.title"]} fallback={t("pros.cta.title", locale)} as="h2" className="font-display text-3xl font-semibold text-green-900" />
-          <ProCta signupOpen={signupOpen} locale={locale} className="mt-8 inline-block rounded-md bg-gold-600 px-8 py-3 text-sm font-medium text-white transition-colors hover:bg-gold-500">
+          <Link href="/contact" className="mt-8 inline-block rounded-md bg-gold-600 px-8 py-3 text-sm font-medium text-white transition-colors hover:bg-gold-500">
             <CmsBlock page={PAGE} block="cta.button" content={cms["cta.button"]} fallback={t("pros.cta.button", locale)} />
-          </ProCta>
+          </Link>
         </div>
       </section>
     </div>
