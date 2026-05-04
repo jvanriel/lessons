@@ -17,6 +17,20 @@ If any role inside the brackets is unknown (typo), the parser falls
 back to treating the brackets as literal text — better to over-show
 than silently hide.
 
+## 2026-05-04 — v1.1.31
+
+- **Clearer "add payment method" message on the dashboard.** When a
+  pro requires online payment and you haven't added a payment method
+  yet, the Quick Book widget now names that pro explicitly — e.g.
+  *"Olivier requires online payment for bookings. Add a payment
+  method to use Quick Book here."* — instead of the generic prompt
+  that read like the platform required it.
+- **"Boek les" / "Book a lesson" button on My Bookings now opens
+  the pro list.** Previously it sent you back to the dashboard,
+  which didn't immediately put you in a booking flow. It now goes
+  straight to /pros where you can pick a pro and start the booking
+  wizard.
+
 ## 2026-05-04 — v1.1.30
 
 - **Required-field marker on extra-participant names.** First name
