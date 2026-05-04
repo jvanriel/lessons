@@ -2740,6 +2740,7 @@ const translations: Record<Locale, Record<string, string>> = {
 
     "nav.forStudents": "Info Leerlingen",
     "nav.forPros": "Info Pro's",
+    "nav.browsePros": "Onze Pro's",
     "students.badge": "Gratis aanmelden",
     "students.hero.title": "Je Persoonlijke Golfcoach, Altijd Binnen Bereik",
     "students.hero.subtitle": "Meld je gratis aan en krijg toegang tot gecertificeerde golfprofessionals. Boek lessen, ontvang persoonlijke feedback en volg je vooruitgang — alles op één plek.",
@@ -4210,6 +4211,7 @@ const translations: Record<Locale, Record<string, string>> = {
 
     "nav.forStudents": "Info Élèves",
     "nav.forPros": "Info Pros",
+    "nav.browsePros": "Nos Pros",
     "students.badge": "Inscription gratuite",
     "students.hero.title": "Votre Coach de Golf Personnel, Toujours à Portée",
     "students.hero.subtitle": "Inscrivez-vous gratuitement et accédez à des professionnels de golf certifiés. Réservez des cours, recevez des retours personnalisés et suivez vos progrès — tout en un seul endroit.",
