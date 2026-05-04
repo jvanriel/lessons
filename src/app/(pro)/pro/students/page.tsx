@@ -89,15 +89,7 @@ export default async function ProStudentsPage() {
         locale={locale}
       />
       <div className="mx-auto max-w-5xl px-6 pb-12">
-        <GuestList
-          guests={guests}
-          locale={locale}
-          inviteHref={(g) =>
-            `/pro/students?invite=${encodeURIComponent(g.email)}` +
-            `&firstName=${encodeURIComponent(g.firstName)}` +
-            `&lastName=${encodeURIComponent(g.lastName)}`
-          }
-        />
+        <GuestList guests={guests} locale={locale} />
       </div>
     </>
   );

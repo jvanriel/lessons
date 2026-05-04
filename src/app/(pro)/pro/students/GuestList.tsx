@@ -18,8 +18,21 @@ export interface Guest {
 interface Props {
   guests: Guest[];
   locale: Locale;
-  /** Pre-filled invite link → /pro/students with the invite dialog opened. */
-  inviteHref: (g: Guest) => string;
+}
+
+/**
+ * Build the pre-filled-invite URL inline (vs. accepting a function
+ * prop from the parent). Functions can't cross the server→client
+ * boundary in App Router unless they're explicitly server actions
+ * — passing one breaks the page render with a hard error. (Sentry
+ * SENTRY-ORANGE-ZEBRA-1R, v1.1.37 regression.)
+ */
+function buildInviteHref(g: Guest): string {
+  return (
+    `/pro/students?invite=${encodeURIComponent(g.email)}` +
+    `&firstName=${encodeURIComponent(g.firstName)}` +
+    `&lastName=${encodeURIComponent(g.lastName)}`
+  );
 }
 
 /**
@@ -29,7 +42,7 @@ interface Props {
  * upgrade a guest to a real student via the existing invite dialog.
  * (Task 87, Option A.)
  */
-export default function GuestList({ guests, locale, inviteHref }: Props) {
+export default function GuestList({ guests, locale }: Props) {
   const [open, setOpen] = useState(false);
 
   if (guests.length === 0) return null;
@@ -100,7 +113,7 @@ export default function GuestList({ guests, locale, inviteHref }: Props) {
                   </p>
                 </div>
                 <a
-                  href={inviteHref(g)}
+                  href={buildInviteHref(g)}
                   className="shrink-0 rounded-md border border-green-300 bg-white px-3 py-1.5 text-xs font-medium text-green-700 hover:bg-green-50"
                 >
                   {t("proGuests.invite", locale)}
