@@ -157,10 +157,14 @@ export async function sendEmail({
       .replace(/\//g, "_")
       .replace(/=+$/, "");
 
-    // Send with one short retry for transient network errors. Socket hang ups
-    // on the Gmail API are rare but real (SENTRY-ORANGE-ZEBRA-F) — usually
-    // the TCP connection is dropped before Google receives the request, so
-    // a retry is safe and succeeds.
+    // Send with up to three retries for transient network errors. Socket
+    // hang ups on the Gmail API are rare but real — and on 2026-05-04
+    // (SENTRY-ORANGE-ZEBRA-1S) BOTH attempts of the previous 2-attempt
+    // retry hung up back-to-back within ~400ms, leaving the user
+    // (Christophe Verreyt #27) without a verification mail. The longer
+    // backoffs below give Google's load balancer time to route us off a
+    // bad edge node before we give up.
+    const RETRY_BACKOFFS_MS = [400, 1500, 4000];
     let res;
     let attempt = 0;
     while (true) {
@@ -171,9 +175,11 @@ export async function sendEmail({
         });
         break;
       } catch (err) {
+        if (attempt >= RETRY_BACKOFFS_MS.length || !isTransientEmailError(err)) {
+          throw err;
+        }
+        const wait = RETRY_BACKOFFS_MS[attempt];
         attempt++;
-        if (attempt >= 2 || !isTransientEmailError(err)) throw err;
-        const wait = 400 * attempt;
         console.warn(
           `sendEmail transient error on attempt ${attempt}, retrying in ${wait}ms:`,
           err instanceof Error ? err.message : err
