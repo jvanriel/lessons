@@ -42,10 +42,12 @@ export async function POST() {
       .where(eq(users.id, user.id));
   }
 
-  // Create SetupIntent to collect payment method without charging
+  // Create SetupIntent to collect payment method without charging.
+  // Card-only by design — see the matching note in
+  // `/api/stripe/setup-subscription/route.ts` (task 93).
   const setupIntent = await stripe.setupIntents.create({
     customer: stripeCustomerId,
-    payment_method_types: ["card", "bancontact"],
+    payment_method_types: ["card"],
     metadata: {
       userId: String(user.id),
       purpose: "student_payment_method",

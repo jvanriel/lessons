@@ -17,6 +17,17 @@ If any role inside the brackets is unknown (typo), the parser falls
 back to treating the brackets as literal text — better to over-show
 than silently hide.
 
+## 2026-05-04 — v1.1.33
+
+- **Card-only at the payment step.** When you add a payment method
+  (as a student or as a pro signing up), the form now offers cards
+  only. Previously it also showed Bancontact and (for pros) SEPA
+  Direct Debit. SEPA in particular dragged a long mandate notice
+  about an "8-week refund right via your bank" — confusing because
+  the platform already auto-refunds within the pro's cancellation
+  window. Cards work everywhere in the target market and the form
+  stays simple.
+
 ## 2026-05-04 — v1.1.32
 
 - **NL: registration wizard now uses "Boek direct" everywhere.**

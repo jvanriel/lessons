@@ -88,10 +88,20 @@ export async function POST(request: NextRequest) {
     console.error("[setup-subscription] invoicing sync failed:", err);
   }
 
-  // Create SetupIntent to collect payment method without charging
+  // Create SetupIntent to collect payment method without charging.
+  //
+  // Card-only by design (task 93). Stripe renders mandate-style legal
+  // copy under the PaymentElement when SEPA Direct Debit is allowed
+  // ("8-week refund right via your bank", PPRO, etc.) and Bancontact
+  // can also surface its own mandate UX. Both confused pros during
+  // testing because they conflict with our automatic
+  // refund-on-cancel flow. The target market (golfers booking €40+
+  // lessons) is reliably card-equipped; the Belgian Bancontact-only
+  // case is rare enough — and most Bancontact cards run on Visa/MC
+  // rails so they go through the card flow anyway.
   const setupIntent = await stripe.setupIntents.create({
     customer: stripeCustomerId,
-    payment_method_types: ["card", "bancontact", "sepa_debit"],
+    payment_method_types: ["card"],
     metadata: {
       userId: String(user.id),
       proProfileId: String(profile.id),
