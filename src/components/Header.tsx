@@ -2,6 +2,7 @@ import Link from "next/link";
 import HeaderNav from "./HeaderNav";
 import Logo from "./Logo";
 import { getSession, hasRole, getImpersonatorSession, parseRoles } from "@/lib/auth";
+import { brandHrefFor } from "./app/dashboard-href";
 import { cookies } from "next/headers";
 import { db } from "@/lib/db";
 import { users } from "@/lib/db/schema";
@@ -139,7 +140,7 @@ export default async function Header() {
     <header className="border-b border-gold-500/10 bg-green-950">
       <nav className="mx-auto flex max-w-6xl flex-wrap items-center justify-between gap-y-3 px-6 py-5">
         <Link
-          href="/"
+          href={brandHrefFor(session ? session.roles : [])}
           className="flex items-center gap-2.5 font-display text-xl font-medium tracking-tight text-gold-200"
         >
           <Logo size={28} variant="cream" />

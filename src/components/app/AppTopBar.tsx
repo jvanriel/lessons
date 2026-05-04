@@ -7,7 +7,7 @@ import Logo from "@/components/Logo";
 import LanguageSwitcher from "@/components/LanguageSwitcher";
 import NotificationBell from "@/components/notifications/NotificationBell";
 import HelpDialog from "@/components/app/HelpDialog";
-import { dashboardHrefFor } from "./dashboard-href";
+import { brandHrefFor } from "./dashboard-href";
 import type { Locale } from "@/lib/i18n";
 import { t } from "@/lib/i18n/translations";
 
@@ -208,7 +208,7 @@ export default function AppTopBar({
           </svg>
         </button>
         <Link
-          href={dashboardHrefFor(roles)}
+          href={brandHrefFor(roles)}
           className="flex items-center gap-2 font-display text-base font-medium tracking-tight text-gold-200"
         >
           <Logo size={22} variant="cream" />
