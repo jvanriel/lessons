@@ -17,6 +17,17 @@ If any role inside the brackets is unknown (typo), the parser falls
 back to treating the brackets as literal text — better to over-show
 than silently hide.
 
+## 2026-05-04 — v1.1.37
+
+- [pro] **New "Guests" panel on the Students page.** Whenever a
+  booking includes additional participants with an email address,
+  those people now appear under a collapsible "Guests" section
+  below your students list — deduplicated by email, with the count
+  of lessons they've attended and the date of their last lesson.
+  We don't create accounts for them automatically. When it makes
+  sense, you can click "Invite as student" — opens the existing
+  invite dialog with their name + email pre-filled.
+
 ## 2026-05-04 — v1.1.36
 
 - **Bolder buttons in confirmation emails.** CTAs in our outgoing

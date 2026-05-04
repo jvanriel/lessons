@@ -7,8 +7,9 @@ import {
   proProfiles,
 } from "@/lib/db/schema";
 import { eq, and, gte, asc } from "drizzle-orm";
-import { getMyStudents, getProQuickBookData, type ProQuickBookData } from "./actions";
+import { getMyStudents, getMyGuests, getProQuickBookData, type ProQuickBookData } from "./actions";
 import StudentManager from "./StudentManager";
+import GuestList from "./GuestList";
 import { getLocale } from "@/lib/locale";
 import { todayInTZ } from "@/lib/local-date";
 
@@ -16,7 +17,10 @@ export const metadata = { title: "Students — Golf Lessons" };
 
 export default async function ProStudentsPage() {
   const { profile } = await requireProProfile();
-  const students = await getMyStudents();
+  const [students, guests] = await Promise.all([
+    getMyStudents(),
+    getMyGuests(),
+  ]);
   const locale = await getLocale();
 
   // Find the current/next student (lesson happening now or next upcoming)
@@ -76,12 +80,25 @@ export default async function ProStudentsPage() {
   }
 
   return (
-    <StudentManager
-      students={students}
-      currentStudentId={currentStudentId}
-      currentBooking={currentBooking}
-      currentQuickBook={currentQuickBook}
-      locale={locale}
-    />
+    <>
+      <StudentManager
+        students={students}
+        currentStudentId={currentStudentId}
+        currentBooking={currentBooking}
+        currentQuickBook={currentQuickBook}
+        locale={locale}
+      />
+      <div className="mx-auto max-w-5xl px-6 pb-12">
+        <GuestList
+          guests={guests}
+          locale={locale}
+          inviteHref={(g) =>
+            `/pro/students?invite=${encodeURIComponent(g.email)}` +
+            `&firstName=${encodeURIComponent(g.firstName)}` +
+            `&lastName=${encodeURIComponent(g.lastName)}`
+          }
+        />
+      </div>
+    </>
   );
 }

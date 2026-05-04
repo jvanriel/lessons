@@ -108,6 +108,112 @@ export async function getMyStudents() {
   return rows;
 }
 
+/**
+ * Aggregate the pro's "guest list" — every emailed extra-participant
+ * who has appeared on at least one of the pro's confirmed bookings,
+ * deduplicated by email (case-insensitive). Pure read; never mutates
+ * `users` or `pro_students`. The pro can manually invite a guest as
+ * a real student via the existing inviteStudent action — that's the
+ * upgrade path. (Task 87, Option A.)
+ *
+ * Excludes guests whose email already belongs to a registered student
+ * with this pro (so we don't double-list them under both Students and
+ * Guests).
+ */
+export async function getMyGuests() {
+  const { profile } = await requireProProfile();
+  if (!profile) return [];
+
+  // All extra-participant rows on this pro's confirmed bookings.
+  // Bookers are participant #1 — we filter those out by joining on
+  // bookedById and excluding rows whose email matches the booker's.
+  const rows = await db
+    .select({
+      firstName: lessonParticipants.firstName,
+      lastName: lessonParticipants.lastName,
+      email: lessonParticipants.email,
+      phone: lessonParticipants.phone,
+      bookingDate: lessonBookings.date,
+      bookerEmail: users.email,
+    })
+    .from(lessonParticipants)
+    .innerJoin(
+      lessonBookings,
+      eq(lessonParticipants.bookingId, lessonBookings.id),
+    )
+    .innerJoin(users, eq(lessonBookings.bookedById, users.id))
+    .where(
+      and(
+        eq(lessonBookings.proProfileId, profile.id),
+        eq(lessonBookings.status, "confirmed"),
+      ),
+    );
+
+  // Existing students for this pro — used to suppress guest entries
+  // that overlap with a real student account.
+  const studentEmails = new Set(
+    (
+      await db
+        .select({ email: users.email })
+        .from(proStudents)
+        .innerJoin(users, eq(proStudents.userId, users.id))
+        .where(eq(proStudents.proProfileId, profile.id))
+    ).map((r) => r.email.toLowerCase()),
+  );
+
+  // Aggregate: dedupe by lowercased email; keep the most recently-seen
+  // (firstName, lastName, phone) tuple; sum lesson count; track last
+  // and first dates.
+  const byEmail = new Map<
+    string,
+    {
+      email: string;
+      firstName: string;
+      lastName: string;
+      phone: string | null;
+      lessonCount: number;
+      firstSeenDate: string;
+      lastSeenDate: string;
+    }
+  >();
+
+  for (const r of rows) {
+    if (!r.email) continue;
+    const emailLc = r.email.toLowerCase();
+    if (emailLc === r.bookerEmail.toLowerCase()) continue;
+    if (studentEmails.has(emailLc)) continue;
+    const existing = byEmail.get(emailLc);
+    if (!existing) {
+      byEmail.set(emailLc, {
+        email: r.email,
+        firstName: r.firstName,
+        lastName: r.lastName,
+        phone: r.phone,
+        lessonCount: 1,
+        firstSeenDate: r.bookingDate,
+        lastSeenDate: r.bookingDate,
+      });
+      continue;
+    }
+    existing.lessonCount += 1;
+    if (r.bookingDate > existing.lastSeenDate) {
+      existing.lastSeenDate = r.bookingDate;
+      // Refresh the cached identity to whatever the booker most
+      // recently typed (people sometimes correct typos on a re-book).
+      existing.firstName = r.firstName;
+      existing.lastName = r.lastName;
+      existing.phone = r.phone;
+    }
+    if (r.bookingDate < existing.firstSeenDate) {
+      existing.firstSeenDate = r.bookingDate;
+    }
+  }
+
+  return Array.from(byEmail.values()).sort(
+    (a, b) => b.lastSeenDate.localeCompare(a.lastSeenDate),
+  );
+}
+
 export async function inviteStudent(
   _prev: { error?: string; success?: boolean; password?: string } | null,
   formData: FormData
