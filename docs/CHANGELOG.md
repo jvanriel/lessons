@@ -17,6 +17,13 @@ If any role inside the brackets is unknown (typo), the parser falls
 back to treating the brackets as literal text — better to over-show
 than silently hide.
 
+## 2026-05-04 — v1.1.30
+
+- **Required-field marker on extra-participant names.** First name
+  and last name fields for additional participants now show a `*`
+  in the placeholder, matching the convention used elsewhere in the
+  forms. Email stays marked "(optional)" since it isn't required.
+
 ## 2026-05-04 — v1.1.29
 
 - **Public booking now shows the correct group price.** When you

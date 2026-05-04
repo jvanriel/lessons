@@ -909,7 +909,7 @@ export default function PublicBookingWizard({
                           ),
                         )
                       }
-                      placeholder={t("book.firstName", locale)}
+                      placeholder={t("book.firstName", locale) + " *"}
                       required
                       className="rounded-md border border-green-200 bg-white px-3 py-2 text-sm text-green-900 focus:border-green-400 focus:outline-none focus:ring-1 focus:ring-green-400"
                     />
@@ -923,7 +923,7 @@ export default function PublicBookingWizard({
                           ),
                         )
                       }
-                      placeholder={t("book.lastName", locale)}
+                      placeholder={t("book.lastName", locale) + " *"}
                       required
                       className="rounded-md border border-green-200 bg-white px-3 py-2 text-sm text-green-900 focus:border-green-400 focus:outline-none focus:ring-1 focus:ring-green-400"
                     />
