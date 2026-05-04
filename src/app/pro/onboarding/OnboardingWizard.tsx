@@ -1454,7 +1454,21 @@ export default function OnboardingWizard({
   const currentStepName = t(STEP_KEYS[step], locale);
 
   return (
-    <div className="min-h-screen bg-[#faf7f0]">
+    <div className="relative min-h-screen bg-[#faf7f0]">
+      {/* Escape hatch — sends a curious visitor back to /for-pros without
+          finishing the wizard. An authenticated pro mid-onboarding can
+          resume later from /pro/dashboard. (Task 81.) */}
+      <a
+        href={hasAccount ? "/pro/dashboard" : "/for-pros"}
+        title={t("onboarding.maybeLater", locale)}
+        aria-label={t("onboarding.maybeLater", locale)}
+        className="absolute right-4 top-4 inline-flex items-center gap-1.5 rounded-full border border-green-200 bg-white px-3 py-1.5 text-xs font-medium text-green-700 shadow-sm transition-colors hover:bg-green-50 sm:right-6 sm:top-6"
+      >
+        <span className="hidden sm:inline">{t("onboarding.maybeLater", locale)}</span>
+        <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+          <path strokeLinecap="round" strokeLinejoin="round" d="M6 18 18 6M6 6l12 12" />
+        </svg>
+      </a>
       <div className="mx-auto max-w-2xl px-6 py-12">
         {/* Header */}
         <div className="text-center">
