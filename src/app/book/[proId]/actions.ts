@@ -26,6 +26,11 @@ import { SignJWT } from "jose";
 import { looksLikeE164, normalizePhone } from "@/lib/phone";
 import { sendEmail } from "@/lib/mail";
 import { after } from "next/server";
+import {
+  parseExtraParticipants,
+  validateExtraParticipants,
+  sendParticipantBookingNotifications,
+} from "@/lib/booking-participants";
 import { excludeDummiesOnProduction } from "@/lib/pro-visibility";
 import { computeBookingPriceCents } from "@/lib/pricing";
 import {
@@ -446,6 +451,7 @@ export async function createPublicBooking(formData: FormData) {
     .trim()
     .toLowerCase();
   const phone = normalizePhone((formData.get("phone") as string) || "");
+  const extraParticipants = parseExtraParticipants(formData, participantCount);
   const honeypot = (formData.get("website") as string) || "";
 
   // Honeypot — legitimate browsers leave this hidden field empty.
@@ -485,6 +491,11 @@ export async function createPublicBooking(formData: FormData) {
 
   if (!firstName || !lastName) {
     return { error: t("publicBook.err.nameRequired", uiLocale) };
+  }
+
+  const participantValidationError = validateExtraParticipants(extraParticipants);
+  if (participantValidationError) {
+    return { error: participantValidationError };
   }
 
   // Very light email shape check — real validation happens when the user
@@ -617,13 +628,16 @@ export async function createPublicBooking(formData: FormData) {
         })
         .returning({ id: lessonBookings.id });
 
-      await tx.insert(lessonParticipants).values({
-        bookingId: b.id,
-        firstName,
-        lastName,
-        email,
-        phone,
-      });
+      await tx.insert(lessonParticipants).values([
+        { bookingId: b.id, firstName, lastName, email, phone },
+        ...extraParticipants.map((p) => ({
+          bookingId: b.id,
+          firstName: p.firstName,
+          lastName: p.lastName,
+          email: p.email,
+          phone: p.phone ?? null,
+        })),
+      ]);
 
       // Upsert the pro↔student relationship so the booking shows up
       // in the pro's student list.
@@ -832,6 +846,11 @@ export async function createPublicBooking(formData: FormData) {
       } catch {
         /* ditto */
       }
+    }
+
+    // Fan out to extra participants (own template + ICS).
+    if (extraParticipants.length > 0) {
+      await sendParticipantBookingNotifications(booking.id);
     }
   });
 

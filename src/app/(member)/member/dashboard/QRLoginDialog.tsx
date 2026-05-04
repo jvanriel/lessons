@@ -48,15 +48,21 @@ function QRLoginDialog({ onClose, locale }: { onClose: () => void; locale: Local
   // Generate QR token on mount
   useEffect(() => {
     startTransition(async () => {
-      const token = await generateQRToken();
-      if (token) {
+      const id = await generateQRToken();
+      if (id) {
         // Prefer our canonical custom domain over the raw Vercel host
         // the user might currently be on (e.g. lessons-xxx.vercel.app).
         // The QR gets scanned on a phone that doesn't know about those
         // preview URLs — it needs a public-facing address.
+        //
+        // The id is short (8 base62 chars), so the full URL stays
+        // ~30-40 chars — small enough that any default phone camera
+        // (Android included) can resolve the QR reliably. Pre-fix
+        // we encoded the full JWT in the URL (~280 chars) and dense
+        // QRs failed to scan on most Android cameras.
         const origin =
           process.env.NEXT_PUBLIC_APP_URL || window.location.origin;
-        const url = `${origin}/api/auth/qr-login?token=${token}`;
+        const url = `${origin}/q/${id}`;
         setQrUrl(url);
       }
     });
@@ -74,15 +80,21 @@ function QRLoginDialog({ onClose, locale }: { onClose: () => void; locale: Local
     setTimeLeft(300);
     setQrUrl(null);
     startTransition(async () => {
-      const token = await generateQRToken();
-      if (token) {
+      const id = await generateQRToken();
+      if (id) {
         // Prefer our canonical custom domain over the raw Vercel host
         // the user might currently be on (e.g. lessons-xxx.vercel.app).
         // The QR gets scanned on a phone that doesn't know about those
         // preview URLs — it needs a public-facing address.
+        //
+        // The id is short (8 base62 chars), so the full URL stays
+        // ~30-40 chars — small enough that any default phone camera
+        // (Android included) can resolve the QR reliably. Pre-fix
+        // we encoded the full JWT in the URL (~280 chars) and dense
+        // QRs failed to scan on most Android cameras.
         const origin =
           process.env.NEXT_PUBLIC_APP_URL || window.location.origin;
-        const url = `${origin}/api/auth/qr-login?token=${token}`;
+        const url = `${origin}/q/${id}`;
         setQrUrl(url);
       }
     });

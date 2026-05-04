@@ -60,7 +60,14 @@ export async function POST(request: Request) {
   }
 
   const [existing] = await db
-    .select({ id: users.id, roles: users.roles, password: users.password })
+    .select({
+      id: users.id,
+      roles: users.roles,
+      password: users.password,
+      // Used below to suppress the verify-email send when this user
+      // already verified via the claim-booking flow (task 90).
+      emailVerifiedAt: users.emailVerifiedAt,
+    })
     .from(users)
     .where(and(eq(users.email, email), isNull(users.deletedAt)))
     .limit(1);
@@ -107,6 +114,17 @@ export async function POST(request: Request) {
   // post-onboarding confirmation (see api/member/onboarding) doubles as
   // the registration acknowledgement. Sending both made students receive
   // two near-identical mails (task 56).
+
+  // Skip the verify-email send when the user landed here via the
+  // claim-booking flow — that flow already set `emailVerifiedAt` on
+  // the existing stub row (see api/auth/claim-booking/route.ts). Send
+  // again in that case = a redundant "please verify" mail right after
+  // a "your account is ready" mail (task 90).
+  const emailAlreadyVerified = !!existing?.emailVerifiedAt;
+  if (emailAlreadyVerified) {
+    await setSessionCookie({ userId, email, roles: ["member"] });
+    return NextResponse.json({ success: true, userId });
+  }
 
   // Send email verification link
   const verifyToken = await new SignJWT({
@@ -156,7 +174,7 @@ export async function POST(request: Request) {
       </h2>
       <p style="margin:0 0 24px 0;">${intro}</p>
       <p style="margin:0 0 24px 0;">
-        <a href="${verifyUrl}" style="display:inline-block;padding:12px 28px;background:#a68523;color:#fff;border-radius:6px;text-decoration:none;font-weight:500;font-size:14px;">
+        <a href="${verifyUrl}" style="display:inline-block;padding:12px 28px;background:#a68523;color:#fff;border-radius:6px;text-decoration:none;font-weight:700;font-size:14px;">
           ${buttonLabel}
         </a>
       </p>

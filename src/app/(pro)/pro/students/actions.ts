@@ -18,6 +18,23 @@ import { eq, and, asc, desc, gte, lte } from "drizzle-orm";
 import { requireProProfile } from "@/lib/pro";
 import { hashPassword } from "@/lib/auth";
 import { sendEmail } from "@/lib/mail";
+import { sendParticipantCancellationNotifications } from "@/lib/booking-participants";
+import {
+  parseEditBookingChanges,
+  validateEditAllowed,
+  validateEditParticipants,
+  isNoOpEdit,
+  isSlotTakenByOther,
+  applyBookingEdit,
+  sendBookingUpdatedNotifications,
+} from "@/lib/booking-edit";
+import {
+  decideEditPaymentAction,
+  applyEditPaymentAction,
+  paymentResultToEmailChange,
+} from "@/lib/booking-edit-payment";
+import { loadBookingPricing } from "@/lib/booking-charge";
+import type { EmailPaymentChange } from "@/lib/email-templates";
 import {
   buildInviteEmail,
   getEmailStrings,
@@ -89,6 +106,112 @@ export async function getMyStudents() {
     .orderBy(proStudents.createdAt);
 
   return rows;
+}
+
+/**
+ * Aggregate the pro's "guest list" — every emailed extra-participant
+ * who has appeared on at least one of the pro's confirmed bookings,
+ * deduplicated by email (case-insensitive). Pure read; never mutates
+ * `users` or `pro_students`. The pro can manually invite a guest as
+ * a real student via the existing inviteStudent action — that's the
+ * upgrade path. (Task 87, Option A.)
+ *
+ * Excludes guests whose email already belongs to a registered student
+ * with this pro (so we don't double-list them under both Students and
+ * Guests).
+ */
+export async function getMyGuests() {
+  const { profile } = await requireProProfile();
+  if (!profile) return [];
+
+  // All extra-participant rows on this pro's confirmed bookings.
+  // Bookers are participant #1 — we filter those out by joining on
+  // bookedById and excluding rows whose email matches the booker's.
+  const rows = await db
+    .select({
+      firstName: lessonParticipants.firstName,
+      lastName: lessonParticipants.lastName,
+      email: lessonParticipants.email,
+      phone: lessonParticipants.phone,
+      bookingDate: lessonBookings.date,
+      bookerEmail: users.email,
+    })
+    .from(lessonParticipants)
+    .innerJoin(
+      lessonBookings,
+      eq(lessonParticipants.bookingId, lessonBookings.id),
+    )
+    .innerJoin(users, eq(lessonBookings.bookedById, users.id))
+    .where(
+      and(
+        eq(lessonBookings.proProfileId, profile.id),
+        eq(lessonBookings.status, "confirmed"),
+      ),
+    );
+
+  // Existing students for this pro — used to suppress guest entries
+  // that overlap with a real student account.
+  const studentEmails = new Set(
+    (
+      await db
+        .select({ email: users.email })
+        .from(proStudents)
+        .innerJoin(users, eq(proStudents.userId, users.id))
+        .where(eq(proStudents.proProfileId, profile.id))
+    ).map((r) => r.email.toLowerCase()),
+  );
+
+  // Aggregate: dedupe by lowercased email; keep the most recently-seen
+  // (firstName, lastName, phone) tuple; sum lesson count; track last
+  // and first dates.
+  const byEmail = new Map<
+    string,
+    {
+      email: string;
+      firstName: string;
+      lastName: string;
+      phone: string | null;
+      lessonCount: number;
+      firstSeenDate: string;
+      lastSeenDate: string;
+    }
+  >();
+
+  for (const r of rows) {
+    if (!r.email) continue;
+    const emailLc = r.email.toLowerCase();
+    if (emailLc === r.bookerEmail.toLowerCase()) continue;
+    if (studentEmails.has(emailLc)) continue;
+    const existing = byEmail.get(emailLc);
+    if (!existing) {
+      byEmail.set(emailLc, {
+        email: r.email,
+        firstName: r.firstName,
+        lastName: r.lastName,
+        phone: r.phone,
+        lessonCount: 1,
+        firstSeenDate: r.bookingDate,
+        lastSeenDate: r.bookingDate,
+      });
+      continue;
+    }
+    existing.lessonCount += 1;
+    if (r.bookingDate > existing.lastSeenDate) {
+      existing.lastSeenDate = r.bookingDate;
+      // Refresh the cached identity to whatever the booker most
+      // recently typed (people sometimes correct typos on a re-book).
+      existing.firstName = r.firstName;
+      existing.lastName = r.lastName;
+      existing.phone = r.phone;
+    }
+    if (r.bookingDate < existing.firstSeenDate) {
+      existing.firstSeenDate = r.bookingDate;
+    }
+  }
+
+  return Array.from(byEmail.values()).sort(
+    (a, b) => b.lastSeenDate.localeCompare(a.lastSeenDate),
+  );
 }
 
 export async function inviteStudent(
@@ -1223,6 +1346,7 @@ export async function proCancelBooking(bookingId: number) {
       endTime: lessonBookings.endTime,
       bookedById: lessonBookings.bookedById,
       proLocationId: lessonBookings.proLocationId,
+      participantCount: lessonBookings.participantCount,
     })
     .from(lessonBookings)
     .where(
@@ -1386,5 +1510,179 @@ export async function proCancelBooking(bookingId: number) {
     }).catch(() => {});
   }
 
+  // Fan out cancellation to extra participants. Skipped automatically
+  // when participantCount === 1.
+  if ((booking.participantCount ?? 1) > 1) {
+    sendParticipantCancellationNotifications(booking.id).catch(() => {});
+  }
+
+  return { success: true };
+}
+
+
+// ─── Edit (pro side) ───────────────────────────────────
+
+/**
+ * Pro-side booking edit. Same shape as the member-side `updateBooking`
+ * but the auth gate is "the booking belongs to my pro profile" rather
+ * than "I'm the booker". Cancellation-window check still applies — the
+ * pro can rebook a past-window lesson out of band by cancelling +
+ * recreating, but `proUpdateBooking` follows the policy.
+ *
+ * Phase 1: no payment delta. The booking's priceCents stays whatever
+ * it was when the booking was first created.
+ */
+export async function proUpdateBooking(formData: FormData) {
+  const { profile } = await requireProProfile();
+  if (!profile) return { error: "No pro profile found." };
+
+  const bookingId = Number(formData.get("bookingId"));
+  if (!bookingId) return { error: "Invalid booking ID" };
+
+  const changes = parseEditBookingChanges(formData);
+  const participantError = validateEditParticipants(changes.extraParticipants);
+  if (participantError) return { error: participantError };
+
+  const [booking] = await db
+    .select({
+      id: lessonBookings.id,
+      proProfileId: lessonBookings.proProfileId,
+      proLocationId: lessonBookings.proLocationId,
+      date: lessonBookings.date,
+      startTime: lessonBookings.startTime,
+      endTime: lessonBookings.endTime,
+      participantCount: lessonBookings.participantCount,
+      status: lessonBookings.status,
+      cancelledAt: lessonBookings.cancelledAt,
+      priceCents: lessonBookings.priceCents,
+      platformFeeCents: lessonBookings.platformFeeCents,
+      paymentStatus: lessonBookings.paymentStatus,
+      stripePaymentIntentId: lessonBookings.stripePaymentIntentId,
+      stripeInvoiceItemId: lessonBookings.stripeInvoiceItemId,
+    })
+    .from(lessonBookings)
+    .where(
+      and(
+        eq(lessonBookings.id, bookingId),
+        eq(lessonBookings.proProfileId, profile.id),
+      ),
+    )
+    .limit(1);
+  if (!booking) return { error: "Booking not found" };
+
+  const tz = await getProLocationTimezone(booking.proLocationId);
+  const cancellationHours = profile.cancellationHours ?? 24;
+  const editError = validateEditAllowed(booking, cancellationHours, tz);
+  if (editError) return { error: editError };
+
+  const currentParticipants = await db
+    .select({
+      id: lessonParticipants.id,
+      firstName: lessonParticipants.firstName,
+      lastName: lessonParticipants.lastName,
+      email: lessonParticipants.email,
+    })
+    .from(lessonParticipants)
+    .where(eq(lessonParticipants.bookingId, bookingId))
+    .orderBy(lessonParticipants.id);
+  const bookerParticipant = currentParticipants[0];
+  if (!bookerParticipant) {
+    return { error: "Booking participant row missing — please contact support." };
+  }
+
+  if (
+    isNoOpEdit(
+      {
+        date: booking.date,
+        startTime: booking.startTime,
+        endTime: booking.endTime,
+        participantCount: booking.participantCount,
+        participants: currentParticipants,
+      },
+      changes,
+    )
+  ) {
+    return { success: true, noop: true };
+  }
+
+  if (
+    booking.date !== changes.date ||
+    booking.startTime !== changes.startTime ||
+    booking.endTime !== changes.endTime
+  ) {
+    const allowedSlots = await fetchAvailableSlots(
+      booking.proProfileId,
+      booking.proLocationId,
+      changes.date,
+      changes.duration,
+    );
+    const inAvailability = allowedSlots.some(
+      (s) => s.startTime === changes.startTime && s.endTime === changes.endTime,
+    );
+    if (!inAvailability) {
+      return { error: "This time slot is not within your availability." };
+    }
+    const taken = await isSlotTakenByOther(
+      booking.proProfileId,
+      booking.proLocationId,
+      changes.date,
+      changes.startTime,
+      changes.endTime,
+      booking.id,
+    );
+    if (taken) return { error: "This time slot is no longer available." };
+  }
+
+  try {
+    await applyBookingEdit(booking.id, changes, bookerParticipant.id);
+  } catch (err) {
+    if (isSlotConflictError(err)) {
+      return { error: "This time slot is no longer available." };
+    }
+    throw err;
+  }
+
+  // Phase 2 payment-delta: same logic as the member side, see
+  // updateBooking in (member)/member/bookings/actions.ts for the
+  // walkthrough. Failures Sentry-tagged "edit-payment".
+  const pricing = await loadBookingPricing(
+    booking.proProfileId,
+    changes.duration,
+    changes.participantCount,
+  );
+  let paymentChange: EmailPaymentChange | undefined;
+  if (pricing.ok) {
+    const action = decideEditPaymentAction(
+      {
+        priceCents: booking.priceCents,
+        platformFeeCents: booking.platformFeeCents,
+        paymentStatus: booking.paymentStatus,
+        stripePaymentIntentId: booking.stripePaymentIntentId,
+        stripeInvoiceItemId: booking.stripeInvoiceItemId,
+      },
+      {
+        priceCents: pricing.priceCents,
+        platformFeeCents: pricing.platformFeeCents,
+      },
+    );
+    const result = await applyEditPaymentAction(booking.id, action, {
+      proProfileId: booking.proProfileId,
+      afterPrice: pricing.priceCents,
+      afterCommission: pricing.platformFeeCents,
+      date: changes.date,
+      startTime: changes.startTime,
+      endTime: changes.endTime,
+    });
+    paymentChange = paymentResultToEmailChange(result);
+  } else {
+    paymentChange = { kind: "manual_review" };
+  }
+
+  after(async () => {
+    await sendBookingUpdatedNotifications(booking.id, paymentChange);
+  });
+
+  revalidatePath("/pro/bookings");
+  revalidatePath("/pro/students");
   return { success: true };
 }

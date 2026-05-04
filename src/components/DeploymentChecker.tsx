@@ -83,11 +83,17 @@ export default function DeploymentChecker() {
           } catch {
             // Some browsers throw if the SW isn't controllable yet.
           }
-          // A newly-found worker means a new build is ready; flag it
-          // alongside the build-id ping. We don't have the new
-          // buildId here — the periodic check() will fill in
-          // `newBuildIdRef` when it next runs.
-          reg.addEventListener?.("updatefound", () => setNewVersion(true));
+          // SW lifecycle lags the page reload by one tick: when the
+          // user clicks Update + we cache-bust the HTML, the new HTML
+          // + JS bundle land instantly but the SW download starts
+          // *after* mount. That fires `updatefound` on the freshly-
+          // loaded page even though the JS is already on the new
+          // BUILD_ID — pre-fix that re-triggered the toast on every
+          // reload (the v1.1.20 cache-bust got us past the cached-
+          // HTML problem but missed this one). Route the trigger
+          // through `check()` so we only show the toast on an actual
+          // server-vs-running BUILD_ID mismatch.
+          reg.addEventListener?.("updatefound", () => check());
         })
         .catch(() => {});
     }

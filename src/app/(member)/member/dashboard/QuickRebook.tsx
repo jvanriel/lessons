@@ -20,6 +20,14 @@ import { t } from "@/lib/i18n/translations";
 interface Props {
   data: QuickBookData;
   proId: number;
+  /**
+   * Pro's display name. Used to interpolate into the
+   * `memberQB.blockedBody` copy so the student sees *which* pro is
+   * driving the payment-method requirement (task 102 — pre-fix the
+   * generic "add a payment method to enable Quick Book" implied the
+   * platform required it, not the pro).
+   */
+  proName: string;
   hasPaymentMethod?: boolean;
   allowBookingWithoutPayment?: boolean;
   locale: Locale;
@@ -48,7 +56,7 @@ function makeDateFormatters(locale: Locale) {
   };
 }
 
-export function QuickBook({ data, proId, hasPaymentMethod = true, allowBookingWithoutPayment = false, locale }: Props) {
+export function QuickBook({ data, proId, proName, hasPaymentMethod = true, allowBookingWithoutPayment = false, locale }: Props) {
   const fd = makeDateFormatters(locale);
   const formatShortDate = fd.short;
   const formatDatePillDay = fd.pillDay;
@@ -222,7 +230,7 @@ export function QuickBook({ data, proId, hasPaymentMethod = true, allowBookingWi
       <div className="mt-3 rounded-lg border border-green-100 bg-green-50/50 p-4">
         <h3 className="text-sm font-medium text-green-900">{t("memberQB.heading", locale)}</h3>
         <p className="mt-2 text-xs text-green-600">
-          {t("memberQB.blockedBody", locale)}
+          {t("memberQB.blockedBody", locale).replace("{pro}", proName)}
         </p>
         <a
           href="/member/settings"

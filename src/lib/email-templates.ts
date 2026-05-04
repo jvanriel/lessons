@@ -279,7 +279,7 @@ export function buildInviteEmail(opts: {
       </tr>
     </table>
     <p style="margin:0 0 24px 0;">
-      <a href="${loginUrl}" style="display:inline-block;background:${COLORS.gold600};color:${COLORS.white};padding:12px 28px;border-radius:6px;text-decoration:none;font-weight:500;font-size:14px;">
+      <a href="${loginUrl}" style="display:inline-block;background:${COLORS.gold600};color:${COLORS.white};padding:12px 28px;border-radius:6px;text-decoration:none;font-weight:700;font-size:14px;">
         ${s.loginButton}
       </a>
     </p>
@@ -321,7 +321,7 @@ export function buildPasswordResetEmail(opts: {
       </tr>
     </table>
     <p style="margin:0 0 24px 0;">
-      <a href="${loginUrl}" style="display:inline-block;background:${COLORS.gold600};color:${COLORS.white};padding:12px 28px;border-radius:6px;text-decoration:none;font-weight:500;font-size:14px;">
+      <a href="${loginUrl}" style="display:inline-block;background:${COLORS.gold600};color:${COLORS.white};padding:12px 28px;border-radius:6px;text-decoration:none;font-weight:700;font-size:14px;">
         ${s.loginButton}
       </a>
     </p>
@@ -430,7 +430,7 @@ export function buildWelcomeEmail(opts: {
     const stepStyle = `padding:10px 0;border-bottom:1px solid ${COLORS.green100};font-size:14px;color:${COLORS.green900};`;
     const numStyle = `display:inline-block;width:22px;height:22px;line-height:22px;text-align:center;background:${COLORS.gold600};color:${COLORS.white};border-radius:50%;font-size:12px;font-weight:600;margin-right:10px;`;
     const step1Body = opts.verifyUrl
-      ? `${s.step1Inline} <a href="${opts.verifyUrl}" style="color:${COLORS.gold600};text-decoration:underline;font-weight:500;">${s.step1LinkLabel}</a>`
+      ? `${s.step1Inline} <a href="${opts.verifyUrl}" style="color:${COLORS.gold600};text-decoration:underline;font-weight:700;">${s.step1LinkLabel}</a>`
       : s.step1;
     const body = `
       <h2 style="font-family:Georgia,'Times New Roman',serif;font-size:22px;color:${COLORS.green950};margin:0 0 16px 0;font-weight:normal;">
@@ -445,7 +445,7 @@ export function buildWelcomeEmail(opts: {
       <div style="${stepStyle}"><span style="${numStyle}">4</span>${s.step4}</div>
 
       <p style="margin:24px 0 24px 0;">
-        <a href="${base}${s.buttonPath}" style="display:inline-block;background:${COLORS.gold600};color:${COLORS.white};padding:12px 28px;border-radius:6px;text-decoration:none;font-weight:500;font-size:14px;">
+        <a href="${base}${s.buttonPath}" style="display:inline-block;background:${COLORS.gold600};color:${COLORS.white};padding:12px 28px;border-radius:6px;text-decoration:none;font-weight:700;font-size:14px;">
           ${s.button}
         </a>
       </p>
@@ -462,7 +462,7 @@ export function buildWelcomeEmail(opts: {
     <p style="margin:0 0 16px 0;">${s.body}</p>
     <p style="margin:0 0 24px 0;color:#555;">${s.note}</p>
     <p style="margin:0 0 24px 0;">
-      <a href="${base}${s.buttonPath}" style="display:inline-block;background:${COLORS.gold600};color:${COLORS.white};padding:12px 28px;border-radius:6px;text-decoration:none;font-weight:500;font-size:14px;">
+      <a href="${base}${s.buttonPath}" style="display:inline-block;background:${COLORS.gold600};color:${COLORS.white};padding:12px 28px;border-radius:6px;text-decoration:none;font-weight:700;font-size:14px;">
         ${s.button}
       </a>
     </p>
@@ -581,7 +581,7 @@ export function buildOnboardingConfirmationEmail(opts: {
   body += `
     <p style="margin:24px 0 16px 0;color:#555;font-size:13px;">${s.profileHint}</p>
     <p style="margin:0;">
-      <a href="${getBaseUrl()}/login?email=${encodeURIComponent(opts.email)}" style="display:inline-block;background:${COLORS.gold600};color:${COLORS.white};padding:12px 28px;border-radius:6px;text-decoration:none;font-weight:500;font-size:14px;">
+      <a href="${getBaseUrl()}/login?email=${encodeURIComponent(opts.email)}" style="display:inline-block;background:${COLORS.gold600};color:${COLORS.white};padding:12px 28px;border-radius:6px;text-decoration:none;font-weight:700;font-size:14px;">
         ${s.button}
       </a>
     </p>
@@ -649,7 +649,7 @@ export function buildTrialEndingEmail(opts: {
     <p style="margin:0 0 16px 0;">${s.body}</p>
     <p style="margin:0 0 24px 0;color:#555;font-size:14px;"><strong>${dateStr}</strong></p>
     <p style="margin:0 0 24px 0;">
-      <a href="${getBaseUrl()}/pro/billing" style="display:inline-block;background:${COLORS.gold600};color:${COLORS.white};padding:12px 28px;border-radius:6px;text-decoration:none;font-weight:500;font-size:14px;">
+      <a href="${getBaseUrl()}/pro/billing" style="display:inline-block;background:${COLORS.gold600};color:${COLORS.white};padding:12px 28px;border-radius:6px;text-decoration:none;font-weight:700;font-size:14px;">
         ${s.cta}
       </a>
     </p>
@@ -703,7 +703,7 @@ export function buildPaymentFailedEmail(opts: {
     <p style="margin:0 0 16px 0;">${s.body}</p>
     <p style="margin:0 0 24px 0;color:#555;font-size:14px;">${s.impact}</p>
     <p style="margin:0 0 24px 0;">
-      <a href="${getBaseUrl()}/pro/billing" style="display:inline-block;background:${COLORS.gold600};color:${COLORS.white};padding:12px 28px;border-radius:6px;text-decoration:none;font-weight:500;font-size:14px;">
+      <a href="${getBaseUrl()}/pro/billing" style="display:inline-block;background:${COLORS.gold600};color:${COLORS.white};padding:12px 28px;border-radius:6px;text-decoration:none;font-weight:700;font-size:14px;">
         ${s.cta}
       </a>
     </p>
@@ -877,7 +877,7 @@ export function buildStudentBookingConfirmationEmail(opts: {
     <p style="margin:0 0 20px 0;">${s.body}</p>
     ${detailsTable(rows)}
     <p style="margin:0 0 24px 0;">
-      <a href="${getBaseUrl()}/member/bookings" style="display:inline-block;background:${COLORS.gold600};color:${COLORS.white};padding:12px 28px;border-radius:6px;text-decoration:none;font-weight:500;font-size:14px;">
+      <a href="${getBaseUrl()}/member/bookings" style="display:inline-block;background:${COLORS.gold600};color:${COLORS.white};padding:12px 28px;border-radius:6px;text-decoration:none;font-weight:700;font-size:14px;">
         ${s.cta}
       </a>
     </p>
@@ -891,6 +891,435 @@ export function getStudentBookingConfirmationSubject(
   locale: Locale
 ): string {
   return (BOOKING_STUDENT_STRINGS[locale] ?? BOOKING_STUDENT_STRINGS.en).subject(proName);
+}
+
+// ─── Participant emails ────────────────────────────────
+//
+// Sent to additional participants on a booking (when participantCount
+// > 1). Mirrors the booker's confirmation email but: (a) reframes the
+// body as "you're joining a lesson booked by X", (b) drops the
+// "View my bookings" CTA — additional participants don't necessarily
+// have an account, and even if they do the booking lives on the
+// booker's dashboard, not theirs.
+
+const PARTICIPANT_BOOKING_STRINGS: Record<Locale, {
+  subject: (proName: string, bookerName: string) => string;
+  greeting: string;
+  body: (bookerName: string, proName: string) => string;
+  pro: string;
+  proEmail: string;
+  proPhone: string;
+  location: string;
+  date: string;
+  time: string;
+  duration: string;
+  durationUnit: string;
+  helper: (bookerName: string) => string;
+  cancelSubject: (proName: string, bookerName: string) => string;
+  cancelBody: (bookerName: string, proName: string) => string;
+}> = {
+  en: {
+    subject: (pro, booker) => `You're joining a golf lesson with ${pro} (booked by ${booker})`,
+    greeting: "Hi",
+    body: (booker, pro) =>
+      `${booker} added you as a participant on a golf lesson with ${pro}. Here are the details:`,
+    pro: "Pro",
+    proEmail: "Pro email",
+    proPhone: "Pro phone",
+    location: "Location",
+    date: "Date",
+    time: "Time",
+    duration: "Duration",
+    durationUnit: "minutes",
+    helper: (booker) =>
+      `If you can't attend, let ${booker} know — only the person who booked the lesson can cancel or reschedule.`,
+    cancelSubject: (pro, booker) => `Cancelled: golf lesson with ${pro} (booked by ${booker})`,
+    cancelBody: (booker, pro) =>
+      `${booker} cancelled the golf lesson with ${pro} you were joining. The calendar invite is being removed.`,
+  },
+  nl: {
+    subject: (pro, booker) => `Je doet mee aan een golfles bij ${pro} (geboekt door ${booker})`,
+    greeting: "Hallo",
+    body: (booker, pro) =>
+      `${booker} heeft jou toegevoegd als deelnemer aan een golfles bij ${pro}. Hier zijn de details:`,
+    pro: "Pro",
+    proEmail: "E-mail pro",
+    proPhone: "Telefoon pro",
+    location: "Locatie",
+    date: "Datum",
+    time: "Tijd",
+    duration: "Duur",
+    durationUnit: "minuten",
+    helper: (booker) =>
+      `Kan je niet komen? Laat het ${booker} weten — alleen wie de les boekte kan annuleren of verzetten.`,
+    cancelSubject: (pro, booker) => `Geannuleerd: golfles bij ${pro} (geboekt door ${booker})`,
+    cancelBody: (booker, pro) =>
+      `${booker} heeft de golfles bij ${pro} waaraan je zou meedoen geannuleerd. De kalenderafspraak wordt verwijderd.`,
+  },
+  fr: {
+    subject: (pro, booker) => `Vous participez à un cours de golf avec ${pro} (réservé par ${booker})`,
+    greeting: "Bonjour",
+    body: (booker, pro) =>
+      `${booker} vous a ajouté comme participant à un cours de golf avec ${pro}. Voici les détails :`,
+    pro: "Pro",
+    proEmail: "E-mail du pro",
+    proPhone: "Téléphone du pro",
+    location: "Lieu",
+    date: "Date",
+    time: "Heure",
+    duration: "Durée",
+    durationUnit: "minutes",
+    helper: (booker) =>
+      `Empêché ? Prévenez ${booker} — seule la personne qui a réservé peut annuler ou reprogrammer.`,
+    cancelSubject: (pro, booker) => `Annulé : cours de golf avec ${pro} (réservé par ${booker})`,
+    cancelBody: (booker, pro) =>
+      `${booker} a annulé le cours de golf avec ${pro} auquel vous deviez participer. L'invitation au calendrier est en cours de suppression.`,
+  },
+};
+
+export function buildParticipantBookingNotificationEmail(opts: {
+  participantFirstName: string;
+  bookerName: string;
+  proName: string;
+  proEmail?: string | null;
+  proPhone?: string | null;
+  locationName: string;
+  date: string;
+  startTime: string;
+  endTime: string;
+  duration: number;
+  locale: Locale;
+}): string {
+  const s = PARTICIPANT_BOOKING_STRINGS[opts.locale] ?? PARTICIPANT_BOOKING_STRINGS.en;
+  const rows: Array<DetailRow> = [[s.pro, opts.proName]];
+  if (opts.proEmail) rows.push([s.proEmail, opts.proEmail, `mailto:${opts.proEmail}`]);
+  if (opts.proPhone) rows.push([s.proPhone, opts.proPhone, `tel:${opts.proPhone.replace(/\s+/g, "")}`]);
+  rows.push(
+    [s.location, opts.locationName],
+    [s.date, formatLessonDate(opts.date, opts.locale)],
+    [s.time, `${opts.startTime} – ${opts.endTime}`],
+    [s.duration, `${opts.duration} ${s.durationUnit}`],
+  );
+  const body = `
+    <h2 style="font-family:Georgia,'Times New Roman',serif;font-size:22px;color:${COLORS.green950};margin:0 0 16px 0;font-weight:normal;">
+      ${formatGreeting(s.greeting, opts.participantFirstName, opts.locale)}
+    </h2>
+    <p style="margin:0 0 20px 0;">${s.body(opts.bookerName, opts.proName)}</p>
+    ${detailsTable(rows)}
+    <p style="color:#666;font-size:13px;margin:0;">${s.helper(opts.bookerName)}</p>
+  `;
+  return emailLayout(body, undefined, opts.locale);
+}
+
+export function getParticipantBookingNotificationSubject(
+  proName: string,
+  bookerName: string,
+  locale: Locale
+): string {
+  return (PARTICIPANT_BOOKING_STRINGS[locale] ?? PARTICIPANT_BOOKING_STRINGS.en).subject(
+    proName,
+    bookerName,
+  );
+}
+
+export function buildParticipantBookingCancelledEmail(opts: {
+  participantFirstName: string;
+  bookerName: string;
+  proName: string;
+  locationName: string;
+  date: string;
+  startTime: string;
+  endTime: string;
+  locale: Locale;
+}): string {
+  const s = PARTICIPANT_BOOKING_STRINGS[opts.locale] ?? PARTICIPANT_BOOKING_STRINGS.en;
+  const rows: Array<DetailRow> = [
+    [s.pro, opts.proName],
+    [s.location, opts.locationName],
+    [s.date, formatLessonDate(opts.date, opts.locale)],
+    [s.time, `${opts.startTime} – ${opts.endTime}`],
+  ];
+  const body = `
+    <h2 style="font-family:Georgia,'Times New Roman',serif;font-size:22px;color:${COLORS.green950};margin:0 0 16px 0;font-weight:normal;">
+      ${formatGreeting(s.greeting, opts.participantFirstName, opts.locale)}
+    </h2>
+    <p style="margin:0 0 20px 0;">${s.cancelBody(opts.bookerName, opts.proName)}</p>
+    ${detailsTable(rows)}
+  `;
+  return emailLayout(body, undefined, opts.locale);
+}
+
+export function getParticipantBookingCancelledSubject(
+  proName: string,
+  bookerName: string,
+  locale: Locale
+): string {
+  return (PARTICIPANT_BOOKING_STRINGS[locale] ?? PARTICIPANT_BOOKING_STRINGS.en).cancelSubject(
+    proName,
+    bookerName,
+  );
+}
+
+// ─── Booking-updated emails ─────────────────────────────
+//
+// Sent after `updateBooking` / `proUpdateBooking` succeeds. Mirrors
+// the confirmation email layout but uses an "updated" subject + body
+// and shows the new lesson details. Phase 1 of booking-edit doesn't
+// adjust price, so no payment line in the body.
+
+const BOOKING_UPDATED_STRINGS: Record<Locale, {
+  subject: (proName: string) => string;
+  greeting: string;
+  body: string;
+  pro: string;
+  proEmail: string;
+  proPhone: string;
+  location: string;
+  date: string;
+  time: string;
+  duration: string;
+  durationUnit: string;
+  participants: string;
+  cta: string;
+  helperNoChange: string;
+  helperCharged: (amount: string) => string;
+  helperRefunded: (amount: string) => string;
+  helperManualReview: string;
+  helperCommissionChanged: (amount: string) => string;
+  // Participant-side variants (booker re-invited an extra participant
+  // when the lesson was rescheduled).
+  participantSubject: (proName: string, bookerName: string) => string;
+  participantBody: (bookerName: string, proName: string) => string;
+  participantHelper: (bookerName: string) => string;
+}> = {
+  en: {
+    subject: (pro) => `Updated: your golf lesson with ${pro}`,
+    greeting: "Hi",
+    body: "Your lesson has been updated. Here are the new details:",
+    pro: "Pro",
+    proEmail: "Pro email",
+    proPhone: "Pro phone",
+    location: "Location",
+    date: "Date",
+    time: "Time",
+    duration: "Duration",
+    durationUnit: "minutes",
+    participants: "Participants",
+    cta: "View my bookings",
+    helperNoChange:
+      "No payment change — the price is the same as the original booking.",
+    helperCharged: (amount) =>
+      `We charged ${amount} to your saved payment method to cover the price increase.`,
+    helperRefunded: (amount) =>
+      `We refunded ${amount} to your card for the price decrease.`,
+    helperManualReview:
+      "The price changed on this booking. Our team will reconcile the payment manually and follow up.",
+    helperCommissionChanged: (amount) =>
+      `Updated commission: ${amount}. The change appears on your next monthly invoice.`,
+    participantSubject: (pro, booker) =>
+      `Updated: your golf lesson with ${pro} (booked by ${booker})`,
+    participantBody: (booker, pro) =>
+      `${booker} updated the golf lesson with ${pro} you're joining. Here are the new details:`,
+    participantHelper: (booker) =>
+      `If the new time doesn't work for you, let ${booker} know — only the booker can change or cancel the lesson.`,
+  },
+  nl: {
+    subject: (pro) => `Bijgewerkt: je golfles bij ${pro}`,
+    greeting: "Hallo",
+    body: "Je les is bijgewerkt. Hier zijn de nieuwe details:",
+    pro: "Pro",
+    proEmail: "E-mail pro",
+    proPhone: "Telefoon pro",
+    location: "Locatie",
+    date: "Datum",
+    time: "Tijd",
+    duration: "Duur",
+    durationUnit: "minuten",
+    participants: "Deelnemers",
+    cta: "Mijn boekingen bekijken",
+    helperNoChange:
+      "Geen betalingswijziging — de prijs blijft hetzelfde als bij de oorspronkelijke boeking.",
+    helperCharged: (amount) =>
+      `We hebben ${amount} afgeschreven van je opgeslagen betaalmiddel voor de prijsverhoging.`,
+    helperRefunded: (amount) =>
+      `We hebben ${amount} teruggestort op je kaart voor de prijsverlaging.`,
+    helperManualReview:
+      "De prijs van deze boeking is gewijzigd. Ons team verwerkt de betaling handmatig en neemt contact op.",
+    helperCommissionChanged: (amount) =>
+      `Bijgewerkte commissie: ${amount}. De wijziging verschijnt op je volgende maandfactuur.`,
+    participantSubject: (pro, booker) =>
+      `Bijgewerkt: je golfles bij ${pro} (geboekt door ${booker})`,
+    participantBody: (booker, pro) =>
+      `${booker} heeft de golfles bij ${pro} waaraan je meedoet bijgewerkt. Hier zijn de nieuwe details:`,
+    participantHelper: (booker) =>
+      `Past het nieuwe moment niet? Laat het ${booker} weten — alleen wie boekte kan wijzigen of annuleren.`,
+  },
+  fr: {
+    subject: (pro) => `Mise à jour : votre cours de golf avec ${pro}`,
+    greeting: "Bonjour",
+    body: "Votre cours a été mis à jour. Voici les nouveaux détails :",
+    pro: "Pro",
+    proEmail: "E-mail du pro",
+    proPhone: "Téléphone du pro",
+    location: "Lieu",
+    date: "Date",
+    time: "Heure",
+    duration: "Durée",
+    durationUnit: "minutes",
+    participants: "Participants",
+    cta: "Voir mes réservations",
+    helperNoChange:
+      "Pas de changement de paiement — le prix reste identique à la réservation initiale.",
+    helperCharged: (amount) =>
+      `Nous avons prélevé ${amount} sur votre moyen de paiement enregistré pour couvrir l'augmentation.`,
+    helperRefunded: (amount) =>
+      `Nous avons remboursé ${amount} sur votre carte pour la baisse de prix.`,
+    helperManualReview:
+      "Le prix de cette réservation a changé. Notre équipe procédera à l'ajustement manuellement et reviendra vers vous.",
+    helperCommissionChanged: (amount) =>
+      `Nouvelle commission : ${amount}. Le changement apparaîtra sur votre prochaine facture mensuelle.`,
+    participantSubject: (pro, booker) =>
+      `Mise à jour : votre cours de golf avec ${pro} (réservé par ${booker})`,
+    participantBody: (booker, pro) =>
+      `${booker} a mis à jour le cours de golf avec ${pro} auquel vous participez. Voici les nouveaux détails :`,
+    participantHelper: (booker) =>
+      `Si le nouvel horaire ne vous convient pas, prévenez ${booker} — seule la personne qui a réservé peut modifier ou annuler.`,
+  },
+};
+
+/**
+ * Concrete payment-change summary the email template renders. Mirrors
+ * the `EditPaymentResult` shape from `booking-edit-payment.ts` but is
+ * intentionally a plain interface so the email module doesn't pull in
+ * the Stripe SDK or DB layer.
+ */
+export type EmailPaymentChange =
+  | { kind: "noop" }
+  | { kind: "charge"; amountCents: number }
+  | { kind: "refund"; amountCents: number }
+  | { kind: "swap_invoice_item"; commissionCents: number }
+  | { kind: "manual_review" };
+
+function formatEur(cents: number, locale: Locale): string {
+  return new Intl.NumberFormat(
+    locale === "en" ? "en-GB" : locale === "nl" ? "nl-BE" : "fr-BE",
+    { style: "currency", currency: "EUR", minimumFractionDigits: 2 },
+  ).format(cents / 100);
+}
+
+function paymentHelperFor(
+  s: (typeof BOOKING_UPDATED_STRINGS)[Locale],
+  change: EmailPaymentChange | undefined,
+  locale: Locale,
+): string {
+  if (!change || change.kind === "noop") return s.helperNoChange;
+  if (change.kind === "charge")
+    return s.helperCharged(formatEur(change.amountCents, locale));
+  if (change.kind === "refund")
+    return s.helperRefunded(formatEur(change.amountCents, locale));
+  if (change.kind === "swap_invoice_item")
+    return s.helperCommissionChanged(formatEur(change.commissionCents, locale));
+  return s.helperManualReview;
+}
+
+export function buildBookingUpdatedEmail(opts: {
+  recipientFirstName: string;
+  proName: string;
+  proEmail?: string | null;
+  proPhone?: string | null;
+  locationName: string;
+  date: string;
+  startTime: string;
+  endTime: string;
+  duration: number;
+  participantCount: number;
+  locale: Locale;
+  /**
+   * What the payment-delta executor did. Only the booker email needs
+   * this; pro + participant variants don't render it. Undefined →
+   * treated as a no-op (Phase 1-style "no payment change" line).
+   */
+  paymentChange?: EmailPaymentChange;
+}): string {
+  const s = BOOKING_UPDATED_STRINGS[opts.locale] ?? BOOKING_UPDATED_STRINGS.en;
+  const rows: Array<DetailRow> = [[s.pro, opts.proName]];
+  if (opts.proEmail) rows.push([s.proEmail, opts.proEmail, `mailto:${opts.proEmail}`]);
+  if (opts.proPhone)
+    rows.push([s.proPhone, opts.proPhone, `tel:${opts.proPhone.replace(/\s+/g, "")}`]);
+  rows.push(
+    [s.location, opts.locationName],
+    [s.date, formatLessonDate(opts.date, opts.locale)],
+    [s.time, `${opts.startTime} – ${opts.endTime}`],
+    [s.duration, `${opts.duration} ${s.durationUnit}`],
+  );
+  if (opts.participantCount > 1) {
+    rows.push([s.participants, String(opts.participantCount)]);
+  }
+  const helperLine = paymentHelperFor(s, opts.paymentChange, opts.locale);
+  const body = `
+    <h2 style="font-family:Georgia,'Times New Roman',serif;font-size:22px;color:${COLORS.green950};margin:0 0 16px 0;font-weight:normal;">
+      ${formatGreeting(s.greeting, opts.recipientFirstName, opts.locale)}
+    </h2>
+    <p style="margin:0 0 20px 0;">${s.body}</p>
+    ${detailsTable(rows)}
+    <p style="margin:0 0 24px 0;">
+      <a href="${getBaseUrl()}/member/bookings" style="display:inline-block;background:${COLORS.gold600};color:${COLORS.white};padding:12px 28px;border-radius:6px;text-decoration:none;font-weight:700;font-size:14px;">
+        ${s.cta}
+      </a>
+    </p>
+    <p style="color:#666;font-size:13px;margin:0;">${helperLine}</p>
+  `;
+  return emailLayout(body, undefined, opts.locale);
+}
+
+export function getBookingUpdatedSubject(proName: string, locale: Locale): string {
+  return (BOOKING_UPDATED_STRINGS[locale] ?? BOOKING_UPDATED_STRINGS.en).subject(proName);
+}
+
+export function buildParticipantBookingUpdatedEmail(opts: {
+  participantFirstName: string;
+  bookerName: string;
+  proName: string;
+  proEmail?: string | null;
+  proPhone?: string | null;
+  locationName: string;
+  date: string;
+  startTime: string;
+  endTime: string;
+  duration: number;
+  locale: Locale;
+}): string {
+  const s = BOOKING_UPDATED_STRINGS[opts.locale] ?? BOOKING_UPDATED_STRINGS.en;
+  const rows: Array<DetailRow> = [[s.pro, opts.proName]];
+  if (opts.proEmail) rows.push([s.proEmail, opts.proEmail, `mailto:${opts.proEmail}`]);
+  if (opts.proPhone)
+    rows.push([s.proPhone, opts.proPhone, `tel:${opts.proPhone.replace(/\s+/g, "")}`]);
+  rows.push(
+    [s.location, opts.locationName],
+    [s.date, formatLessonDate(opts.date, opts.locale)],
+    [s.time, `${opts.startTime} – ${opts.endTime}`],
+    [s.duration, `${opts.duration} ${s.durationUnit}`],
+  );
+  const body = `
+    <h2 style="font-family:Georgia,'Times New Roman',serif;font-size:22px;color:${COLORS.green950};margin:0 0 16px 0;font-weight:normal;">
+      ${formatGreeting(s.greeting, opts.participantFirstName, opts.locale)}
+    </h2>
+    <p style="margin:0 0 20px 0;">${s.participantBody(opts.bookerName, opts.proName)}</p>
+    ${detailsTable(rows)}
+    <p style="color:#666;font-size:13px;margin:0;">${s.participantHelper(opts.bookerName)}</p>
+  `;
+  return emailLayout(body, undefined, opts.locale);
+}
+
+export function getParticipantBookingUpdatedSubject(
+  proName: string,
+  bookerName: string,
+  locale: Locale,
+): string {
+  return (BOOKING_UPDATED_STRINGS[locale] ?? BOOKING_UPDATED_STRINGS.en).participantSubject(
+    proName,
+    bookerName,
+  );
 }
 
 const BOOKING_PRO_STRINGS: Record<Locale, {
@@ -1075,7 +1504,7 @@ export function buildProBookingNotificationEmail(opts: {
     ${unverifiedNotice}
     ${detailsTable(rows)}
     <p style="margin:0 0 24px 0;">
-      <a href="${getBaseUrl()}/pro/bookings" style="display:inline-block;background:${COLORS.gold600};color:${COLORS.white};padding:12px 28px;border-radius:6px;text-decoration:none;font-weight:500;font-size:14px;">
+      <a href="${getBaseUrl()}/pro/bookings" style="display:inline-block;background:${COLORS.gold600};color:${COLORS.white};padding:12px 28px;border-radius:6px;text-decoration:none;font-weight:700;font-size:14px;">
         ${s.cta}
       </a>
     </p>
@@ -1178,7 +1607,7 @@ export function buildLessonReminderEmail(opts: {
       [s.time, `${opts.startTime} – ${opts.endTime}`],
     ])}
     <p style="margin:0 0 24px 0;">
-      <a href="${ctaUrl}" style="display:inline-block;background:${COLORS.gold600};color:${COLORS.white};padding:12px 28px;border-radius:6px;text-decoration:none;font-weight:500;font-size:14px;">
+      <a href="${ctaUrl}" style="display:inline-block;background:${COLORS.gold600};color:${COLORS.white};padding:12px 28px;border-radius:6px;text-decoration:none;font-weight:700;font-size:14px;">
         ${s.cta}
       </a>
     </p>
@@ -1333,7 +1762,7 @@ export function buildClaimAndVerifyBookingEmail(opts: {
     <p style="margin:0 0 20px 0;">${s.claimIntro(opts.proName)}</p>
     ${detailsTable(rows)}
     <p style="margin:0 0 12px 0;">
-      <a href="${opts.claimUrl}" style="display:inline-block;background:${COLORS.gold600};color:${COLORS.white};padding:12px 28px;border-radius:6px;text-decoration:none;font-weight:500;font-size:14px;">
+      <a href="${opts.claimUrl}" style="display:inline-block;background:${COLORS.gold600};color:${COLORS.white};padding:12px 28px;border-radius:6px;text-decoration:none;font-weight:700;font-size:14px;">
         ${s.claimButton}
       </a>
     </p>
@@ -1348,7 +1777,7 @@ export function buildClaimAndVerifyBookingEmail(opts: {
             ${s.registerIntro}
           </p>
           <p style="margin:0;">
-            <a href="${opts.registerUrl}" style="display:inline-block;background:#ffffff;border:1px solid #c4a035;color:${COLORS.green950};padding:10px 22px;border-radius:6px;text-decoration:none;font-weight:500;font-size:13px;">
+            <a href="${opts.registerUrl}" style="display:inline-block;background:#ffffff;border:1px solid #c4a035;color:${COLORS.green950};padding:10px 22px;border-radius:6px;text-decoration:none;font-weight:700;font-size:13px;">
               ${s.registerButton}
             </a>
           </p>
@@ -1393,7 +1822,7 @@ export function buildNewBookingOnAccountEmail(opts: {
     <p style="margin:0 0 20px 0;">${s.alreadyIntro(opts.proName)}</p>
     ${detailsTable(rows)}
     <p style="margin:0 0 12px 0;">
-      <a href="${opts.loginUrl}" style="display:inline-block;background:${COLORS.gold600};color:${COLORS.white};padding:12px 28px;border-radius:6px;text-decoration:none;font-weight:500;font-size:14px;">
+      <a href="${opts.loginUrl}" style="display:inline-block;background:${COLORS.gold600};color:${COLORS.white};padding:12px 28px;border-radius:6px;text-decoration:none;font-weight:700;font-size:14px;">
         ${s.loginButton}
       </a>
     </p>

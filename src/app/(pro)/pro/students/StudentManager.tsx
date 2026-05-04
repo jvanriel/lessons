@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useRef, useEffect, useActionState } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { inviteStudent, getStudentBookings, proCancelBooking, type ProQuickBookData } from "./actions";
 import { ProQuickBook } from "./ProQuickBook";
@@ -79,7 +79,19 @@ export default function StudentManager({
     return () => window.removeEventListener("booking-changed", handleBookingChanged);
   }, [router]);
 
-  const [showInviteForm, setShowInviteForm] = useState(false);
+  // Pre-fill the invite form from query params — used by the Guest
+  // List on the same page, which links here as
+  // `/pro/students?invite=<email>&firstName=...&lastName=...` to let
+  // the pro upgrade a guest into a real student in one click.
+  // (Task 87.)
+  const searchParams = useSearchParams();
+  const inviteEmailParam = searchParams.get("invite") ?? "";
+  const inviteFirstNameParam = searchParams.get("firstName") ?? "";
+  const inviteLastNameParam = searchParams.get("lastName") ?? "";
+
+  const [showInviteForm, setShowInviteForm] = useState(
+    Boolean(inviteEmailParam),
+  );
   const [inviteMode, setInviteMode] = useState<"invited" | "pro_added">(
     "invited"
   );
@@ -208,6 +220,7 @@ export default function StudentManager({
                 <input
                   name="firstName"
                   required
+                  defaultValue={inviteFirstNameParam}
                   className="mt-1 block w-full rounded-lg border border-green-200 px-3 py-2 text-sm focus:border-gold-500 focus:outline-none focus:ring-1 focus:ring-gold-500"
                 />
               </div>
@@ -218,6 +231,7 @@ export default function StudentManager({
                 <input
                   name="lastName"
                   required
+                  defaultValue={inviteLastNameParam}
                   className="mt-1 block w-full rounded-lg border border-green-200 px-3 py-2 text-sm focus:border-gold-500 focus:outline-none focus:ring-1 focus:ring-gold-500"
                 />
               </div>
@@ -230,6 +244,7 @@ export default function StudentManager({
                 name="email"
                 type="email"
                 required
+                defaultValue={inviteEmailParam}
                 className="mt-1 block w-full rounded-lg border border-green-200 px-3 py-2 text-sm focus:border-gold-500 focus:outline-none focus:ring-1 focus:ring-gold-500"
               />
             </div>

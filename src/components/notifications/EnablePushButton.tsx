@@ -48,7 +48,27 @@ export default function EnablePushButton({ locale }: { locale: Locale }) {
 
     navigator.serviceWorker.ready.then(async (reg) => {
       const sub = await reg.pushManager.getSubscription();
-      if (sub) setStatus("enabled");
+      if (sub) {
+        setStatus("enabled");
+        // The browser has a subscription — make sure our DB row exists
+        // for it too. Pre-fix: a stale browser subscription (created
+        // outside this button's flow, or persisting across logouts)
+        // would set the toggle to "active" but the test-send would
+        // fail with "no push subscription found" because the DB had
+        // nothing. /api/push/subscribe is idempotent (upsert on
+        // endpoint) so re-POSTing on every mount is safe and keeps
+        // the two stores in sync. (task 89)
+        try {
+          await fetch("/api/push/subscribe", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(sub.toJSON()),
+          });
+        } catch {
+          // Network blip — the test button will surface a clearer
+          // error if the subscription still ends up missing.
+        }
+      }
     });
   }, []);
 
@@ -182,8 +202,18 @@ function TestPushButton({ locale }: { locale: Locale }) {
         );
       } else {
         setState("err");
+        // The endpoint returns `errorKey` (a stable identifier the
+        // client localizes). Older shape with raw English `error`
+        // string is kept as a defensive fallback. (task 89)
+        const localizedFromKey = data.errorKey
+          ? t(
+              `notifications.err.${data.errorKey}` as Parameters<typeof t>[0],
+              locale,
+            )
+          : null;
         setMessage(
-          data.error ||
+          localizedFromKey ||
+            data.error ||
             t("notifications.testFailed", locale).replace(
               "{status}",
               String(res.status),

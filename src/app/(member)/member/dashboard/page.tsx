@@ -228,6 +228,7 @@ export default async function MemberDashboard() {
                   <QuickBook
                     data={quickBookMap[pro.proStudentId]}
                     proId={pro.proProfileId}
+                    proName={pro.displayName}
                     hasPaymentMethod={hasPaymentMethod}
                     allowBookingWithoutPayment={pro.allowBookingWithoutPayment}
                     locale={locale}

@@ -769,14 +769,14 @@ describe("Phase 6: Cash-only cancel reverses invoice item", () => {
 // ═══════════════════════════════════════════════════════
 
 describe("Phase 7: calculatePlatformFee", () => {
-  it("rounds to nearest cent — online (2.5% + 1.5% = 4.0%)", () => {
+  it("rounds to nearest cent — online (2.5% + 2.5% = 5.0%)", () => {
     // Defaults to online (student paid via Stripe).
-    // 6500 * 0.04 = 260
-    expect(calculatePlatformFee(6500)).toBe(260);
-    // 3500 * 0.04 = 140
-    expect(calculatePlatformFee(3500)).toBe(140);
-    // 100 * 0.04 = 4
-    expect(calculatePlatformFee(100)).toBe(4);
+    // 6500 * 0.05 = 325
+    expect(calculatePlatformFee(6500)).toBe(325);
+    // 3500 * 0.05 = 175
+    expect(calculatePlatformFee(3500)).toBe(175);
+    // 100 * 0.05 = 5
+    expect(calculatePlatformFee(100)).toBe(5);
   });
 
   it("cash-only drops the Stripe surcharge (2.5%)", () => {

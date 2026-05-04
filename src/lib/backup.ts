@@ -34,6 +34,7 @@ export interface BackupData {
     events: Record<string, unknown>[];
     stripeEvents: Record<string, unknown>[];
     webauthnCredentials: Record<string, unknown>[];
+    qrLoginTokens: Record<string, unknown>[];
   };
 }
 
@@ -100,6 +101,7 @@ export async function createBackup(): Promise<BackupMeta> {
     events,
     stripeEvents,
     webauthnCredentials,
+    qrLoginTokens,
   ] = await Promise.all([
     sql`SELECT * FROM users ORDER BY id`,
     sql`SELECT * FROM user_emails ORDER BY id`,
@@ -128,6 +130,7 @@ export async function createBackup(): Promise<BackupMeta> {
     sql`SELECT * FROM events ORDER BY id`,
     sql`SELECT * FROM stripe_events ORDER BY id`,
     sql`SELECT * FROM webauthn_credentials ORDER BY id`,
+    sql`SELECT * FROM qr_login_tokens ORDER BY id`,
   ]);
 
   const now = new Date();
@@ -162,6 +165,7 @@ export async function createBackup(): Promise<BackupMeta> {
       events,
       stripeEvents,
       webauthnCredentials,
+      qrLoginTokens,
     },
   };
 
@@ -210,6 +214,9 @@ const TABLE_DEFS = [
   { name: "events", key: "events", seq: "events_id_seq" },
   { name: "stripe_events", key: "stripeEvents", seq: "stripe_events_id_seq" },
   { name: "webauthn_credentials", key: "webauthnCredentials", seq: "webauthn_credentials_id_seq" },
+  // qr_login_tokens has a varchar PK (no sequence). The seq field is
+  // unused at insert time when the rows already carry their own ids.
+  { name: "qr_login_tokens", key: "qrLoginTokens", seq: "qr_login_tokens_id_seq" },
   // Existing per-row child tables.
   { name: "comment_reactions", key: "commentReactions", seq: "comment_reactions_id_seq" },
   { name: "comments", key: "comments", seq: "comments_id_seq" },

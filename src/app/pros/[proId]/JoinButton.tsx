@@ -3,15 +3,19 @@
 import { useState, useTransition } from "react";
 import Link from "next/link";
 import { joinAsStudent } from "./actions";
+import type { Locale } from "@/lib/i18n";
+import { t } from "@/lib/i18n/translations";
 
 export default function JoinButton({
   proProfileId,
   isLoggedIn,
   isStudent,
+  locale,
 }: {
   proProfileId: number;
   isLoggedIn: boolean;
   isStudent: boolean;
+  locale: Locale;
 }) {
   const [isPending, startTransition] = useTransition();
   const [joined, setJoined] = useState(isStudent);
@@ -23,7 +27,7 @@ export default function JoinButton({
         <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
           <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
         </svg>
-        Joined
+        {t("proBrowse.joined", locale)}
       </span>
     );
   }
@@ -34,7 +38,7 @@ export default function JoinButton({
         href={`/register?pro=${proProfileId}`}
         className="inline-block rounded-md border border-green-300 bg-white px-5 py-2.5 text-sm font-medium text-green-700 transition-colors hover:bg-green-50"
       >
-        Join as Student
+        {t("proBrowse.joinAsStudent", locale)}
       </Link>
     );
   }
@@ -59,7 +63,9 @@ export default function JoinButton({
         disabled={isPending}
         className="rounded-md border border-green-300 bg-white px-5 py-2.5 text-sm font-medium text-green-700 transition-colors hover:bg-green-50 disabled:opacity-50"
       >
-        {isPending ? "Joining..." : "Join as Student"}
+        {isPending
+          ? t("proBrowse.joining", locale)
+          : t("proBrowse.joinAsStudent", locale)}
       </button>
       {error && <p className="mt-1 text-xs text-red-600">{error}</p>}
     </div>

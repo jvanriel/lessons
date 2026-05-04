@@ -174,6 +174,7 @@ export default async function ProProfilePage({ params }: Props) {
                 proProfileId={pro.id}
                 isLoggedIn={relationship.isLoggedIn}
                 isStudent={relationship.isStudent}
+                locale={locale}
               />
             </div>
           </div>

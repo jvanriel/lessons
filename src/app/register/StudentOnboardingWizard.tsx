@@ -156,6 +156,9 @@ function AccountStep({
   onPasswordChange,
   onConfirmChange,
   onGenerate,
+  passwordGenerated,
+  includePasswordInEmail,
+  onIncludePasswordInEmailChange,
   locale,
   showAuthFooter,
   proSignupOpen,
@@ -170,6 +173,12 @@ function AccountStep({
   onPasswordChange: (v: string) => void;
   onConfirmChange: (v: string) => void;
   onGenerate: () => void;
+  /** True after the user has clicked "Generate password" at least
+   * once. Drives the visibility of the "include in confirmation email"
+   * opt-in below — typed passwords are never emailed regardless. */
+  passwordGenerated: boolean;
+  includePasswordInEmail: boolean;
+  onIncludePasswordInEmailChange: (v: boolean) => void;
   locale: Locale;
   /** Show the "Already have an account? Login · I'm a golf pro" links.
    * Only true when the user landed on /register from the header
@@ -390,6 +399,22 @@ function AccountStep({
               <p className={errClass}>{t("authErr.passwordsDontMatch", locale)}</p>
             )}
           </div>
+          {passwordGenerated && (
+            <label className="flex items-start gap-2 rounded-md border border-green-100 bg-green-50/40 px-3 py-2 text-xs text-green-700">
+              <input
+                type="checkbox"
+                checked={includePasswordInEmail}
+                onChange={(e) => onIncludePasswordInEmailChange(e.target.checked)}
+                className="mt-0.5 h-4 w-4 rounded border-green-300 text-gold-600 focus:ring-gold-500"
+              />
+              <span>
+                {t("onboarding.includePasswordInEmail", locale)}
+                <span className="mt-0.5 block text-green-500">
+                  {t("onboarding.includePasswordInEmailHint", locale)}
+                </span>
+              </span>
+            </label>
+          )}
         </>
       )}
 
@@ -755,6 +780,11 @@ export default function StudentOnboardingWizard({
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
   const [passwordGenerated, setPasswordGenerated] = useState(false);
+  // Opt-in to receive the generated password by email. Defaults to
+  // false (security-default) — Nadine flagged the auto-include as a
+  // no-go. Only relevant when `passwordGenerated` is true; typed
+  // passwords are never emailed regardless.
+  const [includePasswordInEmail, setIncludePasswordInEmail] = useState(false);
   const [selectedPros, setSelectedPros] = useState<Set<number>>(() => {
     const initial = new Set<number>(existingProIds);
     if (preSelectedProId) initial.add(preSelectedProId);
@@ -929,7 +959,11 @@ export default function StudentOnboardingWizard({
 
   async function completeOnboarding() {
     const result = await saveStep("complete", {
-      generatedPassword: passwordGenerated ? password : null,
+      // Only include the generated password in the API payload (and
+      // therefore in the confirmation email) when the user opted in
+      // via the checkbox in step 1.
+      generatedPassword:
+        passwordGenerated && includePasswordInEmail ? password : null,
     });
     if (result) setStep(STEP_KEYS.length);
   }
@@ -1034,7 +1068,7 @@ export default function StudentOnboardingWizard({
           {error && <div className="mb-4 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">{error}</div>}
 
           {step === 0 && <LanguageStep selected={data.preferredLocale} onChange={(v) => updateData({ preferredLocale: v })} />}
-          {step === 1 && <AccountStep data={data} onChange={updateData} isAuthenticated={isAuthenticated} emailLocked={emailLocked} originalEmail={originalEmail} password={password} confirmPassword={confirmPassword} onPasswordChange={setPassword} onConfirmChange={setConfirmPassword} onGenerate={() => setPasswordGenerated(true)} locale={loc} showAuthFooter={showAuthFooter} proSignupOpen={proSignupOpen} />}
+          {step === 1 && <AccountStep data={data} onChange={updateData} isAuthenticated={isAuthenticated} emailLocked={emailLocked} originalEmail={originalEmail} password={password} confirmPassword={confirmPassword} onPasswordChange={setPassword} onConfirmChange={setConfirmPassword} onGenerate={() => setPasswordGenerated(true)} passwordGenerated={passwordGenerated} includePasswordInEmail={includePasswordInEmail} onIncludePasswordInEmailChange={setIncludePasswordInEmail} locale={loc} showAuthFooter={showAuthFooter} proSignupOpen={proSignupOpen} />}
           {step === 2 && <GolfProfileStep data={data} onChange={updateData} locale={loc} />}
           {step === 3 && <ChooseProsStep pros={pros} selected={selectedPros} onToggle={togglePro} locale={loc} />}
           {step === 4 && (

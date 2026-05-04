@@ -16,6 +16,27 @@ import { checkCancellationAllowed, buildCancelIcs } from "@/lib/lesson-slots";
 import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import { sendEmail } from "@/lib/mail";
+import { sendParticipantCancellationNotifications } from "@/lib/booking-participants";
+import {
+  parseEditBookingChanges,
+  validateEditAllowed,
+  validateEditParticipants,
+  isNoOpEdit,
+  isSlotTakenByOther,
+  applyBookingEdit,
+  sendBookingUpdatedNotifications,
+} from "@/lib/booking-edit";
+import {
+  decideEditPaymentAction,
+  applyEditPaymentAction,
+  paymentResultToEmailChange,
+} from "@/lib/booking-edit-payment";
+import { loadBookingPricing } from "@/lib/booking-charge";
+import type { EmailPaymentChange } from "@/lib/email-templates";
+import { getAvailableSlots } from "@/app/(member)/member/book/actions";
+import { lessonParticipants } from "@/lib/db/schema";
+import { isSlotConflictError } from "@/lib/db";
+import { after } from "next/server";
 import { getStripe } from "@/lib/stripe";
 import { resolveLocale } from "@/lib/i18n";
 import { getLocale } from "@/lib/locale";
@@ -292,6 +313,12 @@ export async function cancelBooking(bookingId: number) {
     }).catch(() => {});
   }
 
+  // Fan out cancellation to extra participants (best-effort + Sentry-tagged
+  // inside the helper). Skipped automatically when participantCount === 1.
+  if ((booking.participantCount ?? 1) > 1) {
+    sendParticipantCancellationNotifications(bookingId).catch(() => {});
+  }
+
   await logEvent({
     type: "booking.cancelled",
     actorId: session.userId,
@@ -302,6 +329,199 @@ export async function cancelBooking(bookingId: number) {
       startTime: booking.startTime,
       proId: booking.proProfileId,
     },
+  });
+
+  revalidatePath("/member/bookings");
+  return { success: true };
+}
+
+
+// ─── Edit ──────────────────────────────────────────────
+
+/**
+ * Member-side booking edit. Reschedule (date/time/duration), update
+ * participant roster, or both. Pricing is NOT recomputed in Phase 1
+ * — see docs/new-features.md for the Phase 2 payment-delta scope.
+ *
+ * Auth: must be the booker. Cancellation-window gate applies.
+ */
+export async function updateBooking(formData: FormData) {
+  const session = await getSession();
+  if (!session || !hasRole(session, "member")) {
+    return { error: "Unauthorized" };
+  }
+  const bookingId = Number(formData.get("bookingId"));
+  if (!bookingId) return { error: "Invalid booking ID" };
+
+  const changes = parseEditBookingChanges(formData);
+  const participantError = validateEditParticipants(changes.extraParticipants);
+  if (participantError) return { error: participantError };
+
+  // Load the booking + the booker's own lesson_participants row so we
+  // can preserve it across the participant-list rewrite. Pricing
+  // columns come along for the Phase 2 payment-delta decision.
+  const [booking] = await db
+    .select({
+      id: lessonBookings.id,
+      bookedById: lessonBookings.bookedById,
+      proProfileId: lessonBookings.proProfileId,
+      proLocationId: lessonBookings.proLocationId,
+      date: lessonBookings.date,
+      startTime: lessonBookings.startTime,
+      endTime: lessonBookings.endTime,
+      participantCount: lessonBookings.participantCount,
+      status: lessonBookings.status,
+      cancelledAt: lessonBookings.cancelledAt,
+      priceCents: lessonBookings.priceCents,
+      platformFeeCents: lessonBookings.platformFeeCents,
+      paymentStatus: lessonBookings.paymentStatus,
+      stripePaymentIntentId: lessonBookings.stripePaymentIntentId,
+      stripeInvoiceItemId: lessonBookings.stripeInvoiceItemId,
+    })
+    .from(lessonBookings)
+    .where(
+      and(
+        eq(lessonBookings.id, bookingId),
+        eq(lessonBookings.bookedById, session.userId),
+      ),
+    )
+    .limit(1);
+  if (!booking) return { error: "Booking not found" };
+
+  // Cancellation-window gate. Resolve location TZ + the pro's policy.
+  const tz = await getProLocationTimezone(booking.proLocationId);
+  const [proRow] = await db
+    .select({ cancellationHours: proProfiles.cancellationHours })
+    .from(proProfiles)
+    .where(eq(proProfiles.id, booking.proProfileId))
+    .limit(1);
+  const cancellationHours = proRow?.cancellationHours ?? 24;
+  const editError = validateEditAllowed(booking, cancellationHours, tz);
+  if (editError) return { error: editError };
+
+  // Existing participants (booker is participant #1, by id-asc order).
+  const currentParticipants = await db
+    .select({
+      id: lessonParticipants.id,
+      firstName: lessonParticipants.firstName,
+      lastName: lessonParticipants.lastName,
+      email: lessonParticipants.email,
+    })
+    .from(lessonParticipants)
+    .where(eq(lessonParticipants.bookingId, bookingId))
+    .orderBy(lessonParticipants.id);
+  const bookerParticipant = currentParticipants[0];
+  if (!bookerParticipant) {
+    return { error: "Booking participant row missing — please contact support." };
+  }
+
+  if (
+    isNoOpEdit(
+      {
+        date: booking.date,
+        startTime: booking.startTime,
+        endTime: booking.endTime,
+        participantCount: booking.participantCount,
+        participants: currentParticipants,
+      },
+      changes,
+    )
+  ) {
+    return { success: true, noop: true };
+  }
+
+  // New-slot validation: must be (1) inside the pro's published
+  // availability for this duration, AND (2) not overlapping any other
+  // booking. The first check was missing pre-fix — the form's
+  // `<input type="time">` let students pick any time, so an edit
+  // could land outside the pro's actual availability windows. (task 92)
+  if (
+    booking.date !== changes.date ||
+    booking.startTime !== changes.startTime ||
+    booking.endTime !== changes.endTime
+  ) {
+    const locale = await getLocale();
+    const allowedSlots = await getAvailableSlots(
+      booking.proProfileId,
+      booking.proLocationId,
+      changes.date,
+      changes.duration,
+    );
+    const inAvailability = allowedSlots.some(
+      (s) => s.startTime === changes.startTime && s.endTime === changes.endTime,
+    );
+    if (!inAvailability) {
+      return { error: t("bookErr.slotUnavailable", locale) };
+    }
+    const taken = await isSlotTakenByOther(
+      booking.proProfileId,
+      booking.proLocationId,
+      changes.date,
+      changes.startTime,
+      changes.endTime,
+      booking.id,
+    );
+    if (taken) {
+      return { error: t("bookErr.slotUnavailable", locale) };
+    }
+  }
+
+  try {
+    await applyBookingEdit(booking.id, changes, bookerParticipant.id);
+  } catch (err) {
+    if (isSlotConflictError(err)) {
+      const locale = await getLocale();
+      return { error: t("bookErr.slotUnavailable", locale) };
+    }
+    throw err;
+  }
+
+  // Phase 2: recompute pricing for the new (duration, participantCount)
+  // and decide whether to charge a delta, refund a delta, or swap the
+  // pending cash-only commission invoice item. The booking row's
+  // date/time/participant fields are already updated above; this step
+  // brings the financial fields in line. Failures here surface to
+  // Sentry under tags.area="edit-payment" and the booking row keeps
+  // the pre-edit price (admin reconciles).
+  const pricing = await loadBookingPricing(
+    booking.proProfileId,
+    changes.duration,
+    changes.participantCount,
+  );
+  let paymentChange: EmailPaymentChange | undefined;
+  if (pricing.ok) {
+    const action = decideEditPaymentAction(
+      {
+        priceCents: booking.priceCents,
+        platformFeeCents: booking.platformFeeCents,
+        paymentStatus: booking.paymentStatus,
+        stripePaymentIntentId: booking.stripePaymentIntentId,
+        stripeInvoiceItemId: booking.stripeInvoiceItemId,
+      },
+      {
+        priceCents: pricing.priceCents,
+        platformFeeCents: pricing.platformFeeCents,
+      },
+    );
+    const result = await applyEditPaymentAction(booking.id, action, {
+      proProfileId: booking.proProfileId,
+      afterPrice: pricing.priceCents,
+      afterCommission: pricing.platformFeeCents,
+      date: changes.date,
+      startTime: changes.startTime,
+      endTime: changes.endTime,
+    });
+    paymentChange = paymentResultToEmailChange(result);
+  } else {
+    // pricing.ok=false (pro changed config in a way that doesn't
+    // fit) — keep the booking edit but flag for manual reconcile.
+    paymentChange = { kind: "manual_review" };
+  }
+
+  // Notification fanout runs post-response so the UI returns
+  // immediately. Vercel keeps the function alive via `after()`.
+  after(async () => {
+    await sendBookingUpdatedNotifications(booking.id, paymentChange);
   });
 
   revalidatePath("/member/bookings");

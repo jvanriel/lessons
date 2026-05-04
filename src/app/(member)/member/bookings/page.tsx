@@ -90,7 +90,7 @@ export default async function MemberBookingsPage() {
         className="mb-8"
       >
         <Link
-          href="/member/dashboard"
+          href="/pros"
           className="rounded-md bg-gold-600 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-gold-500"
         >
           {t("memberBookings.bookLesson", locale)}
@@ -173,14 +173,22 @@ export default async function MemberBookingsPage() {
                       </div>
                     )}
                   </div>
-                  <CancelBookingButton
-                    bookingId={booking.id}
-                    date={booking.date}
-                    startTime={booking.startTime}
-                    cancellationHours={booking.cancellationHours}
-                    locale={locale}
-                    timezone={booking.locationTimezone}
-                  />
+                  <div className="flex items-center gap-2">
+                    <Link
+                      href={`/member/bookings/${booking.id}/edit`}
+                      className="rounded-md border border-green-300 bg-white px-3 py-1.5 text-xs font-medium text-green-800 hover:bg-green-50"
+                    >
+                      {t("editBooking.editLink", locale)}
+                    </Link>
+                    <CancelBookingButton
+                      bookingId={booking.id}
+                      date={booking.date}
+                      startTime={booking.startTime}
+                      cancellationHours={booking.cancellationHours}
+                      locale={locale}
+                      timezone={booking.locationTimezone}
+                    />
+                  </div>
                 </div>
               </div>
             ))}

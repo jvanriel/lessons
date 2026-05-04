@@ -7,10 +7,13 @@ import { t } from "@/lib/i18n/translations";
 import { cheapestLessonPrice } from "@/lib/pricing";
 import { excludeDummiesOnProduction } from "@/lib/pro-visibility";
 
-export const metadata = {
-  title: "Our Pros — Golf Lessons",
-  description: "Browse certified golf professionals and find the perfect coach for your game.",
-};
+export async function generateMetadata() {
+  const locale = await getLocale();
+  return {
+    title: `${t("pros.browse.title", locale)} — Golf Lessons`,
+    description: t("pros.browse.subtitle", locale),
+  };
+}
 
 export default async function ProsPage() {
   const locale = await getLocale();

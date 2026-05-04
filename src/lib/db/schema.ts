@@ -340,6 +340,14 @@ export const lessonBookings = pgTable("lesson_bookings", {
   googleEventId: varchar("google_event_id", { length: 255 }),
   cancelledAt: timestamp("cancelled_at"),
   cancellationReason: text("cancellation_reason"),
+  /**
+   * Number of times this booking has been edited (reschedule,
+   * participant change, etc.). Used as the ICS `SEQUENCE` value so
+   * that updated calendar invites supersede earlier ones for the
+   * same UID. Bumped inside `updateBooking` / `proUpdateBooking`.
+   * Pure cancellations don't bump this — they emit METHOD:CANCEL.
+   */
+  editCount: integer("edit_count").notNull().default(0),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });
@@ -616,5 +624,41 @@ export const webauthnCredentials = pgTable(
   },
   (table) => ({
     userIdIdx: index("webauthn_credentials_user_id_idx").on(table.userId),
+  })
+);
+
+
+// ─── QR Login Tokens ───────────────────────────────────
+//
+// Short-id → JWT redirection table for the "open on phone" QR login.
+// Keeps the QR URL tiny (`/q/<id>` instead of a 280-char JWT URL) so
+// non-iPhone scanners — Android cameras, Samsung Internet, etc. —
+// can resolve the dense JWT QR. Trade-off vs the previous
+// self-contained JWT-in-URL approach: one extra DB lookup per scan;
+// in exchange we get reliable cross-device scanning.
+//
+// `id` is short opaque base62 (8 chars = 218 trillion combinations,
+// plenty for 5-min collision space). Single-use: `consumed_at` is
+// set on first redemption so a scanned-and-shared URL can't replay.
+// Expired/consumed rows are pruned opportunistically (no cron).
+export const qrLoginTokens = pgTable(
+  "qr_login_tokens",
+  {
+    id: varchar("id", { length: 16 }).primaryKey(),
+    userId: integer("user_id")
+      .references(() => users.id, { onDelete: "cascade" })
+      .notNull(),
+    /**
+     * The full session JWT to install on redemption. Storing it lets
+     * the redeem endpoint stay stateless w.r.t. role/email lookups —
+     * everything needed to set the session cookie is in the token.
+     */
+    sessionJwt: text("session_jwt").notNull(),
+    expiresAt: timestamp("expires_at").notNull(),
+    consumedAt: timestamp("consumed_at"),
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+  },
+  (table) => ({
+    expiresAtIdx: index("qr_login_tokens_expires_at_idx").on(table.expiresAt),
   })
 );

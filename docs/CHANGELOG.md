@@ -17,6 +17,197 @@ If any role inside the brackets is unknown (typo), the parser falls
 back to treating the brackets as literal text — better to over-show
 than silently hide.
 
+## 2026-05-04 — v1.1.37
+
+- [pro] **New "Guests" panel on the Students page.** Whenever a
+  booking includes additional participants with an email address,
+  those people now appear under a collapsible "Guests" section
+  below your students list — deduplicated by email, with the count
+  of lessons they've attended and the date of their last lesson.
+  We don't create accounts for them automatically. When it makes
+  sense, you can click "Invite as student" — opens the existing
+  invite dialog with their name + email pre-filled.
+
+## 2026-05-04 — v1.1.36
+
+- **Bolder buttons in confirmation emails.** CTAs in our outgoing
+  emails ("Verify email", "View my bookings", "Manage your
+  subscription", etc.) used a medium font-weight; they now render in
+  bold so they stand out a bit more against the body copy.
+
+## 2026-05-04 — v1.1.35
+
+- **"Send test notification" no longer fails when notifications look
+  active.** The toggle was reading the browser's subscription state,
+  but the test send was checking the server's database — and the two
+  could drift out of sync if the user enabled notifications outside
+  the usual flow. The browser subscription is now re-registered
+  with the server on every page load, so the two stay aligned and
+  the test button works without needing to toggle off and on.
+- **Notification error messages are now localized.** Errors from
+  the test-send endpoint used to leak through as English ("No push
+  subscription found. Enable notifications first.") regardless of
+  the user's language. They now appear in NL / FR too.
+
+## 2026-05-04 — v1.1.34
+
+- **No more duplicate "verify your email" email after registering
+  via a public booking.** When you booked a lesson without an
+  account, then clicked the verify link in the confirmation email,
+  then registered an account — the system was sending you another
+  "please verify your email" email even though you'd just verified.
+  We now skip that send when your email is already verified.
+
+## 2026-05-04 — v1.1.33
+
+- **Card-only at the payment step.** When you add a payment method
+  (as a student or as a pro signing up), the form now offers cards
+  only. Previously it also showed Bancontact and (for pros) SEPA
+  Direct Debit. SEPA in particular dragged a long mandate notice
+  about an "8-week refund right via your bank" — confusing because
+  the platform already auto-refunds within the pro's cancellation
+  window. Cards work everywhere in the target market and the form
+  stays simple.
+
+## 2026-05-04 — v1.1.32
+
+- **NL: registration wizard now uses "Boek direct" everywhere.**
+  Three onboarding strings still said "Quick Book" while the rest
+  of the Dutch UI uses "Boek direct" (the dashboard widget, the
+  profile, the help text). Updated for consistency. EN and FR keep
+  the English brand name throughout — no change there.
+
+## 2026-05-04 — v1.1.31
+
+- **Clearer "add payment method" message on the dashboard.** When a
+  pro requires online payment and you haven't added a payment method
+  yet, the Quick Book widget now names that pro explicitly — e.g.
+  *"Olivier requires online payment for bookings. Add a payment
+  method to use Quick Book here."* — instead of the generic prompt
+  that read like the platform required it.
+- **"Boek les" / "Book a lesson" button on My Bookings now opens
+  the pro list.** Previously it sent you back to the dashboard,
+  which didn't immediately put you in a booking flow. It now goes
+  straight to /pros where you can pick a pro and start the booking
+  wizard.
+
+## 2026-05-04 — v1.1.30
+
+- **Required-field marker on extra-participant names.** First name
+  and last name fields for additional participants now show a `*`
+  in the placeholder, matching the convention used elsewhere in the
+  forms. Email stays marked "(optional)" since it isn't required.
+
+## 2026-05-04 — v1.1.29
+
+- **Public booking now shows the correct group price.** When you
+  add an extra participant to a public booking, the summary line
+  now includes the extra-participant rate set by the pro instead
+  of just the base price. (The booking row itself was already
+  saving the correct total — only the displayed price was stale.)
+
+## 2026-05-04 — v1.1.28
+
+- **Editing a booking now respects the pro's availability.** When you
+  reschedule, you can only pick from time slots the pro has actually
+  made available — previously the form let you type any time, which
+  meant a student could land a lesson on a slot the pro never
+  offered. Both member-side and pro-side edits now go through the
+  same availability check.
+- **No more confusing "commission" line in your edit-confirmation
+  email.** When a pro is cash-only, internal commission accounting
+  isn't relevant to the student — the email no longer mentions it.
+- **Edit pages are translated.** "Edit" link, page titles, all form
+  labels, and helper text now appear in NL / FR (was English-only).
+
+## 2026-05-04 — v1.1.27
+
+- **Generated passwords are no longer emailed by default.** When you
+  use the "Generate password" button during signup, a checkbox now
+  appears asking whether to also include the password in the
+  confirmation email. It's off by default — putting a password in
+  plain email is generally less secure, and you can reset it later
+  if you forget. Tick the box if you want the convenience.
+
+## 2026-05-03 — v1.1.26
+
+- **QR login now works on Android, not just iPhone.** Previously the
+  QR code on the dashboard encoded a long signed token directly in
+  the URL — fine for the iPhone camera, but most Android cameras
+  couldn't resolve the dense QR. The QR now encodes a short opaque
+  id (8 chars) that the server resolves on scan, so the QR is small
+  and crisp and reads on any default phone camera.
+
+## 2026-05-02 — v1.1.25
+
+- **Edit booking: remove a specific participant.** Previously
+  lowering the participant count always dropped the *last* person in
+  the list — if you wanted to remove someone in the middle you had
+  to edit names around. Each additional-participant row now has its
+  own "× Remove" button.
+- **"New version available" toast really fires only once now.**
+  v1.1.20 fixed the cached-HTML reload but a second trigger remained:
+  the service worker download lags the page reload by one tick, so a
+  freshly-loaded page (already on the new BUILD_ID) still saw an
+  `updatefound` event when the SW caught up — and re-fired the toast.
+  The SW trigger now re-checks the actual server build id and only
+  shows the toast on a real mismatch.
+
+## 2026-05-02 — v1.1.24
+
+- **Edit a booking and the payment is now adjusted automatically.**
+  When you change a booking's duration or the number of participants
+  in a way that changes the price, the system handles the difference:
+  - Online payments: the price increase is charged to your saved
+    card; a price decrease is refunded back. You'll see "we charged
+    €X" or "we refunded €X" in the update email.
+  - Cash-only pros: the platform commission line item on the next
+    monthly invoice is swapped for the new amount.
+  - If anything goes wrong, the email says "our team will reconcile
+    manually" — no surprise charges.
+- [admin,dev] If the original payment is in a partial state (failed,
+  3DS pending, refunded), price changes get flagged for manual review
+  in Sentry under `tags.area = "edit-payment"` instead of trying to
+  auto-adjust.
+
+## 2026-05-02 — v1.1.23
+
+- [admin,dev] **Booking-edit: tests + a real fix to the slot-conflict
+  check.** The Phase 1 edit feature now ships with 19 unit tests +
+  10 DB-integration tests against preview. The integration tests
+  caught a closed-interval overlap bug that would have rejected
+  back-to-back lessons (10:00–11:00 then 11:00–12:00) as a conflict
+  during a reschedule — fixed.
+
+## 2026-05-02 — v1.1.22
+
+- **You can now edit an existing booking.** From the bookings list
+  (member side at /member/bookings, pro side via the booking detail
+  on /pro/bookings) an "Edit" link opens a form where you can change
+  the date, start time, duration, or participant list. The change
+  follows the same window as cancellations — past the cancellation
+  deadline the lesson can no longer be edited.
+
+  When the change saves, both the booker and the pro get an updated
+  confirmation email + an .ics calendar attachment that supersedes
+  the original event in the calendar app. Extra participants get the
+  same.
+
+  Phase 1 limitation: the original price is retained — payment is
+  not adjusted automatically yet for changes in duration or
+  participant count. The Stripe charge / refund / invoice-item
+  rewrite for price deltas comes in Phase 2.
+
+## 2026-05-02 — v1.1.21
+
+- **Extra participants on a group lesson now get their own emails +
+  calendar invites.** When you book a lesson for more than one
+  person (member booking or public booking), the form now asks for
+  each additional participant's first name, last name, and (optional)
+  email. If they have an email, they receive their own confirmation
+  with the lesson details and an .ics calendar invite — same goes
+  for cancellations.
+
 ## 2026-05-02 — v1.1.20
 
 - **"New version available" toast no longer shows up twice.** Clicking

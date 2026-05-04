@@ -108,6 +108,30 @@ export function BookingWizard({
 
   const [notes, setNotes] = useState("");
   const [participantCount, setParticipantCount] = useState(1);
+  // Per-extra-participant info. Length is kept in sync with
+  // `participantCount - 1` by the effect below; the booker is
+  // participant #1 and uses the session's own name/email.
+  const [extraParticipants, setExtraParticipants] = useState<
+    Array<{ firstName: string; lastName: string; email: string; phone: string }>
+  >([]);
+  useEffect(() => {
+    setExtraParticipants((prev) => {
+      const target = Math.max(0, participantCount - 1);
+      if (prev.length === target) return prev;
+      if (prev.length < target) {
+        return [
+          ...prev,
+          ...Array.from({ length: target - prev.length }, () => ({
+            firstName: "",
+            lastName: "",
+            email: "",
+            phone: "",
+          })),
+        ];
+      }
+      return prev.slice(0, target);
+    });
+  }, [participantCount]);
 
   const [error, setError] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
@@ -267,6 +291,14 @@ export function BookingWizard({
     formData.set("lastName", userDetails?.lastName ?? "");
     formData.set("email", userDetails?.email ?? "");
     formData.set("phone", userDetails?.phone ?? "");
+    // Extra participants beyond the booker. Server validates that
+    // first+last name are present.
+    extraParticipants.forEach((p, i) => {
+      formData.set(`participants[${i}].firstName`, p.firstName.trim());
+      formData.set(`participants[${i}].lastName`, p.lastName.trim());
+      formData.set(`participants[${i}].email`, p.email.trim());
+      if (p.phone.trim()) formData.set(`participants[${i}].phone`, p.phone.trim());
+    });
 
     startTransition(async () => {
       const result = await createBooking(formData);
@@ -514,6 +546,70 @@ export function BookingWizard({
                   ),
                 )}
               </select>
+            </div>
+          )}
+
+          {extraParticipants.length > 0 && (
+            <div className="mt-5 space-y-4 rounded-lg border border-green-100 bg-green-50/40 p-4">
+              <p className="text-xs uppercase tracking-wide text-green-600">
+                {t("book.extraParticipantsHeading", locale)}
+              </p>
+              <p className="text-xs text-green-600">
+                {t("book.extraParticipantsHint", locale)}
+              </p>
+              {extraParticipants.map((p, i) => (
+                <div key={i} className="space-y-2">
+                  <p className="text-xs font-medium text-green-700">
+                    {t("book.extraParticipantHeading", locale).replace(
+                      "{n}",
+                      String(i + 2),
+                    )}
+                  </p>
+                  <div className="grid grid-cols-2 gap-2">
+                    <input
+                      type="text"
+                      value={p.firstName}
+                      onChange={(e) =>
+                        setExtraParticipants((prev) =>
+                          prev.map((x, j) =>
+                            j === i ? { ...x, firstName: e.target.value } : x,
+                          ),
+                        )
+                      }
+                      placeholder={t("book.firstName", locale) + " *"}
+                      required
+                      className="rounded-md border border-green-200 bg-white px-3 py-2 text-sm text-green-900 focus:border-green-400 focus:outline-none focus:ring-1 focus:ring-green-400"
+                    />
+                    <input
+                      type="text"
+                      value={p.lastName}
+                      onChange={(e) =>
+                        setExtraParticipants((prev) =>
+                          prev.map((x, j) =>
+                            j === i ? { ...x, lastName: e.target.value } : x,
+                          ),
+                        )
+                      }
+                      placeholder={t("book.lastName", locale) + " *"}
+                      required
+                      className="rounded-md border border-green-200 bg-white px-3 py-2 text-sm text-green-900 focus:border-green-400 focus:outline-none focus:ring-1 focus:ring-green-400"
+                    />
+                  </div>
+                  <input
+                    type="email"
+                    value={p.email}
+                    onChange={(e) =>
+                      setExtraParticipants((prev) =>
+                        prev.map((x, j) =>
+                          j === i ? { ...x, email: e.target.value } : x,
+                        ),
+                      )
+                    }
+                    placeholder={t("book.emailOptional", locale)}
+                    className="block w-full rounded-md border border-green-200 bg-white px-3 py-2 text-sm text-green-900 focus:border-green-400 focus:outline-none focus:ring-1 focus:ring-green-400"
+                  />
+                </div>
+              ))}
             </div>
           )}
 

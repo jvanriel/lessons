@@ -5,7 +5,7 @@ import Script from "next/script";
 import { Button } from "@/components/ui/button";
 import type { Locale } from "@/lib/i18n";
 import { t } from "@/lib/i18n/translations";
-import { formatPrice } from "@/lib/pricing";
+import { formatPrice, computeBookingPriceCents } from "@/lib/pricing";
 import { formatDate as formatDateLocale } from "@/lib/format-date";
 import PhoneField, { isValidPhoneNumber } from "@/components/PhoneField";
 import { BookingCalendar } from "@/components/BookingCalendar";
@@ -46,6 +46,13 @@ interface Pro {
   bio?: string | null;
   lessonDurations: number[];
   lessonPricing: Record<string, number>;
+  /**
+   * Per-duration extra-participant rate. Total price for a booking
+   * with N participants is `lessonPricing[d] + extraStudentPricing[d]
+   * * (N - 1)`. Without this, the summary line shows the base price
+   * regardless of participant count (task 100).
+   */
+  extraStudentPricing?: Record<string, number> | null;
   maxGroupSize: number;
   locations: Location[];
 }
@@ -96,6 +103,27 @@ export default function PublicBookingWizard({
   const [email, setEmail] = useState("");
   const [phone, setPhone] = useState("");
   const [notes, setNotes] = useState("");
+  const [participantCount, setParticipantCount] = useState(1);
+  const [extraParticipants, setExtraParticipants] = useState<
+    Array<{ firstName: string; lastName: string; email: string }>
+  >([]);
+  useEffect(() => {
+    setExtraParticipants((prev) => {
+      const target = Math.max(0, participantCount - 1);
+      if (prev.length === target) return prev;
+      if (prev.length < target) {
+        return [
+          ...prev,
+          ...Array.from({ length: target - prev.length }, () => ({
+            firstName: "",
+            lastName: "",
+            email: "",
+          })),
+        ];
+      }
+      return prev.slice(0, target);
+    });
+  }, [participantCount]);
   // Per-field "touched" state — error messages below a field only
   // show after the user has focused and then left it.
   const [touched, setTouched] = useState<Record<string, boolean>>({});
@@ -182,9 +210,16 @@ export default function PublicBookingWizard({
 
   const priceCents = useMemo(() => {
     if (!pro || !duration) return null;
-    const p = pro.lessonPricing[String(duration)];
-    return typeof p === "number" && p > 0 ? p : null;
-  }, [pro, duration]);
+    // Group-rate aware: base + extra * (N - 1). Pre-fix this only
+    // returned the base price, so the summary line and the resulting
+    // booking row understated the total for groups (task 100).
+    return computeBookingPriceCents({
+      lessonPricing: pro.lessonPricing,
+      extraStudentPricing: pro.extraStudentPricing,
+      duration,
+      participantCount,
+    });
+  }, [pro, duration, participantCount]);
 
   const trimmedFirst = firstName.trim();
   const trimmedLast = lastName.trim();
@@ -245,12 +280,17 @@ export default function PublicBookingWizard({
     formData.set("startTime", slot.startTime);
     formData.set("endTime", slot.endTime);
     formData.set("duration", String(duration));
-    formData.set("participantCount", "1");
+    formData.set("participantCount", String(participantCount));
     formData.set("firstName", trimmedFirst);
     formData.set("lastName", trimmedLast);
     formData.set("email", trimmedEmail);
     formData.set("phone", phone);
     if (notes) formData.set("notes", notes);
+    extraParticipants.forEach((p, i) => {
+      formData.set(`participants[${i}].firstName`, p.firstName.trim());
+      formData.set(`participants[${i}].lastName`, p.lastName.trim());
+      formData.set(`participants[${i}].email`, p.email.trim());
+    });
     formData.set("website", honeypot);
     if (recaptchaToken) formData.set("recaptchaToken", recaptchaToken);
 
@@ -817,6 +857,94 @@ export default function PublicBookingWizard({
               {t("publicBook.phoneHint", locale)}
             </p>
           </div>
+
+          {pro && pro.maxGroupSize > 1 && (
+            <div className="mt-3">
+              <label className="mb-1 block text-xs font-medium text-green-700">
+                {t("book.participants", locale)}
+              </label>
+              <select
+                value={participantCount}
+                onChange={(e) => setParticipantCount(Number(e.target.value))}
+                className="w-full rounded-md border border-green-200 bg-white px-3 py-2 text-sm text-green-900 focus:border-green-400 focus:outline-none focus:ring-1 focus:ring-green-400"
+              >
+                {Array.from({ length: pro.maxGroupSize }, (_, i) => i + 1).map(
+                  (n) => (
+                    <option key={n} value={n}>
+                      {n}{" "}
+                      {n === 1
+                        ? t("book.participant", locale)
+                        : t("book.participantsPlural", locale)}
+                    </option>
+                  ),
+                )}
+              </select>
+            </div>
+          )}
+
+          {extraParticipants.length > 0 && (
+            <div className="mt-3 space-y-3 rounded-lg border border-green-100 bg-green-50/40 p-3">
+              <p className="text-xs uppercase tracking-wide text-green-600">
+                {t("book.extraParticipantsHeading", locale)}
+              </p>
+              <p className="text-xs text-green-600">
+                {t("book.extraParticipantsHint", locale)}
+              </p>
+              {extraParticipants.map((p, i) => (
+                <div key={i} className="space-y-2">
+                  <p className="text-xs font-medium text-green-700">
+                    {t("book.extraParticipantHeading", locale).replace(
+                      "{n}",
+                      String(i + 2),
+                    )}
+                  </p>
+                  <div className="grid grid-cols-2 gap-2">
+                    <input
+                      type="text"
+                      value={p.firstName}
+                      onChange={(e) =>
+                        setExtraParticipants((prev) =>
+                          prev.map((x, j) =>
+                            j === i ? { ...x, firstName: e.target.value } : x,
+                          ),
+                        )
+                      }
+                      placeholder={t("book.firstName", locale) + " *"}
+                      required
+                      className="rounded-md border border-green-200 bg-white px-3 py-2 text-sm text-green-900 focus:border-green-400 focus:outline-none focus:ring-1 focus:ring-green-400"
+                    />
+                    <input
+                      type="text"
+                      value={p.lastName}
+                      onChange={(e) =>
+                        setExtraParticipants((prev) =>
+                          prev.map((x, j) =>
+                            j === i ? { ...x, lastName: e.target.value } : x,
+                          ),
+                        )
+                      }
+                      placeholder={t("book.lastName", locale) + " *"}
+                      required
+                      className="rounded-md border border-green-200 bg-white px-3 py-2 text-sm text-green-900 focus:border-green-400 focus:outline-none focus:ring-1 focus:ring-green-400"
+                    />
+                  </div>
+                  <input
+                    type="email"
+                    value={p.email}
+                    onChange={(e) =>
+                      setExtraParticipants((prev) =>
+                        prev.map((x, j) =>
+                          j === i ? { ...x, email: e.target.value } : x,
+                        ),
+                      )
+                    }
+                    placeholder={t("book.emailOptional", locale)}
+                    className="block w-full rounded-md border border-green-200 bg-white px-3 py-2 text-sm text-green-900 focus:border-green-400 focus:outline-none focus:ring-1 focus:ring-green-400"
+                  />
+                </div>
+              ))}
+            </div>
+          )}
 
           <div className="mt-3">
             <label className="mb-1 block text-xs font-medium text-green-700">
