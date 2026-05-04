@@ -3,6 +3,8 @@
 import { useState, useTransition, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
+import { t } from "@/lib/i18n/translations";
+import type { Locale } from "@/lib/i18n";
 
 interface BookingDetails {
   id: number;
@@ -31,6 +33,8 @@ interface Props {
   durations: number[];
   /** Max group size for this pro. */
   maxGroupSize: number;
+  /** Viewer locale — drives all form labels + button text. */
+  locale: Locale;
 }
 
 function endTimeFor(startTime: string, durationMin: number): string {
@@ -48,6 +52,7 @@ export default function EditBookingForm({
   cancelHref,
   durations,
   maxGroupSize,
+  locale,
 }: Props) {
   const router = useRouter();
   const [date, setDate] = useState(booking.date);
@@ -91,7 +96,7 @@ export default function EditBookingForm({
     setError(null);
 
     if (!date || !startTime || !duration) {
-      setError("Please fill date, time, and duration.");
+      setError(t("editBooking.errFillRequired", locale));
       return;
     }
 
@@ -125,18 +130,18 @@ export default function EditBookingForm({
       className="space-y-5 rounded-xl border border-green-200 bg-white p-6"
     >
       <div>
-        <p className="text-xs uppercase text-green-500">Pro</p>
+        <p className="text-xs uppercase text-green-500">{t("editBooking.proLabel", locale)}</p>
         <p className="text-green-900">{booking.proName}</p>
       </div>
       <div>
-        <p className="text-xs uppercase text-green-500">Location</p>
+        <p className="text-xs uppercase text-green-500">{t("editBooking.locationLabel", locale)}</p>
         <p className="text-green-900">{booking.locationLabel}</p>
       </div>
 
       <div className="grid grid-cols-2 gap-3">
         <div>
           <label htmlFor="date" className="mb-1 block text-sm font-medium text-green-700">
-            Date
+            {t("editBooking.dateLabel", locale)}
           </label>
           <input
             id="date"
@@ -149,7 +154,7 @@ export default function EditBookingForm({
         </div>
         <div>
           <label htmlFor="startTime" className="mb-1 block text-sm font-medium text-green-700">
-            Start time
+            {t("editBooking.startTimeLabel", locale)}
           </label>
           <input
             id="startTime"
@@ -166,7 +171,7 @@ export default function EditBookingForm({
       <div className="grid grid-cols-2 gap-3">
         <div>
           <label htmlFor="duration" className="mb-1 block text-sm font-medium text-green-700">
-            Duration
+            {t("editBooking.durationLabel", locale)}
           </label>
           <select
             id="duration"
@@ -182,7 +187,7 @@ export default function EditBookingForm({
           </select>
         </div>
         <div>
-          <p className="mb-1 block text-sm font-medium text-green-700">End time</p>
+          <p className="mb-1 block text-sm font-medium text-green-700">{t("editBooking.endTimeLabel", locale)}</p>
           <p className="rounded-md border border-green-100 bg-green-50/40 px-3 py-2 text-sm text-green-900">
             {computedEndTime}
           </p>
@@ -192,7 +197,7 @@ export default function EditBookingForm({
       {maxGroupSize > 1 && (
         <div>
           <label htmlFor="participantCount" className="mb-1 block text-sm font-medium text-green-700">
-            Number of participants
+            {t("editBooking.participantCountLabel", locale)}
           </label>
           <select
             id="participantCount"
@@ -202,7 +207,10 @@ export default function EditBookingForm({
           >
             {Array.from({ length: maxGroupSize }, (_, i) => i + 1).map((n) => (
               <option key={n} value={n}>
-                {n} {n === 1 ? "participant" : "participants"}
+                {n}{" "}
+                {n === 1
+                  ? t("book.participant", locale)
+                  : t("book.participantsPlural", locale)}
               </option>
             ))}
           </select>
@@ -212,16 +220,16 @@ export default function EditBookingForm({
       {extraParticipants.length > 0 && (
         <div className="space-y-3 rounded-lg border border-green-100 bg-green-50/40 p-4">
           <p className="text-xs uppercase tracking-wide text-green-600">
-            Additional participants
+            {t("book.extraParticipantsHeading", locale)}
           </p>
           <p className="text-xs text-green-600">
-            We&apos;ll email each one with the updated details. Email is optional.
+            {t("book.extraParticipantsHint", locale)}
           </p>
           {extraParticipants.map((p, i) => (
             <div key={i} className="space-y-2">
               <div className="flex items-center justify-between">
                 <p className="text-xs font-medium text-green-700">
-                  Participant {i + 2}
+                  {t("book.extraParticipantHeading", locale).replace("{n}", String(i + 2))}
                 </p>
                 <button
                   type="button"
@@ -237,9 +245,9 @@ export default function EditBookingForm({
                     setParticipantCount((c) => Math.max(1, c - 1));
                   }}
                   className="text-xs text-red-500 hover:text-red-600"
-                  aria-label={`Remove participant ${i + 2}`}
+                  aria-label={t("editBooking.removeParticipantAria", locale).replace("{n}", String(i + 2))}
                 >
-                  × Remove
+                  {t("editBooking.removeParticipant", locale)}
                 </button>
               </div>
               <div className="grid grid-cols-2 gap-2">
@@ -253,7 +261,7 @@ export default function EditBookingForm({
                       ),
                     )
                   }
-                  placeholder="First name"
+                  placeholder={t("book.firstName", locale)}
                   required
                   className="rounded-md border border-green-200 bg-white px-3 py-2 text-sm text-green-900 focus:border-green-400 focus:outline-none focus:ring-1 focus:ring-green-400"
                 />
@@ -267,7 +275,7 @@ export default function EditBookingForm({
                       ),
                     )
                   }
-                  placeholder="Last name"
+                  placeholder={t("book.lastName", locale)}
                   required
                   className="rounded-md border border-green-200 bg-white px-3 py-2 text-sm text-green-900 focus:border-green-400 focus:outline-none focus:ring-1 focus:ring-green-400"
                 />
@@ -282,7 +290,7 @@ export default function EditBookingForm({
                     ),
                   )
                 }
-                placeholder="Email (optional)"
+                placeholder={t("book.emailOptional", locale)}
                 className="block w-full rounded-md border border-green-200 bg-white px-3 py-2 text-sm text-green-900 focus:border-green-400 focus:outline-none focus:ring-1 focus:ring-green-400"
               />
             </div>
@@ -291,9 +299,7 @@ export default function EditBookingForm({
       )}
 
       <p className="text-xs text-green-600">
-        If the change affects the price (different duration or
-        participant count), we&apos;ll automatically charge or refund
-        the difference and email you a confirmation.
+        {t("editBooking.priceDisclaimer", locale)}
       </p>
 
       {error && (
@@ -308,13 +314,15 @@ export default function EditBookingForm({
           disabled={pending}
           className="rounded-md bg-gold-600 px-4 py-2 text-sm font-medium text-white hover:bg-gold-500 disabled:opacity-50"
         >
-          {pending ? "Saving…" : "Save changes"}
+          {pending
+            ? t("editBooking.saving", locale)
+            : t("editBooking.save", locale)}
         </button>
         <Link
           href={cancelHref}
           className="text-sm text-green-600 hover:text-green-700"
         >
-          Cancel
+          {t("editBooking.cancel", locale)}
         </Link>
       </div>
     </form>

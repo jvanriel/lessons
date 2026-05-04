@@ -220,13 +220,17 @@ describe("paymentResultToEmailChange", () => {
     ).toEqual({ kind: "refund", amountCents: 1500 });
   });
 
-  it("maps swap_invoice_item with the commission cents", () => {
+  it("collapses swap_invoice_item to noop for the booker email (pro-side bookkeeping)", () => {
+    // Per Nadine's task-92 feedback: students were seeing a
+    // "Updated commission: €X" line on cash-only edits. The
+    // commission move is pro-side; booker should see no payment
+    // change at all on cash-only.
     expect(
       paymentResultToEmailChange({
         kind: "swap_invoice_item",
         deltaCents: 375,
       }),
-    ).toEqual({ kind: "swap_invoice_item", commissionCents: 375 });
+    ).toEqual({ kind: "noop" });
   });
 
   it("maps noop through to noop", () => {

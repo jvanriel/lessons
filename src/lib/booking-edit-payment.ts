@@ -416,9 +416,20 @@ async function chargeDelta(opts: {
 
 /**
  * Translate the executor's result into the email-template's payment-
- * change shape. Errors collapse to "manual_review" so the booker sees
- * a clear "we'll follow up" message rather than a fake "you were
- * charged" line that didn't actually happen.
+ * change shape **for the BOOKER's email**. Errors collapse to
+ * "manual_review" so the booker sees a clear "we'll follow up"
+ * message rather than a fake "you were charged" line that didn't
+ * actually happen.
+ *
+ * Cash-only commission swaps (`swap_invoice_item`) are pro-side
+ * bookkeeping — the booker doesn't pay commission and shouldn't see
+ * a "Updated commission: €X" line in their email. Collapsed to
+ * "noop" here. (Reported by Nadine on task 92 — students were
+ * receiving a confusing commission notice on cash-only edits.)
+ *
+ * If we ever want to surface the commission move on the PRO email,
+ * that should be a separate adapter — pros want different copy than
+ * "we charged you".
  */
 export function paymentResultToEmailChange(
   result: EditPaymentResult,
@@ -432,7 +443,8 @@ export function paymentResultToEmailChange(
     case "refund":
       return { kind: "refund", amountCents: result.deltaCents };
     case "swap_invoice_item":
-      return { kind: "swap_invoice_item", commissionCents: result.deltaCents };
+      // Pro-side only — student email shows "no payment change".
+      return { kind: "noop" };
     case "manual_review":
       return { kind: "manual_review" };
   }

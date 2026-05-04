@@ -17,6 +17,20 @@ If any role inside the brackets is unknown (typo), the parser falls
 back to treating the brackets as literal text — better to over-show
 than silently hide.
 
+## 2026-05-04 — v1.1.28
+
+- **Editing a booking now respects the pro's availability.** When you
+  reschedule, you can only pick from time slots the pro has actually
+  made available — previously the form let you type any time, which
+  meant a student could land a lesson on a slot the pro never
+  offered. Both member-side and pro-side edits now go through the
+  same availability check.
+- **No more confusing "commission" line in your edit-confirmation
+  email.** When a pro is cash-only, internal commission accounting
+  isn't relevant to the student — the email no longer mentions it.
+- **Edit pages are translated.** "Edit" link, page titles, all form
+  labels, and helper text now appear in NL / FR (was English-only).
+
 ## 2026-05-04 — v1.1.27
 
 - **Generated passwords are no longer emailed by default.** When you

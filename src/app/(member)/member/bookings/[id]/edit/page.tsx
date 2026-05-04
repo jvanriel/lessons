@@ -12,16 +12,22 @@ import { and, eq, asc } from "drizzle-orm";
 import { getSession, hasRole } from "@/lib/auth";
 import EditBookingForm from "@/components/booking/EditBookingForm";
 import { updateBooking } from "../../actions";
-
-export const metadata = { title: "Edit booking — Golf Lessons" };
+import { getLocale } from "@/lib/locale";
+import { t } from "@/lib/i18n/translations";
 
 interface Props {
   params: Promise<{ id: string }>;
 }
 
+export async function generateMetadata() {
+  const locale = await getLocale();
+  return { title: t("editBooking.metaTitle", locale) };
+}
+
 export default async function EditMemberBookingPage({ params }: Props) {
   const session = await getSession();
   if (!session || !hasRole(session, "member")) redirect("/login");
+  const locale = await getLocale();
 
   const { id } = await params;
   const bookingId = Number(id);
@@ -77,14 +83,13 @@ export default async function EditMemberBookingPage({ params }: Props) {
         href="/member/bookings"
         className="text-sm text-green-600 hover:text-green-700"
       >
-        ← My bookings
+        {t("editBooking.backMember", locale)}
       </Link>
       <h1 className="mt-2 font-display text-3xl font-medium text-green-900">
-        Edit booking
+        {t("editBooking.pageTitle", locale)}
       </h1>
       <p className="mt-2 text-sm text-green-600">
-        Reschedule, change duration, or update the participant list. Edits
-        follow the same window as cancellations.
+        {t("editBooking.subtitleMember", locale)}
       </p>
       <div className="mt-6">
         <EditBookingForm
@@ -104,6 +109,7 @@ export default async function EditMemberBookingPage({ params }: Props) {
           cancelHref="/member/bookings"
           durations={(row.lessonDurations as number[] | null) ?? [60]}
           maxGroupSize={row.maxGroupSize ?? 1}
+          locale={locale}
         />
       </div>
     </div>

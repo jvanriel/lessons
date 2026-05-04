@@ -1504,6 +1504,18 @@ export async function proUpdateBooking(formData: FormData) {
     booking.startTime !== changes.startTime ||
     booking.endTime !== changes.endTime
   ) {
+    const allowedSlots = await fetchAvailableSlots(
+      booking.proProfileId,
+      booking.proLocationId,
+      changes.date,
+      changes.duration,
+    );
+    const inAvailability = allowedSlots.some(
+      (s) => s.startTime === changes.startTime && s.endTime === changes.endTime,
+    );
+    if (!inAvailability) {
+      return { error: "This time slot is not within your availability." };
+    }
     const taken = await isSlotTakenByOther(
       booking.proProfileId,
       booking.proLocationId,

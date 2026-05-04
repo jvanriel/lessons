@@ -549,7 +549,7 @@ export function BookingsCalendar({
                   href={`/pro/bookings/${booking.id}/edit`}
                   className="text-xs font-medium text-green-700 hover:text-green-800"
                 >
-                  Edit
+                  {t("editBooking.editLink", locale)}
                 </Link>
                 <span className="text-xs text-green-300">·</span>
                 <button

@@ -12,8 +12,13 @@ import { and, eq, asc } from "drizzle-orm";
 import { requireProProfile } from "@/lib/pro";
 import EditBookingForm from "@/components/booking/EditBookingForm";
 import { proUpdateBooking } from "../../../students/actions";
+import { getLocale } from "@/lib/locale";
+import { t } from "@/lib/i18n/translations";
 
-export const metadata = { title: "Edit booking — Pro — Golf Lessons" };
+export async function generateMetadata() {
+  const locale = await getLocale();
+  return { title: t("editBooking.metaTitlePro", locale) };
+}
 
 interface Props {
   params: Promise<{ id: string }>;
@@ -22,6 +27,7 @@ interface Props {
 export default async function EditProBookingPage({ params }: Props) {
   const { profile } = await requireProProfile();
   if (!profile) redirect("/pro/dashboard");
+  const locale = await getLocale();
 
   const { id } = await params;
   const bookingId = Number(id);
@@ -77,15 +83,13 @@ export default async function EditProBookingPage({ params }: Props) {
         href="/pro/bookings"
         className="text-sm text-green-600 hover:text-green-700"
       >
-        ← Bookings
+        {t("editBooking.backPro", locale)}
       </Link>
       <h1 className="mt-2 font-display text-3xl font-medium text-green-900">
-        Edit booking
+        {t("editBooking.pageTitle", locale)}
       </h1>
       <p className="mt-2 text-sm text-green-600">
-        Reschedule, change duration, or update the participant list. The
-        student gets emailed with the new details + an updated calendar
-        invite.
+        {t("editBooking.subtitlePro", locale)}
       </p>
       <div className="mt-6">
         <EditBookingForm
@@ -105,6 +109,7 @@ export default async function EditProBookingPage({ params }: Props) {
           cancelHref="/pro/bookings"
           durations={(row.lessonDurations as number[] | null) ?? [60]}
           maxGroupSize={row.maxGroupSize ?? 1}
+          locale={locale}
         />
       </div>
     </div>

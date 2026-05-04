@@ -178,7 +178,7 @@ export default async function MemberBookingsPage() {
                       href={`/member/bookings/${booking.id}/edit`}
                       className="rounded-md border border-green-300 bg-white px-3 py-1.5 text-xs font-medium text-green-800 hover:bg-green-50"
                     >
-                      Edit
+                      {t("editBooking.editLink", locale)}
                     </Link>
                     <CancelBookingButton
                       bookingId={booking.id}

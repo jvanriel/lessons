@@ -33,6 +33,7 @@ import {
 } from "@/lib/booking-edit-payment";
 import { loadBookingPricing } from "@/lib/booking-charge";
 import type { EmailPaymentChange } from "@/lib/email-templates";
+import { getAvailableSlots } from "@/app/(member)/member/book/actions";
 import { lessonParticipants } from "@/lib/db/schema";
 import { isSlotConflictError } from "@/lib/db";
 import { after } from "next/server";
@@ -429,12 +430,29 @@ export async function updateBooking(formData: FormData) {
     return { success: true, noop: true };
   }
 
-  // New-slot availability (excluding ourselves).
+  // New-slot validation: must be (1) inside the pro's published
+  // availability for this duration, AND (2) not overlapping any other
+  // booking. The first check was missing pre-fix — the form's
+  // `<input type="time">` let students pick any time, so an edit
+  // could land outside the pro's actual availability windows. (task 92)
   if (
     booking.date !== changes.date ||
     booking.startTime !== changes.startTime ||
     booking.endTime !== changes.endTime
   ) {
+    const locale = await getLocale();
+    const allowedSlots = await getAvailableSlots(
+      booking.proProfileId,
+      booking.proLocationId,
+      changes.date,
+      changes.duration,
+    );
+    const inAvailability = allowedSlots.some(
+      (s) => s.startTime === changes.startTime && s.endTime === changes.endTime,
+    );
+    if (!inAvailability) {
+      return { error: t("bookErr.slotUnavailable", locale) };
+    }
     const taken = await isSlotTakenByOther(
       booking.proProfileId,
       booking.proLocationId,
@@ -444,7 +462,6 @@ export async function updateBooking(formData: FormData) {
       booking.id,
     );
     if (taken) {
-      const locale = await getLocale();
       return { error: t("bookErr.slotUnavailable", locale) };
     }
   }
