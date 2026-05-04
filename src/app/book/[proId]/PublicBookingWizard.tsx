@@ -5,7 +5,7 @@ import Script from "next/script";
 import { Button } from "@/components/ui/button";
 import type { Locale } from "@/lib/i18n";
 import { t } from "@/lib/i18n/translations";
-import { formatPrice } from "@/lib/pricing";
+import { formatPrice, computeBookingPriceCents } from "@/lib/pricing";
 import { formatDate as formatDateLocale } from "@/lib/format-date";
 import PhoneField, { isValidPhoneNumber } from "@/components/PhoneField";
 import { BookingCalendar } from "@/components/BookingCalendar";
@@ -46,6 +46,13 @@ interface Pro {
   bio?: string | null;
   lessonDurations: number[];
   lessonPricing: Record<string, number>;
+  /**
+   * Per-duration extra-participant rate. Total price for a booking
+   * with N participants is `lessonPricing[d] + extraStudentPricing[d]
+   * * (N - 1)`. Without this, the summary line shows the base price
+   * regardless of participant count (task 100).
+   */
+  extraStudentPricing?: Record<string, number> | null;
   maxGroupSize: number;
   locations: Location[];
 }
@@ -203,9 +210,16 @@ export default function PublicBookingWizard({
 
   const priceCents = useMemo(() => {
     if (!pro || !duration) return null;
-    const p = pro.lessonPricing[String(duration)];
-    return typeof p === "number" && p > 0 ? p : null;
-  }, [pro, duration]);
+    // Group-rate aware: base + extra * (N - 1). Pre-fix this only
+    // returned the base price, so the summary line and the resulting
+    // booking row understated the total for groups (task 100).
+    return computeBookingPriceCents({
+      lessonPricing: pro.lessonPricing,
+      extraStudentPricing: pro.extraStudentPricing,
+      duration,
+      participantCount,
+    });
+  }, [pro, duration, participantCount]);
 
   const trimmedFirst = firstName.trim();
   const trimmedLast = lastName.trim();

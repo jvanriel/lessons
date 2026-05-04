@@ -17,6 +17,14 @@ If any role inside the brackets is unknown (typo), the parser falls
 back to treating the brackets as literal text — better to over-show
 than silently hide.
 
+## 2026-05-04 — v1.1.29
+
+- **Public booking now shows the correct group price.** When you
+  add an extra participant to a public booking, the summary line
+  now includes the extra-participant rate set by the pro instead
+  of just the base price. (The booking row itself was already
+  saving the correct total — only the displayed price was stale.)
+
 ## 2026-05-04 — v1.1.28
 
 - **Editing a booking now respects the pro's availability.** When you
