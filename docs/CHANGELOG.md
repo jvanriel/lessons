@@ -17,6 +17,15 @@ If any role inside the brackets is unknown (typo), the parser falls
 back to treating the brackets as literal text — better to over-show
 than silently hide.
 
+## 2026-05-04 — v1.1.34
+
+- **No more duplicate "verify your email" email after registering
+  via a public booking.** When you booked a lesson without an
+  account, then clicked the verify link in the confirmation email,
+  then registered an account — the system was sending you another
+  "please verify your email" email even though you'd just verified.
+  We now skip that send when your email is already verified.
+
 ## 2026-05-04 — v1.1.33
 
 - **Card-only at the payment step.** When you add a payment method
