@@ -279,7 +279,7 @@ export function buildInviteEmail(opts: {
       </tr>
     </table>
     <p style="margin:0 0 24px 0;">
-      <a href="${loginUrl}" style="display:inline-block;background:${COLORS.gold600};color:${COLORS.white};padding:12px 28px;border-radius:6px;text-decoration:none;font-weight:500;font-size:14px;">
+      <a href="${loginUrl}" style="display:inline-block;background:${COLORS.gold600};color:${COLORS.white};padding:12px 28px;border-radius:6px;text-decoration:none;font-weight:700;font-size:14px;">
         ${s.loginButton}
       </a>
     </p>
@@ -321,7 +321,7 @@ export function buildPasswordResetEmail(opts: {
       </tr>
     </table>
     <p style="margin:0 0 24px 0;">
-      <a href="${loginUrl}" style="display:inline-block;background:${COLORS.gold600};color:${COLORS.white};padding:12px 28px;border-radius:6px;text-decoration:none;font-weight:500;font-size:14px;">
+      <a href="${loginUrl}" style="display:inline-block;background:${COLORS.gold600};color:${COLORS.white};padding:12px 28px;border-radius:6px;text-decoration:none;font-weight:700;font-size:14px;">
         ${s.loginButton}
       </a>
     </p>
@@ -430,7 +430,7 @@ export function buildWelcomeEmail(opts: {
     const stepStyle = `padding:10px 0;border-bottom:1px solid ${COLORS.green100};font-size:14px;color:${COLORS.green900};`;
     const numStyle = `display:inline-block;width:22px;height:22px;line-height:22px;text-align:center;background:${COLORS.gold600};color:${COLORS.white};border-radius:50%;font-size:12px;font-weight:600;margin-right:10px;`;
     const step1Body = opts.verifyUrl
-      ? `${s.step1Inline} <a href="${opts.verifyUrl}" style="color:${COLORS.gold600};text-decoration:underline;font-weight:500;">${s.step1LinkLabel}</a>`
+      ? `${s.step1Inline} <a href="${opts.verifyUrl}" style="color:${COLORS.gold600};text-decoration:underline;font-weight:700;">${s.step1LinkLabel}</a>`
       : s.step1;
     const body = `
       <h2 style="font-family:Georgia,'Times New Roman',serif;font-size:22px;color:${COLORS.green950};margin:0 0 16px 0;font-weight:normal;">
@@ -445,7 +445,7 @@ export function buildWelcomeEmail(opts: {
       <div style="${stepStyle}"><span style="${numStyle}">4</span>${s.step4}</div>
 
       <p style="margin:24px 0 24px 0;">
-        <a href="${base}${s.buttonPath}" style="display:inline-block;background:${COLORS.gold600};color:${COLORS.white};padding:12px 28px;border-radius:6px;text-decoration:none;font-weight:500;font-size:14px;">
+        <a href="${base}${s.buttonPath}" style="display:inline-block;background:${COLORS.gold600};color:${COLORS.white};padding:12px 28px;border-radius:6px;text-decoration:none;font-weight:700;font-size:14px;">
           ${s.button}
         </a>
       </p>
@@ -462,7 +462,7 @@ export function buildWelcomeEmail(opts: {
     <p style="margin:0 0 16px 0;">${s.body}</p>
     <p style="margin:0 0 24px 0;color:#555;">${s.note}</p>
     <p style="margin:0 0 24px 0;">
-      <a href="${base}${s.buttonPath}" style="display:inline-block;background:${COLORS.gold600};color:${COLORS.white};padding:12px 28px;border-radius:6px;text-decoration:none;font-weight:500;font-size:14px;">
+      <a href="${base}${s.buttonPath}" style="display:inline-block;background:${COLORS.gold600};color:${COLORS.white};padding:12px 28px;border-radius:6px;text-decoration:none;font-weight:700;font-size:14px;">
         ${s.button}
       </a>
     </p>
@@ -581,7 +581,7 @@ export function buildOnboardingConfirmationEmail(opts: {
   body += `
     <p style="margin:24px 0 16px 0;color:#555;font-size:13px;">${s.profileHint}</p>
     <p style="margin:0;">
-      <a href="${getBaseUrl()}/login?email=${encodeURIComponent(opts.email)}" style="display:inline-block;background:${COLORS.gold600};color:${COLORS.white};padding:12px 28px;border-radius:6px;text-decoration:none;font-weight:500;font-size:14px;">
+      <a href="${getBaseUrl()}/login?email=${encodeURIComponent(opts.email)}" style="display:inline-block;background:${COLORS.gold600};color:${COLORS.white};padding:12px 28px;border-radius:6px;text-decoration:none;font-weight:700;font-size:14px;">
         ${s.button}
       </a>
     </p>
@@ -649,7 +649,7 @@ export function buildTrialEndingEmail(opts: {
     <p style="margin:0 0 16px 0;">${s.body}</p>
     <p style="margin:0 0 24px 0;color:#555;font-size:14px;"><strong>${dateStr}</strong></p>
     <p style="margin:0 0 24px 0;">
-      <a href="${getBaseUrl()}/pro/billing" style="display:inline-block;background:${COLORS.gold600};color:${COLORS.white};padding:12px 28px;border-radius:6px;text-decoration:none;font-weight:500;font-size:14px;">
+      <a href="${getBaseUrl()}/pro/billing" style="display:inline-block;background:${COLORS.gold600};color:${COLORS.white};padding:12px 28px;border-radius:6px;text-decoration:none;font-weight:700;font-size:14px;">
         ${s.cta}
       </a>
     </p>
@@ -703,7 +703,7 @@ export function buildPaymentFailedEmail(opts: {
     <p style="margin:0 0 16px 0;">${s.body}</p>
     <p style="margin:0 0 24px 0;color:#555;font-size:14px;">${s.impact}</p>
     <p style="margin:0 0 24px 0;">
-      <a href="${getBaseUrl()}/pro/billing" style="display:inline-block;background:${COLORS.gold600};color:${COLORS.white};padding:12px 28px;border-radius:6px;text-decoration:none;font-weight:500;font-size:14px;">
+      <a href="${getBaseUrl()}/pro/billing" style="display:inline-block;background:${COLORS.gold600};color:${COLORS.white};padding:12px 28px;border-radius:6px;text-decoration:none;font-weight:700;font-size:14px;">
         ${s.cta}
       </a>
     </p>
@@ -877,7 +877,7 @@ export function buildStudentBookingConfirmationEmail(opts: {
     <p style="margin:0 0 20px 0;">${s.body}</p>
     ${detailsTable(rows)}
     <p style="margin:0 0 24px 0;">
-      <a href="${getBaseUrl()}/member/bookings" style="display:inline-block;background:${COLORS.gold600};color:${COLORS.white};padding:12px 28px;border-radius:6px;text-decoration:none;font-weight:500;font-size:14px;">
+      <a href="${getBaseUrl()}/member/bookings" style="display:inline-block;background:${COLORS.gold600};color:${COLORS.white};padding:12px 28px;border-radius:6px;text-decoration:none;font-weight:700;font-size:14px;">
         ${s.cta}
       </a>
     </p>
@@ -1263,7 +1263,7 @@ export function buildBookingUpdatedEmail(opts: {
     <p style="margin:0 0 20px 0;">${s.body}</p>
     ${detailsTable(rows)}
     <p style="margin:0 0 24px 0;">
-      <a href="${getBaseUrl()}/member/bookings" style="display:inline-block;background:${COLORS.gold600};color:${COLORS.white};padding:12px 28px;border-radius:6px;text-decoration:none;font-weight:500;font-size:14px;">
+      <a href="${getBaseUrl()}/member/bookings" style="display:inline-block;background:${COLORS.gold600};color:${COLORS.white};padding:12px 28px;border-radius:6px;text-decoration:none;font-weight:700;font-size:14px;">
         ${s.cta}
       </a>
     </p>
@@ -1504,7 +1504,7 @@ export function buildProBookingNotificationEmail(opts: {
     ${unverifiedNotice}
     ${detailsTable(rows)}
     <p style="margin:0 0 24px 0;">
-      <a href="${getBaseUrl()}/pro/bookings" style="display:inline-block;background:${COLORS.gold600};color:${COLORS.white};padding:12px 28px;border-radius:6px;text-decoration:none;font-weight:500;font-size:14px;">
+      <a href="${getBaseUrl()}/pro/bookings" style="display:inline-block;background:${COLORS.gold600};color:${COLORS.white};padding:12px 28px;border-radius:6px;text-decoration:none;font-weight:700;font-size:14px;">
         ${s.cta}
       </a>
     </p>
@@ -1607,7 +1607,7 @@ export function buildLessonReminderEmail(opts: {
       [s.time, `${opts.startTime} – ${opts.endTime}`],
     ])}
     <p style="margin:0 0 24px 0;">
-      <a href="${ctaUrl}" style="display:inline-block;background:${COLORS.gold600};color:${COLORS.white};padding:12px 28px;border-radius:6px;text-decoration:none;font-weight:500;font-size:14px;">
+      <a href="${ctaUrl}" style="display:inline-block;background:${COLORS.gold600};color:${COLORS.white};padding:12px 28px;border-radius:6px;text-decoration:none;font-weight:700;font-size:14px;">
         ${s.cta}
       </a>
     </p>
@@ -1762,7 +1762,7 @@ export function buildClaimAndVerifyBookingEmail(opts: {
     <p style="margin:0 0 20px 0;">${s.claimIntro(opts.proName)}</p>
     ${detailsTable(rows)}
     <p style="margin:0 0 12px 0;">
-      <a href="${opts.claimUrl}" style="display:inline-block;background:${COLORS.gold600};color:${COLORS.white};padding:12px 28px;border-radius:6px;text-decoration:none;font-weight:500;font-size:14px;">
+      <a href="${opts.claimUrl}" style="display:inline-block;background:${COLORS.gold600};color:${COLORS.white};padding:12px 28px;border-radius:6px;text-decoration:none;font-weight:700;font-size:14px;">
         ${s.claimButton}
       </a>
     </p>
@@ -1777,7 +1777,7 @@ export function buildClaimAndVerifyBookingEmail(opts: {
             ${s.registerIntro}
           </p>
           <p style="margin:0;">
-            <a href="${opts.registerUrl}" style="display:inline-block;background:#ffffff;border:1px solid #c4a035;color:${COLORS.green950};padding:10px 22px;border-radius:6px;text-decoration:none;font-weight:500;font-size:13px;">
+            <a href="${opts.registerUrl}" style="display:inline-block;background:#ffffff;border:1px solid #c4a035;color:${COLORS.green950};padding:10px 22px;border-radius:6px;text-decoration:none;font-weight:700;font-size:13px;">
               ${s.registerButton}
             </a>
           </p>
@@ -1822,7 +1822,7 @@ export function buildNewBookingOnAccountEmail(opts: {
     <p style="margin:0 0 20px 0;">${s.alreadyIntro(opts.proName)}</p>
     ${detailsTable(rows)}
     <p style="margin:0 0 12px 0;">
-      <a href="${opts.loginUrl}" style="display:inline-block;background:${COLORS.gold600};color:${COLORS.white};padding:12px 28px;border-radius:6px;text-decoration:none;font-weight:500;font-size:14px;">
+      <a href="${opts.loginUrl}" style="display:inline-block;background:${COLORS.gold600};color:${COLORS.white};padding:12px 28px;border-radius:6px;text-decoration:none;font-weight:700;font-size:14px;">
         ${s.loginButton}
       </a>
     </p>

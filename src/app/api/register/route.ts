@@ -174,7 +174,7 @@ export async function POST(request: Request) {
       </h2>
       <p style="margin:0 0 24px 0;">${intro}</p>
       <p style="margin:0 0 24px 0;">
-        <a href="${verifyUrl}" style="display:inline-block;padding:12px 28px;background:#a68523;color:#fff;border-radius:6px;text-decoration:none;font-weight:500;font-size:14px;">
+        <a href="${verifyUrl}" style="display:inline-block;padding:12px 28px;background:#a68523;color:#fff;border-radius:6px;text-decoration:none;font-weight:700;font-size:14px;">
           ${buttonLabel}
         </a>
       </p>

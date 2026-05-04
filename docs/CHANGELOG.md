@@ -17,6 +17,13 @@ If any role inside the brackets is unknown (typo), the parser falls
 back to treating the brackets as literal text — better to over-show
 than silently hide.
 
+## 2026-05-04 — v1.1.36
+
+- **Bolder buttons in confirmation emails.** CTAs in our outgoing
+  emails ("Verify email", "View my bookings", "Manage your
+  subscription", etc.) used a medium font-weight; they now render in
+  bold so they stand out a bit more against the body copy.
+
 ## 2026-05-04 — v1.1.35
 
 - **"Send test notification" no longer fails when notifications look
