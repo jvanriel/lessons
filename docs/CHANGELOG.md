@@ -17,6 +17,15 @@ If any role inside the brackets is unknown (typo), the parser falls
 back to treating the brackets as literal text — better to over-show
 than silently hide.
 
+## 2026-05-04 — v1.1.27
+
+- **Generated passwords are no longer emailed by default.** When you
+  use the "Generate password" button during signup, a checkbox now
+  appears asking whether to also include the password in the
+  confirmation email. It's off by default — putting a password in
+  plain email is generally less secure, and you can reset it later
+  if you forget. Tick the box if you want the convenience.
+
 ## 2026-05-03 — v1.1.26
 
 - **QR login now works on Android, not just iPhone.** Previously the
