@@ -62,7 +62,7 @@ export const PLATFORM_FEE_PERCENT = readPercentEnv(
  */
 export const STRIPE_SURCHARGE_PERCENT = readPercentEnv(
   "NEXT_PUBLIC_STRIPE_SURCHARGE_PERCENT",
-  1.5,
+  2.5,
 );
 
 // Minimum lesson price in cents (€50)
