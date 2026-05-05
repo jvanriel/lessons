@@ -112,6 +112,9 @@ export default function UserManager({ users }: { users: User[] }) {
                 Email
               </th>
               <th className="px-4 py-3 text-left font-medium text-green-700">
+                Phone
+              </th>
+              <th className="px-4 py-3 text-left font-medium text-green-700">
                 Roles
               </th>
               <th className="px-4 py-3 text-left font-medium text-green-700">
@@ -138,6 +141,9 @@ export default function UserManager({ users }: { users: User[] }) {
                       +{user.emails.length - 1}
                     </span>
                   )}
+                </td>
+                <td className="px-4 py-3 text-green-600">
+                  {user.phone ?? <span className="text-green-300">—</span>}
                 </td>
                 <td className="px-4 py-3">
                   {user.roles
@@ -976,6 +982,17 @@ function UserDialog({
               />
             </div>
             <div>
+              <label className="block text-sm font-medium text-green-800">
+                Phone
+              </label>
+              <input
+                name="phone"
+                type="tel"
+                defaultValue={user.phone ?? ""}
+                className={inputClass}
+              />
+            </div>
+            <div>
               <label className="mb-1 block text-sm font-medium text-green-800">
                 Roles
               </label>
@@ -1162,6 +1179,10 @@ function CreateUserDialog({ onClose }: { onClose: () => void }) {
             <div>
               <label className="block text-sm font-medium text-green-800">Email *</label>
               <input name="email" type="email" required className={inputClass} />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-green-800">Phone</label>
+              <input name="phone" type="tel" className={inputClass} />
             </div>
             <div>
               <label className="block text-sm font-medium text-green-800">Password</label>

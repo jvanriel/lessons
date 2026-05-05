@@ -17,6 +17,88 @@ If any role inside the brackets is unknown (typo), the parser falls
 back to treating the brackets as literal text — better to over-show
 than silently hide.
 
+## 2026-05-05 — v1.1.47
+
+- [admin] **Phone column on the Users admin page.** The /admin/users
+  table now shows each user's phone number alongside their email,
+  and the Edit and Add User dialogs both gained a Phone field — so
+  admins can see and update phone numbers from one place. (task 70)
+
+## 2026-05-04 — v1.1.46
+
+- **Logo link goes somewhere useful when you're signed in.**
+  Clicking the "Golf Lessons" wordmark used to send signed-in users
+  back to the public homepage, which then auto-redirected them
+  somewhere else — confusing. The link now points to the most
+  useful page for your role: /member/book for members,
+  /pro/bookings for pros, /admin for admins. Signed-out visitors
+  still land on the marketing homepage.
+
+## 2026-05-04 — v1.1.45
+
+- [admin,dev] **Verification email retries are more patient.** Send
+  attempts went from 2 to 4 with longer backoffs (400 ms / 1.5 s /
+  4 s) so a brief Gmail blip no longer leaves a freshly-registered
+  user stranded without their verification email.
+- [admin] **Admin can resend a verification email from the API.** A
+  new `/api/admin/resend-verification?id=<userId>` endpoint lets
+  admins push a fresh verification mail to a stranded user who can't
+  log in to use the in-app resend flow.
+
+## 2026-05-04 — v1.1.44
+
+- **"Maybe later" close link on the pro-onboarding wizard.** The
+  pro-signup wizard took over the full viewport with no exit; visitors
+  who clicked "Aan de slag" / "Registreer" out of curiosity were
+  stuck. A small "Maybe later" link in the top-right now sends you
+  back to /for-pros (or /pro/dashboard if you're already signed in).
+
+## 2026-05-04 — v1.1.43
+
+- **"Contact Us" button on /for-pros now goes to the contact page.**
+  The bottom CTA's label was "Contact Us" but the click still opened
+  the pro-signup dialog — confusing if you wanted to ask a question
+  first. It now links straight to /contact. The hero CTA at the top
+  still drives signup.
+
+## 2026-05-04 — v1.1.42
+
+- **NL / FR translations on the "Our Pros" menu and tab title.** The
+  navigation entry now reads "Onze Pro's" / "Nos Pros" instead of
+  falling through to English, and the browser tab title for the
+  /pros page follows the same locale.
+
+## 2026-05-04 — v1.1.41
+
+- **NL / FR translations on the "Join as student" button.** On a
+  pro's public profile (/pros/[proId]) the join button now reads
+  in your language instead of always English.
+
+## 2026-05-04 — v1.1.40
+
+- [pro] **Online-payment surcharge bumped from 1.5% → 2.5% (total
+  5%).** Cash commission stays at 2.5%; the online-payment uplift
+  rises to better cover Stripe's blended processing cost across
+  cards, Bancontact, and SEPA. Public pricing copy on /for-pros
+  and the earnings help copy reflect the new rate in NL / EN / FR.
+
+## 2026-05-04 — v1.1.39
+
+- **Clearer "extra participant email" hint on the booking form.**
+  The hint used to say "email is optional but recommended" without
+  explaining why. It now leads with the reason — confirmation
+  details and a calendar invite are sent by email — so it's obvious
+  you'll want to fill one in for each participant if you can.
+
+## 2026-05-04 — v1.1.38
+
+- [pro] **Fixed crash on the Students page Guests panel.** Opening
+  /pro/students could fail to render after the v1.1.37 Guests panel
+  shipped — the "Invite as student" link was being constructed in a
+  way that didn't survive the server-to-client boundary. The link
+  is now built inside the client component, so the page renders
+  cleanly.
+
 ## 2026-05-04 — v1.1.37
 
 - [pro] **New "Guests" panel on the Students page.** Whenever a
