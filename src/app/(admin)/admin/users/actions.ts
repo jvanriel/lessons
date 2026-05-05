@@ -33,6 +33,7 @@ export async function createUser(
   const firstName = (formData.get("firstName") as string).trim();
   const lastName = (formData.get("lastName") as string).trim();
   const email = (formData.get("email") as string).trim().toLowerCase();
+  const phone = ((formData.get("phone") as string) ?? "").trim() || null;
   const rolesRaw = (formData.get("roles") as string)?.trim() || "";
   const password = (formData.get("password") as string)?.trim();
 
@@ -53,7 +54,7 @@ export async function createUser(
 
   const [inserted] = await db
     .insert(users)
-    .values({ firstName, lastName, email, password: hashed, roles })
+    .values({ firstName, lastName, email, phone, password: hashed, roles })
     .returning({ id: users.id });
 
   // Add primary email to user_emails
@@ -84,6 +85,7 @@ export async function updateUser(
   const firstName = (formData.get("firstName") as string).trim();
   const lastName = (formData.get("lastName") as string).trim();
   const email = (formData.get("email") as string).trim().toLowerCase();
+  const phone = ((formData.get("phone") as string) ?? "").trim() || null;
   const rolesRaw = (formData.get("roles") as string)?.trim() || "";
   const roles = normalizeRoles(rolesRaw);
   const newPassword = (formData.get("newPassword") as string)?.trim();
@@ -110,6 +112,7 @@ export async function updateUser(
     firstName,
     lastName,
     email,
+    phone,
     roles,
   };
 
