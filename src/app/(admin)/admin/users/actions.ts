@@ -2,7 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { db } from "@/lib/db";
-import { users, userEmails, proProfiles, lessonBookings, proStudents } from "@/lib/db/schema";
+import { users, userEmails, proProfiles, lessonBookings, proStudents, notifications } from "@/lib/db/schema";
 import { eq, and, gte } from "drizzle-orm";
 import { getSession, hasRole, hashPassword } from "@/lib/auth";
 import { sendEmail } from "@/lib/mail";
@@ -307,44 +307,49 @@ async function purgeUserInternal(userId: number): Promise<{ success: boolean } |
   const now = new Date();
   const today = formatLocalDate(now);
 
-  // Cancel future bookings first (so slots are freed)
-  await db
-    .update(lessonBookings)
-    .set({ status: "cancelled", cancelledAt: now, cancellationReason: "Account purged", updatedAt: now })
-    .where(and(eq(lessonBookings.bookedById, userId), eq(lessonBookings.status, "confirmed"), gte(lessonBookings.date, today)));
-
-  // Delete pro profile if exists (and cascade its children)
-  const [proProfile] = await db
-    .select({ id: proProfiles.id })
-    .from(proProfiles)
-    .where(eq(proProfiles.userId, userId))
-    .limit(1);
-
-  if (proProfile) {
-    // Cancel future bookings for this pro
-    await db
+  // Wrapped in a transaction so a foreign-key violation on any step
+  // rolls back the partial deletes — without this an admin could
+  // end up with a user row whose bookings/pro-profile/notifications
+  // were already gone but the user record itself failed to drop.
+  await db.transaction(async (tx) => {
+    // Cancel future bookings first (so slots are freed)
+    await tx
       .update(lessonBookings)
-      .set({ status: "cancelled", cancelledAt: now, cancellationReason: "Pro account purged", updatedAt: now })
-      .where(and(eq(lessonBookings.proProfileId, proProfile.id), eq(lessonBookings.status, "confirmed"), gte(lessonBookings.date, today)));
+      .set({ status: "cancelled", cancelledAt: now, cancellationReason: "Account purged", updatedAt: now })
+      .where(and(eq(lessonBookings.bookedById, userId), eq(lessonBookings.status, "confirmed"), gte(lessonBookings.date, today)));
 
-    // Delete all bookings referencing this pro (no cascade on FK)
-    await db.delete(lessonBookings).where(eq(lessonBookings.proProfileId, proProfile.id));
-    // Pro profile cascade-deletes: proLocations, proAvailability, proStudents, proPages, etc.
-    await db.delete(proProfiles).where(eq(proProfiles.id, proProfile.id));
-  }
+    // Delete pro profile if exists (and cascade its children)
+    const [proProfile] = await tx
+      .select({ id: proProfiles.id })
+      .from(proProfiles)
+      .where(eq(proProfiles.userId, userId))
+      .limit(1);
 
-  // Delete bookings made by this user (no cascade on FK)
-  await db.delete(lessonBookings).where(eq(lessonBookings.bookedById, userId));
+    if (proProfile) {
+      // Cancel future bookings for this pro
+      await tx
+        .update(lessonBookings)
+        .set({ status: "cancelled", cancelledAt: now, cancellationReason: "Pro account purged", updatedAt: now })
+        .where(and(eq(lessonBookings.proProfileId, proProfile.id), eq(lessonBookings.status, "confirmed"), gte(lessonBookings.date, today)));
 
-  // Delete remaining pro-student relationships
-  await db.delete(proStudents).where(eq(proStudents.userId, userId));
+      // Delete all bookings referencing this pro (no cascade on FK)
+      await tx.delete(lessonBookings).where(eq(lessonBookings.proProfileId, proProfile.id));
+      // Pro profile cascade-deletes: proLocations, proAvailability, proStudents, proPages, etc.
+      await tx.delete(proProfiles).where(eq(proProfiles.id, proProfile.id));
+    }
 
-  // Delete notifications
-  const { notifications } = await import("@/lib/db/schema");
-  await db.delete(notifications).where(eq(notifications.targetUserId, userId));
+    // Delete bookings made by this user (no cascade on FK)
+    await tx.delete(lessonBookings).where(eq(lessonBookings.bookedById, userId));
 
-  // User cascade-deletes: userEmails, comments reactions (via authorId set null)
-  await db.delete(users).where(eq(users.id, userId));
+    // Delete remaining pro-student relationships
+    await tx.delete(proStudents).where(eq(proStudents.userId, userId));
+
+    // Delete notifications
+    await tx.delete(notifications).where(eq(notifications.targetUserId, userId));
+
+    // User cascade-deletes: userEmails, comments reactions (via authorId set null)
+    await tx.delete(users).where(eq(users.id, userId));
+  });
 
   revalidatePath("/admin/users");
   return { success: true };

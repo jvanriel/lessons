@@ -17,6 +17,16 @@ If any role inside the brackets is unknown (typo), the parser falls
 back to treating the brackets as literal text — better to over-show
 than silently hide.
 
+## 2026-05-05 — v1.1.48
+
+- [admin] **Purge user — feedback + atomicity (task 79).** The
+  "Purge permanently" button now confirms with a "User permanently
+  purged" alert on success and surfaces any server-side error to
+  the admin instead of silently failing. The underlying purge runs
+  inside a database transaction, so a foreign-key violation on any
+  step rolls back cleanly rather than leaving the account half-
+  deleted.
+
 ## 2026-05-05 — v1.1.47
 
 - [admin] **Phone column on the Users admin page.** The /admin/users
