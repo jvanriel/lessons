@@ -25,7 +25,7 @@ pnpm lint         # ESLint
 - **Payments**: Stripe Connect Express (lesson payments to pros) + direct Stripe (pro subscriptions)
 - **Auth**: Custom JWT (jose + bcryptjs) — pattern from silverswing
 - **i18n**: EN, NL, FR
-- **Deployment**: Vercel (password-protected pre-launch)
+- **Deployment**: Vercel (live at golflessons.be since 2026-05-05)
 - **Package manager**: pnpm
 - **Testing**: Vitest
 
