@@ -17,6 +17,18 @@ If any role inside the brackets is unknown (typo), the parser falls
 back to treating the brackets as literal text — better to over-show
 than silently hide.
 
+## 2026-05-06 — v1.1.51
+
+- [pro] **Public-profile preview is now a preview.** When you click
+  "View public profile" from your dashboard, the page no longer
+  shows the "Book a Lesson" or "Join as Student" buttons (those
+  don't make sense on your own profile). Instead a small
+  "Preview — this is your public profile" hint appears in their
+  place. Clicking "Join as Student" on yourself used to create a
+  bad student-of-yourself row that broke the Students tab; that
+  can no longer happen, and the server rejects any self-join
+  attempt as a defensive backstop. (task 108)
+
 ## 2026-05-06 — v1.1.50
 
 - [pro] **Pro registration wizard — go back any time.** Two

@@ -571,6 +571,7 @@ const translations: Record<Locale, Record<string, string>> = {
     "proBrowse.joinAsStudent": "Join as Student",
     "proBrowse.joining": "Joining…",
     "proBrowse.joined": "Joined",
+    "proBrowse.ownProfilePreview": "Preview — this is your public profile",
     // Slot explanation dialog
     "slotExpl.preferredDayNote": "Your preferred day is {day}. Quick Book suggests dates starting from the next {day}. You can change this in your profile under Booking Preferences.",
     "slotExpl.intervalLabel.weekly": "In a week",
@@ -2058,6 +2059,7 @@ const translations: Record<Locale, Record<string, string>> = {
     "proBrowse.joinAsStudent": "Inschrijven als leerling",
     "proBrowse.joining": "Bezig…",
     "proBrowse.joined": "Ingeschreven",
+    "proBrowse.ownProfilePreview": "Preview — dit is jouw publieke profiel",
     "slotExpl.preferredDayNote": "Je voorkeursdag is {day}. Boek direct stelt datums voor vanaf de volgende {day}. Je kunt dit wijzigen in je profiel onder Reserveringsvoorkeuren.",
     "slotExpl.intervalLabel.weekly": "Over een week",
     "slotExpl.intervalLabel.biweekly": "Over 2 weken",
@@ -3529,6 +3531,7 @@ const translations: Record<Locale, Record<string, string>> = {
     "proBrowse.joinAsStudent": "S'inscrire comme élève",
     "proBrowse.joining": "Inscription…",
     "proBrowse.joined": "Inscrit",
+    "proBrowse.ownProfilePreview": "Aperçu — c'est votre profil public",
     "slotExpl.preferredDayNote": "Votre jour préféré est {day}. Quick Book propose des dates à partir du prochain {day}. Vous pouvez modifier cela dans votre profil sous Préférences de réservation.",
     "slotExpl.intervalLabel.weekly": "Dans une semaine",
     "slotExpl.intervalLabel.biweekly": "Dans 2 semaines",
