@@ -17,7 +17,7 @@ import {
   proStudents,
   users,
 } from "@/lib/db/schema";
-import { eq, and, gte, lte, desc, isNull } from "drizzle-orm";
+import { eq, ne, and, gte, lte, desc, isNull } from "drizzle-orm";
 import { getSession, hasRole } from "@/lib/auth";
 import { createNotification } from "@/lib/notifications";
 import {
@@ -239,7 +239,16 @@ export async function getAvailableSlots(
   proProfileId: number,
   locationId: number,
   date: string,
-  duration: number
+  duration: number,
+  /**
+   * Optional booking id to exclude from the conflict check. Used by
+   * the booking-edit flow so the booking being edited doesn't appear
+   * to block its own extension (e.g. 60 → 90 min at the same start
+   * time would otherwise be reported "not available" because the
+   * existing 60-min booking overlaps the proposed 90-min slot).
+   * (task 114)
+   */
+  excludeBookingId?: number,
 ) {
   await requireMember();
 
@@ -296,7 +305,8 @@ export async function getAvailableSlots(
         eq(lessonBookings.proProfileId, proProfileId),
         eq(lessonBookings.proLocationId, locationId),
         eq(lessonBookings.date, date),
-        eq(lessonBookings.status, "confirmed")
+        eq(lessonBookings.status, "confirmed"),
+        ...(excludeBookingId ? [ne(lessonBookings.id, excludeBookingId)] : []),
       )
     );
 

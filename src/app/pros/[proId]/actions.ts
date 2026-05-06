@@ -1,7 +1,7 @@
 "use server";
 
 import { db } from "@/lib/db";
-import { proStudents } from "@/lib/db/schema";
+import { proProfiles, proStudents } from "@/lib/db/schema";
 import { eq, and } from "drizzle-orm";
 import { getSession, hasRole } from "@/lib/auth";
 import { revalidatePath } from "next/cache";
@@ -10,6 +10,18 @@ export async function joinAsStudent(proProfileId: number) {
   const session = await getSession();
   if (!session || !hasRole(session, "member")) {
     return { error: "You must be logged in to join." };
+  }
+
+  // Reject self-join: a pro who is also a member would otherwise
+  // create a `pro_students` row pointing back at themselves, which
+  // breaks the pro-side Students tab. (task 108)
+  const [self] = await db
+    .select({ userId: proProfiles.userId })
+    .from(proProfiles)
+    .where(eq(proProfiles.id, proProfileId))
+    .limit(1);
+  if (self && self.userId === session.userId) {
+    return { error: "You cannot join yourself as a student." };
   }
 
   // Check if relationship already exists

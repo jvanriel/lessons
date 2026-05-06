@@ -32,6 +32,13 @@ interface ProInfo {
    */
   extraStudentPricing: Record<string, number> | null;
   maxGroupSize: number;
+  /**
+   * Number of days into the future the pro accepts bookings. Used
+   * to display a "Bookings open through {date}" caption on the
+   * calendar so students aren't left wondering why forward dates
+   * are unavailable. (task 115)
+   */
+  bookingHorizon: number;
 }
 
 interface LocationInfo {
@@ -96,6 +103,18 @@ export function BookingWizard({
   );
   const [date, setDate] = useState<string | null>(null);
   const [slot, setSlot] = useState<Slot | null>(null);
+
+  // Booking horizon as a YYYY-MM-DD string, computed once on mount.
+  // Passed to BookingCalendar so it can show "Bookings open through
+  // {date}" beneath the grid. (task 115)
+  const horizonDateStr = useMemo(() => {
+    const d = new Date();
+    d.setDate(d.getDate() + pro.bookingHorizon);
+    const y = d.getFullYear();
+    const m = String(d.getMonth() + 1).padStart(2, "0");
+    const day = String(d.getDate()).padStart(2, "0");
+    return `${y}-${m}-${day}`;
+  }, [pro.bookingHorizon]);
 
   const [availableDates, setAvailableDates] = useState<string[]>([]);
   const [slots, setSlots] = useState<Slot[]>([]);
@@ -461,6 +480,7 @@ export function BookingWizard({
                 selectedDate={date}
                 onSelect={setDate}
                 locale={locale}
+                horizonDate={horizonDateStr}
               />
               {date && (
                 <div className="mt-5 border-t border-green-100 pt-4">

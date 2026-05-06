@@ -14,7 +14,7 @@ import {
   proAvailability,
   proAvailabilityOverrides,
 } from "@/lib/db/schema";
-import { eq, and, asc, desc, gte, lte } from "drizzle-orm";
+import { eq, ne, and, asc, desc, gte, lte } from "drizzle-orm";
 import { requireProProfile } from "@/lib/pro";
 import { hashPassword } from "@/lib/auth";
 import { sendEmail } from "@/lib/mail";
@@ -44,6 +44,7 @@ import {
   getProBookingNotificationSubject,
 } from "@/lib/email-templates";
 import { getLocale } from "@/lib/locale";
+import { t } from "@/lib/i18n/translations";
 import {
   addDaysToDateString,
   formatLocalDate,
@@ -605,7 +606,13 @@ async function fetchAvailableSlots(
   proProfileId: number,
   locationId: number,
   date: string,
-  duration: number
+  duration: number,
+  /**
+   * Optional booking id to exclude when computing conflicts. Set by
+   * the booking-edit flow so the booking being edited doesn't block
+   * its own extension. (task 114)
+   */
+  excludeBookingId?: number,
 ) {
   const [pro] = await db
     .select({ bookingNotice: proProfiles.bookingNotice })
@@ -660,7 +667,8 @@ async function fetchAvailableSlots(
         eq(lessonBookings.proProfileId, proProfileId),
         eq(lessonBookings.proLocationId, locationId),
         eq(lessonBookings.date, date),
-        eq(lessonBookings.status, "confirmed")
+        eq(lessonBookings.status, "confirmed"),
+        ...(excludeBookingId ? [ne(lessonBookings.id, excludeBookingId)] : []),
       )
     );
 
@@ -1573,7 +1581,17 @@ export async function proUpdateBooking(formData: FormData) {
   const tz = await getProLocationTimezone(booking.proLocationId);
   const cancellationHours = profile.cancellationHours ?? 24;
   const editError = validateEditAllowed(booking, cancellationHours, tz);
-  if (editError) return { error: editError };
+  if (editError) {
+    const localeForError = await getLocale();
+    return {
+      error: t(
+        editError === "only-confirmed"
+          ? "editBooking.errOnlyConfirmed"
+          : "editBooking.errTooLate",
+        localeForError,
+      ),
+    };
+  }
 
   const currentParticipants = await db
     .select({
@@ -1610,17 +1628,21 @@ export async function proUpdateBooking(formData: FormData) {
     booking.startTime !== changes.startTime ||
     booking.endTime !== changes.endTime
   ) {
+    // Exclude the booking being edited from the conflict check —
+    // see the same fix on the member side. (task 114)
     const allowedSlots = await fetchAvailableSlots(
       booking.proProfileId,
       booking.proLocationId,
       changes.date,
       changes.duration,
+      booking.id,
     );
     const inAvailability = allowedSlots.some(
       (s) => s.startTime === changes.startTime && s.endTime === changes.endTime,
     );
+    const localeForSlot = await getLocale();
     if (!inAvailability) {
-      return { error: "This time slot is not within your availability." };
+      return { error: t("editBooking.errNotInAvailability", localeForSlot) };
     }
     const taken = await isSlotTakenByOther(
       booking.proProfileId,
@@ -1630,14 +1652,15 @@ export async function proUpdateBooking(formData: FormData) {
       changes.endTime,
       booking.id,
     );
-    if (taken) return { error: "This time slot is no longer available." };
+    if (taken) return { error: t("bookErr.slotUnavailable", localeForSlot) };
   }
 
   try {
     await applyBookingEdit(booking.id, changes, bookerParticipant.id);
   } catch (err) {
     if (isSlotConflictError(err)) {
-      return { error: "This time slot is no longer available." };
+      const locale = await getLocale();
+      return { error: t("bookErr.slotUnavailable", locale) };
     }
     throw err;
   }

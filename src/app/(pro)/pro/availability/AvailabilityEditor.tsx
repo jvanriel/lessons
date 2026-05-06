@@ -770,9 +770,23 @@ function SchedulePeriodsSection({
       {activePeriod && (
         <div className="space-y-3 rounded-xl border border-green-200 bg-white p-4">
           <div className="flex flex-wrap items-center justify-between gap-2">
-            <p className="text-sm text-green-700">
-              {periodDescription(activePeriod, locale)}
-            </p>
+            <div className="flex-1">
+              <p className="text-sm text-green-700">
+                {periodDescription(activePeriod, locale)}
+              </p>
+              {/* Hint for the unbounded "Always" tab when other periods
+                  exist — explains how to "reset" to a single-schedule
+                  setup. (task 77 item D-ii) */}
+              {activePeriod.validFrom === null &&
+                activePeriod.validUntil === null &&
+                periods.some(
+                  (p) => p.validFrom !== null || p.validUntil !== null,
+                ) && (
+                  <p className="mt-1 text-[11px] italic text-green-500">
+                    {t("proAvail.alwaysResetHint", locale)}
+                  </p>
+                )}
+            </div>
             <div className="flex items-center gap-2 text-xs">
               <button
                 type="button"
@@ -1098,32 +1112,46 @@ function PeriodDatesDialog({
   const [openEnd, setOpenEnd] = useState(
     allowOpenEnd && initialUntil === null,
   );
-  const [error, setError] = useState<string | null>(null);
+  const [submitError, setSubmitError] = useState<string | null>(null);
 
-  function submit() {
-    setError(null);
+  // Inline validation — recomputed each render. Shown below the fields
+  // and disables Save while present, so users see the issue as they
+  // type/change a date instead of only at submit time. (task 77)
+  const inlineError = (() => {
     const fromValue = openStart ? "" : from;
     const untilValue = openEnd ? "" : until;
-    if ((!fromValue && !openStart) || (!untilValue && !openEnd)) {
-      setError(t("proAvail.periodDatesRequired", locale));
-      return;
-    }
     if (fromValue && untilValue && fromValue > untilValue) {
-      setError(t("proAvail.periodFromBeforeUntil", locale));
-      return;
+      return t("proAvail.periodFromBeforeUntil", locale);
     }
-    // Overlap guard against other bounded periods. Open-ended fields
-    // skip this check — server enforces the broader invariant.
     if (fromValue && untilValue) {
       for (const r of existingBoundedRanges) {
         if (fromValue <= r.until && r.from <= untilValue) {
-          setError(t("proAvail.periodOverlap", locale));
-          return;
+          return t("proAvail.periodOverlap", locale);
         }
       }
     }
+    return null;
+  })();
+
+  function submit() {
+    setSubmitError(null);
+    const fromValue = openStart ? "" : from;
+    const untilValue = openEnd ? "" : until;
+    if ((!fromValue && !openStart) || (!untilValue && !openEnd)) {
+      setSubmitError(t("proAvail.periodDatesRequired", locale));
+      return;
+    }
+    // The inline error catches end-before-start and overlap; if it's
+    // present we shouldn't reach submit (button is disabled), but
+    // double-check defensively.
+    if (inlineError) {
+      setSubmitError(inlineError);
+      return;
+    }
     onSubmit(fromValue, untilValue);
   }
+
+  const error = inlineError ?? submitError;
 
   return (
     <div
@@ -1194,7 +1222,8 @@ function PeriodDatesDialog({
           <button
             type="button"
             onClick={submit}
-            className="flex-1 rounded-md bg-green-700 px-4 py-2 text-sm font-medium text-white hover:bg-green-800"
+            disabled={Boolean(inlineError)}
+            className="flex-1 rounded-md bg-green-700 px-4 py-2 text-sm font-medium text-white hover:bg-green-800 disabled:cursor-not-allowed disabled:bg-green-300"
           >
             {t("proAvail.save", locale)}
           </button>
@@ -1952,6 +1981,23 @@ function PreviewBlockingGrid({
           <h2 className="font-display text-lg font-semibold text-green-950">{t("proAvail.blocksHeading", locale)}</h2>
           <p className="mt-0.5 text-xs text-green-700/50">
             {t("proAvail.blocksHelp", locale)}
+          </p>
+          {/* Surface the pro's own booking horizon so they know which
+              window of dates students will see in their booking
+              calendar. (task 77 item B) */}
+          <p className="mt-1 text-[11px] italic text-green-500">
+            {t("publicBook.bookingsOpenThrough", locale).replace(
+              "{date}",
+              formatDateLocale(
+                (() => {
+                  const d = new Date();
+                  d.setDate(d.getDate() + profileSettings.bookingHorizon);
+                  return d;
+                })(),
+                locale,
+                { day: "numeric", month: "long", year: "numeric" },
+              ),
+            )}
           </p>
         </div>
         <div className="flex items-center gap-3">

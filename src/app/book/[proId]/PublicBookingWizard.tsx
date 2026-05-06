@@ -55,6 +55,12 @@ interface Pro {
   extraStudentPricing?: Record<string, number> | null;
   maxGroupSize: number;
   locations: Location[];
+  /**
+   * Number of days into the future the pro accepts bookings. Used
+   * to display a "Bookings open through {date}" caption on the
+   * calendar. (task 115)
+   */
+  bookingHorizon: number;
 }
 
 interface Slot {
@@ -93,6 +99,18 @@ export default function PublicBookingWizard({
   const [date, setDate] = useState<string | null>(null);
   const [slot, setSlot] = useState<Slot | null>(null);
   const [availableDates, setAvailableDates] = useState<string[]>([]);
+
+  // Booking horizon as YYYY-MM-DD. Passed to BookingCalendar so the
+  // student sees the cutoff. (task 115)
+  const horizonDateStr = useMemo(() => {
+    if (!pro) return undefined;
+    const d = new Date();
+    d.setDate(d.getDate() + pro.bookingHorizon);
+    const y = d.getFullYear();
+    const m = String(d.getMonth() + 1).padStart(2, "0");
+    const day = String(d.getDate()).padStart(2, "0");
+    return `${y}-${m}-${day}`;
+  }, [pro]);
   const [slots, setSlots] = useState<Slot[]>([]);
   const [loadingDates, setLoadingDates] = useState(false);
   const [loadingSlots, setLoadingSlots] = useState(false);
@@ -704,6 +722,7 @@ export default function PublicBookingWizard({
                 selectedDate={date}
                 onSelect={setDate}
                 locale={locale}
+                horizonDate={horizonDateStr}
               />
               {date && (
                 <div className="mt-5 border-t border-green-100 pt-4">

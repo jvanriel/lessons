@@ -224,7 +224,7 @@ describe("validateEditAllowed", () => {
       24,
       TZ,
     );
-    expect(result).toMatch(/confirmed bookings/i);
+    expect(result).toBe("only-confirmed");
   });
 
   it("rejects editing once the cancellation window has passed", () => {
@@ -239,7 +239,7 @@ describe("validateEditAllowed", () => {
       24,
       TZ,
     );
-    expect(result).toMatch(/cancellation window/i);
+    expect(result).toBe("too-late");
   });
 
   it("proCancelOverride bypasses the cancellation-window gate", () => {
@@ -273,7 +273,7 @@ describe("validateEditAllowed", () => {
       TZ,
       { proCancelOverride: true },
     );
-    expect(result).toMatch(/confirmed bookings/i);
+    expect(result).toBe("only-confirmed");
   });
 });
 

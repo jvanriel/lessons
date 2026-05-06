@@ -17,6 +17,129 @@ If any role inside the brackets is unknown (typo), the parser falls
 back to treating the brackets as literal text — better to over-show
 than silently hide.
 
+## 2026-05-06 — v1.1.57
+
+- [pro] **Pro billing/payment copy refinements (task 13).** Two
+  copy tweaks Nadine asked for:
+  - On /for-pros, the "Get Paid Seamlessly" Dutch description now
+    reads "ontvang de betaling voor lessen" instead of "ontvang
+    lesbetalingen" — clearer phrasing.
+  - In /pro/billing under the bank-account section, the description
+    is now active-voice: "Je ontvangt maandelijks betalingen voor
+    lessen op deze rekening." (and the matching tweak in EN/FR).
+
+## 2026-05-06 — v1.1.56
+
+- [pro] **Pro availability editor — UX polish (task 77).** Four
+  related improvements on /pro/availability:
+  - The Edit-dates dialog now validates as you type. End-before-
+    start and overlap with another bounded period show an inline
+    error and disable Save, instead of waiting until you click
+    Save to find out.
+  - The Schedule & blocks section now shows "Bookings open through
+    {date}" beneath the heading, mirroring the caption students see
+    in their booking calendar so the pro knows exactly which window
+    is reachable.
+  - When you're viewing the "Always" period and have at least one
+    bounded period, a small hint reads "Tip: remove every bounded
+    period to return to a single Always schedule" — clearer path
+    back to the simple setup.
+  - Removed an inaccurate sentence from the availability help text
+    that claimed the location's opening hours took priority. The
+    platform doesn't currently consult any club-opening-hours data,
+    so the claim was misleading.
+
+## 2026-05-06 — v1.1.55
+
+- **Booking calendar shows when the pro's calendar is open through.**
+  A small caption now sits below the booking calendar — "Bookings
+  open through {date}" — so students don't have to guess why
+  forward months stop showing slots. Applies to both the public
+  booking flow (/book/[proId]) and the registered-student flow
+  (/member/book/[proId]). NL / FR translated. (task 115)
+
+## 2026-05-06 — v1.1.54
+
+- **Extending a booking's duration now works.** Previously, trying
+  to extend a 60-minute lesson to 90 minutes at the same start time
+  failed with "this slot is not available" — the system was
+  treating the existing 60-minute booking as a blocker against its
+  own extension. The conflict check now excludes the booking being
+  edited, so any extension that fits the pro's published
+  availability goes through cleanly. (task 114)
+- **Edit-booking error messages are translated.** Three messages
+  the edit form could surface were hardcoded English ("Only
+  confirmed bookings can be edited", "It's too late to edit this
+  lesson — the cancellation window has passed", "This time slot is
+  not within your availability"). They now appear in NL / FR.
+
+## 2026-05-06 — v1.1.53
+
+- [pro] **Day-letter headers on Pro Quick Book are now localized.**
+  The mini-calendar in the pro-side Quick Book on /pro/students
+  always showed M T W T F S S regardless of language. Now follows
+  the user's locale: NL → M D W D V Z Z, FR → L M M J V S D, EN
+  unchanged. (task 113)
+
+## 2026-05-06 — v1.1.52
+
+- [pro] **Pro registration email — cleaner, points to Feedback tab.**
+  Two changes (task 111):
+  - Dropped the "Complete your subscription on the payment page"
+    step. The wizard already gates this and the rest of the
+    dashboard isn't usable until subscription is active, so the
+    email line was duplicate noise.
+  - Replaced the closing line "Just reply to this email — we're
+    here to help" with a pointer to the Feedback tab in the
+    dashboard, so questions land in the canonical support flow.
+  Email goes from 4 numbered steps to 3 (verify → setup profile →
+  publish). NL and FR copy updated to match.
+
+## 2026-05-06 — v1.1.51
+
+- [pro] **Public-profile preview is now a preview.** When you click
+  "View public profile" from your dashboard, the page no longer
+  shows the "Book a Lesson" or "Join as Student" buttons (those
+  don't make sense on your own profile). Instead a small
+  "Preview — this is your public profile" hint appears in their
+  place. Clicking "Join as Student" on yourself used to create a
+  bad student-of-yourself row that broke the Students tab; that
+  can no longer happen, and the server rejects any self-join
+  attempt as a defensive backstop. (task 108)
+
+## 2026-05-06 — v1.1.50
+
+- [pro] **Pro registration wizard — go back any time.** Two
+  related fixes on /pro/onboarding (task 106):
+  - The Subscription step (final step) now has a Back button so a
+    pro can return to the Bank step to fix details before paying.
+    Previously you could only pay or quit.
+  - The progress dots at the top are now clickable for already-
+    completed steps — click any earlier dot to jump straight there
+    instead of clicking Back multiple times.
+
+## 2026-05-06 — v1.1.49
+
+- **Extra-participant emails are now in each participant's own
+  language.** When a Dutch booker added a French friend as an extra
+  participant, the friend used to receive the confirmation, update,
+  and cancellation emails in Dutch. They now arrive in French if the
+  friend has an account with French as their preferred language —
+  same logic for any locale combination. Falls back to the booker's
+  language only if the participant doesn't have an account on file.
+  Applies to all three fanouts: booking confirmation, booking edit,
+  and cancellation. (task 105)
+
+## 2026-05-05 — v1.1.48
+
+- [admin] **Purge user — feedback + atomicity (task 79).** The
+  "Purge permanently" button now confirms with a "User permanently
+  purged" alert on success and surfaces any server-side error to
+  the admin instead of silently failing. The underlying purge runs
+  inside a database transaction, so a foreign-key violation on any
+  step rolls back cleanly rather than leaving the account half-
+  deleted.
+
 ## 2026-05-05 — v1.1.47
 
 - [admin] **Phone column on the Users admin page.** The /admin/users

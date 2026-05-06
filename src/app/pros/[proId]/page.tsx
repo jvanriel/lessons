@@ -15,6 +15,7 @@ import { getLocale } from "@/lib/locale";
 import { t } from "@/lib/i18n/translations";
 import { cheapestLessonPrice } from "@/lib/pricing";
 import { excludeDummiesOnProduction } from "@/lib/pro-visibility";
+import { getSession } from "@/lib/auth";
 
 interface Props {
   params: Promise<{ proId: string }>;
@@ -53,6 +54,7 @@ export default async function ProProfilePage({ params }: Props) {
   const [pro] = await db
     .select({
       id: proProfiles.id,
+      userId: proProfiles.userId,
       displayName: proProfiles.displayName,
       bio: proProfiles.bio,
       specialties: proProfiles.specialties,
@@ -94,6 +96,13 @@ export default async function ProProfilePage({ params }: Props) {
     );
 
   const relationship = await checkStudentRelationship(pro.id);
+
+  // Pros previewing their own public profile shouldn't see actionable
+  // CTAs — clicking "Join as student" on yourself created a stale
+  // pro_students row pointing back at the pro and broke the Students
+  // tab. Render a small preview hint instead. (task 108)
+  const session = await getSession();
+  const isOwnProfile = Boolean(session) && session!.userId === pro.userId;
 
   const flyerPages = await db
     .select({
@@ -162,20 +171,32 @@ export default async function ProProfilePage({ params }: Props) {
               </span>
             </div>
             <div className="mt-4 flex flex-wrap gap-3">
-              {pro.bookingEnabled && (
-                <Link
-                  href={`/book/${pro.id}`}
-                  className="inline-block rounded-md bg-gold-600 px-5 py-2.5 text-sm font-medium text-white transition-colors hover:bg-gold-500"
-                >
-                  {t("proBrowse.bookALesson", locale)}
-                </Link>
+              {isOwnProfile ? (
+                <span className="inline-flex items-center gap-1.5 rounded-md border border-green-200 bg-green-50 px-4 py-2.5 text-xs font-medium text-green-700">
+                  <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M2.036 12.322a1.012 1.012 0 0 1 0-.639C3.423 7.51 7.36 4.5 12 4.5c4.638 0 8.573 3.007 9.963 7.178.07.207.07.431 0 .639C20.577 16.49 16.64 19.5 12 19.5c-4.638 0-8.573-3.007-9.963-7.178Z" />
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M15 12a3 3 0 1 1-6 0 3 3 0 0 1 6 0Z" />
+                  </svg>
+                  {t("proBrowse.ownProfilePreview", locale)}
+                </span>
+              ) : (
+                <>
+                  {pro.bookingEnabled && (
+                    <Link
+                      href={`/book/${pro.id}`}
+                      className="inline-block rounded-md bg-gold-600 px-5 py-2.5 text-sm font-medium text-white transition-colors hover:bg-gold-500"
+                    >
+                      {t("proBrowse.bookALesson", locale)}
+                    </Link>
+                  )}
+                  <JoinButton
+                    proProfileId={pro.id}
+                    isLoggedIn={relationship.isLoggedIn}
+                    isStudent={relationship.isStudent}
+                    locale={locale}
+                  />
+                </>
               )}
-              <JoinButton
-                proProfileId={pro.id}
-                isLoggedIn={relationship.isLoggedIn}
-                isStudent={relationship.isStudent}
-                locale={locale}
-              />
             </div>
           </div>
         </div>

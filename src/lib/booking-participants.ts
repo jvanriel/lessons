@@ -137,33 +137,51 @@ function durationMinutes(start: string, end: string): number {
 
 /**
  * Fetch all extra participants (i.e. excluding the booker themselves)
- * with an email on file. Used by the create + cancel fanout below.
+ * with an email on file. Used by the create + cancel + update fanouts
+ * below — and re-exported for `booking-edit.ts` so the update path
+ * shares the same locale resolution.
  *
  * The booker is identified by matching `lessonParticipants.email`
  * against `lessonBookings.bookedBy → users.email` — if a booker
  * recorded themselves as an extra participant by typo, we'd email
  * them twice; we filter that out here.
+ *
+ * `preferredLocale` is sourced from the participant's own `users`
+ * row, looked up by email (LEFT JOIN — null when no account exists
+ * for that email). Used by the fanout helpers to send each
+ * participant their own-language email instead of the booker's.
+ * (task 105)
  */
-async function getEmailableParticipants(
+export interface EmailableParticipant {
+  firstName: string;
+  lastName: string;
+  email: string;
+  preferredLocale: string | null;
+}
+
+export async function getEmailableParticipants(
   bookingId: number,
   bookerEmail: string,
-): Promise<{ firstName: string; lastName: string; email: string }[]> {
+): Promise<EmailableParticipant[]> {
   const rows = await db
     .select({
       firstName: lessonParticipants.firstName,
       lastName: lessonParticipants.lastName,
       email: lessonParticipants.email,
+      preferredLocale: users.preferredLocale,
     })
     .from(lessonParticipants)
+    .leftJoin(users, eq(users.email, lessonParticipants.email))
     .where(eq(lessonParticipants.bookingId, bookingId));
   return rows
-    .filter((r): r is { firstName: string; lastName: string; email: string } =>
+    .filter((r): r is EmailableParticipant =>
       Boolean(r.email) && r.email!.toLowerCase() !== bookerEmail.toLowerCase(),
     )
     .map((r) => ({
       firstName: r.firstName,
       lastName: r.lastName,
       email: r.email,
+      preferredLocale: r.preferredLocale,
     }));
 }
 
@@ -173,10 +191,11 @@ async function getEmailableParticipants(
  * single failed send doesn't surface as a booking-flow error to the
  * user.
  *
- * Locale: we don't have a `preferredLocale` on participant rows
- * (they're not necessarily users), so we fall back to the booker's
- * preferred locale. That matches the most common case (a member
- * booking a lesson for friends usually shares a language with them).
+ * Locale: each participant's email is rendered in their own
+ * `preferredLocale` if they have a user account on file. Falls back
+ * to the booker's locale only when the participant isn't a registered
+ * user — registered users with a French preference always get French
+ * even if a Dutch booker added them to the lesson. (task 105)
  */
 export async function sendParticipantBookingNotifications(
   bookingId: number,
@@ -187,7 +206,6 @@ export async function sendParticipantBookingNotifications(
     const participants = await getEmailableParticipants(bookingId, data.bookerEmail);
     if (participants.length === 0) return;
 
-    const locale = resolveLocale(data.bookerLocale);
     const bookerName =
       `${data.bookerFirstName ?? ""} ${data.bookerLastName ?? ""}`.trim() ||
       data.bookerEmail;
@@ -218,8 +236,9 @@ export async function sendParticipantBookingNotifications(
     };
 
     await Promise.all(
-      participants.map((p) =>
-        sendEmail({
+      participants.map((p) => {
+        const locale = resolveLocale(p.preferredLocale ?? data.bookerLocale);
+        return sendEmail({
           to: p.email,
           subject: getParticipantBookingNotificationSubject(
             data.proDisplayName,
@@ -245,8 +264,8 @@ export async function sendParticipantBookingNotifications(
             tags: { area: "participant-notify" },
             extra: { bookingId, participantEmail: p.email },
           });
-        }),
-      ),
+        });
+      }),
     );
   } catch (err) {
     Sentry.captureException(err, {
@@ -270,7 +289,6 @@ export async function sendParticipantCancellationNotifications(
     const participants = await getEmailableParticipants(bookingId, data.bookerEmail);
     if (participants.length === 0) return;
 
-    const locale = resolveLocale(data.bookerLocale);
     const bookerName =
       `${data.bookerFirstName ?? ""} ${data.bookerLastName ?? ""}`.trim() ||
       data.bookerEmail;
@@ -300,8 +318,9 @@ export async function sendParticipantCancellationNotifications(
     };
 
     await Promise.all(
-      participants.map((p) =>
-        sendEmail({
+      participants.map((p) => {
+        const locale = resolveLocale(p.preferredLocale ?? data.bookerLocale);
+        return sendEmail({
           to: p.email,
           subject: getParticipantBookingCancelledSubject(
             data.proDisplayName,
@@ -324,8 +343,8 @@ export async function sendParticipantCancellationNotifications(
             tags: { area: "participant-cancel" },
             extra: { bookingId, participantEmail: p.email },
           });
-        }),
-      ),
+        });
+      }),
     );
   } catch (err) {
     Sentry.captureException(err, {

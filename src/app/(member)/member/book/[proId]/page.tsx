@@ -63,6 +63,7 @@ export default async function BookingPage({
       bookingEnabled: proProfiles.bookingEnabled,
       published: proProfiles.published,
       maxGroupSize: proProfiles.maxGroupSize,
+      bookingHorizon: proProfiles.bookingHorizon,
       allowBookingWithoutPayment: proProfiles.allowBookingWithoutPayment,
     })
     .from(proProfiles)
@@ -153,6 +154,7 @@ export default async function BookingPage({
           extraStudentPricing:
             (pro.extraStudentPricing as Record<string, number> | null) ?? null,
           maxGroupSize: pro.maxGroupSize,
+          bookingHorizon: pro.bookingHorizon,
         }}
         locations={proLocs}
         userDetails={userDetails}

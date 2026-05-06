@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useRef, useCallback, useTransition } from "react";
+import { useState, useEffect, useRef, useMemo, useCallback, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import {
   proQuickBookForStudent,
@@ -32,6 +32,22 @@ export function ProQuickBook({ proStudentId, studentName, initialData, autoOpen,
   const [data, setData] = useState<ProQuickBookData | null>(initialData ?? null);
   const [open, setOpen] = useState(!!initialData);
   const [interval, setInterval] = useState<string | null>(initialData?.interval ?? null);
+
+  // Single-letter weekday headers for the mini-calendar, in the
+  // user's locale. EN→M T W T F S S, NL→M D W D V Z Z, FR→L M M J V S D.
+  // Was hardcoded English. (task 113)
+  const weekdayNarrow = useMemo(() => {
+    const fmt = new Intl.DateTimeFormat(
+      locale === "nl" ? "nl-BE" : locale === "fr" ? "fr-BE" : "en-GB",
+      { weekday: "narrow" },
+    );
+    const monday = new Date(2024, 0, 1); // Jan 1 2024 is a Monday
+    return Array.from({ length: 7 }, (_, i) => {
+      const d = new Date(monday);
+      d.setDate(monday.getDate() + i);
+      return fmt.format(d);
+    });
+  }, [locale]);
 
   // Listen for booking changes (from notifications) and refresh
   useEffect(() => {
@@ -561,9 +577,9 @@ export function ProQuickBook({ proStudentId, studentName, initialData, autoOpen,
                     <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" /></svg>
                   </button>
                 </div>
-                {/* Day headers */}
+                {/* Day headers — locale-aware narrow weekday names. */}
                 <div className="mb-0.5 grid grid-cols-7 text-center text-[10px] font-medium text-green-400">
-                  {["M", "T", "W", "T", "F", "S", "S"].map((d, i) => <div key={i} className="py-0.5">{d}</div>)}
+                  {weekdayNarrow.map((d, i) => <div key={i} className="py-0.5">{d}</div>)}
                 </div>
                 {/* Days grid */}
                 <div className="grid grid-cols-7 gap-0.5">

@@ -22,6 +22,7 @@ import { resolveLocale } from "@/lib/i18n";
 import {
   parseExtraParticipants,
   validateExtraParticipants,
+  getEmailableParticipants,
   type ExtraParticipant,
 } from "@/lib/booking-participants";
 import * as Sentry from "@sentry/nextjs";
@@ -97,8 +98,15 @@ export function isNoOpEdit(
 }
 
 /**
- * Server-side validation for an edit. Returns null on success or an
- * error message ready to surface to the user.
+ * Reason an edit is rejected. Stable codes so the action layer can
+ * translate them per the user's locale rather than ship hardcoded
+ * English. (task 114)
+ */
+export type EditNotAllowedReason = "only-confirmed" | "too-late";
+
+/**
+ * Server-side validation for an edit. Returns null on success or a
+ * typed error code the action layer translates.
  *
  * The cancellation-window gate is the same one that protects the
  * cancel flow — the rationale being that if the lesson is too late to
@@ -113,9 +121,9 @@ export function validateEditAllowed(
   cancellationHours: number,
   locationTimezone: string,
   opts: { proCancelOverride?: boolean } = {},
-): string | null {
+): EditNotAllowedReason | null {
   if (booking.status !== "confirmed" || booking.cancelledAt) {
-    return "Only confirmed bookings can be edited.";
+    return "only-confirmed";
   }
   if (opts.proCancelOverride) return null;
   const check = checkCancellationAllowed(
@@ -127,7 +135,7 @@ export function validateEditAllowed(
     locationTimezone,
   );
   if (!check.canCancel) {
-    return "It's too late to edit this lesson — the cancellation window has passed.";
+    return "too-late";
   }
   return null;
 }
@@ -311,14 +319,14 @@ export async function sendBookingUpdatedNotifications(
     const data = await loadBookingForUpdate(bookingId);
     if (!data) return;
 
-    const participantRows = await db
-      .select({
-        firstName: lessonParticipants.firstName,
-        lastName: lessonParticipants.lastName,
-        email: lessonParticipants.email,
-      })
-      .from(lessonParticipants)
-      .where(eq(lessonParticipants.bookingId, bookingId));
+    // Use the shared helper so the update path resolves participant
+    // locales the same way create + cancel do — by joining with users
+    // on email and falling back to the booker's locale only when the
+    // participant has no account on file. (task 105)
+    const emailableParticipants = await getEmailableParticipants(
+      bookingId,
+      data.bookerEmail,
+    );
 
     const bookerName =
       `${data.bookerFirstName ?? ""} ${data.bookerLastName ?? ""}`.trim() ||
@@ -329,12 +337,6 @@ export async function sendBookingUpdatedNotifications(
     const duration = durationMinutes(data.startTime, data.endTime);
     const bookerLocale = resolveLocale(data.bookerLocale);
     const proLocale = resolveLocale(data.proLocale);
-
-    const emailableParticipants = participantRows
-      .filter((r): r is { firstName: string; lastName: string; email: string } =>
-        Boolean(r.email) && r.email!.toLowerCase() !== data.bookerEmail.toLowerCase(),
-      )
-      .map((r) => ({ firstName: r.firstName, lastName: r.lastName, email: r.email }));
 
     const ics = buildIcs({
       date: data.date,
@@ -409,14 +411,19 @@ export async function sendBookingUpdatedNotifications(
       });
     });
 
-    // Extra participants
+    // Extra participants — render each in their own preferred locale
+    // when they're a registered user, falling back to bookerLocale
+    // only if no account exists for that email. (task 105)
     for (const p of emailableParticipants) {
+      const participantLocale = resolveLocale(
+        p.preferredLocale ?? data.bookerLocale,
+      );
       sendEmail({
         to: p.email,
         subject: getParticipantBookingUpdatedSubject(
           data.proDisplayName,
           bookerName,
-          bookerLocale,
+          participantLocale,
         ),
         html: buildParticipantBookingUpdatedEmail({
           participantFirstName: p.firstName,
@@ -429,7 +436,7 @@ export async function sendBookingUpdatedNotifications(
           startTime: data.startTime,
           endTime: data.endTime,
           duration,
-          locale: bookerLocale,
+          locale: participantLocale,
         }),
         attachments: [icsAttachment],
       }).catch((err) => {

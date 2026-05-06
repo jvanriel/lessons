@@ -61,6 +61,20 @@ async function main() {
       SET "column" = ${column}, position = ${position}, updated_at = NOW()
       WHERE id = ${id}
     `;
+    // Log the transition so we can analyse fix-cycle quality later
+    // (which tasks bounce to_test → in_progress, etc.). Skipped when
+    // it's a no-op move that didn't actually change column.
+    if (existing.column !== column) {
+      await sql`
+        INSERT INTO events (type, level, actor_id, payload)
+        VALUES (
+          'task.column_change',
+          'info',
+          ${CLAUDE_CODE_USER_ID},
+          ${JSON.stringify({ taskId: id, from: existing.column, to: column })}::jsonb
+        )
+      `;
+    }
   }
 
   if (comment) {

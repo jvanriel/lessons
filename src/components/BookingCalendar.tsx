@@ -2,6 +2,8 @@
 
 import { useMemo, useState } from "react";
 import type { Locale } from "@/lib/i18n";
+import { t } from "@/lib/i18n/translations";
+import { formatDate } from "@/lib/format-date";
 
 /**
  * Month-grid calendar that highlights days on which the pro has any
@@ -19,11 +21,20 @@ export function BookingCalendar({
   selectedDate,
   onSelect,
   locale,
+  /**
+   * Optional booking horizon (ISO YYYY-MM-DD). When provided, the
+   * calendar shows a "Bookings open through {date}" caption below
+   * the grid so the student knows the pro's cap. Without this the
+   * navigation just stops silently when forward months have no
+   * slots, leaving the student wondering why. (task 115)
+   */
+  horizonDate,
 }: {
   availableDates: string[];
   selectedDate: string | null;
   onSelect: (d: string) => void;
   locale: Locale;
+  horizonDate?: string;
 }) {
   const availableSet = useMemo(
     () => new Set(availableDates),
@@ -175,6 +186,18 @@ export function BookingCalendar({
           );
         })}
       </div>
+      {horizonDate && (
+        <p className="mt-3 text-center text-[11px] italic text-green-500">
+          {t("publicBook.bookingsOpenThrough", locale).replace(
+            "{date}",
+            formatDate(new Date(horizonDate + "T00:00:00"), locale, {
+              day: "numeric",
+              month: "long",
+              year: "numeric",
+            }),
+          )}
+        </p>
+      )}
     </div>
   );
 }

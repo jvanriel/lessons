@@ -48,6 +48,7 @@ export default async function PublicBookingPage({ params }: Props) {
           lessonPricing:
             (pro.lessonPricing as Record<string, number> | null) ?? {},
           maxGroupSize: pro.maxGroupSize,
+          bookingHorizon: pro.bookingHorizon,
           locations: proLocs,
         }}
         allPros={null}

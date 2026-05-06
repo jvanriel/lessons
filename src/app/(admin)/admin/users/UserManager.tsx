@@ -475,8 +475,20 @@ function UserRowActions({
                   setMenuOpen(false);
                   if (!confirm(`Permanently purge ${user.firstName} ${user.lastName}? This will remove all data and cannot be undone.`)) return;
                   startTransition(async () => {
-                    const result = await purgeUser(user.id);
-                    if ("error" in result) alert(result.error);
+                    try {
+                      const result = await purgeUser(user.id);
+                      if ("error" in result) {
+                        alert(result.error);
+                        return;
+                      }
+                      alert(`User permanently purged.`);
+                    } catch (err) {
+                      alert(
+                        `Purge failed: ${
+                          err instanceof Error ? err.message : "unknown error"
+                        }`,
+                      );
+                    }
                   });
                 }}
                 className="block w-full px-4 py-2 text-left text-sm text-red-600 hover:bg-red-50"
