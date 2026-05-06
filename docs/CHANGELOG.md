@@ -17,6 +17,15 @@ If any role inside the brackets is unknown (typo), the parser falls
 back to treating the brackets as literal text — better to over-show
 than silently hide.
 
+## 2026-05-06 — v1.1.55
+
+- **Booking calendar shows when the pro's calendar is open through.**
+  A small caption now sits below the booking calendar — "Bookings
+  open through {date}" — so students don't have to guess why
+  forward months stop showing slots. Applies to both the public
+  booking flow (/book/[proId]) and the registered-student flow
+  (/member/book/[proId]). NL / FR translated. (task 115)
+
 ## 2026-05-06 — v1.1.54
 
 - **Extending a booking's duration now works.** Previously, trying

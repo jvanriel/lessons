@@ -18,6 +18,7 @@ export default async function PublicBookEntryPage() {
     lessonPricing:
       (p.lessonPricing as Record<string, number> | null) ?? {},
     maxGroupSize: p.maxGroupSize,
+    bookingHorizon: p.bookingHorizon,
     locations: p.locations,
   }));
 
