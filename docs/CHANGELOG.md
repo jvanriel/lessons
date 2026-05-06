@@ -17,6 +17,21 @@ If any role inside the brackets is unknown (typo), the parser falls
 back to treating the brackets as literal text — better to over-show
 than silently hide.
 
+## 2026-05-06 — v1.1.54
+
+- **Extending a booking's duration now works.** Previously, trying
+  to extend a 60-minute lesson to 90 minutes at the same start time
+  failed with "this slot is not available" — the system was
+  treating the existing 60-minute booking as a blocker against its
+  own extension. The conflict check now excludes the booking being
+  edited, so any extension that fits the pro's published
+  availability goes through cleanly. (task 114)
+- **Edit-booking error messages are translated.** Three messages
+  the edit form could surface were hardcoded English ("Only
+  confirmed bookings can be edited", "It's too late to edit this
+  lesson — the cancellation window has passed", "This time slot is
+  not within your availability"). They now appear in NL / FR.
+
 ## 2026-05-06 — v1.1.53
 
 - [pro] **Day-letter headers on Pro Quick Book are now localized.**

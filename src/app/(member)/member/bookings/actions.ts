@@ -397,7 +397,17 @@ export async function updateBooking(formData: FormData) {
     .limit(1);
   const cancellationHours = proRow?.cancellationHours ?? 24;
   const editError = validateEditAllowed(booking, cancellationHours, tz);
-  if (editError) return { error: editError };
+  if (editError) {
+    const localeForError = await getLocale();
+    return {
+      error: t(
+        editError === "only-confirmed"
+          ? "editBooking.errOnlyConfirmed"
+          : "editBooking.errTooLate",
+        localeForError,
+      ),
+    };
+  }
 
   // Existing participants (booker is participant #1, by id-asc order).
   const currentParticipants = await db
@@ -441,17 +451,21 @@ export async function updateBooking(formData: FormData) {
     booking.endTime !== changes.endTime
   ) {
     const locale = await getLocale();
+    // Exclude the booking being edited from the conflict check —
+    // otherwise extending a 60-min booking to 90 min at the same
+    // start time appears blocked by itself. (task 114)
     const allowedSlots = await getAvailableSlots(
       booking.proProfileId,
       booking.proLocationId,
       changes.date,
       changes.duration,
+      booking.id,
     );
     const inAvailability = allowedSlots.some(
       (s) => s.startTime === changes.startTime && s.endTime === changes.endTime,
     );
     if (!inAvailability) {
-      return { error: t("bookErr.slotUnavailable", locale) };
+      return { error: t("editBooking.errNotInAvailability", locale) };
     }
     const taken = await isSlotTakenByOther(
       booking.proProfileId,

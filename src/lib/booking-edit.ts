@@ -98,8 +98,15 @@ export function isNoOpEdit(
 }
 
 /**
- * Server-side validation for an edit. Returns null on success or an
- * error message ready to surface to the user.
+ * Reason an edit is rejected. Stable codes so the action layer can
+ * translate them per the user's locale rather than ship hardcoded
+ * English. (task 114)
+ */
+export type EditNotAllowedReason = "only-confirmed" | "too-late";
+
+/**
+ * Server-side validation for an edit. Returns null on success or a
+ * typed error code the action layer translates.
  *
  * The cancellation-window gate is the same one that protects the
  * cancel flow — the rationale being that if the lesson is too late to
@@ -114,9 +121,9 @@ export function validateEditAllowed(
   cancellationHours: number,
   locationTimezone: string,
   opts: { proCancelOverride?: boolean } = {},
-): string | null {
+): EditNotAllowedReason | null {
   if (booking.status !== "confirmed" || booking.cancelledAt) {
-    return "Only confirmed bookings can be edited.";
+    return "only-confirmed";
   }
   if (opts.proCancelOverride) return null;
   const check = checkCancellationAllowed(
@@ -128,7 +135,7 @@ export function validateEditAllowed(
     locationTimezone,
   );
   if (!check.canCancel) {
-    return "It's too late to edit this lesson — the cancellation window has passed.";
+    return "too-late";
   }
   return null;
 }
