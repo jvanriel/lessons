@@ -22,6 +22,7 @@ import { resolveLocale } from "@/lib/i18n";
 import {
   parseExtraParticipants,
   validateExtraParticipants,
+  getEmailableParticipants,
   type ExtraParticipant,
 } from "@/lib/booking-participants";
 import * as Sentry from "@sentry/nextjs";
@@ -311,14 +312,14 @@ export async function sendBookingUpdatedNotifications(
     const data = await loadBookingForUpdate(bookingId);
     if (!data) return;
 
-    const participantRows = await db
-      .select({
-        firstName: lessonParticipants.firstName,
-        lastName: lessonParticipants.lastName,
-        email: lessonParticipants.email,
-      })
-      .from(lessonParticipants)
-      .where(eq(lessonParticipants.bookingId, bookingId));
+    // Use the shared helper so the update path resolves participant
+    // locales the same way create + cancel do — by joining with users
+    // on email and falling back to the booker's locale only when the
+    // participant has no account on file. (task 105)
+    const emailableParticipants = await getEmailableParticipants(
+      bookingId,
+      data.bookerEmail,
+    );
 
     const bookerName =
       `${data.bookerFirstName ?? ""} ${data.bookerLastName ?? ""}`.trim() ||
@@ -329,12 +330,6 @@ export async function sendBookingUpdatedNotifications(
     const duration = durationMinutes(data.startTime, data.endTime);
     const bookerLocale = resolveLocale(data.bookerLocale);
     const proLocale = resolveLocale(data.proLocale);
-
-    const emailableParticipants = participantRows
-      .filter((r): r is { firstName: string; lastName: string; email: string } =>
-        Boolean(r.email) && r.email!.toLowerCase() !== data.bookerEmail.toLowerCase(),
-      )
-      .map((r) => ({ firstName: r.firstName, lastName: r.lastName, email: r.email }));
 
     const ics = buildIcs({
       date: data.date,
@@ -409,14 +404,19 @@ export async function sendBookingUpdatedNotifications(
       });
     });
 
-    // Extra participants
+    // Extra participants — render each in their own preferred locale
+    // when they're a registered user, falling back to bookerLocale
+    // only if no account exists for that email. (task 105)
     for (const p of emailableParticipants) {
+      const participantLocale = resolveLocale(
+        p.preferredLocale ?? data.bookerLocale,
+      );
       sendEmail({
         to: p.email,
         subject: getParticipantBookingUpdatedSubject(
           data.proDisplayName,
           bookerName,
-          bookerLocale,
+          participantLocale,
         ),
         html: buildParticipantBookingUpdatedEmail({
           participantFirstName: p.firstName,
@@ -429,7 +429,7 @@ export async function sendBookingUpdatedNotifications(
           startTime: data.startTime,
           endTime: data.endTime,
           duration,
-          locale: bookerLocale,
+          locale: participantLocale,
         }),
         attachments: [icsAttachment],
       }).catch((err) => {

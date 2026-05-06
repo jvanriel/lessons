@@ -17,6 +17,18 @@ If any role inside the brackets is unknown (typo), the parser falls
 back to treating the brackets as literal text — better to over-show
 than silently hide.
 
+## 2026-05-06 — v1.1.49
+
+- **Extra-participant emails are now in each participant's own
+  language.** When a Dutch booker added a French friend as an extra
+  participant, the friend used to receive the confirmation, update,
+  and cancellation emails in Dutch. They now arrive in French if the
+  friend has an account with French as their preferred language —
+  same logic for any locale combination. Falls back to the booker's
+  language only if the participant doesn't have an account on file.
+  Applies to all three fanouts: booking confirmation, booking edit,
+  and cancellation. (task 105)
+
 ## 2026-05-05 — v1.1.48
 
 - [admin] **Purge user — feedback + atomicity (task 79).** The
