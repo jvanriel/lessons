@@ -53,6 +53,18 @@ async function main() {
     VALUES ('task', ${taskId}, ${CLAUDE_CODE_USER_ID}, ${comment}, 'comment')
   `;
 
+  // Log the initial placement so we have a complete column-history
+  // trace for each task (from `null` → starting column).
+  await sql`
+    INSERT INTO events (type, level, actor_id, payload)
+    VALUES (
+      'task.column_change',
+      'info',
+      ${CLAUDE_CODE_USER_ID},
+      ${JSON.stringify({ taskId, from: null, to: column })}::jsonb
+    )
+  `;
+
   console.log(JSON.stringify({ taskId, column, position }, null, 2));
 }
 
