@@ -17,6 +17,17 @@ If any role inside the brackets is unknown (typo), the parser falls
 back to treating the brackets as literal text — better to over-show
 than silently hide.
 
+## 2026-05-06 — v1.1.50
+
+- [pro] **Pro registration wizard — go back any time.** Two
+  related fixes on /pro/onboarding (task 106):
+  - The Subscription step (final step) now has a Back button so a
+    pro can return to the Bank step to fix details before paying.
+    Previously you could only pay or quit.
+  - The progress dots at the top are now clickable for already-
+    completed steps — click any earlier dot to jump straight there
+    instead of clicking Back multiple times.
+
 ## 2026-05-06 — v1.1.49
 
 - **Extra-participant emails are now in each participant's own

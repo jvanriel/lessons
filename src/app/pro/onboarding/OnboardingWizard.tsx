@@ -71,31 +71,58 @@ interface InitialData {
 
 // ─── Progress Bar ───────────────────────────────────────
 
-function ProgressBar({ current, total }: { current: number; total: number }) {
+function ProgressBar({
+  current,
+  total,
+  onJump,
+}: {
+  current: number;
+  total: number;
+  /**
+   * Optional click handler to jump to a previously completed step.
+   * Only fires for indices `< current` — future steps stay inert.
+   */
+  onJump?: (index: number) => void;
+}) {
   return (
     <div className="flex items-center gap-2">
-      {Array.from({ length: total }).map((_, i) => (
-        <div key={i} className="flex items-center gap-2">
-          <div
-            className={`flex h-8 w-8 items-center justify-center rounded-full text-xs font-semibold ${
-              i < current
-                ? "bg-green-700 text-white"
-                : i === current
-                  ? "bg-gold-600 text-white"
-                  : "bg-green-100 text-green-400"
-            }`}
-          >
-            {i < current ? "✓" : i + 1}
+      {Array.from({ length: total }).map((_, i) => {
+        const isCompleted = i < current;
+        const isCurrent = i === current;
+        const clickable = isCompleted && Boolean(onJump);
+        const dotClass = `flex h-8 w-8 items-center justify-center rounded-full text-xs font-semibold transition-colors ${
+          isCompleted
+            ? "bg-green-700 text-white"
+            : isCurrent
+              ? "bg-gold-600 text-white"
+              : "bg-green-100 text-green-400"
+        } ${clickable ? "cursor-pointer hover:bg-green-800" : ""}`;
+        return (
+          <div key={i} className="flex items-center gap-2">
+            {clickable ? (
+              <button
+                type="button"
+                onClick={() => onJump?.(i)}
+                aria-label={`Go to step ${i + 1}`}
+                className={dotClass}
+              >
+                {isCompleted ? "✓" : i + 1}
+              </button>
+            ) : (
+              <div className={dotClass}>
+                {isCompleted ? "✓" : i + 1}
+              </div>
+            )}
+            {i < total - 1 && (
+              <div
+                className={`h-0.5 w-6 sm:w-10 ${
+                  i < current ? "bg-green-700" : "bg-green-200"
+                }`}
+              />
+            )}
           </div>
-          {i < total - 1 && (
-            <div
-              className={`h-0.5 w-6 sm:w-10 ${
-                i < current ? "bg-green-700" : "bg-green-200"
-              }`}
-            />
-          )}
-        </div>
-      ))}
+        );
+      })}
     </div>
   );
 }
@@ -1485,7 +1512,13 @@ export default function OnboardingWizard({
 
         {/* Progress */}
         <div className="mt-6 flex justify-center">
-          <ProgressBar current={step} total={STEP_COUNT} />
+          <ProgressBar
+            current={step}
+            total={STEP_COUNT}
+            // Click a completed dot to jump back. Disabled while
+            // saving so we don't strand a half-saved step. (task 106)
+            onJump={saving ? undefined : (i) => setStep(i)}
+          />
         </div>
 
         {/* Step content */}
@@ -1523,8 +1556,12 @@ export default function OnboardingWizard({
             <SubscriptionStep onSuccess={() => setStep(STEP_COUNT)} locale={locale} />
           )}
 
-          {/* Navigation (not shown for subscription step — it has its own buttons) */}
-          {step < STEP_SUBSCRIPTION && (
+          {/* Navigation. Continue is hidden on the subscription step
+              (it has its own "Continue to payment" + Stripe form
+              buttons), but Back stays available so the pro can
+              return to Bank — or any earlier step via the progress
+              dots — even after reaching subscription. (task 106) */}
+          {step < STEP_COUNT && (
             <div className="mt-8 flex justify-between">
               <Button
                 type="button"
@@ -1535,13 +1572,17 @@ export default function OnboardingWizard({
               >
                 {t("proOnb.back", locale)}
               </Button>
-              <Button
-                onClick={handleNext}
-                disabled={saving || !stepValid()}
-                className="bg-gold-600 text-white hover:bg-gold-500 disabled:opacity-50"
-              >
-                {saving ? t("proOnb.saving", locale) : t("proOnb.continue", locale)}
-              </Button>
+              {step < STEP_SUBSCRIPTION ? (
+                <Button
+                  onClick={handleNext}
+                  disabled={saving || !stepValid()}
+                  className="bg-gold-600 text-white hover:bg-gold-500 disabled:opacity-50"
+                >
+                  {saving ? t("proOnb.saving", locale) : t("proOnb.continue", locale)}
+                </Button>
+              ) : (
+                <span />
+              )}
             </div>
           )}
         </div>
