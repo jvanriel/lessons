@@ -17,6 +17,14 @@ If any role inside the brackets is unknown (typo), the parser falls
 back to treating the brackets as literal text — better to over-show
 than silently hide.
 
+## 2026-05-06 — v1.1.53
+
+- [pro] **Day-letter headers on Pro Quick Book are now localized.**
+  The mini-calendar in the pro-side Quick Book on /pro/students
+  always showed M T W T F S S regardless of language. Now follows
+  the user's locale: NL → M D W D V Z Z, FR → L M M J V S D, EN
+  unchanged. (task 113)
+
 ## 2026-05-06 — v1.1.52
 
 - [pro] **Pro registration email — cleaner, points to Feedback tab.**
