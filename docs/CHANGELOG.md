@@ -17,6 +17,17 @@ If any role inside the brackets is unknown (typo), the parser falls
 back to treating the brackets as literal text — better to over-show
 than silently hide.
 
+## 2026-05-06 — v1.1.57
+
+- [pro] **Pro billing/payment copy refinements (task 13).** Two
+  copy tweaks Nadine asked for:
+  - On /for-pros, the "Get Paid Seamlessly" Dutch description now
+    reads "ontvang de betaling voor lessen" instead of "ontvang
+    lesbetalingen" — clearer phrasing.
+  - In /pro/billing under the bank-account section, the description
+    is now active-voice: "Je ontvangt maandelijks betalingen voor
+    lessen op deze rekening." (and the matching tweak in EN/FR).
+
 ## 2026-05-06 — v1.1.56
 
 - [pro] **Pro availability editor — UX polish (task 77).** Four
