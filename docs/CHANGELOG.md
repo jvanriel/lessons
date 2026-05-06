@@ -17,6 +17,20 @@ If any role inside the brackets is unknown (typo), the parser falls
 back to treating the brackets as literal text — better to over-show
 than silently hide.
 
+## 2026-05-06 — v1.1.52
+
+- [pro] **Pro registration email — cleaner, points to Feedback tab.**
+  Two changes (task 111):
+  - Dropped the "Complete your subscription on the payment page"
+    step. The wizard already gates this and the rest of the
+    dashboard isn't usable until subscription is active, so the
+    email line was duplicate noise.
+  - Replaced the closing line "Just reply to this email — we're
+    here to help" with a pointer to the Feedback tab in the
+    dashboard, so questions land in the canonical support flow.
+  Email goes from 4 numbered steps to 3 (verify → setup profile →
+  publish). NL and FR copy updated to match.
+
 ## 2026-05-06 — v1.1.51
 
 - [pro] **Public-profile preview is now a preview.** When you click

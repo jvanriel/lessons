@@ -368,6 +368,11 @@ export function buildWelcomeEmail(opts: {
     },
   };
 
+  // Step 2 (subscription payment) intentionally removed: it's already
+  // the last gate of the onboarding wizard, and the rest of the
+  // dashboard stays inaccessible until subscription is active — so
+  // calling it out separately in the email duplicates the wizard
+  // and confuses pros who already paid. (task 111)
   const proStrings: Record<Locale, {
     intro: string;
     stepsHeading: string;
@@ -376,7 +381,6 @@ export function buildWelcomeEmail(opts: {
     step1LinkLabel: string;
     step2: string;
     step3: string;
-    step4: string;
     closing: string;
     button: string;
     buttonPath: string;
@@ -387,10 +391,9 @@ export function buildWelcomeEmail(opts: {
       step1: "Verify your email — we sent you a separate verification link.",
       step1Inline: "Verify your email address.",
       step1LinkLabel: "Verify now",
-      step2: "Complete your subscription on the payment page so students can discover you.",
-      step3: "Set up your profile, add your teaching locations, and paint your weekly availability.",
-      step4: "Publish your profile and start receiving bookings.",
-      closing: "Any questions along the way? Just reply to this email — we're here to help.",
+      step2: "Set up your profile, add your teaching locations, and paint your weekly availability.",
+      step3: "Publish your profile and start receiving bookings.",
+      closing: "Have a question? Use the Feedback tab in your dashboard and we'll get back to you.",
       button: "Continue setup",
       buttonPath: "/pro/dashboard",
     },
@@ -400,10 +403,9 @@ export function buildWelcomeEmail(opts: {
       step1: "Bevestig je e-mailadres — we hebben je een aparte bevestigingslink gestuurd.",
       step1Inline: "Bevestig je e-mailadres.",
       step1LinkLabel: "Nu bevestigen",
-      step2: "Rond je abonnement af op de betaalpagina zodat leerlingen je kunnen vinden.",
-      step3: "Stel je profiel in, voeg je leslocaties toe en stel je wekelijkse beschikbaarheid in.",
-      step4: "Publiceer je profiel en begin met het ontvangen van boekingen.",
-      closing: "Vragen onderweg? Antwoord gewoon op deze e-mail — we helpen je graag verder.",
+      step2: "Stel je profiel in, voeg je leslocaties toe en stel je wekelijkse beschikbaarheid in.",
+      step3: "Publiceer je profiel en begin met het ontvangen van boekingen.",
+      closing: "Heb je een vraag? Gebruik het Feedback-tabblad in je dashboard en we komen bij je terug.",
       button: "Verder met instellen",
       buttonPath: "/pro/dashboard",
     },
@@ -413,10 +415,9 @@ export function buildWelcomeEmail(opts: {
       step1: "Confirmez votre adresse e-mail — nous vous avons envoyé un lien de vérification séparé.",
       step1Inline: "Confirmez votre adresse e-mail.",
       step1LinkLabel: "Confirmer maintenant",
-      step2: "Finalisez votre abonnement sur la page de paiement afin que les élèves puissent vous trouver.",
-      step3: "Configurez votre profil, ajoutez vos lieux de cours et renseignez vos disponibilités hebdomadaires.",
-      step4: "Publiez votre profil et commencez à recevoir des réservations.",
-      closing: "Des questions en cours de route ? Répondez simplement à cet e-mail — nous sommes là pour vous aider.",
+      step2: "Configurez votre profil, ajoutez vos lieux de cours et renseignez vos disponibilités hebdomadaires.",
+      step3: "Publiez votre profil et commencez à recevoir des réservations.",
+      closing: "Une question ? Utilisez l'onglet Feedback dans votre tableau de bord et nous reviendrons vers vous.",
       button: "Poursuivre la configuration",
       buttonPath: "/pro/dashboard",
     },
@@ -442,7 +443,6 @@ export function buildWelcomeEmail(opts: {
       <div style="${stepStyle}"><span style="${numStyle}">1</span>${step1Body}</div>
       <div style="${stepStyle}"><span style="${numStyle}">2</span>${s.step2}</div>
       <div style="${stepStyle}"><span style="${numStyle}">3</span>${s.step3}</div>
-      <div style="${stepStyle}"><span style="${numStyle}">4</span>${s.step4}</div>
 
       <p style="margin:24px 0 24px 0;">
         <a href="${base}${s.buttonPath}" style="display:inline-block;background:${COLORS.gold600};color:${COLORS.white};padding:12px 28px;border-radius:6px;text-decoration:none;font-weight:700;font-size:14px;">
