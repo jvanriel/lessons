@@ -17,6 +17,27 @@ If any role inside the brackets is unknown (typo), the parser falls
 back to treating the brackets as literal text — better to over-show
 than silently hide.
 
+## 2026-05-06 — v1.1.56
+
+- [pro] **Pro availability editor — UX polish (task 77).** Four
+  related improvements on /pro/availability:
+  - The Edit-dates dialog now validates as you type. End-before-
+    start and overlap with another bounded period show an inline
+    error and disable Save, instead of waiting until you click
+    Save to find out.
+  - The Schedule & blocks section now shows "Bookings open through
+    {date}" beneath the heading, mirroring the caption students see
+    in their booking calendar so the pro knows exactly which window
+    is reachable.
+  - When you're viewing the "Always" period and have at least one
+    bounded period, a small hint reads "Tip: remove every bounded
+    period to return to a single Always schedule" — clearer path
+    back to the simple setup.
+  - Removed an inaccurate sentence from the availability help text
+    that claimed the location's opening hours took priority. The
+    platform doesn't currently consult any club-opening-hours data,
+    so the claim was misleading.
+
 ## 2026-05-06 — v1.1.55
 
 - **Booking calendar shows when the pro's calendar is open through.**

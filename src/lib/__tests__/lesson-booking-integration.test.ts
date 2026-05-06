@@ -1071,3 +1071,109 @@ describe("available override on blocked day", () => {
     expect(slotsAfter[0].startTime).toBe("10:00");
   });
 });
+
+// ─── Bounded period regression tests (#120) ──────────
+//
+// These tests pull `pro_availability` rows through Drizzle and feed them
+// into `computeAvailableSlots` — exact same path as production. Earlier
+// unit tests in lesson-slots.test.ts pass string literals directly, which
+// silently bypass the schema↔consumer type mismatch we're fixing here:
+// `date()` columns return Date objects, not strings, so `dateStr < t.validFrom`
+// becomes `string < Date`, both coerce to NaN, comparison returns false,
+// the bounded-period filter never excludes anything.
+//
+// Test pro is set up with Mon/Tue/Thu/Fri = days 0,1,3,4 (in beforeAll).
+// We add a Saturday-only (day=5) row bounded to June 2026 and verify
+// dates inside / outside the bound behave correctly via the real DB path.
+
+describe("bounded period filtering through DB (regression: #120)", () => {
+  const BOUNDED_FROM = "2026-06-01";
+  const BOUNDED_UNTIL = "2026-06-30";
+  // 2026-06-06 (Sat), 2026-05-30 (Sat before), 2026-07-04 (Sat after)
+  // 2024-01-06 (Sat) is far in the past — used as `now` so the booking
+  // notice doesn't filter our future dates out.
+  const FAKE_NOW = new Date("2024-01-06T12:00:00Z");
+
+  let boundedRowId: number | null = null;
+
+  beforeAll(async () => {
+    const [row] = await db
+      .insert(proAvailability)
+      .values({
+        proProfileId: TEST_PRO_PROFILE_ID,
+        proLocationId: TEST_PRO_LOCATION_ID,
+        dayOfWeek: 5, // Saturday — not in the default Mon/Tue/Thu/Fri set
+        startTime: "10:00",
+        endTime: "12:00",
+        validFrom: BOUNDED_FROM,
+        validUntil: BOUNDED_UNTIL,
+      } as never) // schema currently types validFrom as Date; runtime accepts string. See #120.
+      .returning({ id: proAvailability.id });
+    boundedRowId = row.id;
+    createdAvailabilityIds.push(row.id);
+  });
+
+  /**
+   * Pull the test pro's templates from the DB and run them through
+   * `computeAvailableSlots` for the given date. Mirrors the prod
+   * `getAvailableSlots` server action minus the auth check.
+   */
+  async function runForDate(dateStr: string) {
+    const templates = await db
+      .select({
+        dayOfWeek: proAvailability.dayOfWeek,
+        startTime: proAvailability.startTime,
+        endTime: proAvailability.endTime,
+        validFrom: proAvailability.validFrom,
+        validUntil: proAvailability.validUntil,
+      })
+      .from(proAvailability)
+      .where(
+        and(
+          eq(proAvailability.proProfileId, TEST_PRO_PROFILE_ID),
+          eq(proAvailability.proLocationId, TEST_PRO_LOCATION_ID),
+        ),
+      );
+    return computeAvailableSlots(
+      dateStr,
+      templates as AvailabilityTemplate[],
+      [],
+      [],
+      0,
+      60,
+      FAKE_NOW,
+      "Europe/Brussels",
+    );
+  }
+
+  it("returns slots for a Saturday INSIDE the bounded period", async () => {
+    const slots = await runForDate("2026-06-06");
+    expect(slots.length).toBeGreaterThan(0);
+    expect(slots[0]).toEqual({ startTime: "10:00", endTime: "11:00" });
+  });
+
+  it("returns NO slots for a Saturday BEFORE the bounded period", async () => {
+    // 2026-05-30 is a Saturday — the only matching dayOfWeek=5 row is
+    // bounded to June. Mon/Tue/Thu/Fri rows don't match a Saturday.
+    const slots = await runForDate("2026-05-30");
+    expect(slots).toEqual([]);
+  });
+
+  it("returns NO slots for a Saturday AFTER the bounded period", async () => {
+    const slots = await runForDate("2026-07-04");
+    expect(slots).toEqual([]);
+  });
+
+  it("validFrom value pulled from DB matches the YYYY-MM-DD we wrote", async () => {
+    // Sanity check that surfaces the schema mode mismatch directly:
+    // we write "2026-06-01" but Drizzle returns a Date object until
+    // we switch to {mode: "string"}. Once #120 ships, this assertion
+    // will pass without coercion.
+    const [row] = await db
+      .select({ validFrom: proAvailability.validFrom })
+      .from(proAvailability)
+      .where(eq(proAvailability.id, boundedRowId!))
+      .limit(1);
+    expect(row.validFrom).toBe(BOUNDED_FROM);
+  });
+});
