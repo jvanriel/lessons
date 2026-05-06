@@ -499,6 +499,7 @@ export async function updateBooking(formData: FormData) {
   // the pre-edit price (admin reconciles).
   const pricing = await loadBookingPricing(
     booking.proProfileId,
+    booking.proLocationId,
     changes.duration,
     changes.participantCount,
   );

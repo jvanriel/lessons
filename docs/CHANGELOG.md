@@ -17,6 +17,26 @@ If any role inside the brackets is unknown (typo), the parser falls
 back to treating the brackets as literal text — better to over-show
 than silently hide.
 
+## 2026-05-06 — v1.1.58
+
+- [pro] **Per-location lesson pricing (task 109).** Each location
+  now carries its own lesson durations and prices. A pro who
+  teaches at multiple clubs can set a different price at each one
+  — the booking wizard charges the active location's price, and
+  the booking row records that exact amount.
+  - New "Lessons & pricing" section on each location card under
+    /pro/locations: pick durations, set price + per-extra-student
+    surcharge per duration. Translated NL / FR / EN.
+  - Booking calendar (member + public) now sources durations and
+    prices from the location the student picks rather than from
+    the pro's global defaults.
+  - The pricing fields on /pro/profile become a per-pro default
+    used only when adding new locations; a small notice points
+    pros to /pro/locations for the actual prices.
+  - Existing locations were backfilled from each pro's global
+    defaults during the migration, so behaviour for current pros
+    is unchanged until they customise per-location.
+
 ## 2026-05-06 — v1.1.57
 
 - [pro] **Pro billing/payment copy refinements (task 13).** Two

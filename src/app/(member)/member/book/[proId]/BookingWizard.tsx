@@ -22,15 +22,6 @@ interface ProInfo {
   displayName: string;
   photoUrl: string | null;
   specialties: string | null;
-  lessonDurations: number[];
-  /** Real charged prices in EUR cents, keyed by duration-in-minutes string. */
-  lessonPricing: Record<string, number>;
-  /**
-   * Per-extra-student surcharge in EUR cents, keyed by duration. The total
-   * billed for N participants is `lessonPricing[d] + extraStudentPricing[d] * (N - 1)`.
-   * Default of `null`/missing means extra students cost nothing.
-   */
-  extraStudentPricing: Record<string, number> | null;
   maxGroupSize: number;
   /**
    * Number of days into the future the pro accepts bookings. Used
@@ -47,6 +38,20 @@ interface LocationInfo {
   city: string | null;
   address: string | null;
   lessonDuration: number | null;
+  /**
+   * Per-location lesson durations + pricing (task 109). Each
+   * location is its own offering — different clubs can have
+   * different durations and prices for the same pro.
+   */
+  lessonDurations: number[];
+  /** Real charged prices in EUR cents, keyed by duration-in-minutes string. */
+  lessonPricing: Record<string, number>;
+  /**
+   * Per-extra-student surcharge in EUR cents, keyed by duration. The total
+   * billed for N participants is `lessonPricing[d] + extraStudentPricing[d] * (N - 1)`.
+   * Default of `null`/missing means extra students cost nothing.
+   */
+  extraStudentPricing: Record<string, number> | null;
 }
 
 interface UserDetails {
@@ -90,9 +95,14 @@ export function BookingWizard({
   // when there's only one option, used by the "edit booking" entry point.
   const singleLocation =
     !showAllSteps && locations.length === 1 ? locations[0] : null;
+  // Per task 109, durations come from the active location, not the pro.
+  // Auto-pick a duration only when there's a single location AND its
+  // single offering covers exactly one duration.
   const singleDuration =
-    !showAllSteps && pro.lessonDurations.length === 1
-      ? pro.lessonDurations[0]
+    !showAllSteps &&
+    singleLocation &&
+    singleLocation.lessonDurations.length === 1
+      ? singleLocation.lessonDurations[0]
       : null;
 
   const [locationId, setLocationId] = useState<number | null>(
@@ -265,21 +275,28 @@ export function BookingWizard({
     }
   }, [draftKey, locationId, duration, date, slot, notes, participantCount]);
 
+  // Active location's offering — pricing is per-location since
+  // task 109. Memoised so identity is stable across renders.
+  const activeLocation = useMemo(
+    () => locations.find((l) => l.id === locationId) ?? null,
+    [locations, locationId],
+  );
+
   const priceCents = useMemo(() => {
-    if (!duration) return null;
-    const p = pro.lessonPricing[String(duration)];
+    if (!duration || !activeLocation) return null;
+    const p = activeLocation.lessonPricing[String(duration)];
     return typeof p === "number" && p > 0 ? p : null;
-  }, [pro.lessonPricing, duration]);
+  }, [activeLocation, duration]);
 
   const totalCents = useMemo(() => {
-    if (!duration) return null;
+    if (!duration || !activeLocation) return null;
     return computeBookingPriceCents({
-      lessonPricing: pro.lessonPricing,
-      extraStudentPricing: pro.extraStudentPricing,
+      lessonPricing: activeLocation.lessonPricing,
+      extraStudentPricing: activeLocation.extraStudentPricing,
       duration,
       participantCount,
     });
-  }, [pro.lessonPricing, pro.extraStudentPricing, duration, participantCount]);
+  }, [activeLocation, duration, participantCount]);
 
   const paymentBlocked = !hasPaymentMethod && !allowBookingWithoutPayment;
   const requiresPriceButNone =
@@ -390,8 +407,10 @@ export function BookingWizard({
                   aria-pressed={selected}
                   onClick={() => {
                     setLocationId(l.id);
-                    if (pro.lessonDurations.length === 1) {
-                      setDuration(pro.lessonDurations[0]);
+                    // Auto-pick a duration when this location only
+                    // offers one (task 109 made durations per-location).
+                    if (l.lessonDurations.length === 1) {
+                      setDuration(l.lessonDurations[0]);
                     } else {
                       setDuration(null);
                     }
@@ -415,23 +434,25 @@ export function BookingWizard({
         </div>
       )}
 
-      {/* Duration — always shown; single-duration renders as a
-          passive chip with a noun label ("Duur"), multi switches to
-          imperative ("Kies de lesduur") (task 42). */}
-      {locationId && pro.lessonDurations.length > 0 && (
+      {/* Duration — sourced from the active location's offering since
+          task 109 made pricing per-location. Single-duration renders
+          as a passive chip with a noun label ("Duur"), multi switches
+          to imperative ("Kies de lesduur") (task 42). */}
+      {locationId && activeLocation && activeLocation.lessonDurations.length > 0 && (
         <div className="mt-6">
           <label className="block text-sm font-medium text-green-800">
             {t(
-              pro.lessonDurations.length > 1
+              activeLocation.lessonDurations.length > 1
                 ? "publicBook.durationPick"
                 : "publicBook.duration",
               locale,
             )}
           </label>
           <div className="mt-2 flex flex-wrap gap-2">
-            {pro.lessonDurations.map((d) => {
-              const p = pro.lessonPricing[String(d)];
-              const single = !showAllSteps && pro.lessonDurations.length === 1;
+            {activeLocation.lessonDurations.map((d) => {
+              const p = activeLocation.lessonPricing[String(d)];
+              const single =
+                !showAllSteps && activeLocation.lessonDurations.length === 1;
               const selected = duration === d;
               return (
                 <button

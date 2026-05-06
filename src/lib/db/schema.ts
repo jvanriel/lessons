@@ -243,6 +243,31 @@ export const proLocations = pgTable("pro_locations", {
   notes: text("notes"),
   sortOrder: integer("sort_order").notNull().default(0),
   active: boolean("active").notNull().default(true),
+  /**
+   * Per-location lesson durations + pricing (task 109). Each location
+   * is its own offering — a pro at multiple clubs can charge different
+   * prices and offer different durations per club. Defaults match the
+   * pre-migration shape of `pro_profiles.lessonDurations`/`lessonPricing`/
+   * `extraStudentPricing` so existing rows behave the same after the
+   * backfill.
+   *
+   * `pro_profiles.lessonDurations`/`lessonPricing`/`extraStudentPricing`
+   * remain in place for one ship cycle as a safety net but are no
+   * longer the source of truth — booking flows read from these
+   * location-level columns.
+   */
+  lessonDurations: jsonb("lesson_durations")
+    .$type<number[]>()
+    .notNull()
+    .default([60]),
+  lessonPricing: jsonb("lesson_pricing")
+    .$type<Record<string, number>>()
+    .notNull()
+    .default({}),
+  extraStudentPricing: jsonb("extra_student_pricing")
+    .$type<Record<string, number>>()
+    .notNull()
+    .default({}),
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
 

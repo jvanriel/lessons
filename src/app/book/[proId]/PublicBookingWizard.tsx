@@ -36,6 +36,14 @@ interface Location {
   city: string | null;
   address: string | null;
   lessonDuration: number | null;
+  /**
+   * Per-location lesson durations + pricing (task 109). Each
+   * location is its own offering — different clubs can have
+   * different durations and prices for the same pro.
+   */
+  lessonDurations: number[];
+  lessonPricing: Record<string, number>;
+  extraStudentPricing?: Record<string, number> | null;
 }
 
 interface Pro {
@@ -44,15 +52,6 @@ interface Pro {
   photoUrl: string | null;
   specialties?: string | null;
   bio?: string | null;
-  lessonDurations: number[];
-  lessonPricing: Record<string, number>;
-  /**
-   * Per-duration extra-participant rate. Total price for a booking
-   * with N participants is `lessonPricing[d] + extraStudentPricing[d]
-   * * (N - 1)`. Without this, the summary line shows the base price
-   * regardless of participant count (task 100).
-   */
-  extraStudentPricing?: Record<string, number> | null;
   maxGroupSize: number;
   locations: Location[];
   /**
@@ -92,8 +91,16 @@ export default function PublicBookingWizard({
     if (pro && pro.locations.length === 1) return pro.locations[0].id;
     return null;
   });
+  // Active location's offering (durations + pricing). Pricing is
+  // per-location since task 109. Picked once locationId is set.
+  const activeLocation = useMemo(
+    () => pro?.locations.find((l) => l.id === locationId) ?? null,
+    [pro, locationId],
+  );
   const [duration, setDuration] = useState<number | null>(() => {
-    if (pro && pro.lessonDurations.length === 1) return pro.lessonDurations[0];
+    if (pro && pro.locations.length === 1 && pro.locations[0].lessonDurations.length === 1) {
+      return pro.locations[0].lessonDurations[0];
+    }
     return null;
   });
   const [date, setDate] = useState<string | null>(null);
@@ -177,11 +184,14 @@ export default function PublicBookingWizard({
   // → pre-select).
   function handlePickPro(next: Pro) {
     setPro(next);
-    setLocationId(
-      next.locations.length === 1 ? next.locations[0].id : null
-    );
+    const onlyLoc = next.locations.length === 1 ? next.locations[0] : null;
+    setLocationId(onlyLoc ? onlyLoc.id : null);
+    // Auto-pick a duration only when there's a single location AND its
+    // single offering covers exactly one duration (task 109).
     setDuration(
-      next.lessonDurations.length === 1 ? next.lessonDurations[0] : null
+      onlyLoc && onlyLoc.lessonDurations.length === 1
+        ? onlyLoc.lessonDurations[0]
+        : null,
     );
     setDate(null);
     setSlot(null);
@@ -227,17 +237,18 @@ export default function PublicBookingWizard({
   }, [pro, locationId, duration, date]);
 
   const priceCents = useMemo(() => {
-    if (!pro || !duration) return null;
+    if (!activeLocation || !duration) return null;
     // Group-rate aware: base + extra * (N - 1). Pre-fix this only
     // returned the base price, so the summary line and the resulting
     // booking row understated the total for groups (task 100).
+    // Pricing now sourced per-location (task 109).
     return computeBookingPriceCents({
-      lessonPricing: pro.lessonPricing,
-      extraStudentPricing: pro.extraStudentPricing,
+      lessonPricing: activeLocation.lessonPricing,
+      extraStudentPricing: activeLocation.extraStudentPricing,
       duration,
       participantCount,
     });
-  }, [pro, duration, participantCount]);
+  }, [activeLocation, duration, participantCount]);
 
   const trimmedFirst = firstName.trim();
   const trimmedLast = lastName.trim();
@@ -663,20 +674,21 @@ export default function PublicBookingWizard({
         </div>
       )}
 
-      {/* Step 2: Duration */}
-      {locationId && pro.lessonDurations.length > 0 && (
+      {/* Step 2: Duration — sourced from the active location's
+          offering since task 109 made pricing per-location. */}
+      {locationId && activeLocation && activeLocation.lessonDurations.length > 0 && (
         <div className="mt-6">
           <label className="block text-sm font-medium text-green-800">
             {t(
-              pro.lessonDurations.length > 1
+              activeLocation.lessonDurations.length > 1
                 ? "publicBook.durationPick"
                 : "publicBook.duration",
               locale,
             )}
           </label>
           <div className="mt-2 flex flex-wrap gap-2">
-            {pro.lessonDurations.map((d) => {
-              const p = pro.lessonPricing[String(d)];
+            {activeLocation.lessonDurations.map((d) => {
+              const p = activeLocation.lessonPricing[String(d)];
               return (
                 <button
                   key={d}

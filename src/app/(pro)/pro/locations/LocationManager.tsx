@@ -22,7 +22,19 @@ interface ProLocation {
   notes: string | null;
   sortOrder: number;
   active: boolean;
+  /**
+   * Per-location lesson durations + pricing (task 109). Each location
+   * is its own offering — different clubs can have different durations
+   * and prices for the same pro.
+   */
+  lessonDurations: number[];
+  /** Per-duration prices in EUR cents. */
+  lessonPricing: Record<string, number>;
+  /** Per-duration extra-student surcharge in EUR cents. */
+  extraStudentPricing: Record<string, number>;
 }
+
+const DURATION_OPTIONS = [30, 45, 60, 75, 90, 120] as const;
 
 const inputClass =
   "block w-full rounded-lg border border-green-300 px-3 py-2 text-sm focus:border-gold-500 focus:outline-none focus:ring-1 focus:ring-gold-500";
@@ -295,8 +307,58 @@ function EditLocationForm({
   // absent — here it always exists.
   const inferredFromCountry = defaultTimezoneForCountry(country);
 
+  // Per-location lesson durations + pricing (task 109). Edited as
+  // EUR strings here, converted to cents on submit.
+  const [lessonDurations, setLessonDurations] = useState<number[]>(
+    location.lessonDurations ?? [],
+  );
+  const [lessonPricing, setLessonPricing] = useState<Record<string, string>>(
+    () =>
+      Object.fromEntries(
+        Object.entries(location.lessonPricing ?? {}).map(([k, v]) => [
+          k,
+          String((v as number) / 100),
+        ]),
+      ),
+  );
+  const [extraStudentPricing, setExtraStudentPricing] = useState<
+    Record<string, string>
+  >(() =>
+    Object.fromEntries(
+      Object.entries(location.extraStudentPricing ?? {}).map(([k, v]) => [
+        k,
+        String((v as number) / 100),
+      ]),
+    ),
+  );
+
   return (
-    <form action={action} className="space-y-3">
+    <form
+      action={(formData) => {
+        // Convert EUR strings to cents before submit.
+        formData.set("lessonDurations", JSON.stringify(lessonDurations));
+        const pricingCents: Record<string, number> = {};
+        for (const d of lessonDurations) {
+          const eur = lessonPricing[String(d)];
+          const num = eur ? Number(eur.replace(",", ".")) : NaN;
+          if (Number.isFinite(num) && num > 0) {
+            pricingCents[String(d)] = Math.round(num * 100);
+          }
+        }
+        formData.set("lessonPricing", JSON.stringify(pricingCents));
+        const extraCents: Record<string, number> = {};
+        for (const d of lessonDurations) {
+          const eur = extraStudentPricing[String(d)];
+          const num = eur ? Number(eur.replace(",", ".")) : NaN;
+          if (Number.isFinite(num) && num > 0) {
+            extraCents[String(d)] = Math.round(num * 100);
+          }
+        }
+        formData.set("extraStudentPricing", JSON.stringify(extraCents));
+        return action(formData);
+      }}
+      className="space-y-3"
+    >
       <input type="hidden" name="proLocationId" value={location.proLocationId} />
       <input type="hidden" name="active" value={String(active)} />
       <div className="flex items-center justify-between gap-3">
@@ -387,6 +449,96 @@ function EditLocationForm({
             className={inputClass}
           />
         </div>
+      </div>
+      {/* Per-location lesson durations + pricing (task 109) */}
+      <div className="rounded-lg border border-green-100 bg-green-50/40 p-4">
+        <h4 className="text-sm font-medium text-green-900">
+          {t("proLocations.lessonsHeading", locale)}
+        </h4>
+        <p className="mt-0.5 text-xs text-green-600">
+          {t("proLocations.lessonsHelp", locale)}
+        </p>
+        <div className="mt-3">
+          <p className="text-xs font-medium text-green-700">
+            {t("proLocations.durationsLabel", locale)}
+          </p>
+          <div className="mt-2 flex flex-wrap gap-2">
+            {DURATION_OPTIONS.map((d) => (
+              <label
+                key={d}
+                className="flex cursor-pointer items-center gap-1.5 rounded-full border border-green-200 bg-white px-3 py-1 text-xs text-green-800 hover:border-green-300"
+              >
+                <input
+                  type="checkbox"
+                  className="h-3 w-3 rounded border-green-300 text-green-700 focus:ring-green-500"
+                  checked={lessonDurations.includes(d)}
+                  onChange={(e) => {
+                    if (e.target.checked) {
+                      setLessonDurations(
+                        [...lessonDurations, d].sort((a, b) => a - b),
+                      );
+                    } else {
+                      setLessonDurations(lessonDurations.filter((v) => v !== d));
+                    }
+                  }}
+                />
+                {d} {t("publicBook.minShort", locale)}
+              </label>
+            ))}
+          </div>
+        </div>
+        {lessonDurations.length > 0 && (
+          <div className="mt-3 grid gap-2 sm:grid-cols-2">
+            {lessonDurations.map((d) => (
+              <div key={d} className="rounded-md border border-green-100 bg-white p-3">
+                <p className="text-xs font-medium text-green-800">
+                  {d} {t("publicBook.minShort", locale)}
+                </p>
+                <div className="mt-2 grid gap-2">
+                  <label className="block text-[11px] text-green-700">
+                    {t("proLocations.lessonPriceLabel", locale)}
+                    <div className="mt-0.5 flex items-center gap-1">
+                      <span className="text-xs text-green-500">€</span>
+                      <input
+                        type="number"
+                        step="0.01"
+                        min="0"
+                        value={lessonPricing[String(d)] ?? ""}
+                        onChange={(e) =>
+                          setLessonPricing({
+                            ...lessonPricing,
+                            [String(d)]: e.target.value,
+                          })
+                        }
+                        className="block w-full rounded-md border border-green-200 px-2 py-1 text-xs text-green-900 focus:border-green-400 focus:outline-none focus:ring-1 focus:ring-green-400"
+                      />
+                    </div>
+                  </label>
+                  <label className="block text-[11px] text-green-700">
+                    {t("proLocations.extraStudentPriceLabel", locale)}
+                    <div className="mt-0.5 flex items-center gap-1">
+                      <span className="text-xs text-green-500">€</span>
+                      <input
+                        type="number"
+                        step="0.01"
+                        min="0"
+                        value={extraStudentPricing[String(d)] ?? ""}
+                        placeholder="0"
+                        onChange={(e) =>
+                          setExtraStudentPricing({
+                            ...extraStudentPricing,
+                            [String(d)]: e.target.value,
+                          })
+                        }
+                        className="block w-full rounded-md border border-green-200 px-2 py-1 text-xs text-green-900 focus:border-green-400 focus:outline-none focus:ring-1 focus:ring-green-400"
+                      />
+                    </div>
+                  </label>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
       </div>
       {state?.error && (
         <p className="text-sm text-red-600">{state.error}</p>

@@ -44,12 +44,18 @@ export default async function PublicBookingPage({ params }: Props) {
           photoUrl: pro.photoUrl,
           specialties: pro.specialties,
           bio: pro.bio,
-          lessonDurations: (pro.lessonDurations as number[] | null) ?? [],
-          lessonPricing:
-            (pro.lessonPricing as Record<string, number> | null) ?? {},
           maxGroupSize: pro.maxGroupSize,
           bookingHorizon: pro.bookingHorizon,
-          locations: proLocs,
+          // Pricing is per-location now (task 109) — sourced from
+          // each pro_locations row.
+          locations: proLocs.map((l) => ({
+            ...l,
+            lessonDurations: (l.lessonDurations as number[] | null) ?? [],
+            lessonPricing:
+              (l.lessonPricing as Record<string, number> | null) ?? {},
+            extraStudentPricing:
+              (l.extraStudentPricing as Record<string, number> | null) ?? null,
+          })),
         }}
         allPros={null}
         locale={locale}

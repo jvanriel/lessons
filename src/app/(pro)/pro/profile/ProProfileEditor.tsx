@@ -361,6 +361,13 @@ export default function ProProfileEditor({
             {t("proProfile.section.lessons", locale)}
           </h2>
 
+          {/* Per-location pricing notice (task 109). Lesson prices
+              now live on each location, not at the profile level —
+              the fields below are the legacy global default. */}
+          <p className="rounded-md border border-green-100 bg-green-50/40 p-3 text-xs text-green-700">
+            {t("proProfile.perLocationPricingNotice", locale)}
+          </p>
+
           <div>
             <label className="block text-sm font-medium text-green-800">
               {t("proProfile.lessonDurations", locale)}

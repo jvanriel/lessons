@@ -929,11 +929,20 @@ describe("loadBookingPricing (DB integration)", () => {
     // object for "no pricing" rather than null so the column-type
     // contract holds. `decideBookingPricing` treats `{}` as "no
     // entries" identically to null via `?.[String(duration)]`.
+    //
+    // Pricing now lives on pro_locations (task 109). The non-pricing
+    // fields (allowBookingWithoutPayment, subscriptionStatus) stay on
+    // pro_profiles since they're pro-wide.
     await db
-      .update(proProfiles)
+      .update(proLocations)
       .set({
         lessonPricing: opts.lessonPricing ?? {},
         extraStudentPricing: opts.extraStudentPricing ?? {},
+      })
+      .where(eq(proLocations.id, TEST_PRO_LOCATION_ID));
+    await db
+      .update(proProfiles)
+      .set({
         allowBookingWithoutPayment: opts.allowBookingWithoutPayment ?? false,
         subscriptionStatus: opts.subscriptionStatus ?? "active",
       })
@@ -942,7 +951,7 @@ describe("loadBookingPricing (DB integration)", () => {
 
   it("online pro with priced 60-min slot returns paymentStatus=pending + online fee", async () => {
     await setProPricing({ lessonPricing: baselinePricing });
-    const r = await loadBookingPricing(TEST_PRO_PROFILE_ID, 60, 1);
+    const r = await loadBookingPricing(TEST_PRO_PROFILE_ID, TEST_PRO_LOCATION_ID, 60, 1);
     expect(r.ok).toBe(true);
     if (!r.ok) return;
     expect(r.priceCents).toBe(6500);
@@ -956,7 +965,7 @@ describe("loadBookingPricing (DB integration)", () => {
   it("online pro without a price for the duration returns noPriceForDuration", async () => {
     await setProPricing({ lessonPricing: baselinePricing });
     // 30-min request against a 60-min-only pricing table.
-    const r = await loadBookingPricing(TEST_PRO_PROFILE_ID, 30, 1);
+    const r = await loadBookingPricing(TEST_PRO_PROFILE_ID, TEST_PRO_LOCATION_ID, 30, 1);
     expect(r.ok).toBe(false);
     if (r.ok) return;
     expect(r.errorKey).toBe("noPriceForDuration");
@@ -967,7 +976,7 @@ describe("loadBookingPricing (DB integration)", () => {
       lessonPricing: baselinePricing,
       allowBookingWithoutPayment: true,
     });
-    const r = await loadBookingPricing(TEST_PRO_PROFILE_ID, 60, 1);
+    const r = await loadBookingPricing(TEST_PRO_PROFILE_ID, TEST_PRO_LOCATION_ID, 60, 1);
     expect(r.ok).toBe(true);
     if (!r.ok) return;
     expect(r.cashOnly).toBe(true);
@@ -982,7 +991,7 @@ describe("loadBookingPricing (DB integration)", () => {
       lessonPricing: baselinePricing,
       subscriptionStatus: "comp",
     });
-    const r = await loadBookingPricing(TEST_PRO_PROFILE_ID, 60, 1);
+    const r = await loadBookingPricing(TEST_PRO_PROFILE_ID, TEST_PRO_LOCATION_ID, 60, 1);
     expect(r.ok).toBe(true);
     if (!r.ok) return;
     expect(r.isComp).toBe(true);
@@ -995,7 +1004,7 @@ describe("loadBookingPricing (DB integration)", () => {
       lessonPricing: baselinePricing,
       extraStudentPricing: { "60": 1500 },
     });
-    const r = await loadBookingPricing(TEST_PRO_PROFILE_ID, 60, 3);
+    const r = await loadBookingPricing(TEST_PRO_PROFILE_ID, TEST_PRO_LOCATION_ID, 60, 3);
     expect(r.ok).toBe(true);
     if (!r.ok) return;
     expect(r.priceCents).toBe(6500 + 2 * 1500);
@@ -1010,7 +1019,7 @@ describe("loadBookingPricing (DB integration)", () => {
       lessonPricing: {},
       allowBookingWithoutPayment: true,
     });
-    const r = await loadBookingPricing(TEST_PRO_PROFILE_ID, 60, 1);
+    const r = await loadBookingPricing(TEST_PRO_PROFILE_ID, TEST_PRO_LOCATION_ID, 60, 1);
     expect(r.ok).toBe(true);
     if (!r.ok) return;
     expect(r.priceCents).toBeNull();

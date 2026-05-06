@@ -35,6 +35,11 @@ export async function getMyLocations() {
       notes: proLocations.notes,
       sortOrder: proLocations.sortOrder,
       active: proLocations.active,
+      // Per-location pricing (task 109) — surfaced to the editor
+      // so each location can be configured independently.
+      lessonDurations: proLocations.lessonDurations,
+      lessonPricing: proLocations.lessonPricing,
+      extraStudentPricing: proLocations.extraStudentPricing,
     })
     .from(proLocations)
     .innerJoin(locations, eq(proLocations.locationId, locations.id))
@@ -141,6 +146,35 @@ export async function updateProLocation(
   }
   const timezone: string = timezoneRaw;
 
+  // Per-location lesson durations + pricing (task 109). Form sends
+  // these as JSON strings already in cents.
+  let lessonDurations: number[] = [];
+  let lessonPricing: Record<string, number> = {};
+  let extraStudentPricing: Record<string, number> = {};
+  try {
+    const ld = formData.get("lessonDurations");
+    if (typeof ld === "string" && ld) {
+      const parsed = JSON.parse(ld);
+      if (Array.isArray(parsed)) {
+        lessonDurations = parsed.filter(
+          (n) => typeof n === "number" && n > 0,
+        );
+      }
+    }
+    const lp = formData.get("lessonPricing");
+    if (typeof lp === "string" && lp) {
+      const parsed = JSON.parse(lp);
+      if (parsed && typeof parsed === "object") lessonPricing = parsed;
+    }
+    const ep = formData.get("extraStudentPricing");
+    if (typeof ep === "string" && ep) {
+      const parsed = JSON.parse(ep);
+      if (parsed && typeof parsed === "object") extraStudentPricing = parsed;
+    }
+  } catch {
+    return { error: "Invalid pricing payload." };
+  }
+
   // Look up the shared locations row via the pro_locations junction,
   // scoped to the current pro so one pro can't edit another's row.
   const [link] = await db
@@ -161,7 +195,13 @@ export async function updateProLocation(
     .where(eq(locations.id, link.locationId));
   await db
     .update(proLocations)
-    .set({ notes, active })
+    .set({
+      notes,
+      active,
+      lessonDurations,
+      lessonPricing,
+      extraStudentPricing,
+    })
     .where(eq(proLocations.id, proLocationId));
 
   revalidatePath("/pro/locations");

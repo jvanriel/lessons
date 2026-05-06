@@ -1151,18 +1151,27 @@ export async function proQuickBookForStudent(data: {
   // notification mail so it lives in their inbox alongside the in-app
   // toast — useful as a record of what they just booked on behalf of
   // the student.
+  // Pricing now lives on pro_locations (task 109). Pull the location's
+  // own lessonPricing for the email's price line, plus the pro's
+  // contact + locale fields from pro_profiles via the same join.
   const [proRow] = await db
     .select({
       contactPhone: proProfiles.contactPhone,
-      lessonPricing: proProfiles.lessonPricing,
+      lessonPricing: proLocations.lessonPricing,
       allowBookingWithoutPayment: proProfiles.allowBookingWithoutPayment,
       proFirstName: users.firstName,
       proEmail: users.email,
       proLocale: users.preferredLocale,
     })
-    .from(proProfiles)
+    .from(proLocations)
+    .innerJoin(proProfiles, eq(proProfiles.id, proLocations.proProfileId))
     .innerJoin(users, eq(proProfiles.userId, users.id))
-    .where(eq(proProfiles.id, profile.id))
+    .where(
+      and(
+        eq(proLocations.id, data.proLocationId),
+        eq(proProfiles.id, profile.id),
+      ),
+    )
     .limit(1);
 
   const [loc] = await db
@@ -1670,6 +1679,7 @@ export async function proUpdateBooking(formData: FormData) {
   // walkthrough. Failures Sentry-tagged "edit-payment".
   const pricing = await loadBookingPricing(
     booking.proProfileId,
+    booking.proLocationId,
     changes.duration,
     changes.participantCount,
   );

@@ -148,6 +148,21 @@ export async function POST(request: Request) {
           updatedAt: new Date(),
         })
         .where(eq(proProfiles.id, profile.id));
+
+      // Mirror durations + pricing to all of this pro's locations
+      // (task 109). Onboarding captures pricing once at the global
+      // level; the per-location editor lets the pro customise after
+      // sign-up. Without this step new pros' pro_locations rows
+      // would have empty pricing and the booking flow would refuse
+      // to price the slot.
+      await db
+        .update(proLocations)
+        .set({
+          lessonDurations: lessonDurations?.length ? lessonDurations : [60],
+          lessonPricing: cleanedPricing,
+          extraStudentPricing: cleanedExtra,
+        })
+        .where(eq(proLocations.proProfileId, profile.id));
       break;
     }
 

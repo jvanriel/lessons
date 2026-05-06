@@ -479,7 +479,12 @@ export async function createBooking(formData: FormData) {
   // via `loadBookingPricing` so both paths apply the same rules
   // (group-rate, cash-only routing, comp accounts, online-pro-needs-price
   // bailout). See `src/lib/booking-charge.ts`.
-  const pricing = await loadBookingPricing(proProfileId, duration, participantCount);
+  const pricing = await loadBookingPricing(
+    proProfileId,
+    proLocationId,
+    duration,
+    participantCount,
+  );
   if (!pricing.ok) {
     return { error: t(`bookErr.${pricing.errorKey}`, locale) };
   }
@@ -1101,7 +1106,12 @@ export async function quickCreateBooking(data: {
   // no PaymentIntent / hardcoded "manual" pro-email — so an online-pay
   // pro received "Cash on the day" while we never charged the student
   // (gaps.md §0 High: Quick Book pricing bypass).
-  const pricing = await loadBookingPricing(data.proProfileId, data.duration, 1);
+  const pricing = await loadBookingPricing(
+    data.proProfileId,
+    data.proLocationId,
+    data.duration,
+    1,
+  );
   if (!pricing.ok) {
     return { error: t(`bookErr.${pricing.errorKey}`, locale) };
   }
