@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { jwtVerify } from "jose";
+import { jwtVerify, errors as joseErrors } from "jose";
 import * as Sentry from "@sentry/nextjs";
 import { db } from "@/lib/db";
 import { users, lessonBookings } from "@/lib/db/schema";
@@ -80,7 +80,19 @@ export async function GET(request: NextRequest) {
     // Fallback: no booking found — send to home page
     return NextResponse.redirect(new URL("/?verified=1", request.url));
   } catch (err) {
-    Sentry.captureException(err, { tags: { area: "claim-booking" } });
+    // Don't alert on user-input failures: a stale, expired, or
+    // mangled magic link is a 4xx-class problem, not a server bug.
+    // jose throws subclasses of JOSEError for malformed/expired/
+    // wrong-signature tokens; our own guards throw plain Errors with
+    // known messages. Both should redirect quietly. Anything else
+    // (DB failure, unexpected state) still escalates to Sentry.
+    const isUserError =
+      err instanceof joseErrors.JOSEError ||
+      (err instanceof Error &&
+        (err.message === "Invalid token" || err.message === "User not found"));
+    if (!isUserError) {
+      Sentry.captureException(err, { tags: { area: "claim-booking" } });
+    }
     return NextResponse.redirect(new URL("/login?claim=error", request.url));
   }
 }
