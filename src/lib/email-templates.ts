@@ -1110,6 +1110,9 @@ const BOOKING_UPDATED_STRINGS: Record<Locale, {
   duration: string;
   durationUnit: string;
   participants: string;
+  /** "(was X)" prefix used to surface the pre-edit value next to the
+   *  new one on rows that actually changed. */
+  was: (oldValue: string) => string;
   cta: string;
   helperNoChange: string;
   helperCharged: (amount: string) => string;
@@ -1135,6 +1138,7 @@ const BOOKING_UPDATED_STRINGS: Record<Locale, {
     duration: "Duration",
     durationUnit: "minutes",
     participants: "Participants",
+    was: (old) => `(was ${old})`,
     cta: "View my bookings",
     helperNoChange:
       "No payment change — the price is the same as the original booking.",
@@ -1166,6 +1170,7 @@ const BOOKING_UPDATED_STRINGS: Record<Locale, {
     duration: "Duur",
     durationUnit: "minuten",
     participants: "Deelnemers",
+    was: (old) => `(was ${old})`,
     cta: "Mijn boekingen bekijken",
     helperNoChange:
       "Geen betalingswijziging — de prijs blijft hetzelfde als bij de oorspronkelijke boeking.",
@@ -1197,6 +1202,7 @@ const BOOKING_UPDATED_STRINGS: Record<Locale, {
     duration: "Durée",
     durationUnit: "minutes",
     participants: "Participants",
+    was: (old) => `(auparavant ${old})`,
     cta: "Voir mes réservations",
     helperNoChange:
       "Pas de changement de paiement — le prix reste identique à la réservation initiale.",
@@ -1252,6 +1258,28 @@ function paymentHelperFor(
   return s.helperManualReview;
 }
 
+/**
+ * Pre-edit values rendered as "(was X)" suffixes next to each new
+ * value on the rows that actually changed. Undefined → no suffix
+ * (e.g. participant emails for bookings whose only change is the
+ * extra-participant list).
+ */
+export interface PreviousBookingValues {
+  date: string;
+  startTime: string;
+  endTime: string;
+  duration: number;
+  participantCount: number;
+}
+
+function wasSuffix(
+  s: (typeof BOOKING_UPDATED_STRINGS)[Locale],
+  oldValue: string | null,
+): string {
+  if (!oldValue) return "";
+  return ` <span style="color:#999;font-weight:normal;">${s.was(oldValue)}</span>`;
+}
+
 export function buildBookingUpdatedEmail(opts: {
   recipientFirstName: string;
   proName: string;
@@ -1270,20 +1298,46 @@ export function buildBookingUpdatedEmail(opts: {
    * treated as a no-op (Phase 1-style "no payment change" line).
    */
   paymentChange?: EmailPaymentChange;
+  /**
+   * Pre-edit values — rendered inline next to the new value on rows
+   * whose value differs ("(was Thursday 15 May)"). When undefined the
+   * email reads as the post-edit snapshot only.
+   */
+  previous?: PreviousBookingValues;
 }): string {
   const s = BOOKING_UPDATED_STRINGS[opts.locale] ?? BOOKING_UPDATED_STRINGS.en;
+  const prevDate = opts.previous && opts.previous.date !== opts.date
+    ? formatLessonDate(opts.previous.date, opts.locale)
+    : null;
+  const prevTime =
+    opts.previous &&
+    (opts.previous.startTime !== opts.startTime ||
+      opts.previous.endTime !== opts.endTime)
+      ? `${opts.previous.startTime} – ${opts.previous.endTime}`
+      : null;
+  const prevDuration =
+    opts.previous && opts.previous.duration !== opts.duration
+      ? `${opts.previous.duration} ${s.durationUnit}`
+      : null;
+  const prevPCount =
+    opts.previous && opts.previous.participantCount !== opts.participantCount
+      ? String(opts.previous.participantCount)
+      : null;
   const rows: Array<DetailRow> = [[s.pro, opts.proName]];
   if (opts.proEmail) rows.push([s.proEmail, opts.proEmail, `mailto:${opts.proEmail}`]);
   if (opts.proPhone)
     rows.push([s.proPhone, opts.proPhone, `tel:${opts.proPhone.replace(/\s+/g, "")}`]);
   rows.push(
     [s.location, opts.locationName],
-    [s.date, formatLessonDate(opts.date, opts.locale)],
-    [s.time, `${opts.startTime} – ${opts.endTime}`],
-    [s.duration, `${opts.duration} ${s.durationUnit}`],
+    [s.date, formatLessonDate(opts.date, opts.locale) + wasSuffix(s, prevDate)],
+    [s.time, `${opts.startTime} – ${opts.endTime}` + wasSuffix(s, prevTime)],
+    [s.duration, `${opts.duration} ${s.durationUnit}` + wasSuffix(s, prevDuration)],
   );
-  if (opts.participantCount > 1) {
-    rows.push([s.participants, String(opts.participantCount)]);
+  if (opts.participantCount > 1 || prevPCount) {
+    rows.push([
+      s.participants,
+      String(opts.participantCount) + wasSuffix(s, prevPCount),
+    ]);
   }
   const helperLine = paymentHelperFor(s, opts.paymentChange, opts.locale);
   const body = `
@@ -1318,17 +1372,35 @@ export function buildParticipantBookingUpdatedEmail(opts: {
   endTime: string;
   duration: number;
   locale: Locale;
+  /** Pre-edit values rendered as "(was X)" next to changed rows. */
+  previous?: Pick<
+    PreviousBookingValues,
+    "date" | "startTime" | "endTime" | "duration"
+  >;
 }): string {
   const s = BOOKING_UPDATED_STRINGS[opts.locale] ?? BOOKING_UPDATED_STRINGS.en;
+  const prevDate = opts.previous && opts.previous.date !== opts.date
+    ? formatLessonDate(opts.previous.date, opts.locale)
+    : null;
+  const prevTime =
+    opts.previous &&
+    (opts.previous.startTime !== opts.startTime ||
+      opts.previous.endTime !== opts.endTime)
+      ? `${opts.previous.startTime} – ${opts.previous.endTime}`
+      : null;
+  const prevDuration =
+    opts.previous && opts.previous.duration !== opts.duration
+      ? `${opts.previous.duration} ${s.durationUnit}`
+      : null;
   const rows: Array<DetailRow> = [[s.pro, opts.proName]];
   if (opts.proEmail) rows.push([s.proEmail, opts.proEmail, `mailto:${opts.proEmail}`]);
   if (opts.proPhone)
     rows.push([s.proPhone, opts.proPhone, `tel:${opts.proPhone.replace(/\s+/g, "")}`]);
   rows.push(
     [s.location, opts.locationName],
-    [s.date, formatLessonDate(opts.date, opts.locale)],
-    [s.time, `${opts.startTime} – ${opts.endTime}`],
-    [s.duration, `${opts.duration} ${s.durationUnit}`],
+    [s.date, formatLessonDate(opts.date, opts.locale) + wasSuffix(s, prevDate)],
+    [s.time, `${opts.startTime} – ${opts.endTime}` + wasSuffix(s, prevTime)],
+    [s.duration, `${opts.duration} ${s.durationUnit}` + wasSuffix(s, prevDuration)],
   );
   const body = `
     <h2 style="font-family:Georgia,'Times New Roman',serif;font-size:22px;color:${COLORS.green950};margin:0 0 16px 0;font-weight:normal;">

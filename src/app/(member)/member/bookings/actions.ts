@@ -480,6 +480,23 @@ export async function updateBooking(formData: FormData) {
     }
   }
 
+  // Snapshot the pre-edit values BEFORE applyBookingEdit overwrites
+  // them. Used by the booking-updated emails so the recipient (booker,
+  // pro, extra participant) sees "(was OLD)" next to each changed
+  // field. Booking row's `endTime - startTime` is the original
+  // duration; participantCount is also captured.
+  const previous = {
+    date: booking.date,
+    startTime: booking.startTime,
+    endTime: booking.endTime,
+    duration:
+      Number(booking.endTime.split(":")[0]) * 60 +
+      Number(booking.endTime.split(":")[1]) -
+      (Number(booking.startTime.split(":")[0]) * 60 +
+        Number(booking.startTime.split(":")[1])),
+    participantCount: booking.participantCount,
+  };
+
   try {
     await applyBookingEdit(booking.id, changes, bookerParticipant.id);
   } catch (err) {
@@ -536,7 +553,7 @@ export async function updateBooking(formData: FormData) {
   // Notification fanout runs post-response so the UI returns
   // immediately. Vercel keeps the function alive via `after()`.
   after(async () => {
-    await sendBookingUpdatedNotifications(booking.id, paymentChange);
+    await sendBookingUpdatedNotifications(booking.id, paymentChange, previous);
   });
 
   revalidatePath("/member/bookings");

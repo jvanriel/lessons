@@ -1675,6 +1675,21 @@ export async function proUpdateBooking(formData: FormData) {
     if (taken) return { error: t("bookErr.slotUnavailable", localeForSlot) };
   }
 
+  // Pre-edit snapshot for the booking-updated emails. Mirror of the
+  // member side — both sides need this so the recipients see what
+  // actually changed.
+  const previous = {
+    date: booking.date,
+    startTime: booking.startTime,
+    endTime: booking.endTime,
+    duration:
+      Number(booking.endTime.split(":")[0]) * 60 +
+      Number(booking.endTime.split(":")[1]) -
+      (Number(booking.startTime.split(":")[0]) * 60 +
+        Number(booking.startTime.split(":")[1])),
+    participantCount: booking.participantCount,
+  };
+
   try {
     await applyBookingEdit(booking.id, changes, bookerParticipant.id);
   } catch (err) {
@@ -1723,7 +1738,7 @@ export async function proUpdateBooking(formData: FormData) {
   }
 
   after(async () => {
-    await sendBookingUpdatedNotifications(booking.id, paymentChange);
+    await sendBookingUpdatedNotifications(booking.id, paymentChange, previous);
   });
 
   revalidatePath("/pro/bookings");

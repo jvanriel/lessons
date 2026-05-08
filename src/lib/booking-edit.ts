@@ -17,6 +17,7 @@ import {
   buildParticipantBookingUpdatedEmail,
   getParticipantBookingUpdatedSubject,
   type EmailPaymentChange,
+  type PreviousBookingValues,
 } from "@/lib/email-templates";
 import { resolveLocale } from "@/lib/i18n";
 import { formatLocationFull } from "@/lib/location-display";
@@ -316,6 +317,15 @@ export async function sendBookingUpdatedNotifications(
    * don't get the payment line. Undefined → "no payment change".
    */
   paymentChange?: EmailPaymentChange,
+  /**
+   * Pre-edit values captured by the caller before `applyBookingEdit`
+   * overwrote the booking row. Forwarded to the email templates so
+   * each changed field renders as "NEW (was OLD)" — the recipient
+   * (booker, pro, or extra participant) can immediately see what was
+   * changed without having to compare against a separate calendar
+   * invite.
+   */
+  previous?: PreviousBookingValues,
 ): Promise<void> {
   try {
     const data = await loadBookingForUpdate(bookingId);
@@ -381,6 +391,7 @@ export async function sendBookingUpdatedNotifications(
         participantCount: data.participantCount,
         locale: bookerLocale,
         paymentChange,
+        previous,
       }),
       attachments: [icsAttachment],
     }).catch((err) => {
@@ -406,6 +417,7 @@ export async function sendBookingUpdatedNotifications(
         duration,
         participantCount: data.participantCount,
         locale: proLocale,
+        previous,
       }),
       attachments: [icsAttachment],
     }).catch((err) => {
@@ -441,6 +453,12 @@ export async function sendBookingUpdatedNotifications(
           endTime: data.endTime,
           duration,
           locale: participantLocale,
+          previous: previous && {
+            date: previous.date,
+            startTime: previous.startTime,
+            endTime: previous.endTime,
+            duration: previous.duration,
+          },
         }),
         attachments: [icsAttachment],
       }).catch((err) => {
