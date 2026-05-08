@@ -1,28 +1,30 @@
 "use client";
 
 /**
- * QuickBook-style date pill row + slot list. Visual shell adapted
- * from `(member)/member/dashboard/QuickRebook.tsx`.
+ * QuickBook-style date pill row + slot list + interval pills + "More
+ * options" link, all inside the same green-bordered container as the
+ * dashboard QuickBook (`(member)/member/dashboard/QuickRebook.tsx`).
+ *
+ * Same JSX structure and styling as QuickRebook so a student debating
+ * a date change with their pro sees the same pill row whether they're
+ * on the dashboard or the booking-edit page (IntervalPills +
+ * MoreOptionsLink are extracted as shared subcomponents to keep the
+ * two surfaces in lockstep).
  *
  * Behaviour difference vs QuickRebook: this is a *picker*, not a
  * commit gesture. Tapping a slot only selects it — saving is the
- * caller's responsibility (a Save button on the parent form). This
- * matches the booking-edit flow, where the user might also be
- * tweaking duration / participant count and wants to review before
- * committing all changes together.
+ * caller's responsibility (a Save button on the parent form), so the
+ * user can review duration / participant edits together with the slot
+ * change before committing.
  *
- * What's stripped out vs QuickRebook:
- *   - Hold-to-confirm gesture, "saving" / "saved" status states.
- *   - Interval picker, payment-method gating, "More options" link,
- *     long-press date-explanation dialog. None apply on edit.
+ * Pill click here calls `suggestSlotForInterval` which saves the new
+ * preferred interval AND returns a fresh suggestedSlot anchored to
+ * today + the student's preferredDayOfWeek. The form folds the result
+ * into its own selectedSlot state so the calendar visibly jumps —
+ * matching QuickBook's "pill is a navigational shortcut" semantic.
  *
- * What's added:
- *   - `currentSlot`: the booking's existing slot, highlighted as
- *     "your existing booking" so the user can spot (and re-pick) it.
- *   - `selectedSlot` / `onSlotChange`: lifts selection up so the
- *     parent form can submit it as part of FormData.
- *   - `excludeBookingId`: forwarded to the server actions so the
- *     booking-being-edited doesn't conflict with itself.
+ * `excludeBookingId` is forwarded to the slot fetchers so the booking
+ * being edited doesn't appear as a conflict against itself.
  */
 
 import {
@@ -35,7 +37,12 @@ import {
   getAvailableDates,
   getAvailableSlots,
   getDateBlockReason,
+  suggestSlotForInterval,
 } from "@/app/(member)/member/book/actions";
+import IntervalPills, {
+  type IntervalValue,
+} from "@/components/booking/IntervalPills";
+import MoreOptionsLink from "@/components/booking/MoreOptionsLink";
 import type { Locale } from "@/lib/i18n";
 import { t } from "@/lib/i18n/translations";
 import { formatDate } from "@/lib/format-date";
@@ -64,10 +71,22 @@ interface Props {
   /** Currently picked slot (controlled). Pre-fill with `currentSlot`
    *  on first render to highlight the user's starting position. */
   selectedSlot: QuickBookSelection | null;
-  /** Fired when the user taps a date pill or a slot pill. The
-   *  parent form folds this into its own state and commits via
-   *  the Save button. */
+  /** Fired when the user taps a date pill, slot pill, or interval
+   *  pill that produces a new suggestion. The parent form folds this
+   *  into its own state and commits via the Save button. */
   onSlotChange: (slot: QuickBookSelection | null) => void;
+  /**
+   * When set together with `proStudentId`, the form renders the same
+   * 3 interval pills + "More options" link that QuickBook shows on
+   * the dashboard. Pro-side edits leave both null and the row stays
+   * hidden (a pro setting the golfer's recurrence preference doesn't
+   * fit the model).
+   */
+  proId?: number;
+  proStudentId?: number | null;
+  /** Member-side only — current preferredInterval, drives which pill
+   *  is highlighted. */
+  currentInterval?: IntervalValue;
   locale: Locale;
 }
 
@@ -79,6 +98,9 @@ export default function QuickBookCalendar({
   excludeBookingId,
   selectedSlot,
   onSlotChange,
+  proId,
+  proStudentId,
+  currentInterval,
   locale,
 }: Props) {
   const [isPending, startTransition] = useTransition();
@@ -90,6 +112,9 @@ export default function QuickBookCalendar({
   );
   const [slots, setSlots] = useState<QuickBookSlot[]>([]);
   const [blockReason, setBlockReason] = useState<string | null>(null);
+  const [interval, setInterval] = useState<IntervalValue>(
+    currentInterval ?? null,
+  );
 
   const pillRefs = useRef<Map<string, HTMLButtonElement>>(new Map());
 
@@ -102,10 +127,10 @@ export default function QuickBookCalendar({
   }, [selectedDate]);
 
   // Sync local selectedDate when the parent jumps selectedSlot to a
-  // new date (e.g. user clicks a "weekly / biweekly / monthly" pill on
-  // the edit form and the form receives a fresh suggestedDate from
-  // the server). Without this, the date pills + slot list would stay
-  // anchored to the previous date.
+  // new date (e.g. after an interval pill click here calls
+  // suggestSlotForInterval and the form receives a fresh
+  // suggestedDate). Without this, the date pills + slot list would
+  // stay anchored to the previous date.
   useEffect(() => {
     if (selectedSlot && selectedSlot.date !== selectedDate) {
       setSelectedDate(selectedSlot.date);
@@ -211,6 +236,28 @@ export default function QuickBookCalendar({
     });
   }
 
+  function handleIntervalChange(next: IntervalValue) {
+    if (proStudentId == null) return;
+    setInterval(next);
+    startTransition(async () => {
+      const result = await suggestSlotForInterval(
+        proStudentId,
+        next,
+        proProfileId,
+        proLocationId,
+        duration,
+        excludeBookingId,
+      );
+      if (result?.suggestedSlot) {
+        onSlotChange({
+          date: result.suggestedDate,
+          startTime: result.suggestedSlot.startTime,
+          endTime: result.suggestedSlot.endTime,
+        });
+      }
+    });
+  }
+
   const isCurrentSlot = (slot: QuickBookSlot) =>
     !!currentSlot &&
     selectedDate === currentSlot.date &&
@@ -220,6 +267,8 @@ export default function QuickBookCalendar({
     !!selectedSlot &&
     selectedDate === selectedSlot.date &&
     slot.startTime === selectedSlot.startTime;
+
+  const showIntervalRow = proStudentId != null && proId != null;
 
   return (
     <div className="rounded-lg border border-green-100 bg-green-50/50 p-4">
@@ -306,7 +355,7 @@ export default function QuickBookCalendar({
           )}
         </div>
       ) : (
-        <div className="flex flex-wrap gap-1.5">
+        <div className="mb-3 flex flex-wrap gap-1.5">
           {slots.map((slot) => {
             const isCurrent = isCurrentSlot(slot);
             const isSelected = isSelectedSlot(slot);
@@ -332,6 +381,22 @@ export default function QuickBookCalendar({
               </button>
             );
           })}
+        </div>
+      )}
+
+      {/* Interval pills + More options — same row as QuickRebook on
+          the member dashboard. Hidden on the pro side (no proStudentId
+          / proId), and visually identical otherwise so a student
+          debating a date change with their pro sees the same surface
+          as on their dashboard. */}
+      {showIntervalRow && (
+        <div className="flex items-center justify-between">
+          <IntervalPills
+            value={interval}
+            onChange={handleIntervalChange}
+            locale={locale}
+          />
+          <MoreOptionsLink proId={proId!} locale={locale} />
         </div>
       )}
     </div>

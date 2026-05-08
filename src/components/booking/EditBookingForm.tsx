@@ -8,7 +8,7 @@ import type { Locale } from "@/lib/i18n";
 import QuickBookCalendar, {
   type QuickBookSelection,
 } from "@/components/booking/QuickBookCalendar";
-import { suggestSlotForInterval } from "@/app/(member)/member/book/actions";
+import type { IntervalValue } from "@/components/booking/IntervalPills";
 
 interface BookingDetails {
   id: number;
@@ -75,9 +75,6 @@ export default function EditBookingForm({
 }: Props) {
   const router = useRouter();
   const [duration, setDuration] = useState(booking.duration);
-  const [interval, setInterval] = useState<string | null>(
-    currentInterval ?? null,
-  );
   const [participantCount, setParticipantCount] = useState(
     booking.participantCount,
   );
@@ -325,52 +322,11 @@ export default function EditBookingForm({
           }}
           selectedSlot={selectedSlot}
           onSlotChange={setSelectedSlot}
+          proId={booking.proProfileId}
+          proStudentId={proStudentId}
+          currentInterval={(currentInterval ?? null) as IntervalValue}
           locale={locale}
         />
-        {proStudentId != null && (
-          <div className="mt-2 flex items-center gap-1">
-            {([
-              { value: "weekly", label: t("memberQB.inAWeek", locale) },
-              { value: "biweekly", label: t("memberQB.inTwoWeeks", locale) },
-              { value: "monthly", label: t("memberQB.inAMonth", locale) },
-            ] as const).map((iv) => (
-              <button
-                key={iv.value}
-                type="button"
-                onClick={() => {
-                  // Toggle off if already selected — same gesture
-                  // QuickBook uses on the member dashboard.
-                  const newVal = interval === iv.value ? null : iv.value;
-                  setInterval(newVal);
-                  startTransition(async () => {
-                    const result = await suggestSlotForInterval(
-                      proStudentId,
-                      newVal,
-                      booking.proProfileId,
-                      booking.proLocationId,
-                      duration,
-                      booking.id,
-                    );
-                    if (result?.suggestedSlot) {
-                      setSelectedSlot({
-                        date: result.suggestedDate,
-                        startTime: result.suggestedSlot.startTime,
-                        endTime: result.suggestedSlot.endTime,
-                      });
-                    }
-                  });
-                }}
-                className={`rounded-full px-2 py-0.5 text-[10px] font-medium transition-colors ${
-                  interval === iv.value
-                    ? "bg-green-700 text-white"
-                    : "bg-green-50 text-green-500 hover:text-green-700"
-                }`}
-              >
-                {iv.label}
-              </button>
-            ))}
-          </div>
-        )}
       </div>
 
       <p className="text-xs text-green-600">

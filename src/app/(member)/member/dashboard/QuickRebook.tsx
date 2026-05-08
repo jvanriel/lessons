@@ -2,7 +2,6 @@
 
 import { useState, useEffect, useRef, useCallback, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import Link from "next/link";
 import {
   quickCreateBooking,
   getAvailableSlots,
@@ -13,6 +12,10 @@ import {
   type SlotExplanation,
 } from "../book/actions";
 import { SlotExplanationDialog } from "@/components/SlotExplanationDialog";
+import IntervalPills, {
+  type IntervalValue,
+} from "@/components/booking/IntervalPills";
+import MoreOptionsLink from "@/components/booking/MoreOptionsLink";
 import { formatDate as formatDateLocale } from "@/lib/format-date";
 import type { Locale } from "@/lib/i18n";
 import { t } from "@/lib/i18n/translations";
@@ -479,54 +482,18 @@ export function QuickBook({ data, proId, proName, hasPaymentMethod = true, allow
 
           {/* Next lesson timing + more options */}
           <div className="flex items-center justify-between">
-            <div className="flex items-center gap-1">
-              {([
-                { value: "weekly", label: t("memberQB.inAWeek", locale) },
-                { value: "biweekly", label: t("memberQB.inTwoWeeks", locale) },
-                { value: "monthly", label: t("memberQB.inAMonth", locale) },
-              ] as const).map((iv) => (
-                <button
-                  key={iv.value}
-                  onClick={() => {
-                    const newVal = interval === iv.value ? null : iv.value;
-                    setInterval(newVal);
-                    startTransition(async () => {
-                      await updatePreferredInterval(
-                        data.proStudentId,
-                        newVal
-                      );
-                      router.refresh();
-                    });
-                  }}
-                  className={`rounded-full px-2 py-0.5 text-[10px] font-medium transition-colors ${
-                    interval === iv.value
-                      ? "bg-green-700 text-white"
-                      : "bg-green-50 text-green-500 hover:text-green-700"
-                  }`}
-                >
-                  {iv.label}
-                </button>
-              ))}
-            </div>
-            <Link
-              href={`/member/book/${proId}?full=1`}
-              className="inline-flex items-center gap-1 rounded-md border border-green-200 bg-white px-2.5 py-1 text-xs font-medium text-green-700 transition-colors hover:border-green-300 hover:bg-green-50"
-            >
-              {t("memberQB.moreOptions", locale)}
-              <svg
-                className="h-3 w-3"
-                fill="none"
-                viewBox="0 0 24 24"
-                stroke="currentColor"
-                strokeWidth={2.5}
-              >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  d="M9 5l7 7-7 7"
-                />
-              </svg>
-            </Link>
+            <IntervalPills
+              value={interval as IntervalValue}
+              onChange={(newVal) => {
+                setInterval(newVal);
+                startTransition(async () => {
+                  await updatePreferredInterval(data.proStudentId, newVal);
+                  router.refresh();
+                });
+              }}
+              locale={locale}
+            />
+            <MoreOptionsLink proId={proId} locale={locale} />
           </div>
 
       {/* Slot explanation dialog */}
