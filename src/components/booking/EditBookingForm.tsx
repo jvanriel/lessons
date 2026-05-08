@@ -310,23 +310,30 @@ export default function EditBookingForm({
           {t("editBooking.dateLabel", locale)} &amp;{" "}
           {t("editBooking.startTimeLabel", locale)}
         </p>
-        <QuickBookCalendar
-          proProfileId={booking.proProfileId}
-          proLocationId={booking.proLocationId}
-          duration={duration}
-          excludeBookingId={booking.id}
-          currentSlot={{
-            date: booking.date,
-            startTime: booking.startTime,
-            endTime: booking.endTime,
-          }}
-          selectedSlot={selectedSlot}
-          onSlotChange={setSelectedSlot}
-          proId={booking.proProfileId}
-          proStudentId={proStudentId}
-          currentInterval={(currentInterval ?? null) as IntervalValue}
-          locale={locale}
-        />
+        {/* -mx-2 negates 8px of the form's p-6 on each side so the
+            calendar's outer margin (16px to the form's border) matches
+            the dashboard pro card's p-4 outer margin around its
+            QuickBook surface. Keeps the pill row from being narrower
+            on mobile than its dashboard twin. */}
+        <div className="-mx-2">
+          <QuickBookCalendar
+            proProfileId={booking.proProfileId}
+            proLocationId={booking.proLocationId}
+            duration={duration}
+            excludeBookingId={booking.id}
+            currentSlot={{
+              date: booking.date,
+              startTime: booking.startTime,
+              endTime: booking.endTime,
+            }}
+            selectedSlot={selectedSlot}
+            onSlotChange={setSelectedSlot}
+            proId={booking.proProfileId}
+            proStudentId={proStudentId}
+            currentInterval={(currentInterval ?? null) as IntervalValue}
+            locale={locale}
+          />
+        </div>
       </div>
 
       <p className="text-xs text-green-600">
