@@ -7,6 +7,7 @@ import Link from "next/link";
 import { Suspense } from "react";
 import type { Locale } from "@/lib/i18n";
 import PasswordInput from "@/components/PasswordInput";
+import LanguageSwitcher from "@/components/LanguageSwitcher";
 
 const strings: Record<string, Record<string, string>> = {
   en: {
@@ -52,7 +53,10 @@ function ResetPasswordFormInner({ locale }: { locale: Locale }) {
 
   if (!token) {
     return (
-      <div className="flex min-h-screen items-center justify-center bg-green-950 px-6">
+      <div className="relative flex min-h-screen items-center justify-center bg-green-950 px-6">
+        <div className="absolute right-6 top-6">
+          <LanguageSwitcher locale={locale} />
+        </div>
         <div className="w-full max-w-sm text-center">
           <h1 className="font-display text-2xl font-bold text-gold-200">
             {s.title}
@@ -70,7 +74,10 @@ function ResetPasswordFormInner({ locale }: { locale: Locale }) {
   }
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-green-950 px-6">
+    <div className="relative flex min-h-screen items-center justify-center bg-green-950 px-6">
+      <div className="absolute right-6 top-6">
+        <LanguageSwitcher locale={locale} />
+      </div>
       <div className="w-full max-w-sm">
         <h1 className="font-display text-2xl font-bold text-gold-200">
           {s.title}
