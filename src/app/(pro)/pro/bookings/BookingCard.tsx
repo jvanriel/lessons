@@ -102,14 +102,6 @@ export default function BookingCard({
               {paymentLabel}
             </span>
           )}
-          {!b.studentEmailVerified && (
-            <span
-              className="inline-flex items-center rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-medium text-amber-700"
-              title={t("proBookingsView.emailUnverified", locale)}
-            >
-              {t("proBookingsView.emailUnverified", locale)}
-            </span>
-          )}
           {showStatusPill && (
             <span
               className={cn(
@@ -130,14 +122,27 @@ export default function BookingCard({
         {b.studentFirstName} {b.studentLastName}
       </p>
 
-      {/* Contact: email · phone (compact, both tappable) */}
+      {/* Contact: email + unverified badge · phone (compact, both
+          tappable). The unverified badge sits inline next to the
+          email so it gets the full row width to fit instead of
+          wrapping under the time row. */}
       <p className="mt-0.5 flex flex-wrap items-center gap-x-3 gap-y-0.5 text-xs">
-        <a
-          href={`mailto:${b.studentEmail}`}
-          className="text-green-600 underline-offset-2 hover:underline"
-        >
-          {b.studentEmail}
-        </a>
+        <span className="inline-flex items-center gap-1.5">
+          <a
+            href={`mailto:${b.studentEmail}`}
+            className="text-green-600 underline-offset-2 hover:underline"
+          >
+            {b.studentEmail}
+          </a>
+          {!b.studentEmailVerified && (
+            <span
+              className="inline-flex items-center rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-medium text-amber-700"
+              title={t("proBookingsView.emailUnverified", locale)}
+            >
+              {t("proBookingsView.emailUnverified", locale)}
+            </span>
+          )}
+        </span>
         {b.studentPhone && (
           <a
             href={`tel:${b.studentPhone.replace(/\s+/g, "")}`}
