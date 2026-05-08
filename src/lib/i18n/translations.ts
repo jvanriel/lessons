@@ -863,6 +863,8 @@ const translations: Record<Locale, Record<string, string>> = {
     "profile.cannotVerifyPassword": "Could not verify current password.",
 
     // Home
+    "home.hero.kicker": "Belgium's home for golf coaching",
+    "home.hero.intro": "Find a certified pro, book a private lesson, and track your progress — all in one place. Made in Belgium for golfers and the pros who teach them.",
     "home.hero.title": "Elevate Your Game",
     "home.hero.subtitle": "Book private golf lessons with certified professionals. Whether you are a beginner or looking to refine your technique, find the perfect pro for your game.",
     "home.hero.cta": "Book a lesson",
@@ -2353,6 +2355,8 @@ const translations: Record<Locale, Record<string, string>> = {
     "profile.cannotVerifyPassword": "Kon huidig wachtwoord niet verifiëren.",
 
     // Home
+    "home.hero.kicker": "De Belgische thuisbasis voor golflessen",
+    "home.hero.intro": "Vind een gecertificeerde pro, boek een privéles en volg je vooruitgang — alles op één plek. Gemaakt in België, voor golfspelers en de pro's die hen lesgeven.",
     "home.hero.title": "Verbeter Je Spel",
     "home.hero.subtitle": "Boek privé golflessen bij gecertificeerde professionals. Of je nu beginner bent of je techniek wilt verfijnen, vind de perfecte pro voor jouw spel.",
     "home.hero.cta": "Boek een les",
@@ -3839,6 +3843,8 @@ const translations: Record<Locale, Record<string, string>> = {
     "profile.cannotVerifyPassword": "Impossible de vérifier le mot de passe actuel.",
 
     // Home
+    "home.hero.kicker": "Le point de rendez-vous belge des cours de golf",
+    "home.hero.intro": "Trouvez un pro certifié, réservez un cours privé et suivez vos progrès — le tout au même endroit. Conçu en Belgique, pour les golfeurs et les pros qui les accompagnent.",
     "home.hero.title": "Améliorez Votre Jeu",
     "home.hero.subtitle": "Réservez des cours de golf privés avec des professionnels certifiés. Que vous soyez débutant ou que vous souhaitiez perfectionner votre technique, trouvez le pro idéal.",
     "home.hero.cta": "Réserver un cours",
