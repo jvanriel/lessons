@@ -56,6 +56,19 @@ interface CommentsProps {
   onUpload?: (file: File) => Promise<Attachment | null>;
   fillHeight?: boolean;
   emptyText?: string;
+  /**
+   * If set, render WhatsApp-style read-receipt ticks next to the
+   * timestamp on the viewer's own messages: ✓ (sent) when the
+   * other side has not loaded the chat since this message was
+   * created, ✓✓ (read) when they have. Pass an ISO string from
+   * the server (the page that renders this should fetch the
+   * partner's last_seen_at and forward it).
+   *
+   * Currently used only by `CoachingChat`. Other surfaces (task
+   * comments, etc.) should leave this undefined — they don't
+   * carry per-conversation read state.
+   */
+  readReceiptOtherSeenAt?: string | null;
 }
 
 const QUICK_REACTIONS = ["👍", "❤️", "😂", "🎯", "✅"];
@@ -84,7 +97,11 @@ export default function Comments({
   onUpload,
   fillHeight = false,
   emptyText = "No comments yet. Start the conversation.",
+  readReceiptOtherSeenAt,
 }: CommentsProps) {
+  const otherSeenAtMs = readReceiptOtherSeenAt
+    ? new Date(readReceiptOtherSeenAt).getTime()
+    : null;
   const [comments, setComments] = useState<Comment[]>([]);
   const [loading, setLoading] = useState(true);
   const [input, setInput] = useState("");
@@ -838,7 +855,7 @@ export default function Comments({
                   )}
                   </div>
 
-                  {/* Edited indicator + timestamp */}
+                  {/* Edited indicator + timestamp + read receipt */}
                   <div
                     className={`mt-0.5 flex items-center gap-1.5 px-1 ${isOwn ? "justify-end" : "justify-start"}`}
                   >
@@ -850,6 +867,27 @@ export default function Comments({
                     <span className="text-[10px] text-green-400">
                       {formatTime(comment.createdAt)}
                     </span>
+                    {/* WhatsApp-style ✓ / ✓✓ on own, non-deleted
+                        messages. Only renders when the parent has
+                        opted into read receipts via the
+                        readReceiptOtherSeenAt prop. */}
+                    {isOwn &&
+                      !isDeleted &&
+                      readReceiptOtherSeenAt !== undefined &&
+                      (() => {
+                        const sentAt = new Date(comment.createdAt).getTime();
+                        const isRead =
+                          otherSeenAtMs !== null && otherSeenAtMs >= sentAt;
+                        return (
+                          <span
+                            className={`text-[11px] ${isRead ? "text-blue-500" : "text-green-400"}`}
+                            aria-label={isRead ? "Read" : "Sent"}
+                            title={isRead ? "Read" : "Sent"}
+                          >
+                            {isRead ? "✓✓" : "✓"}
+                          </span>
+                        );
+                      })()}
                   </div>
 
                   {/* Reactions */}

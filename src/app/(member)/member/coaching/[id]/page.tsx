@@ -30,6 +30,9 @@ export default async function MemberCoachingChatPage({
       proDisplayName: proProfiles.displayName,
       proPhotoUrl: proProfiles.photoUrl,
       proSpecialties: proProfiles.specialties,
+      // Pro's last_seen_at — viewer here is the golfer, so this
+      // is the *other* side for read-receipt purposes.
+      proLastSeenAt: proStudents.proLastSeenAt,
     })
     .from(proStudents)
     .innerJoin(proProfiles, eq(proStudents.proProfileId, proProfiles.id))
@@ -98,6 +101,9 @@ export default async function MemberCoachingChatPage({
           partnerName={record.proDisplayName}
           partnerRole="pro"
           emptyText={t("coaching.empty", await getLocale())}
+          otherSideLastSeenAt={
+            record.proLastSeenAt ? record.proLastSeenAt.toISOString() : null
+          }
         />
       </div>
     </div>
