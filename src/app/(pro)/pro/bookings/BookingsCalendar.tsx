@@ -17,6 +17,7 @@ import { getPaymentBadge } from "@/lib/payment-status";
 import { proCancelBooking } from "../students/actions";
 import { CancelBookingDialog } from "../_components/CancelBookingDialog";
 import BookingCard from "./BookingCard";
+import { LOCATION_COLORS, buildLocationColorMap } from "@/lib/location-colors";
 
 // ─── Types ──────────────────────────────────────────
 
@@ -53,6 +54,12 @@ interface AvailabilitySlot {
 interface Props {
   bookings: Booking[];
   availability: AvailabilitySlot[];
+  /**
+   * Pro's locations sorted by `sortOrder` (same ordering the
+   * availability editor uses), so the location → colour mapping in
+   * both grids matches — same club gets the same colour.
+   */
+  proLocations: { id: number }[];
   locale: Locale;
   /**
    * IANA timezone the calendar renders in — typically the pro's
@@ -144,6 +151,7 @@ export function computeHourRange(
 export function BookingsCalendar({
   bookings,
   availability,
+  proLocations,
   locale,
   timezone,
 }: Props) {
@@ -154,6 +162,15 @@ export function BookingsCalendar({
   const [expandedBookingId, setExpandedBookingId] = useState<number | null>(null);
   const [cancelTargetId, setCancelTargetId] = useState<number | null>(null);
   const [cancelPending, startCancelTransition] = useTransition();
+
+  // Build location → colour-index map identical to AvailabilityEditor's
+  // (same shared helper, same `sortOrder`-ordered list). The booking
+  // block's bg + border come from this index so the same club gets the
+  // same colour in both calendars.
+  const locationColorMap = useMemo(
+    () => buildLocationColorMap(proLocations),
+    [proLocations],
+  );
 
   const weekDates = useMemo(() => {
     return Array.from({ length: 7 }, (_, i) =>
@@ -352,7 +369,10 @@ export function BookingsCalendar({
                     );
                   })}
 
-                  {/* Booking blocks */}
+                  {/* Booking blocks — coloured by location (same palette as
+                      the availability editor). Cancelled bookings keep the
+                      location colour but render with a strike-through and
+                      reduced opacity so the status is still legible. */}
                   {dayBookings.map((booking) => {
                     const topMin = timeToGridRow(booking.startTime, startHour);
                     const bottomMin = timeToGridRow(booking.endTime, startHour);
@@ -360,19 +380,18 @@ export function BookingsCalendar({
                     const heightPx = Math.max(((bottomMin - topMin) / 60) * 48, 20);
                     const isExpanded = expandedBookingId === booking.id;
 
-                    const statusColors =
-                      booking.status === "confirmed"
-                        ? "bg-green-600 border-green-700"
-                        : booking.status === "cancelled"
-                          ? "bg-red-400 border-red-500"
-                          : "bg-amber-400 border-amber-500";
+                    const colorIdx = locationColorMap.get(booking.proLocationId) ?? 0;
+                    const color = LOCATION_COLORS[colorIdx];
+                    const cancelled = booking.status === "cancelled";
 
                     return (
                       <div
                         key={booking.id}
                         className={cn(
                           "absolute left-0.5 right-0.5 flex cursor-pointer items-center overflow-hidden rounded-md border px-1.5 py-0.5 text-white shadow-sm transition-shadow hover:shadow-md",
-                          statusColors
+                          color.bg,
+                          color.border,
+                          cancelled && "opacity-50 line-through"
                         )}
                         style={{
                           top: `${topPx}px`,

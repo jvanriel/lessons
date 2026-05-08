@@ -145,11 +145,15 @@ function BookingsList({
 export function BookingsView({
   bookings,
   availability,
+  proLocations,
   locale,
   timezone,
 }: {
   bookings: Booking[];
   availability: AvailabilitySlot[];
+  /** Pro's locations sorted by sortOrder — same ordering the
+   *  availability editor uses, so colour assignments match. */
+  proLocations: { id: number }[];
   locale: Locale;
   timezone: string;
 }) {
@@ -201,7 +205,13 @@ export function BookingsView({
       </div>
 
       {view === "calendar" ? (
-        <BookingsCalendar bookings={bookings} availability={availability} locale={locale} timezone={timezone} />
+        <BookingsCalendar
+          bookings={bookings}
+          availability={availability}
+          proLocations={proLocations}
+          locale={locale}
+          timezone={timezone}
+        />
       ) : (
         <BookingsList bookings={bookings} locale={locale} timezone={timezone} />
       )}

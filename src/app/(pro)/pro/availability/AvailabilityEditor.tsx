@@ -14,6 +14,7 @@ import { t } from "@/lib/i18n/translations";
 import type { Locale } from "@/lib/i18n";
 import { formatDate as formatDateLocale } from "@/lib/format-date";
 import { addDaysToDateString } from "@/lib/local-date";
+import { LOCATION_COLORS, buildLocationColorMap } from "@/lib/location-colors";
 
 // ─── Constants ───────────────────────────────────────
 
@@ -52,15 +53,6 @@ function useCellHeight() {
   return cellH;
 }
 
-// Distinct colors for up to 6 locations
-const LOCATION_COLORS = [
-  { bg: "bg-green-500/80", bgHex: "#22c55e", text: "text-green-700", light: "bg-green-100", border: "border-green-500" },
-  { bg: "bg-blue-500/80", bgHex: "#3b82f6", text: "text-blue-700", light: "bg-blue-100", border: "border-blue-500" },
-  { bg: "bg-amber-500/80", bgHex: "#f59e0b", text: "text-amber-700", light: "bg-amber-100", border: "border-amber-500" },
-  { bg: "bg-purple-500/80", bgHex: "#a855f7", text: "text-purple-700", light: "bg-purple-100", border: "border-purple-500" },
-  { bg: "bg-rose-500/80", bgHex: "#f43f5e", text: "text-rose-700", light: "bg-rose-100", border: "border-rose-500" },
-  { bg: "bg-cyan-500/80", bgHex: "#06b6d4", text: "text-cyan-700", light: "bg-cyan-100", border: "border-cyan-500" },
-];
 
 function rowToTime(row: number): string {
   const totalMinutes = (GRID_START_HOUR * 60) + (row * 30);
@@ -399,12 +391,12 @@ export default function AvailabilityEditor({
 }: Props) {
   const CELL_H = useCellHeight();
 
-  // Build location -> color index map
-  const locationColorMap = useMemo(() => {
-    const map = new Map<number, number>();
-    locations.forEach((loc, i) => map.set(loc.id, i % LOCATION_COLORS.length));
-    return map;
-  }, [locations]);
+  // Build location -> color index map (shared helper so the bookings
+  // calendar uses the identical mapping).
+  const locationColorMap = useMemo(
+    () => buildLocationColorMap(locations),
+    [locations],
+  );
 
   // Active brush for painting
   const [activeLocationId, setActiveLocationId] = useState<number>(locations[0]?.id || 0);

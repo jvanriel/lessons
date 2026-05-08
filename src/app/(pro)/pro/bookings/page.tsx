@@ -25,7 +25,7 @@ export default async function ProBookingsPage() {
 
   const locale = await getLocale();
 
-  const [bookings, availability] = await Promise.all([
+  const [bookings, availability, proLocs] = await Promise.all([
     db
       .select({
         id: lessonBookings.id,
@@ -71,6 +71,16 @@ export default async function ProBookingsPage() {
       .from(proAvailability)
       .where(eq(proAvailability.proProfileId, profile.id))
       .orderBy(proAvailability.dayOfWeek, proAvailability.startTime),
+
+    // Pro's locations sorted the same way the availability editor
+    // sorts them (by sortOrder), so the location → colour mapping
+    // built in BookingsCalendar matches what AvailabilityEditor
+    // assigns. Same club gets the same colour in both views.
+    db
+      .select({ id: proLocations.id })
+      .from(proLocations)
+      .where(eq(proLocations.proProfileId, profile.id))
+      .orderBy(proLocations.sortOrder),
   ]);
 
   // Schema: `proProfiles.defaultTimezone` is `notNull default "Europe/Brussels"`,
@@ -94,7 +104,13 @@ export default async function ProBookingsPage() {
 
       {/* Bookings view (calendar or list) */}
       <section className="mb-10">
-        <BookingsView bookings={bookings} availability={availability} locale={locale} timezone={tz} />
+        <BookingsView
+          bookings={bookings}
+          availability={availability}
+          proLocations={proLocs}
+          locale={locale}
+          timezone={tz}
+        />
       </section>
 
       {/* Past & cancelled */}
