@@ -388,14 +388,6 @@ export function BookingsCalendar({
                         <div className="truncate text-[10px] font-semibold leading-tight">
                           {booking.studentFirstName} {booking.studentLastName}
                         </div>
-                        <div className="truncate text-[9px] leading-tight opacity-90">
-                          {booking.startTime} - {booking.endTime}
-                        </div>
-                        {heightPx > 36 && (
-                          <div className="truncate text-[9px] leading-tight opacity-80">
-                            {booking.locationName}
-                          </div>
-                        )}
                         {(() => {
                           // Tiny corner indicator: ✓ for paid, € for cash,
                           // ! for failed/incomplete. Tooltip carries the
