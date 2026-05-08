@@ -138,8 +138,8 @@ export default function EditBookingForm({
         <p className="text-green-900">{booking.locationLabel}</p>
       </div>
 
-      <div className="grid grid-cols-2 gap-3">
-        <div>
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+        <div className="min-w-0">
           <label htmlFor="date" className="mb-1 block text-sm font-medium text-green-700">
             {t("editBooking.dateLabel", locale)}
           </label>
@@ -152,7 +152,7 @@ export default function EditBookingForm({
             className="w-full rounded-md border border-green-200 bg-white px-3 py-2 text-sm text-green-900 focus:border-green-400 focus:outline-none focus:ring-1 focus:ring-green-400"
           />
         </div>
-        <div>
+        <div className="min-w-0">
           <label htmlFor="startTime" className="mb-1 block text-sm font-medium text-green-700">
             {t("editBooking.startTimeLabel", locale)}
           </label>
@@ -168,8 +168,8 @@ export default function EditBookingForm({
         </div>
       </div>
 
-      <div className="grid grid-cols-2 gap-3">
-        <div>
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+        <div className="min-w-0">
           <label htmlFor="duration" className="mb-1 block text-sm font-medium text-green-700">
             {t("editBooking.durationLabel", locale)}
           </label>
@@ -186,7 +186,7 @@ export default function EditBookingForm({
             ))}
           </select>
         </div>
-        <div>
+        <div className="min-w-0">
           <p className="mb-1 block text-sm font-medium text-green-700">{t("editBooking.endTimeLabel", locale)}</p>
           <p className="rounded-md border border-green-100 bg-green-50/40 px-3 py-2 text-sm text-green-900">
             {computedEndTime}
