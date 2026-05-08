@@ -9,6 +9,7 @@ import QuickBookCalendar, {
   type QuickBookSelection,
 } from "@/components/booking/QuickBookCalendar";
 import type { IntervalValue } from "@/components/booking/IntervalPills";
+import { formatDate } from "@/lib/format-date";
 
 interface BookingDetails {
   id: number;
@@ -171,6 +172,19 @@ export default function EditBookingForm({
           {t("editBooking.locationLabel", locale)}
         </p>
         <p className="text-green-900">{booking.locationLabel}</p>
+      </div>
+      <div>
+        <p className="text-xs uppercase text-green-500">
+          {t("editBooking.currentLabel", locale)}
+        </p>
+        <p className="text-green-900">
+          {formatDate(booking.date, locale, {
+            weekday: "long",
+            month: "long",
+            day: "numeric",
+          })}{" "}
+          · {booking.startTime}–{booking.endTime}
+        </p>
       </div>
 
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
