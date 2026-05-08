@@ -371,7 +371,7 @@ export function BookingsCalendar({
                       <div
                         key={booking.id}
                         className={cn(
-                          "absolute left-0.5 right-0.5 cursor-pointer overflow-hidden rounded-md border px-1.5 py-0.5 text-white shadow-sm transition-shadow hover:shadow-md",
+                          "absolute left-0.5 right-0.5 flex cursor-pointer items-center overflow-hidden rounded-md border px-1.5 py-0.5 text-white shadow-sm transition-shadow hover:shadow-md",
                           statusColors
                         )}
                         style={{
@@ -385,7 +385,7 @@ export function BookingsCalendar({
                           )
                         }
                       >
-                        <div className="truncate text-[10px] font-semibold leading-tight">
+                        <div className="min-w-0 flex-1 truncate text-[10px] font-semibold leading-tight">
                           {booking.studentFirstName} {booking.studentLastName}
                         </div>
                         {(() => {
