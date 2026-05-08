@@ -17,6 +17,39 @@ If any role inside the brackets is unknown (typo), the parser falls
 back to treating the brackets as literal text — better to over-show
 than silently hide.
 
+## 2026-05-08 — v1.1.60
+
+- **Editing a booking now uses the QuickBook surface.** Date pill row,
+  slot list, weekly/biweekly/monthly pills and a "More options" link,
+  same as on the member dashboard. Tapping a pill jumps the calendar
+  to the next suggested date based on your preferences.
+- **Edit form shows the booking's current date/time at the top.** Pro
+  and location alongside it so you can see what you're changing from
+  at a glance.
+- **Booking-update emails show what changed.** Each field that
+  actually moved renders inline as "NEW (was OLD)" — date, time,
+  duration, participant count.
+- **Dropped participants get a removal email.** When a booker removes
+  someone from an existing booking, that person receives a "Removed"
+  email and a calendar invite that cancels the entry from their
+  calendar.
+- [pro] **Pro bookings page redesign.** New mobile-first card with
+  outlined Edit + Cancel buttons, shared between the list view and
+  the calendar's expanded detail panel. Calendar blocks show just
+  the student name; tapping opens the card in a centered dialog.
+  Cards are colour-coded by location, matching the palette on the
+  availability page so the same club gets the same colour in both
+  grids. The dialog has explicit Close + Edit + Cancel buttons
+  (Close on the right, booking actions on the left) with icons —
+  the dismissive action can't be confused with cancelling the
+  lesson.
+- [pro] **Bookings is the default landing page.** Bottom nav order
+  is now Reserveringen → Golfers → Beschikbaarheid; Dashboard moved
+  to the top of the "More" sheet.
+- [pro] **Bookings on the availability page are clickable.** The
+  preview grid now shows the student's name on each booking and
+  opens the same booking card on tap.
+
 ## 2026-05-06 — v1.1.58
 
 - [pro] **Per-location lesson pricing (task 109).** Each location
