@@ -2,6 +2,7 @@
 
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
+import Link from "next/link";
 import { BookingsCalendar } from "./BookingsCalendar";
 import { formatDate as formatDateHelper } from "@/lib/format-date";
 import { todayInTZ } from "@/lib/local-date";
@@ -112,83 +113,108 @@ function BookingsList({
           <h3 className="mb-2 text-sm font-semibold text-green-800">
             {formatDate(date)}
           </h3>
-          <div className="space-y-1.5">
+          {/* Mobile-first card: time as visual anchor, badges
+              top-right, content stacked top-to-bottom (nothing
+              relies on `justify-between` so nothing escapes the
+              card on narrow screens), outlined buttons in a
+              footer row for tappable Edit + Cancel actions. Outer
+              shell matches the dashboard pro card styling
+              (rounded-xl + green-200 border) so the surface looks
+              consistent across the app. */}
+          <div className="space-y-3">
             {dateBookings.map((b) => (
               <div
                 key={b.id}
-                className="flex items-center justify-between rounded-lg border border-green-100 bg-white px-4 py-3"
+                className="rounded-xl border border-green-200 bg-white p-4"
               >
-                <div className="flex items-center gap-4">
-                  <div className="text-sm font-medium text-green-900">
-                    {b.startTime} - {b.endTime}
-                  </div>
-                  <div>
-                    <p className="text-sm text-green-800">
-                      {b.studentFirstName} {b.studentLastName}
-                      {(() => {
-                        const pb = getPaymentBadge(b.paymentStatus);
-                        if (!pb) return null;
-                        const label = t(pb.labelKey, locale);
-                        return (
-                          <span
-                            className={`ml-2 inline-flex items-center rounded-full ${pb.bg} px-2 py-0.5 text-[10px] font-medium ${pb.fg}`}
-                            title={label}
-                          >
-                            {label}
-                          </span>
-                        );
-                      })()}
-                      {!b.studentEmailVerified && (
-                        <span className="ml-2 inline-flex items-center rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-medium text-amber-700" title={t("proBookingsView.emailUnverified", locale)}>
-                          {t("proBookingsView.emailUnverified", locale)}
-                        </span>
-                      )}
-                    </p>
-                    {/* Clickable email + phone — same pattern as the
-                        calendar's expanded detail panel (commit 7876e0d). */}
-                    <p className="mt-0.5 flex flex-wrap items-center gap-x-3 gap-y-0.5 text-xs">
-                      <a
-                        href={`mailto:${b.studentEmail}`}
-                        className="text-green-600 underline-offset-2 hover:underline"
-                      >
-                        {b.studentEmail}
-                      </a>
-                      {b.studentPhone && (
-                        <a
-                          href={`tel:${b.studentPhone.replace(/\s+/g, "")}`}
-                          className="text-green-600 underline-offset-2 hover:underline"
+                {/* Header — time + status badges */}
+                <div className="flex items-baseline justify-between gap-2">
+                  <p className="font-display text-lg font-medium text-green-900">
+                    {b.startTime} – {b.endTime}
+                  </p>
+                  <div className="flex flex-wrap items-center justify-end gap-1.5">
+                    {(() => {
+                      const pb = getPaymentBadge(b.paymentStatus);
+                      if (!pb) return null;
+                      const label = t(pb.labelKey, locale);
+                      return (
+                        <span
+                          className={`inline-flex items-center rounded-full ${pb.bg} px-2 py-0.5 text-[10px] font-medium ${pb.fg}`}
+                          title={label}
                         >
-                          {b.studentPhone}
-                        </a>
-                      )}
-                    </p>
-                    <p className="text-xs text-green-500">
-                      {b.locationName}
-                      {b.locationCity ? `, ${b.locationCity}` : ""}
-                    </p>
-                  </div>
-                </div>
-                <div className="flex items-center gap-3">
-                  <div className="text-right">
-                    {b.participantCount > 1 && (
-                      <span className="text-xs text-green-500">
-                        {t("proBookingsView.participants", locale).replace(
-                          "{n}",
-                          String(b.participantCount)
-                        )}
+                          {label}
+                        </span>
+                      );
+                    })()}
+                    {!b.studentEmailVerified && (
+                      <span
+                        className="inline-flex items-center rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-medium text-amber-700"
+                        title={t("proBookingsView.emailUnverified", locale)}
+                      >
+                        {t("proBookingsView.emailUnverified", locale)}
                       </span>
                     )}
-                    {b.notes && (
-                      <p className="max-w-[200px] truncate text-xs text-green-400">
-                        {b.notes}
-                      </p>
-                    )}
                   </div>
+                </div>
+
+                {/* Student name */}
+                <p className="mt-1 text-sm font-medium text-green-800">
+                  {b.studentFirstName} {b.studentLastName}
+                </p>
+
+                {/* Contact: email · phone (compact, both tappable) */}
+                <p className="mt-0.5 flex flex-wrap items-center gap-x-3 gap-y-0.5 text-xs">
+                  <a
+                    href={`mailto:${b.studentEmail}`}
+                    className="text-green-600 underline-offset-2 hover:underline"
+                  >
+                    {b.studentEmail}
+                  </a>
+                  {b.studentPhone && (
+                    <a
+                      href={`tel:${b.studentPhone.replace(/\s+/g, "")}`}
+                      className="text-green-600 underline-offset-2 hover:underline"
+                    >
+                      {b.studentPhone}
+                    </a>
+                  )}
+                </p>
+
+                {/* Location */}
+                <p className="mt-0.5 text-xs text-green-500">
+                  {b.locationName}
+                  {b.locationCity ? `, ${b.locationCity}` : ""}
+                </p>
+
+                {b.participantCount > 1 && (
+                  <p className="mt-1 text-xs text-green-500">
+                    {t("proBookingsView.participants", locale).replace(
+                      "{n}",
+                      String(b.participantCount)
+                    )}
+                  </p>
+                )}
+
+                {b.notes && (
+                  <p className="mt-2 rounded-md bg-green-50 px-2 py-1 text-xs italic text-green-700">
+                    {b.notes}
+                  </p>
+                )}
+
+                {/* Action footer — outlined buttons, right-aligned.
+                    Bigger tap targets than text links for mobile. */}
+                <div className="mt-3 flex items-center justify-end gap-2 border-t border-green-100 pt-3">
+                  <Link
+                    href={`/pro/bookings/${b.id}/edit`}
+                    className="rounded-md border border-green-200 px-3 py-1.5 text-xs font-medium text-green-700 transition-colors hover:bg-green-50"
+                  >
+                    {t("editBooking.editLink", locale)}
+                  </Link>
                   <button
                     type="button"
                     onClick={() => setCancelTarget(b)}
                     disabled={pending}
-                    className="text-[11px] font-medium text-red-400 hover:text-red-600 disabled:opacity-50"
+                    className="rounded-md border border-red-200 px-3 py-1.5 text-xs font-medium text-red-600 transition-colors hover:bg-red-50 disabled:opacity-50"
                   >
                     {t("proStudentBookings.cancel", locale)}
                   </button>
