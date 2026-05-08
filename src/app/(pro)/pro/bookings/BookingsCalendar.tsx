@@ -424,22 +424,29 @@ export function BookingsCalendar({
       </div>
 
       {/* Expanded booking details — same shared BookingCard the
-          /pro/bookings list uses, with showDate enabled (the
-          calendar block doesn't carry a visible date label) and an
-          onClose handler to collapse the panel. */}
+          /pro/bookings list uses, opened in a modal dialog so the
+          calendar grid stays visible behind it. Backdrop click +
+          the card's own X close button both dismiss. */}
       {expandedBookingId !== null && (() => {
         const booking = bookings.find((b) => b.id === expandedBookingId);
         if (!booking) return null;
         return (
-          <div className="mt-4">
-            <BookingCard
-              booking={booking}
-              locale={locale}
-              cancelPending={cancelPending}
-              onCancel={() => setCancelTargetId(booking.id)}
-              showDate
-              onClose={() => setExpandedBookingId(null)}
-            />
+          <div
+            className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-black/50 px-4 py-12"
+            onClick={(e) => {
+              if (e.target === e.currentTarget) setExpandedBookingId(null);
+            }}
+          >
+            <div className="w-full max-w-md">
+              <BookingCard
+                booking={booking}
+                locale={locale}
+                cancelPending={cancelPending}
+                onCancel={() => setCancelTargetId(booking.id)}
+                showDate
+                onClose={() => setExpandedBookingId(null)}
+              />
+            </div>
           </div>
         );
       })()}
