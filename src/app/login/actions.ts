@@ -102,10 +102,12 @@ export async function userLogin(
     redirect(from);
   }
 
-  // Route to the appropriate dashboard based on role
+  // Route to the appropriate landing surface based on role. Pros land
+  // on /pro/bookings — that's the page they open the app for; the
+  // dashboard moved to the More sheet.
   const roles = parseRoles(user.roles);
   if (roles.includes("pro")) {
-    redirect("/pro/dashboard");
+    redirect("/pro/bookings");
   } else if (roles.includes("admin") || roles.includes("dev")) {
     redirect("/admin");
   } else {

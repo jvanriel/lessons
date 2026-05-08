@@ -12,7 +12,7 @@ const PAGE = "home";
 export default async function Home() {
   const session = await getSession();
   if (session) {
-    if (hasRole(session, "pro")) redirect("/pro/dashboard");
+    if (hasRole(session, "pro")) redirect("/pro/bookings");
     if (hasRole(session, "admin")) redirect("/admin/users");
     redirect("/member/dashboard");
   }
