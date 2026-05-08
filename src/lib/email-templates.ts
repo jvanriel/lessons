@@ -944,6 +944,13 @@ const PARTICIPANT_BOOKING_STRINGS: Record<Locale, {
   helper: (bookerName: string) => string;
   cancelSubject: (proName: string, bookerName: string) => string;
   cancelBody: (bookerName: string, proName: string) => string;
+  /**
+   * "You were removed from the lesson" — the lesson itself is still
+   * happening with the remaining participants, so the wording must
+   * not imply cancellation.
+   */
+  removedSubject: (proName: string, bookerName: string) => string;
+  removedBody: (bookerName: string, proName: string) => string;
 }> = {
   en: {
     subject: (pro, booker) => `You're joining a golf lesson with ${pro} (booked by ${booker})`,
@@ -963,6 +970,10 @@ const PARTICIPANT_BOOKING_STRINGS: Record<Locale, {
     cancelSubject: (pro, booker) => `Cancelled: golf lesson with ${pro} (booked by ${booker})`,
     cancelBody: (booker, pro) =>
       `${booker} cancelled the golf lesson with ${pro} you were joining. The calendar invite is being removed.`,
+    removedSubject: (pro, booker) =>
+      `Removed: golf lesson with ${pro} (booked by ${booker})`,
+    removedBody: (booker, pro) =>
+      `${booker} removed you from the golf lesson with ${pro}. The lesson is still going ahead with the other participants — you're no longer part of it. The calendar invite has been removed.`,
   },
   nl: {
     subject: (pro, booker) => `Je doet mee aan een golfles bij ${pro} (geboekt door ${booker})`,
@@ -982,6 +993,10 @@ const PARTICIPANT_BOOKING_STRINGS: Record<Locale, {
     cancelSubject: (pro, booker) => `Geannuleerd: golfles bij ${pro} (geboekt door ${booker})`,
     cancelBody: (booker, pro) =>
       `${booker} heeft de golfles bij ${pro} waaraan je zou meedoen geannuleerd. De kalenderafspraak wordt verwijderd.`,
+    removedSubject: (pro, booker) =>
+      `Verwijderd: golfles bij ${pro} (geboekt door ${booker})`,
+    removedBody: (booker, pro) =>
+      `${booker} heeft jou verwijderd uit de golfles bij ${pro}. De les gaat nog steeds door met de overige deelnemers — jij doet niet langer mee. De kalenderafspraak is verwijderd.`,
   },
   fr: {
     subject: (pro, booker) => `Vous participez à un cours de golf avec ${pro} (réservé par ${booker})`,
@@ -1001,6 +1016,10 @@ const PARTICIPANT_BOOKING_STRINGS: Record<Locale, {
     cancelSubject: (pro, booker) => `Annulé : cours de golf avec ${pro} (réservé par ${booker})`,
     cancelBody: (booker, pro) =>
       `${booker} a annulé le cours de golf avec ${pro} auquel vous deviez participer. L'invitation au calendrier est en cours de suppression.`,
+    removedSubject: (pro, booker) =>
+      `Retiré : cours de golf avec ${pro} (réservé par ${booker})`,
+    removedBody: (booker, pro) =>
+      `${booker} vous a retiré du cours de golf avec ${pro}. Le cours a toujours lieu avec les autres participants — vous n'y participez plus. L'invitation au calendrier a été supprimée.`,
   },
 };
 
@@ -1085,6 +1104,51 @@ export function getParticipantBookingCancelledSubject(
   locale: Locale
 ): string {
   return (PARTICIPANT_BOOKING_STRINGS[locale] ?? PARTICIPANT_BOOKING_STRINGS.en).cancelSubject(
+    proName,
+    bookerName,
+  );
+}
+
+/**
+ * Sent to a participant who was REMOVED from a still-active booking
+ * during an edit (booker dropped them from the participant list, but
+ * the lesson itself is still happening for the others). Distinct from
+ * the cancel template above so the wording doesn't imply the lesson
+ * was cancelled.
+ */
+export function buildParticipantBookingRemovedEmail(opts: {
+  participantFirstName: string;
+  bookerName: string;
+  proName: string;
+  locationName: string;
+  date: string;
+  startTime: string;
+  endTime: string;
+  locale: Locale;
+}): string {
+  const s = PARTICIPANT_BOOKING_STRINGS[opts.locale] ?? PARTICIPANT_BOOKING_STRINGS.en;
+  const rows: Array<DetailRow> = [
+    [s.pro, opts.proName],
+    [s.location, opts.locationName],
+    [s.date, formatLessonDate(opts.date, opts.locale)],
+    [s.time, `${opts.startTime} – ${opts.endTime}`],
+  ];
+  const body = `
+    <h2 style="font-family:Georgia,'Times New Roman',serif;font-size:22px;color:${COLORS.green950};margin:0 0 16px 0;font-weight:normal;">
+      ${formatGreeting(s.greeting, opts.participantFirstName, opts.locale)}
+    </h2>
+    <p style="margin:0 0 20px 0;">${s.removedBody(opts.bookerName, opts.proName)}</p>
+    ${detailsTable(rows)}
+  `;
+  return emailLayout(body, undefined, opts.locale);
+}
+
+export function getParticipantBookingRemovedSubject(
+  proName: string,
+  bookerName: string,
+  locale: Locale,
+): string {
+  return (PARTICIPANT_BOOKING_STRINGS[locale] ?? PARTICIPANT_BOOKING_STRINGS.en).removedSubject(
     proName,
     bookerName,
   );

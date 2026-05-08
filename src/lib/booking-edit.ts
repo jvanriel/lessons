@@ -16,9 +16,12 @@ import {
   getBookingUpdatedSubject,
   buildParticipantBookingUpdatedEmail,
   getParticipantBookingUpdatedSubject,
+  buildParticipantBookingRemovedEmail,
+  getParticipantBookingRemovedSubject,
   type EmailPaymentChange,
   type PreviousBookingValues,
 } from "@/lib/email-templates";
+import { buildCancelIcs } from "@/lib/lesson-slots";
 import { resolveLocale } from "@/lib/i18n";
 import { formatLocationFull } from "@/lib/location-display";
 import {
@@ -26,6 +29,7 @@ import {
   validateExtraParticipants,
   getEmailableParticipants,
   type ExtraParticipant,
+  type EmailableParticipant,
 } from "@/lib/booking-participants";
 import * as Sentry from "@sentry/nextjs";
 
@@ -326,6 +330,15 @@ export async function sendBookingUpdatedNotifications(
    * invite.
    */
   previous?: PreviousBookingValues,
+  /**
+   * The participant list as it stood BEFORE applyBookingEdit deleted
+   * + reinserted the rows. Used to detect participants who were
+   * dropped from the booking — they need a "you were removed" email
+   * + ICS CANCEL, since they no longer appear in the post-edit
+   * fanout. Caller obtains this with `getEmailableParticipants` right
+   * before applying the edit.
+   */
+  previousParticipants?: EmailableParticipant[],
 ): Promise<void> {
   try {
     const data = await loadBookingForUpdate(bookingId);
@@ -467,6 +480,77 @@ export async function sendBookingUpdatedNotifications(
           extra: { bookingId, recipient: "participant", email: p.email },
         });
       });
+    }
+
+    // Removed participants — anyone who was on the booking pre-edit
+    // but isn't anymore. They wouldn't otherwise hear about it (the
+    // post-edit fanout queries the live lessonParticipants table).
+    // Send a "removed" email + ICS CANCEL using the PREVIOUS slot so
+    // the calendar app drops the right event from their calendar.
+    if (previousParticipants && previousParticipants.length > 0 && previous) {
+      const stillIn = new Set(
+        emailableParticipants.map((p) => p.email.toLowerCase()),
+      );
+      const removed = previousParticipants.filter(
+        (p) => !stillIn.has(p.email.toLowerCase()),
+      );
+      for (const p of removed) {
+        const participantLocale = resolveLocale(
+          p.preferredLocale ?? data.bookerLocale,
+        );
+        const cancelIcs = buildCancelIcs({
+          date: previous.date,
+          startTime: previous.startTime,
+          endTime: previous.endTime,
+          summary: `Golf lesson with ${data.proDisplayName}`,
+          location: locationLabel,
+          description: `Removed from lesson — booked via golflessons.be — ${bookerName}`,
+          bookingId,
+          tz: data.locationTimezone,
+          sequence: data.editCount,
+          attendees: [
+            {
+              name: `${p.firstName} ${p.lastName}`.trim() || p.email,
+              email: p.email,
+            },
+          ],
+        });
+        sendEmail({
+          to: p.email,
+          subject: getParticipantBookingRemovedSubject(
+            data.proDisplayName,
+            bookerName,
+            participantLocale,
+          ),
+          html: buildParticipantBookingRemovedEmail({
+            participantFirstName: p.firstName,
+            bookerName,
+            proName: data.proDisplayName,
+            locationName: locationLabel,
+            date: previous.date,
+            startTime: previous.startTime,
+            endTime: previous.endTime,
+            locale: participantLocale,
+          }),
+          attachments: [
+            {
+              filename: "lesson-cancel.ics",
+              contentType: "text/calendar",
+              content: cancelIcs,
+              method: "CANCEL",
+            },
+          ],
+        }).catch((err) => {
+          Sentry.captureException(err, {
+            tags: { area: "booking-updated-notify" },
+            extra: {
+              bookingId,
+              recipient: "participant-removed",
+              email: p.email,
+            },
+          });
+        });
+      }
     }
   } catch (err) {
     Sentry.captureException(err, {

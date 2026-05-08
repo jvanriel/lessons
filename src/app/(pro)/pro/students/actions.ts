@@ -18,7 +18,10 @@ import { eq, ne, and, asc, desc, gte, lte } from "drizzle-orm";
 import { requireProProfile } from "@/lib/pro";
 import { hashPassword } from "@/lib/auth";
 import { sendEmail } from "@/lib/mail";
-import { sendParticipantCancellationNotifications } from "@/lib/booking-participants";
+import {
+  sendParticipantCancellationNotifications,
+  getEmailableParticipants,
+} from "@/lib/booking-participants";
 import {
   parseEditBookingChanges,
   validateEditAllowed,
@@ -1574,6 +1577,7 @@ export async function proUpdateBooking(formData: FormData) {
   const [booking] = await db
     .select({
       id: lessonBookings.id,
+      bookedById: lessonBookings.bookedById,
       proProfileId: lessonBookings.proProfileId,
       proLocationId: lessonBookings.proLocationId,
       date: lessonBookings.date,
@@ -1689,6 +1693,19 @@ export async function proUpdateBooking(formData: FormData) {
         Number(booking.startTime.split(":")[1])),
     participantCount: booking.participantCount,
   };
+  // Booker email — needed by getEmailableParticipants to exclude the
+  // booker from the participant fanout. Pro session is the pro, not
+  // the booker, so look it up from the booking row.
+  const [bookerUser] = await db
+    .select({ email: users.email })
+    .from(users)
+    .where(eq(users.id, booking.bookedById))
+    .limit(1);
+  const bookerEmail = bookerUser?.email ?? "";
+  const previousParticipants = await getEmailableParticipants(
+    booking.id,
+    bookerEmail,
+  );
 
   try {
     await applyBookingEdit(booking.id, changes, bookerParticipant.id);
@@ -1738,7 +1755,12 @@ export async function proUpdateBooking(formData: FormData) {
   }
 
   after(async () => {
-    await sendBookingUpdatedNotifications(booking.id, paymentChange, previous);
+    await sendBookingUpdatedNotifications(
+      booking.id,
+      paymentChange,
+      previous,
+      previousParticipants,
+    );
   });
 
   revalidatePath("/pro/bookings");

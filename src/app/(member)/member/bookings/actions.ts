@@ -16,7 +16,10 @@ import { checkCancellationAllowed, buildCancelIcs } from "@/lib/lesson-slots";
 import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import { sendEmail } from "@/lib/mail";
-import { sendParticipantCancellationNotifications } from "@/lib/booking-participants";
+import {
+  sendParticipantCancellationNotifications,
+  getEmailableParticipants,
+} from "@/lib/booking-participants";
 import {
   parseEditBookingChanges,
   validateEditAllowed,
@@ -496,6 +499,15 @@ export async function updateBooking(formData: FormData) {
         Number(booking.startTime.split(":")[1])),
     participantCount: booking.participantCount,
   };
+  // Capture the participant list BEFORE applyBookingEdit deletes +
+  // reinserts. Anyone removed from the booking won't appear in the
+  // post-edit fanout but still needs a "you were removed" email +
+  // ICS CANCEL — `sendBookingUpdatedNotifications` diffs this against
+  // the live list and emails the dropouts.
+  const previousParticipants = await getEmailableParticipants(
+    booking.id,
+    session.email,
+  );
 
   try {
     await applyBookingEdit(booking.id, changes, bookerParticipant.id);
@@ -553,7 +565,12 @@ export async function updateBooking(formData: FormData) {
   // Notification fanout runs post-response so the UI returns
   // immediately. Vercel keeps the function alive via `after()`.
   after(async () => {
-    await sendBookingUpdatedNotifications(booking.id, paymentChange, previous);
+    await sendBookingUpdatedNotifications(
+      booking.id,
+      paymentChange,
+      previous,
+      previousParticipants,
+    );
   });
 
   revalidatePath("/member/bookings");
