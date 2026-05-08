@@ -15,6 +15,7 @@ import { todayInTZ } from "@/lib/local-date";
 import { t } from "@/lib/i18n/translations";
 import { redirect } from "next/navigation";
 import Link from "next/link";
+import { wazeUrl, googleMapsUrl } from "@/lib/location-display";
 import { QRLoginButton } from "./QRLoginDialog";
 import { HelpButton } from "./HelpDialog";
 import { BookingRefreshListener } from "@/components/BookingRefreshListener";
@@ -53,6 +54,9 @@ export default async function MemberDashboard() {
       proName: proProfiles.displayName,
       proId: proProfiles.id,
       locationName: locations.name,
+      locationAddress: locations.address,
+      locationLat: locations.lat,
+      locationLng: locations.lng,
       locationTimezone: locations.timezone,
       cancellationHours: proProfiles.cancellationHours,
     })
@@ -287,6 +291,40 @@ export default async function MemberDashboard() {
                     {t("memberDash.with", locale)} {booking.proName}{" "}
                     {t("memberDash.at", locale)} {booking.locationName}
                   </div>
+                  {(() => {
+                    const loc = {
+                      lat: booking.locationLat,
+                      lng: booking.locationLng,
+                      address: booking.locationAddress,
+                    };
+                    const waze = wazeUrl(loc);
+                    const gmaps = googleMapsUrl(loc);
+                    if (!waze && !gmaps) return null;
+                    return (
+                      <div className="mt-1.5 flex flex-wrap gap-1.5">
+                        {waze && (
+                          <a
+                            href={waze}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="inline-flex items-center gap-1 rounded bg-blue-600 px-2 py-0.5 text-[10px] font-medium text-white hover:bg-blue-700"
+                          >
+                            🚗 Waze
+                          </a>
+                        )}
+                        {gmaps && (
+                          <a
+                            href={gmaps}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="inline-flex items-center gap-1 rounded bg-green-700 px-2 py-0.5 text-[10px] font-medium text-white hover:bg-green-800"
+                          >
+                            📍 Maps
+                          </a>
+                        )}
+                      </div>
+                    );
+                  })()}
                 </div>
                 <CancelBookingButton
                   locale={locale}
