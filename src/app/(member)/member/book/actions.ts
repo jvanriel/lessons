@@ -1601,3 +1601,84 @@ export async function updatePreferredInterval(
   return { success: true };
 }
 
+/**
+ * Pill-driven jump for the booking-edit calendar. Saves the new
+ * preferred interval, then computes where QuickBook would point the
+ * student to under that interval (preferredDayOfWeek + tz anchor),
+ * and returns a slot at preferredTime (or first available) on that
+ * date. The form folds the result into its own selectedSlot state so
+ * the date pills + slot list visibly move — matching the QuickBook
+ * dashboard semantic where the pill is a navigational shortcut.
+ */
+export async function suggestSlotForInterval(
+  proStudentId: number,
+  interval: "weekly" | "biweekly" | "monthly" | null,
+  proProfileId: number,
+  proLocationId: number,
+  duration: number,
+  excludeBookingId?: number,
+): Promise<{
+  suggestedDate: string;
+  suggestedSlot: { startTime: string; endTime: string } | null;
+} | null> {
+  const session = await requireMember();
+
+  await db
+    .update(proStudents)
+    .set({ preferredInterval: interval })
+    .where(
+      and(
+        eq(proStudents.id, proStudentId),
+        eq(proStudents.userId, session.userId),
+      ),
+    );
+
+  const [rel] = await db
+    .select({
+      preferredDayOfWeek: proStudents.preferredDayOfWeek,
+      preferredTime: proStudents.preferredTime,
+    })
+    .from(proStudents)
+    .where(
+      and(
+        eq(proStudents.id, proStudentId),
+        eq(proStudents.userId, session.userId),
+      ),
+    )
+    .limit(1);
+
+  if (!rel || rel.preferredDayOfWeek === null) return null;
+
+  const tz = await getProLocationTimezone(proLocationId);
+  const suggestedDate = computeSuggestedDate(
+    interval,
+    rel.preferredDayOfWeek,
+    null,
+    tz,
+  );
+
+  const slots = await getAvailableSlots(
+    proProfileId,
+    proLocationId,
+    suggestedDate,
+    duration,
+    excludeBookingId,
+  );
+
+  if (slots.length === 0) {
+    return { suggestedDate, suggestedSlot: null };
+  }
+
+  const preferred = rel.preferredTime
+    ? slots.find((s) => s.startTime === rel.preferredTime) ?? slots[0]
+    : slots[0];
+
+  return {
+    suggestedDate,
+    suggestedSlot: {
+      startTime: preferred.startTime,
+      endTime: preferred.endTime,
+    },
+  };
+}
+

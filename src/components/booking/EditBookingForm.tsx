@@ -8,7 +8,7 @@ import type { Locale } from "@/lib/i18n";
 import QuickBookCalendar, {
   type QuickBookSelection,
 } from "@/components/booking/QuickBookCalendar";
-import { updatePreferredInterval } from "@/app/(member)/member/book/actions";
+import { suggestSlotForInterval } from "@/app/(member)/member/book/actions";
 
 interface BookingDetails {
   id: number;
@@ -343,8 +343,21 @@ export default function EditBookingForm({
                   const newVal = interval === iv.value ? null : iv.value;
                   setInterval(newVal);
                   startTransition(async () => {
-                    await updatePreferredInterval(proStudentId, newVal);
-                    router.refresh();
+                    const result = await suggestSlotForInterval(
+                      proStudentId,
+                      newVal,
+                      booking.proProfileId,
+                      booking.proLocationId,
+                      duration,
+                      booking.id,
+                    );
+                    if (result?.suggestedSlot) {
+                      setSelectedSlot({
+                        date: result.suggestedDate,
+                        startTime: result.suggestedSlot.startTime,
+                        endTime: result.suggestedSlot.endTime,
+                      });
+                    }
                   });
                 }}
                 className={`rounded-full px-2 py-0.5 text-[10px] font-medium transition-colors ${

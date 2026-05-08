@@ -101,6 +101,18 @@ export default function QuickBookCalendar({
     pill?.scrollIntoView({ block: "nearest", inline: "center" });
   }, [selectedDate]);
 
+  // Sync local selectedDate when the parent jumps selectedSlot to a
+  // new date (e.g. user clicks a "weekly / biweekly / monthly" pill on
+  // the edit form and the form receives a fresh suggestedDate from
+  // the server). Without this, the date pills + slot list would stay
+  // anchored to the previous date.
+  useEffect(() => {
+    if (selectedSlot && selectedSlot.date !== selectedDate) {
+      setSelectedDate(selectedSlot.date);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedSlot]);
+
   // Refetch the bookable-dates list whenever pro / location /
   // duration changes. After the fetch, prefer to keep the user's
   // current pick if it's still valid, otherwise fall back to
