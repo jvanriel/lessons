@@ -67,6 +67,7 @@ export default async function MemberSettingsPage() {
       <div className="mt-10 rounded-xl border border-green-200 bg-white p-8">
         <GolfProfileSection
           initialHandicap={user.handicap || ""}
+          initialClubMemberNumber={user.clubMemberNumber || ""}
           initialGoals={(user.golfGoals as string[]) || []}
           initialGoalsOther={user.golfGoalsOther || ""}
           locale={locale}

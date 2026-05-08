@@ -66,8 +66,9 @@ export async function POST(request: Request) {
     }
 
     case "golf-profile": {
-      const { handicap, golfGoals, golfGoalsOther } = data as {
+      const { handicap, clubMemberNumber, golfGoals, golfGoalsOther } = data as {
         handicap: string | null;
+        clubMemberNumber?: string | null;
         golfGoals: string[];
         golfGoalsOther: string | null;
       };
@@ -82,6 +83,8 @@ export async function POST(request: Request) {
         }
         parsedHandicap = String(h);
       }
+      const cleanMemberNumber =
+        clubMemberNumber?.trim().slice(0, 64) || null;
       const validGoals = (golfGoals || []).filter((g) =>
         VALID_GOALS.includes(g)
       );
@@ -89,6 +92,7 @@ export async function POST(request: Request) {
         .update(users)
         .set({
           handicap: parsedHandicap,
+          clubMemberNumber: cleanMemberNumber,
           golfGoals: validGoals.length > 0 ? validGoals : null,
           golfGoalsOther: golfGoalsOther?.trim() || null,
         })

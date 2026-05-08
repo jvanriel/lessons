@@ -28,6 +28,7 @@ export const users = pgTable("users", {
   stripeCustomerId: varchar("stripe_customer_id", { length: 255 }),
   // Golf profile (students)
   handicap: numeric("handicap"),
+  clubMemberNumber: varchar("club_member_number", { length: 64 }),
   golfGoals: jsonb("golf_goals").$type<string[]>(),
   golfGoalsOther: varchar("golf_goals_other", { length: 500 }),
   onboardingCompletedAt: timestamp("onboarding_completed_at"),

@@ -54,6 +54,7 @@ interface ProfileData {
   phone: string;
   preferredLocale: string;
   handicap: string;
+  clubMemberNumber: string;
   golfGoals: string[];
   golfGoalsOther: string;
 }
@@ -518,6 +519,21 @@ function GolfProfileStep({
       </div>
       <div>
         <label className="block text-sm font-medium text-green-800">
+          {t("onboarding.clubMemberNumber", locale)}{" "}
+          <span className="font-normal text-green-500">({t("onboarding.handicapOptional", locale)})</span>
+        </label>
+        <input
+          type="text"
+          value={data.clubMemberNumber}
+          onChange={(e) => onChange({ clubMemberNumber: e.target.value })}
+          placeholder={t("onboarding.clubMemberNumberPlaceholder", locale)}
+          maxLength={64}
+          className={inputClass + " max-w-[260px]"}
+        />
+        <p className="mt-1 text-xs text-green-500">{t("onboarding.clubMemberNumberHint", locale)}</p>
+      </div>
+      <div>
+        <label className="block text-sm font-medium text-green-800">
           {t("onboarding.goals", locale)}
         </label>
         <div className="mt-2 flex flex-wrap gap-2">
@@ -773,6 +789,7 @@ export default function StudentOnboardingWizard({
       phone: "",
       preferredLocale: locale,
       handicap: "",
+      clubMemberNumber: "",
       golfGoals: [],
       golfGoalsOther: "",
     }
@@ -928,7 +945,7 @@ export default function StudentOnboardingWizard({
     let result;
     switch (step) {
       case 2:
-        result = await saveStep("golf-profile", { handicap: data.handicap || null, golfGoals: data.golfGoals, golfGoalsOther: data.golfGoalsOther || null });
+        result = await saveStep("golf-profile", { handicap: data.handicap || null, clubMemberNumber: data.clubMemberNumber.trim() || null, golfGoals: data.golfGoals, golfGoalsOther: data.golfGoalsOther || null });
         if (!result) break;
         // Skip step 3 (Choose Pros) entirely when the student arrived
         // from a booking with a pre-selected pro — the pro_students row

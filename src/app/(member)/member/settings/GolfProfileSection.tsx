@@ -19,17 +19,22 @@ const inputClass =
 
 export function GolfProfileSection({
   initialHandicap,
+  initialClubMemberNumber,
   initialGoals,
   initialGoalsOther,
   locale,
 }: {
   initialHandicap: string;
+  initialClubMemberNumber: string;
   initialGoals: string[];
   initialGoalsOther: string;
   locale: Locale;
 }) {
   const [isPending, startTransition] = useTransition();
   const [handicap, setHandicap] = useState(initialHandicap);
+  const [clubMemberNumber, setClubMemberNumber] = useState(
+    initialClubMemberNumber,
+  );
   const [goals, setGoals] = useState<string[]>(initialGoals);
   const [goalsOther, setGoalsOther] = useState(initialGoalsOther);
   const [message, setMessage] = useState<{
@@ -57,6 +62,7 @@ export function GolfProfileSection({
     startTransition(async () => {
       const result = await updateGolfProfile({
         handicap: handicap || null,
+        clubMemberNumber: clubMemberNumber.trim() || null,
         golfGoals: goals,
         golfGoalsOther: goalsOther || null,
       });
@@ -92,6 +98,26 @@ export function GolfProfileSection({
             step="0.1"
             className={inputClass + " max-w-[200px]"}
           />
+        </div>
+
+        <div>
+          <label className="block text-sm font-medium text-green-800">
+            {t("onboarding.clubMemberNumber", locale)}{" "}
+            <span className="font-normal text-green-500">
+              ({t("onboarding.handicapOptional", locale)})
+            </span>
+          </label>
+          <input
+            type="text"
+            value={clubMemberNumber}
+            onChange={(e) => setClubMemberNumber(e.target.value)}
+            placeholder={t("onboarding.clubMemberNumberPlaceholder", locale)}
+            maxLength={64}
+            className={inputClass + " max-w-[260px]"}
+          />
+          <p className="mt-1 text-xs text-green-500">
+            {t("onboarding.clubMemberNumberHint", locale)}
+          </p>
         </div>
 
         <div>
