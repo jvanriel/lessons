@@ -1,7 +1,6 @@
 "use client";
 
 import { useState, useMemo, useTransition } from "react";
-import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
@@ -17,6 +16,7 @@ import { t } from "@/lib/i18n/translations";
 import { getPaymentBadge } from "@/lib/payment-status";
 import { proCancelBooking } from "../students/actions";
 import { CancelBookingDialog } from "../_components/CancelBookingDialog";
+import BookingCard from "./BookingCard";
 
 // ─── Types ──────────────────────────────────────────
 
@@ -431,137 +431,23 @@ export function BookingsCalendar({
         </div>
       </div>
 
-      {/* Expanded booking details */}
+      {/* Expanded booking details — same shared BookingCard the
+          /pro/bookings list uses, with showDate enabled (the
+          calendar block doesn't carry a visible date label) and an
+          onClose handler to collapse the panel. */}
       {expandedBookingId !== null && (() => {
         const booking = bookings.find((b) => b.id === expandedBookingId);
         if (!booking) return null;
-
         return (
-          <div className="mt-4 rounded-xl border border-green-200 bg-white p-5 shadow-sm">
-            <div className="flex items-start justify-between">
-              <div>
-                <h3 className="font-display text-lg font-medium text-green-900">
-                  {booking.studentFirstName} {booking.studentLastName}
-                  {(() => {
-                    const pb = getPaymentBadge(booking.paymentStatus);
-                    if (!pb) return null;
-                    const label = t(pb.labelKey, locale);
-                    return (
-                      <span
-                        className={`ml-2 inline-flex items-center rounded-full ${pb.bg} px-2 py-0.5 align-middle text-[10px] font-medium ${pb.fg}`}
-                      >
-                        {label}
-                      </span>
-                    );
-                  })()}
-                  {!booking.studentEmailVerified && (
-                    <span className="ml-2 inline-flex items-center rounded-full bg-amber-100 px-2 py-0.5 align-middle text-[10px] font-medium text-amber-700">
-                      {t("proBookingsView.emailUnverified", locale)}
-                    </span>
-                  )}
-                </h3>
-                <p className="mt-0.5 text-sm text-green-600">
-                  {formatDateLocale(booking.date, locale)}
-                </p>
-              </div>
-              <button
-                onClick={() => setExpandedBookingId(null)}
-                className="rounded-md p-1 text-green-400 hover:bg-green-50 hover:text-green-600"
-              >
-                <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
-                </svg>
-              </button>
-            </div>
-
-            <div className="mt-3 grid gap-2 text-sm sm:grid-cols-2">
-              <div>
-                <span className="text-green-500">{t("proBookingsCal.time", locale)}</span>{" "}
-                <span className="font-medium text-green-900">
-                  {booking.startTime} - {booking.endTime}
-                </span>
-              </div>
-              <div>
-                <span className="text-green-500">{t("proBookingsCal.location", locale)}</span>{" "}
-                <span className="font-medium text-green-900">
-                  {booking.locationName}
-                  {booking.locationCity && `, ${booking.locationCity}`}
-                </span>
-              </div>
-              <div>
-                <span className="text-green-500">{t("proBookingsCal.email", locale)}</span>{" "}
-                <a
-                  href={`mailto:${booking.studentEmail}`}
-                  className="font-medium text-green-900 underline-offset-2 hover:underline"
-                >
-                  {booking.studentEmail}
-                </a>
-              </div>
-              {booking.studentPhone && (
-                <div>
-                  <span className="text-green-500">{t("proBookingsCal.phone", locale)}</span>{" "}
-                  <a
-                    href={`tel:${booking.studentPhone.replace(/\s+/g, "")}`}
-                    className="font-medium text-green-900 underline-offset-2 hover:underline"
-                  >
-                    {booking.studentPhone}
-                  </a>
-                </div>
-              )}
-              {booking.participantCount > 1 && (
-                <div>
-                  <span className="text-green-500">{t("proBookingsCal.participants", locale)}</span>{" "}
-                  <span className="font-medium text-green-900">
-                    {booking.participantCount}
-                  </span>
-                </div>
-              )}
-              <div>
-                <span className="text-green-500">{t("proBookingsCal.status", locale)}</span>{" "}
-                <span
-                  className={cn(
-                    "rounded-md px-2 py-0.5 text-xs font-medium",
-                    booking.status === "confirmed"
-                      ? "bg-green-100 text-green-700"
-                      : booking.status === "cancelled"
-                        ? "bg-red-100 text-red-600"
-                        : "bg-amber-100 text-amber-700"
-                  )}
-                >
-                  {(() => {
-                    const key = `proBookingsCal.bookingStatus.${booking.status}`;
-                    const label = t(key, locale);
-                    return label === key ? booking.status : label;
-                  })()}
-                </span>
-              </div>
-            </div>
-
-            {booking.notes && (
-              <div className="mt-3 rounded-lg bg-green-50 px-3 py-2 text-sm text-green-700 italic">
-                {booking.notes}
-              </div>
-            )}
-
-            {booking.status === "confirmed" && (
-              <div className="mt-4 flex items-center gap-3 border-t border-green-100 pt-3">
-                <Link
-                  href={`/pro/bookings/${booking.id}/edit`}
-                  className="text-xs font-medium text-green-700 hover:text-green-800"
-                >
-                  {t("editBooking.editLink", locale)}
-                </Link>
-                <span className="text-xs text-green-300">·</span>
-                <button
-                  type="button"
-                  onClick={() => setCancelTargetId(booking.id)}
-                  disabled={cancelPending}
-                  className="text-xs font-medium text-red-500 hover:text-red-600 disabled:opacity-50"
-                >
-                  {t("proStudentBookings.cancel", locale)}
-                </button>
-              </div>
-            )}
+          <div className="mt-4">
+            <BookingCard
+              booking={booking}
+              locale={locale}
+              cancelPending={cancelPending}
+              onCancel={() => setCancelTargetId(booking.id)}
+              showDate
+              onClose={() => setExpandedBookingId(null)}
+            />
           </div>
         );
       })()}
