@@ -2266,10 +2266,23 @@ function PreviewBlockingGrid({
                 // name on top of the overlay so the pro can scan the
                 // grid and see which lesson sits at which slot. Only
                 // the first row gets the label so it isn't repeated
-                // on every 30-min cell of a longer booking.
+                // on every 30-min cell of a longer booking. The label
+                // span extends downward to cover the full booking
+                // height (rowSpan * CELL_H) and flex-centres its text
+                // vertically — same visual centring the bookings
+                // calendar uses.
                 const isBookingFirstRow =
                   !!booking &&
                   (row === 0 || bookingMap[dayIdx][row - 1]?.id !== booking.id);
+                let bookingRowSpan = 0;
+                if (isBookingFirstRow && booking) {
+                  bookingRowSpan = 1;
+                  let r = row + 1;
+                  while (r < ROWS && bookingMap[dayIdx][r]?.id === booking.id) {
+                    bookingRowSpan++;
+                    r++;
+                  }
+                }
 
                 return (
                   <div
@@ -2316,11 +2329,13 @@ function PreviewBlockingGrid({
                     )}
                     {isBookingFirstRow && booking && (
                       <span
-                        className="pointer-events-none absolute inset-x-0.5 top-0.5 truncate px-1 text-[10px] font-semibold leading-tight text-white"
-                        title={booking.bookerName ?? ""}
+                        className="pointer-events-none absolute inset-x-0.5 top-0 z-10 flex items-center justify-center px-1"
+                        style={{ height: bookingRowSpan * CELL_H }}
                       >
-                        {booking.bookerName ??
-                          t("proAvail.booked", locale)}
+                        <span className="truncate text-[10px] font-semibold leading-tight text-white">
+                          {booking.bookerName ??
+                            t("proAvail.booked", locale)}
+                        </span>
                       </span>
                     )}
                   </div>
