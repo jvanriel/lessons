@@ -432,7 +432,7 @@ export function BookingsCalendar({
         if (!booking) return null;
         return (
           <div
-            className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-black/50 px-4 py-12"
+            className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 px-4"
             onClick={(e) => {
               if (e.target === e.currentTarget) setExpandedBookingId(null);
             }}
