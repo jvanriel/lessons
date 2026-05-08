@@ -1,11 +1,42 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { after } from "next/server";
 import { db } from "@/lib/db";
 import { locations, proLocations, proProfiles } from "@/lib/db/schema";
 import { eq, and } from "drizzle-orm";
 import { getSession, hasRole } from "@/lib/auth";
 import { isValidIanaTimezone } from "@/lib/timezones";
+import { geocodeAddress } from "@/lib/geocode";
+import * as Sentry from "@sentry/nextjs";
+
+/**
+ * Fill in `locations.lat` / `lng` for a single id by querying
+ * Nominatim. Runs after the user's action returns (via `after()`)
+ * so the editor doesn't wait on a network round-trip. Best-effort:
+ * a miss leaves coords NULL and the helpers fall back to address-
+ * based URLs.
+ */
+async function geocodeLocationInBackground(
+  locationId: number,
+  name: string,
+  address: string | null,
+  city: string | null,
+) {
+  try {
+    const coords = await geocodeAddress({ name, address, city });
+    if (!coords) return;
+    await db
+      .update(locations)
+      .set({ lat: coords.lat, lng: coords.lng })
+      .where(eq(locations.id, locationId));
+  } catch (err) {
+    Sentry.captureException(err, {
+      tags: { area: "geocode" },
+      extra: { locationId, name, address, city },
+    });
+  }
+}
 
 async function getProProfileId(): Promise<number | null> {
   const session = await getSession();
@@ -89,6 +120,12 @@ export async function createLocation(
       .values({ name, address, city, country, timezone })
       .returning({ id: locations.id });
     locationId = inserted.id;
+    // New location: kick off a background geocode so the booking
+    // emails / Waze links light up automatically. Even nameless-
+    // address rows can resolve via the address-only path; a
+    // pure-name row resolves via the POI fallback.
+    const newId = locationId;
+    after(() => geocodeLocationInBackground(newId, name, address, city));
   }
 
   // Check if pro already has this location
@@ -189,10 +226,29 @@ export async function updateProLocation(
     .limit(1);
   if (!link) return { error: "Location not found." };
 
+  // Capture the pre-update address/city so we can decide whether
+  // to re-geocode after the write. A bare name/notes/timezone edit
+  // shouldn't burn a Nominatim hit.
+  const [prev] = await db
+    .select({ address: locations.address, city: locations.city })
+    .from(locations)
+    .where(eq(locations.id, link.locationId))
+    .limit(1);
+
   await db
     .update(locations)
     .set({ name, address, city, country, timezone })
     .where(eq(locations.id, link.locationId));
+
+  const addressChanged =
+    prev?.address !== address || prev?.city !== city;
+  if (addressChanged) {
+    const id = link.locationId;
+    const n = name;
+    const a = address;
+    const c = city;
+    after(() => geocodeLocationInBackground(id, n, a, c));
+  }
   await db
     .update(proLocations)
     .set({
