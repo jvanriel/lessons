@@ -973,7 +973,7 @@ const PARTICIPANT_BOOKING_STRINGS: Record<Locale, {
     removedSubject: (pro, booker) =>
       `Removed: golf lesson with ${pro} (booked by ${booker})`,
     removedBody: (booker, pro) =>
-      `${booker} removed you from the golf lesson with ${pro}. The lesson is still going ahead with the other participants — you're no longer part of it. The calendar invite has been removed.`,
+      `${booker} removed you from the golf lesson with ${pro}. The calendar invite has been removed.`,
   },
   nl: {
     subject: (pro, booker) => `Je doet mee aan een golfles bij ${pro} (geboekt door ${booker})`,
@@ -996,7 +996,7 @@ const PARTICIPANT_BOOKING_STRINGS: Record<Locale, {
     removedSubject: (pro, booker) =>
       `Verwijderd: golfles bij ${pro} (geboekt door ${booker})`,
     removedBody: (booker, pro) =>
-      `${booker} heeft jou verwijderd uit de golfles bij ${pro}. De les gaat nog steeds door met de overige deelnemers — jij doet niet langer mee. De kalenderafspraak is verwijderd.`,
+      `${booker} heeft jou verwijderd uit de golfles bij ${pro}. De kalenderafspraak is verwijderd.`,
   },
   fr: {
     subject: (pro, booker) => `Vous participez à un cours de golf avec ${pro} (réservé par ${booker})`,
@@ -1019,7 +1019,7 @@ const PARTICIPANT_BOOKING_STRINGS: Record<Locale, {
     removedSubject: (pro, booker) =>
       `Retiré : cours de golf avec ${pro} (réservé par ${booker})`,
     removedBody: (booker, pro) =>
-      `${booker} vous a retiré du cours de golf avec ${pro}. Le cours a toujours lieu avec les autres participants — vous n'y participez plus. L'invitation au calendrier a été supprimée.`,
+      `${booker} vous a retiré du cours de golf avec ${pro}. L'invitation au calendrier a été supprimée.`,
   },
 };
 
