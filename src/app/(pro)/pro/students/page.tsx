@@ -13,7 +13,7 @@ import GuestList from "./GuestList";
 import { getLocale } from "@/lib/locale";
 import { todayInTZ } from "@/lib/local-date";
 
-export const metadata = { title: "Students — Golf Lessons" };
+export const metadata = { title: "Golfers — Golf Lessons" };
 
 export default async function ProStudentsPage() {
   const { profile } = await requireProProfile();
