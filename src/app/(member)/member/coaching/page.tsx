@@ -6,6 +6,7 @@ import { eq, and } from "drizzle-orm";
 import { getSession, hasRole } from "@/lib/auth";
 import { getLocale } from "@/lib/locale";
 import { t } from "@/lib/i18n/translations";
+import { getCoachingUnreadCountsForStudent } from "@/lib/coaching-unread";
 
 export const metadata = { title: "Coaching — Golf Lessons" };
 
@@ -17,21 +18,24 @@ export default async function MemberCoachingListPage() {
 
   const locale = await getLocale();
 
-  const myPros = await db
-    .select({
-      proStudentId: proStudents.id,
-      proDisplayName: proProfiles.displayName,
-      proPhotoUrl: proProfiles.photoUrl,
-      proSpecialties: proProfiles.specialties,
-    })
-    .from(proStudents)
-    .innerJoin(proProfiles, eq(proStudents.proProfileId, proProfiles.id))
-    .where(
-      and(
-        eq(proStudents.userId, session.userId),
-        eq(proStudents.status, "active")
-      )
-    );
+  const [myPros, unread] = await Promise.all([
+    db
+      .select({
+        proStudentId: proStudents.id,
+        proDisplayName: proProfiles.displayName,
+        proPhotoUrl: proProfiles.photoUrl,
+        proSpecialties: proProfiles.specialties,
+      })
+      .from(proStudents)
+      .innerJoin(proProfiles, eq(proStudents.proProfileId, proProfiles.id))
+      .where(
+        and(
+          eq(proStudents.userId, session.userId),
+          eq(proStudents.status, "active")
+        )
+      ),
+    getCoachingUnreadCountsForStudent(session.userId),
+  ]);
 
   return (
     <div className="mx-auto max-w-2xl px-4 py-6">
@@ -56,7 +60,9 @@ export default async function MemberCoachingListPage() {
         </div>
       ) : (
         <ul className="mt-6 space-y-3">
-          {myPros.map((pro) => (
+          {myPros.map((pro) => {
+            const unreadCount = unread.byProStudentId.get(pro.proStudentId) ?? 0;
+            return (
             <li key={pro.proStudentId}>
               <Link
                 href={`/member/coaching/${pro.proStudentId}`}
@@ -75,7 +81,7 @@ export default async function MemberCoachingListPage() {
                   </div>
                 )}
                 <div className="flex-1">
-                  <p className="text-sm font-medium text-green-900">
+                  <p className={`text-sm ${unreadCount > 0 ? "font-bold" : "font-medium"} text-green-900`}>
                     {pro.proDisplayName}
                   </p>
                   {pro.proSpecialties && (
@@ -84,6 +90,11 @@ export default async function MemberCoachingListPage() {
                     </p>
                   )}
                 </div>
+                {unreadCount > 0 && (
+                  <span className="inline-flex min-w-[24px] items-center justify-center rounded-full bg-red-500 px-2 py-0.5 text-xs font-semibold text-white">
+                    {unreadCount > 99 ? "99+" : unreadCount}
+                  </span>
+                )}
                 <svg
                   className="h-5 w-5 text-green-400"
                   fill="none"
@@ -99,7 +110,8 @@ export default async function MemberCoachingListPage() {
                 </svg>
               </Link>
             </li>
-          ))}
+            );
+          })}
         </ul>
       )}
     </div>

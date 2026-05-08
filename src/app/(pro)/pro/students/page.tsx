@@ -12,16 +12,27 @@ import StudentManager from "./StudentManager";
 import GuestList from "./GuestList";
 import { getLocale } from "@/lib/locale";
 import { todayInTZ } from "@/lib/local-date";
+import { getSession } from "@/lib/auth";
+import { getCoachingUnreadCountsForPro } from "@/lib/coaching-unread";
 
 export const metadata = { title: "Golfers — Golf Lessons" };
 
 export default async function ProStudentsPage() {
   const { profile } = await requireProProfile();
-  const [students, guests] = await Promise.all([
+  const session = await getSession();
+  const [students, guests, unread] = await Promise.all([
     getMyStudents(),
     getMyGuests(),
+    session
+      ? getCoachingUnreadCountsForPro(session.userId)
+      : Promise.resolve({ byProStudentId: new Map(), total: 0 }),
   ]);
   const locale = await getLocale();
+  // Convert the Map to a plain object for the client component prop.
+  const unreadByStudentId: Record<number, number> = {};
+  for (const [k, v] of unread.byProStudentId.entries()) {
+    unreadByStudentId[k] = v;
+  }
 
   // Find the current/next student (lesson happening now or next upcoming)
   let currentStudentId: number | null = null;
@@ -86,6 +97,7 @@ export default async function ProStudentsPage() {
         currentStudentId={currentStudentId}
         currentBooking={currentBooking}
         currentQuickBook={currentQuickBook}
+        unreadByStudentId={unreadByStudentId}
         locale={locale}
       />
       <div className="mx-auto max-w-5xl px-6 pb-12">

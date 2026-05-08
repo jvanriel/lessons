@@ -346,6 +346,13 @@ const sections: NavSection[] = [
 ];
 
 
+// Items whose row should display the coaching-unread badge. Both
+// the pro entry ("/pro/students") and the golfer entry
+// ("/member/coaching") count — for users with both roles, the
+// /api/coaching/unread response merges the two and we get a single
+// total.
+const COACHING_BADGE_LABEL_KEYS = new Set(["appNav.students", "appNav.chat"]);
+
 export default function AppSidebar({
   roles,
   collapsed,
@@ -353,6 +360,45 @@ export default function AppSidebar({
   locale,
 }: AppSidebarProps) {
   const pathname = usePathname();
+
+  // Coaching-chat unread badge (task 122). Skipped entirely when
+  // the viewer has neither a member nor a pro role — there's
+  // nothing to badge for admin/dev-only users.
+  const showCoachingBadge =
+    roles.includes("member") || roles.includes("pro");
+  const [coachingUnread, setCoachingUnread] = useState(0);
+
+  useEffect(() => {
+    if (!showCoachingBadge) return;
+    let cancelled = false;
+    async function fetchCount() {
+      try {
+        const res = await fetch("/api/coaching/unread");
+        if (!res.ok) return;
+        const data = (await res.json()) as { total?: number };
+        if (!cancelled) setCoachingUnread(data.total ?? 0);
+      } catch {
+        // Stay on whatever we last had — transient network
+        // failures shouldn't drop the badge to 0.
+      }
+    }
+    void fetchCount();
+    // 30s matches the cadence of the global notifications poller
+    // already used by AppTopBar.
+    const id = setInterval(fetchCount, 30_000);
+    // Recheck when the tab gains focus — common case is the user
+    // alt-tabs after reading a message in the other tab.
+    function onFocus() {
+      void fetchCount();
+    }
+    window.addEventListener("focus", onFocus);
+    return () => {
+      cancelled = true;
+      clearInterval(id);
+      window.removeEventListener("focus", onFocus);
+    };
+  }, [showCoachingBadge]);
+
   const visibleSections = sections.filter((s) => {
     // `role` is optional: a section without one (e.g. utility entries
     // like About) is visible to every authenticated user.
@@ -451,6 +497,10 @@ export default function AppSidebar({
                       pathname === resolvedHref ||
                       pathname.startsWith(resolvedHref + "/");
                     const itemLabel = item.labelKey ? t(item.labelKey, locale) : item.label;
+                    const showBadge =
+                      coachingUnread > 0 &&
+                      item.labelKey !== undefined &&
+                      COACHING_BADGE_LABEL_KEYS.has(item.labelKey);
                     return (
                       <li key={item.href}>
                         <Link
@@ -462,12 +512,26 @@ export default function AppSidebar({
                               : "text-green-100/60 hover:bg-green-800 hover:text-green-100"
                           }`}
                         >
-                          {item.icon}
+                          <span className="relative">
+                            {item.icon}
+                            {/* Tiny red dot when collapsed —
+                                still flags new messages without
+                                stealing icon-row real estate. */}
+                            {showBadge && collapsed && (
+                              <span className="absolute -right-0.5 -top-0.5 h-2 w-2 rounded-full bg-red-500 ring-1 ring-green-950" />
+                            )}
+                          </span>
                           {!collapsed && <span>{itemLabel}</span>}
+                          {!collapsed && showBadge && (
+                            <span className="ml-auto inline-flex min-w-[20px] items-center justify-center rounded-full bg-red-500 px-1.5 text-[10px] font-semibold text-white">
+                              {coachingUnread > 99 ? "99+" : coachingUnread}
+                            </span>
+                          )}
                           {/* Tooltip when collapsed */}
                           {collapsed && (
                             <span className="pointer-events-none absolute left-full ml-2 whitespace-nowrap rounded-md bg-green-800 px-2 py-1 text-xs text-green-100 opacity-0 shadow-lg transition-opacity group-hover:opacity-100">
                               {itemLabel}
+                              {showBadge && ` (${coachingUnread})`}
                             </span>
                           )}
                         </Link>

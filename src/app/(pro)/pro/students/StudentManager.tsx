@@ -62,12 +62,20 @@ export default function StudentManager({
   currentStudentId,
   currentBooking,
   currentQuickBook,
+  unreadByStudentId,
   locale,
 }: {
   students: Student[];
   currentStudentId: number | null;
   currentBooking: { date: string; startTime: string; endTime: string } | null;
   currentQuickBook: ProQuickBookData | null;
+  /**
+   * Coaching-chat unread count keyed by `proStudents.id`. Rendered
+   * as a red badge next to the golfer's name on the list (task 122).
+   * Server-rendered to avoid a client round-trip; the AppSidebar
+   * separately polls for total live updates.
+   */
+  unreadByStudentId?: Record<number, number>;
   locale: Locale;
 }) {
   const router = useRouter();
@@ -487,8 +495,15 @@ export default function StudentManager({
                       {student.lastName.charAt(0)}
                     </div>
                     <div className="min-w-0 flex-1">
-                      <p className="text-sm font-medium text-green-900">
-                        {student.firstName} {student.lastName}
+                      <p className="flex items-center gap-2 text-sm font-medium text-green-900">
+                        <span className={(unreadByStudentId?.[student.id] ?? 0) > 0 ? "font-bold" : undefined}>
+                          {student.firstName} {student.lastName}
+                        </span>
+                        {(unreadByStudentId?.[student.id] ?? 0) > 0 && (
+                          <span className="inline-flex min-w-[20px] items-center justify-center rounded-full bg-red-500 px-1.5 py-0.5 text-[10px] font-semibold text-white">
+                            {unreadByStudentId![student.id]! > 99 ? "99+" : unreadByStudentId![student.id]}
+                          </span>
+                        )}
                       </p>
                       <div className="mt-0.5 flex flex-wrap items-center gap-x-3 text-xs">
                         <a

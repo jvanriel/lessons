@@ -124,9 +124,44 @@ const proMoreItems: TabItem[] = [
   },
 ];
 
+// Items whose tab should display the coaching-unread badge.
+const COACHING_BADGE_LABEL_KEYS = new Set(["appNav.students", "appNav.chat"]);
+
 export default function BottomNav({ roles, locale }: BottomNavProps) {
   const pathname = usePathname();
   const [moreOpen, setMoreOpen] = useState(false);
+
+  // Coaching-chat unread badge (task 122). Mirror of AppSidebar's
+  // logic: fetch on mount, poll every 30s, refresh on focus.
+  const showCoachingBadge =
+    roles.includes("member") || roles.includes("pro");
+  const [coachingUnread, setCoachingUnread] = useState(0);
+
+  useEffect(() => {
+    if (!showCoachingBadge) return;
+    let cancelled = false;
+    async function fetchCount() {
+      try {
+        const res = await fetch("/api/coaching/unread");
+        if (!res.ok) return;
+        const data = (await res.json()) as { total?: number };
+        if (!cancelled) setCoachingUnread(data.total ?? 0);
+      } catch {
+        // Keep last value on transient failure.
+      }
+    }
+    void fetchCount();
+    const id = setInterval(fetchCount, 30_000);
+    function onFocus() {
+      void fetchCount();
+    }
+    window.addEventListener("focus", onFocus);
+    return () => {
+      cancelled = true;
+      clearInterval(id);
+      window.removeEventListener("focus", onFocus);
+    };
+  }, [showCoachingBadge]);
 
   const isPro = roles.includes("pro");
   const isAdmin = roles.includes("admin");
@@ -174,6 +209,9 @@ export default function BottomNav({ roles, locale }: BottomNavProps) {
         {tabs.map((tab) => {
           const active =
             pathname === tab.href || pathname.startsWith(tab.href + "/");
+          const showBadge =
+            coachingUnread > 0 &&
+            COACHING_BADGE_LABEL_KEYS.has(tab.labelKey);
           return (
             <Link
               key={tab.href}
@@ -182,19 +220,26 @@ export default function BottomNav({ roles, locale }: BottomNavProps) {
                 active ? "text-gold-600" : "text-green-600/50"
               }`}
             >
-              <svg
-                className="h-5 w-5"
-                fill="none"
-                viewBox="0 0 24 24"
-                stroke="currentColor"
-                strokeWidth={1.5}
-              >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  d={tab.icon}
-                />
-              </svg>
+              <span className="relative">
+                <svg
+                  className="h-5 w-5"
+                  fill="none"
+                  viewBox="0 0 24 24"
+                  stroke="currentColor"
+                  strokeWidth={1.5}
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    d={tab.icon}
+                  />
+                </svg>
+                {showBadge && (
+                  <span className="absolute -right-2 -top-1 inline-flex min-w-[16px] items-center justify-center rounded-full bg-red-500 px-1 text-[9px] font-semibold text-white">
+                    {coachingUnread > 99 ? "99+" : coachingUnread}
+                  </span>
+                )}
+              </span>
               {t(tab.labelKey, locale)}
             </Link>
           );
