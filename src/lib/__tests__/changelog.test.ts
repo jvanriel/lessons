@@ -206,6 +206,16 @@ describe("parseItemRoles", () => {
     });
   });
 
+  it("recognizes [golfer] as an authoring alias and preserves it in roles", () => {
+    // Visibility expansion (golfer → member) happens in
+    // isItemVisibleTo, not at parse time — keep the original tag so
+    // the rendered badge says "golfer" rather than "member".
+    expect(parseItemRoles("[golfer] Booking calendar polish.")).toEqual({
+      text: "Booking calendar polish.",
+      roles: ["golfer"],
+    });
+  });
+
   it("is case-insensitive on the role names", () => {
     expect(parseItemRoles("[PRO,Admin] mixed case")).toEqual({
       text: "mixed case",
@@ -248,12 +258,41 @@ describe("parseItemRoles", () => {
 describe("isItemVisibleTo", () => {
   const ANON: never[] = [];
 
-  it("shows untagged items to anonymous viewers", () => {
-    expect(isItemVisibleTo({ text: "Hi", roles: null }, ANON)).toBe(true);
+  // Task 117: untagged items are internal — only staff (admin/dev)
+  // see them. Anyone else gets the curated subset matching their
+  // audience tag.
+  it("hides untagged items from anonymous viewers", () => {
+    expect(isItemVisibleTo({ text: "Hi", roles: null }, ANON)).toBe(false);
   });
 
-  it("hides tagged items from anonymous viewers", () => {
+  it("hides untagged items from members and pros", () => {
+    expect(isItemVisibleTo({ text: "Hi", roles: null }, ["member"])).toBe(false);
+    expect(isItemVisibleTo({ text: "Hi", roles: null }, ["pro"])).toBe(false);
+  });
+
+  it("shows untagged items to staff (admin / dev)", () => {
+    expect(isItemVisibleTo({ text: "Hi", roles: null }, ["admin"])).toBe(true);
+    expect(isItemVisibleTo({ text: "Hi", roles: null }, ["dev"])).toBe(true);
+  });
+
+  it("shows [golfer] items to anonymous visitors (marketing)", () => {
+    expect(isItemVisibleTo({ text: "Hi", roles: ["golfer"] }, ANON)).toBe(true);
+  });
+
+  it("hides [pro] items from anonymous visitors", () => {
     expect(isItemVisibleTo({ text: "Hi", roles: ["pro"] }, ANON)).toBe(false);
+  });
+
+  it("[golfer] is visible to a member viewer (alias for member)", () => {
+    expect(
+      isItemVisibleTo({ text: "Hi", roles: ["golfer"] }, ["member"]),
+    ).toBe(true);
+  });
+
+  it("[golfer] is hidden from a pro viewer", () => {
+    expect(
+      isItemVisibleTo({ text: "Hi", roles: ["golfer"] }, ["pro"]),
+    ).toBe(false);
   });
 
   it("shows tagged items to a viewer with the matching role", () => {
@@ -278,6 +317,12 @@ describe("isItemVisibleTo", () => {
     expect(
       isItemVisibleTo({ text: "Hi", roles: ["member"] }, ["pro"]),
     ).toBe(false);
+  });
+
+  it("staff (admin) sees pro-tagged items", () => {
+    expect(
+      isItemVisibleTo({ text: "Hi", roles: ["pro"] }, ["admin"]),
+    ).toBe(true);
   });
 });
 

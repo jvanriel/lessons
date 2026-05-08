@@ -71,7 +71,7 @@ than silently hide.
 
 ## 2026-05-06 — v1.1.55
 
-- **Booking calendar shows when the pro's calendar is open through.**
+- [golfer] **Booking calendar shows when the pro's calendar is open through.**
   A small caption now sits below the booking calendar — "Bookings
   open through {date}" — so students don't have to guess why
   forward months stop showing slots. Applies to both the public
@@ -80,7 +80,7 @@ than silently hide.
 
 ## 2026-05-06 — v1.1.54
 
-- **Extending a booking's duration now works.** Previously, trying
+- [golfer] **Extending a booking's duration now works.** Previously, trying
   to extend a 60-minute lesson to 90 minutes at the same start time
   failed with "this slot is not available" — the system was
   treating the existing 60-minute booking as a blocker against its
@@ -140,7 +140,7 @@ than silently hide.
 
 ## 2026-05-06 — v1.1.49
 
-- **Extra-participant emails are now in each participant's own
+- [golfer] **Extra-participant emails are now in each participant's own
   language.** When a Dutch booker added a French friend as an extra
   participant, the friend used to receive the confirmation, update,
   and cancellation emails in Dutch. They now arrive in French if the
@@ -227,7 +227,7 @@ than silently hide.
 
 ## 2026-05-04 — v1.1.39
 
-- **Clearer "extra participant email" hint on the booking form.**
+- [golfer] **Clearer "extra participant email" hint on the booking form.**
   The hint used to say "email is optional but recommended" without
   explaining why. It now leads with the reason — confirmation
   details and a calendar invite are sent by email — so it's obvious
@@ -304,7 +304,7 @@ than silently hide.
 
 ## 2026-05-04 — v1.1.31
 
-- **Clearer "add payment method" message on the dashboard.** When a
+- [golfer] **Clearer "add payment method" message on the dashboard.** When a
   pro requires online payment and you haven't added a payment method
   yet, the Quick Book widget now names that pro explicitly — e.g.
   *"Olivier requires online payment for bookings. Add a payment
@@ -325,7 +325,7 @@ than silently hide.
 
 ## 2026-05-04 — v1.1.29
 
-- **Public booking now shows the correct group price.** When you
+- [golfer] **Public booking now shows the correct group price.** When you
   add an extra participant to a public booking, the summary line
   now includes the extra-participant rate set by the pro instead
   of just the base price. (The booking row itself was already
@@ -333,7 +333,7 @@ than silently hide.
 
 ## 2026-05-04 — v1.1.28
 
-- **Editing a booking now respects the pro's availability.** When you
+- [golfer] **Editing a booking now respects the pro's availability.** When you
   reschedule, you can only pick from time slots the pro has actually
   made available — previously the form let you type any time, which
   meant a student could land a lesson on a slot the pro never
@@ -347,7 +347,7 @@ than silently hide.
 
 ## 2026-05-04 — v1.1.27
 
-- **Generated passwords are no longer emailed by default.** When you
+- [golfer] **Generated passwords are no longer emailed by default.** When you
   use the "Generate password" button during signup, a checkbox now
   appears asking whether to also include the password in the
   confirmation email. It's off by default — putting a password in
@@ -356,7 +356,7 @@ than silently hide.
 
 ## 2026-05-03 — v1.1.26
 
-- **QR login now works on Android, not just iPhone.** Previously the
+- [golfer] **QR login now works on Android, not just iPhone.** Previously the
   QR code on the dashboard encoded a long signed token directly in
   the URL — fine for the iPhone camera, but most Android cameras
   couldn't resolve the dense QR. The QR now encodes a short opaque
@@ -365,7 +365,7 @@ than silently hide.
 
 ## 2026-05-02 — v1.1.25
 
-- **Edit booking: remove a specific participant.** Previously
+- [golfer] **Edit booking: remove a specific participant.** Previously
   lowering the participant count always dropped the *last* person in
   the list — if you wanted to remove someone in the middle you had
   to edit names around. Each additional-participant row now has its
@@ -380,7 +380,7 @@ than silently hide.
 
 ## 2026-05-02 — v1.1.24
 
-- **Edit a booking and the payment is now adjusted automatically.**
+- [golfer] **Edit a booking and the payment is now adjusted automatically.**
   When you change a booking's duration or the number of participants
   in a way that changes the price, the system handles the difference:
   - Online payments: the price increase is charged to your saved
@@ -406,7 +406,7 @@ than silently hide.
 
 ## 2026-05-02 — v1.1.22
 
-- **You can now edit an existing booking.** From the bookings list
+- [golfer] **You can now edit an existing booking.** From the bookings list
   (member side at /member/bookings, pro side via the booking detail
   on /pro/bookings) an "Edit" link opens a form where you can change
   the date, start time, duration, or participant list. The change
@@ -425,7 +425,7 @@ than silently hide.
 
 ## 2026-05-02 — v1.1.21
 
-- **Extra participants on a group lesson now get their own emails +
+- [golfer] **Extra participants on a group lesson now get their own emails +
   calendar invites.** When you book a lesson for more than one
   person (member booking or public booking), the form now asks for
   each additional participant's first name, last name, and (optional)
