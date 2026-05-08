@@ -123,8 +123,13 @@ export default async function AvailabilityPage() {
           status: lessonBookings.status,
           proLocationId: lessonBookings.proLocationId,
           participantCount: lessonBookings.participantCount,
+          notes: lessonBookings.notes,
+          paymentStatus: lessonBookings.paymentStatus,
           firstName: users.firstName,
           lastName: users.lastName,
+          email: users.email,
+          phone: users.phone,
+          emailVerifiedAt: users.emailVerifiedAt,
         })
         .from(lessonBookings)
         .innerJoin(users, eq(lessonBookings.bookedById, users.id))
@@ -187,8 +192,12 @@ export default async function AvailabilityPage() {
     reason: o.reason,
   }));
 
-  // Build location name lookup
-  const locNameMap = new Map(proLocs.map((l) => [l.id, l.city ? `${l.name} (${l.city})` : l.name]));
+  // Build location name + city lookups
+  const locNameMap = new Map(
+    proLocs.map((l) => [l.id, l.city ? `${l.name} (${l.city})` : l.name]),
+  );
+  const locCityMap = new Map(proLocs.map((l) => [l.id, l.city ?? null]));
+  const locBareNameMap = new Map(proLocs.map((l) => [l.id, l.name]));
 
   const serializedBookings: SerializedBooking[] = bookings.map((b) => ({
     id: b.id,
@@ -198,9 +207,20 @@ export default async function AvailabilityPage() {
     endTime: b.endTime,
     status: b.status,
     participantCount: b.participantCount,
-    locationName: locNameMap.get(b.proLocationId) ?? null,
-    bookerName: `${b.firstName} ${b.lastName}`,
+    locationName: locBareNameMap.get(b.proLocationId) ?? null,
+    bookerName: `${b.firstName ?? ""} ${b.lastName ?? ""}`.trim() || null,
+    notes: b.notes ?? null,
+    paymentStatus: b.paymentStatus,
+    studentFirstName: b.firstName ?? null,
+    studentLastName: b.lastName ?? null,
+    studentEmail: b.email,
+    studentPhone: b.phone ?? null,
+    studentEmailVerified: b.emailVerifiedAt ?? null,
+    locationCity: locCityMap.get(b.proLocationId) ?? null,
   }));
+  // locNameMap retained for any future text-only label use; not used
+  // by the new BookingCard surface.
+  void locNameMap;
 
   const settings: SerializedProfileSettings = profileData[0]
     ? {

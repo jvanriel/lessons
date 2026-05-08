@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useCallback, useRef, useMemo, useEffect, type ReactNode } from "react";
+import { useState, useCallback, useRef, useMemo, useEffect, useTransition, type ReactNode } from "react";
 import type {
   SerializedAvailability,
   SerializedOverride,
@@ -15,6 +15,10 @@ import type { Locale } from "@/lib/i18n";
 import { formatDate as formatDateLocale } from "@/lib/format-date";
 import { addDaysToDateString } from "@/lib/local-date";
 import { LOCATION_COLORS, buildLocationColorMap } from "@/lib/location-colors";
+import BookingCard from "../bookings/BookingCard";
+import { CancelBookingDialog } from "../_components/CancelBookingDialog";
+import { proCancelBooking } from "../students/actions";
+import { useRouter } from "next/navigation";
 
 // ─── Constants ───────────────────────────────────────
 
@@ -1587,10 +1591,34 @@ function PreviewBlockingGrid({
   locale: Locale;
 }) {
   const CELL_H = useCellHeight();
+  const router = useRouter();
   const [weekOffset, setWeekOffset] = useState(0);
   const [dirty, setDirty] = useState(false);
   const [saveStatus, setSaveStatus] = useState<"idle" | "saving" | "saved">("idle");
   const debounceRef = useRef<ReturnType<typeof setTimeout>>(undefined);
+
+  // Booking dialog: tap any booking cell to open the shared
+  // BookingCard (same surface as /pro/bookings). Cancel uses the same
+  // confirm dialog as the bookings views.
+  const [expandedBooking, setExpandedBooking] =
+    useState<SerializedBooking | null>(null);
+  const [cancelTargetBooking, setCancelTargetBooking] =
+    useState<SerializedBooking | null>(null);
+  const [cancelPending, startCancelTransition] = useTransition();
+  function handleCancelBooking() {
+    if (!cancelTargetBooking) return;
+    const id = cancelTargetBooking.id;
+    startCancelTransition(async () => {
+      const result = await proCancelBooking(id);
+      if ("error" in result) {
+        alert(result.error);
+      } else {
+        router.refresh();
+      }
+      setCancelTargetBooking(null);
+      setExpandedBooking(null);
+    });
+  }
 
   const today = useMemo(() => {
     const d = new Date();
@@ -1662,8 +1690,8 @@ function PreviewBlockingGrid({
       );
     });
 
-    const bMap: (string | null)[][] = Array.from({ length: 7 }, () =>
-      Array<string | null>(ROWS).fill(null),
+    const bMap: (SerializedBooking | null)[][] = Array.from({ length: 7 }, () =>
+      Array<SerializedBooking | null>(ROWS).fill(null),
     );
     for (const b of bookings) {
       if (b.status?.startsWith("cancelled")) continue;
@@ -1671,12 +1699,11 @@ function PreviewBlockingGrid({
       if (dayIdx < 0) continue;
       const startRow = timeToRow(b.startTime);
       const endRow = timeToRow(b.endTime);
-      const label = b.bookerName || t("proAvail.booked", locale);
-      for (let r = startRow; r < endRow; r++) bMap[dayIdx][r] = label;
+      for (let r = startRow; r < endRow; r++) bMap[dayIdx][r] = b;
     }
 
     return { templateAvailMap: aMap, bookingMap: bMap };
-  }, [days, periods, bookings, locale]);
+  }, [days, periods, bookings]);
 
   // ─── Paint handlers ───────────────────────────────
 
@@ -2232,23 +2259,48 @@ function PreviewBlockingGrid({
                 } else if (hasExtra) {
                   title += ` - ${t("proAvail.extraPrefix", locale)}: ${cellLocNames(extraLocs)}`;
                 } else if (booking) {
-                  title += ` - ${booking}`;
+                  title += ` - ${booking.bookerName ?? t("proAvail.booked", locale)}`;
                 }
+
+                // First row of a booking block — render the student
+                // name on top of the overlay so the pro can scan the
+                // grid and see which lesson sits at which slot. Only
+                // the first row gets the label so it isn't repeated
+                // on every 30-min cell of a longer booking.
+                const isBookingFirstRow =
+                  !!booking &&
+                  (row === 0 || bookingMap[dayIdx][row - 1]?.id !== booking.id);
 
                 return (
                   <div
                     key={`${dayIdx}-${row}`}
                     data-cell={`${dayIdx}-${row}`}
-                    onPointerDown={(e) =>
+                    onPointerDown={(e) => {
+                      // Booking cell short-circuits the paint flow:
+                      // tapping a lesson opens the BookingCard dialog
+                      // instead of toggling block / extra-availability.
+                      if (booking) {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        setExpandedBooking(booking);
+                        return;
+                      }
                       beginCellPointer(
                         e,
                         () => handlePointerDown(dayIdx, row, e),
                         () => startOverrideDrag(),
-                      )
-                    }
+                      );
+                    }}
                     onContextMenu={(e) => e.preventDefault()}
-                    onDoubleClick={(e) => handleDoubleClick(dayIdx, row, e)}
-                    className={cellClass}
+                    onDoubleClick={(e) => {
+                      if (booking) {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        return;
+                      }
+                      handleDoubleClick(dayIdx, row, e);
+                    }}
+                    className={cellClass + (booking ? " cursor-pointer" : "")}
                     style={cellStyle}
                     title={title}
                   >
@@ -2261,6 +2313,15 @@ function PreviewBlockingGrid({
                             : { backgroundColor: overlayBg }
                         }
                       />
+                    )}
+                    {isBookingFirstRow && booking && (
+                      <span
+                        className="pointer-events-none absolute inset-x-0.5 top-0.5 truncate px-1 text-[10px] font-semibold leading-tight text-white"
+                        title={booking.bookerName ?? ""}
+                      >
+                        {booking.bookerName ??
+                          t("proAvail.booked", locale)}
+                      </span>
                     )}
                   </div>
                 );
@@ -2341,6 +2402,55 @@ function PreviewBlockingGrid({
             </div>
           </div>
         </>
+      )}
+
+      {/* Booking dialog — same shared BookingCard the /pro/bookings
+          calendar uses. Tap any booking cell on the preview grid to
+          open it; backdrop click + the card's Close button dismiss. */}
+      {expandedBooking && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 px-4"
+          onClick={(e) => {
+            if (e.target === e.currentTarget) setExpandedBooking(null);
+          }}
+        >
+          <div className="w-full max-w-md">
+            <BookingCard
+              booking={{
+                ...expandedBooking,
+                locationName: expandedBooking.locationName ?? "",
+              }}
+              locale={locale}
+              cancelPending={cancelPending}
+              onCancel={() => setCancelTargetBooking(expandedBooking)}
+              showDate
+              onClose={() => setExpandedBooking(null)}
+            />
+          </div>
+        </div>
+      )}
+
+      {/* Cancel-confirm dialog — same component the bookings views
+          mount. proCancelBooking handles the server side; on success
+          we close both dialogs and refresh so the cell drops. */}
+      {cancelTargetBooking && (
+        <CancelBookingDialog
+          date={cancelTargetBooking.date}
+          startTime={cancelTargetBooking.startTime}
+          endTime={cancelTargetBooking.endTime}
+          studentName={cancelTargetBooking.bookerName ?? undefined}
+          onConfirm={handleCancelBooking}
+          onClose={() => setCancelTargetBooking(null)}
+          pending={cancelPending}
+          formatDate={(d) =>
+            formatDateLocale(d, locale, {
+              weekday: "short",
+              month: "short",
+              day: "numeric",
+            })
+          }
+          locale={locale}
+        />
       )}
     </div>
   );

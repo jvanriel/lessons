@@ -73,6 +73,17 @@ export interface SerializedBooking {
   participantCount: number;
   locationName: string | null;
   bookerName: string | null;
+  // Extra fields the shared BookingCard dialog renders. Populated by
+  // the availability page so the same surface used on /pro/bookings
+  // can be opened from a booking cell on /pro/availability.
+  notes: string | null;
+  paymentStatus: string;
+  studentFirstName: string | null;
+  studentLastName: string | null;
+  studentEmail: string;
+  studentPhone: string | null;
+  studentEmailVerified: Date | null;
+  locationCity: string | null;
 }
 
 export interface SerializedProfileSettings {
