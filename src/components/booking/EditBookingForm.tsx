@@ -5,7 +5,9 @@ import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { t } from "@/lib/i18n/translations";
 import type { Locale } from "@/lib/i18n";
-import QuickBookCalendar from "@/components/booking/QuickBookCalendar";
+import QuickBookCalendar, {
+  type QuickBookSelection,
+} from "@/components/booking/QuickBookCalendar";
 
 interface BookingDetails {
   id: number;
@@ -69,6 +71,19 @@ export default function EditBookingForm({
       email: p.email ?? "",
     })),
   );
+  // Selected slot — defaults to the booking's existing slot, so an
+  // edit that only changes participants/duration still has a slot
+  // to submit. The QuickBookCalendar will null this out if the user
+  // changes duration to something the existing startTime no longer
+  // fits, forcing them to repick.
+  const [selectedSlot, setSelectedSlot] = useState<QuickBookSelection | null>(
+    () => ({
+      date: booking.date,
+      startTime: booking.startTime,
+      endTime: booking.endTime,
+    }),
+  );
+
   useEffect(() => {
     setExtraParticipants((prev) => {
       const target = Math.max(0, participantCount - 1);
@@ -88,36 +103,25 @@ export default function EditBookingForm({
   }, [participantCount]);
 
   const [error, setError] = useState<string | null>(null);
-  const [, startTransition] = useTransition();
+  const [pending, startTransition] = useTransition();
 
-  // The QuickBookCalendar handles slot picking + the hold-to-save
-  // gesture itself. This callback receives the picked slot, packs
-  // the rest of the form state into FormData, and calls the parent-
-  // supplied server action. Returning an error surfaces inline; on
-  // success we redirect.
-  async function handleConfirm(slot: {
-    date: string;
-    startTime: string;
-    endTime: string;
-  }): Promise<{ error?: string } | void> {
+  function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
+    e.preventDefault();
     setError(null);
 
-    // Validate extra-participant rows before committing — same rule
-    // as the booking flow: each extra participant needs first +
-    // last name (email is optional).
-    for (const p of extraParticipants) {
-      if (!p.firstName.trim() || !p.lastName.trim()) {
-        const msg = t("editBooking.errFillRequired", locale);
-        setError(msg);
-        return { error: msg };
-      }
+    if (!selectedSlot) {
+      setError(t("editBooking.errPickSlot", locale));
+      return;
     }
 
     const fd = new FormData();
     fd.set("bookingId", String(booking.id));
-    fd.set("date", slot.date);
-    fd.set("startTime", slot.startTime);
-    fd.set("endTime", endTimeFor(slot.startTime, duration));
+    fd.set("date", selectedSlot.date);
+    fd.set("startTime", selectedSlot.startTime);
+    // The slot row reports its own endTime, but duration may have
+    // changed since the slot was picked; recompute against the
+    // current duration so the submitted endTime always matches.
+    fd.set("endTime", endTimeFor(selectedSlot.startTime, duration));
     fd.set("duration", String(duration));
     fd.set("participantCount", String(participantCount));
     extraParticipants.forEach((p, i) => {
@@ -126,27 +130,22 @@ export default function EditBookingForm({
       fd.set(`participants[${i}].email`, p.email.trim());
     });
 
-    const result = await action(fd);
-    if (result.error) {
-      setError(result.error);
-      return { error: result.error };
-    }
-    // After the QuickBookCalendar flips to its "saved" state, give
-    // the toast a moment to register before navigating away.
-    startTransition(() => {
-      setTimeout(() => {
-        router.push(successHref);
-        router.refresh();
-      }, 600);
+    startTransition(async () => {
+      const result = await action(fd);
+      if (result.error) {
+        setError(result.error);
+        return;
+      }
+      router.push(successHref);
+      router.refresh();
     });
   }
 
-  const hasInvalidParticipants = extraParticipants.some(
-    (p) => !p.firstName.trim() || !p.lastName.trim(),
-  );
-
   return (
-    <div className="space-y-5 rounded-xl border border-green-200 bg-white p-6">
+    <form
+      onSubmit={handleSubmit}
+      className="space-y-5 rounded-xl border border-green-200 bg-white p-6"
+    >
       <div>
         <p className="text-xs uppercase text-green-500">
           {t("editBooking.proLabel", locale)}
@@ -307,8 +306,8 @@ export default function EditBookingForm({
             startTime: booking.startTime,
             endTime: booking.endTime,
           }}
-          disabled={hasInvalidParticipants}
-          onConfirm={handleConfirm}
+          selectedSlot={selectedSlot}
+          onSlotChange={setSelectedSlot}
           locale={locale}
         />
       </div>
@@ -324,6 +323,15 @@ export default function EditBookingForm({
       )}
 
       <div className="flex items-center gap-3">
+        <button
+          type="submit"
+          disabled={pending || !selectedSlot}
+          className="rounded-md bg-gold-600 px-4 py-2 text-sm font-medium text-white hover:bg-gold-500 disabled:opacity-50"
+        >
+          {pending
+            ? t("editBooking.saving", locale)
+            : t("editBooking.save", locale)}
+        </button>
         <Link
           href={cancelHref}
           className="text-sm text-green-600 hover:text-green-700"
@@ -331,6 +339,6 @@ export default function EditBookingForm({
           {t("editBooking.cancel", locale)}
         </Link>
       </div>
-    </div>
+    </form>
   );
 }

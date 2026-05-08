@@ -1,36 +1,34 @@
 "use client";
 
 /**
- * QuickBook-style date pill row + slot list with a hold-to-confirm
- * gesture. Visual shell extracted (copied) from
- * `(member)/member/dashboard/QuickRebook.tsx` so the booking-edit
- * flow gets the same UX a golfer already knows. Marked as a
- * fresh-copy intentionally — not yet wired through the existing
- * QuickRebook + ProQuickBook variants. Migrating those is a
- * separate refactor (see follow-up task).
+ * QuickBook-style date pill row + slot list. Visual shell adapted
+ * from `(member)/member/dashboard/QuickRebook.tsx`.
  *
- * What's left out vs the originals:
- *   - The interval picker (weekly / biweekly / monthly) — meaningless
- *     for an edit.
- *   - The "More options" link to the full booking flow — the user
- *     is already on the dedicated edit page.
- *   - The long-press date-explanation dialog — bonus feature, can
- *     come back later.
- *   - The payment-method gating — no charge change in an edit.
+ * Behaviour difference vs QuickRebook: this is a *picker*, not a
+ * commit gesture. Tapping a slot only selects it — saving is the
+ * caller's responsibility (a Save button on the parent form). This
+ * matches the booking-edit flow, where the user might also be
+ * tweaking duration / participant count and wants to review before
+ * committing all changes together.
+ *
+ * What's stripped out vs QuickRebook:
+ *   - Hold-to-confirm gesture, "saving" / "saved" status states.
+ *   - Interval picker, payment-method gating, "More options" link,
+ *     long-press date-explanation dialog. None apply on edit.
  *
  * What's added:
- *   - `currentSlot`: the booking's existing slot is highlighted as
- *     "your current slot" so the user can see (and re-pick) it.
- *   - `excludeBookingId`: passes through to the server actions so
- *     the booking being edited doesn't make adjacent dates / slots
- *     look fully booked.
+ *   - `currentSlot`: the booking's existing slot, highlighted as
+ *     "your existing booking" so the user can spot (and re-pick) it.
+ *   - `selectedSlot` / `onSlotChange`: lifts selection up so the
+ *     parent form can submit it as part of FormData.
+ *   - `excludeBookingId`: forwarded to the server actions so the
+ *     booking-being-edited doesn't conflict with itself.
  */
 
 import {
   useState,
   useEffect,
   useRef,
-  useCallback,
   useTransition,
 } from "react";
 import {
@@ -42,9 +40,13 @@ import type { Locale } from "@/lib/i18n";
 import { t } from "@/lib/i18n/translations";
 import { formatDate } from "@/lib/format-date";
 
-const HOLD_MS = 600;
-
 export interface QuickBookSlot {
+  startTime: string;
+  endTime: string;
+}
+
+export interface QuickBookSelection {
+  date: string;
   startTime: string;
   endTime: string;
 }
@@ -53,22 +55,19 @@ interface Props {
   proProfileId: number;
   proLocationId: number;
   duration: number;
-  /** Highlight this slot as "your current booking" if it appears in the list. */
-  currentSlot?: { date: string; startTime: string; endTime: string } | null;
+  /** The booking's existing slot — highlighted as "now" so the
+   *  user knows where they're starting from. */
+  currentSlot?: QuickBookSelection | null;
   /** Forwarded to getAvailableDates / getAvailableSlots so the
    *  booking being edited doesn't conflict with itself. */
   excludeBookingId?: number;
-  /**
-   * Hold-to-confirm callback. Caller supplies the actual save
-   * (PUT to updateBooking, etc.). Return `{ error }` to surface
-   * a message inline; return falsy or `{ success: true }` to flip
-   * to the "saved" toast.
-   */
-  onConfirm: (slot: { date: string; startTime: string; endTime: string }) =>
-    Promise<{ error?: string } | void>;
-  /** Caller-controlled — disables the hold gesture (e.g. while
-   *  validating extra-participant fields). */
-  disabled?: boolean;
+  /** Currently picked slot (controlled). Pre-fill with `currentSlot`
+   *  on first render to highlight the user's starting position. */
+  selectedSlot: QuickBookSelection | null;
+  /** Fired when the user taps a date pill or a slot pill. The
+   *  parent form folds this into its own state and commits via
+   *  the Save button. */
+  onSlotChange: (slot: QuickBookSelection | null) => void;
   locale: Locale;
 }
 
@@ -78,41 +77,34 @@ export default function QuickBookCalendar({
   duration,
   currentSlot,
   excludeBookingId,
-  onConfirm,
-  disabled = false,
+  selectedSlot,
+  onSlotChange,
   locale,
 }: Props) {
   const [isPending, startTransition] = useTransition();
   const [availableDates, setAvailableDates] = useState<string[]>(
-    currentSlot ? [currentSlot.date] : [],
+    selectedSlot ? [selectedSlot.date] : currentSlot ? [currentSlot.date] : [],
   );
   const [selectedDate, setSelectedDate] = useState<string>(
-    currentSlot?.date ?? "",
+    selectedSlot?.date ?? currentSlot?.date ?? "",
   );
   const [slots, setSlots] = useState<QuickBookSlot[]>([]);
-  const [status, setStatus] = useState<
-    "idle" | "holding" | "saving" | "saved" | "error"
-  >("idle");
-  const [error, setError] = useState<string | null>(null);
-  const [holdProgress, setHoldProgress] = useState(0);
-  const [holdingSlot, setHoldingSlot] = useState<string | null>(null);
   const [blockReason, setBlockReason] = useState<string | null>(null);
 
   const pillRefs = useRef<Map<string, HTMLButtonElement>>(new Map());
-  const holdTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const animFrame = useRef<number | null>(null);
-  const holdStart = useRef(0);
 
-  // Keep the selected date pill in view as the user navigates the
-  // arrow controls — same trick as QuickRebook (task 33).
+  // Keep the selected pill scrolled into view as the user navigates
+  // — same trick as QuickRebook (task 33) so the active pill never
+  // hides behind the overflow.
   useEffect(() => {
     const pill = pillRefs.current.get(selectedDate);
     pill?.scrollIntoView({ block: "nearest", inline: "center" });
   }, [selectedDate]);
 
-  // Fetch the list of bookable dates whenever pro/location/duration
-  // changes. Reset selectedDate to the current booking's date when
-  // possible, otherwise the first available.
+  // Refetch the bookable-dates list whenever pro / location /
+  // duration changes. After the fetch, prefer to keep the user's
+  // current pick if it's still valid, otherwise fall back to
+  // currentSlot's date, otherwise the first available.
   useEffect(() => {
     let cancelled = false;
     startTransition(async () => {
@@ -125,9 +117,11 @@ export default function QuickBookCalendar({
       if (cancelled) return;
       setAvailableDates(dates);
       const next =
-        currentSlot && dates.includes(currentSlot.date)
-          ? currentSlot.date
-          : dates[0] ?? "";
+        selectedSlot && dates.includes(selectedSlot.date)
+          ? selectedSlot.date
+          : currentSlot && dates.includes(currentSlot.date)
+            ? currentSlot.date
+            : dates[0] ?? "";
       setSelectedDate(next);
     });
     return () => {
@@ -170,67 +164,19 @@ export default function QuickBookCalendar({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedDate, duration, excludeBookingId]);
 
-  const animateProgress = useCallback(() => {
-    const elapsed = Date.now() - holdStart.current;
-    const progress = Math.min(elapsed / HOLD_MS, 1);
-    setHoldProgress(progress);
-    if (progress < 1) {
-      animFrame.current = requestAnimationFrame(animateProgress);
-    }
-  }, []);
-
-  const startHold = useCallback(
-    (slot: QuickBookSlot) => {
-      if (disabled) return;
-      if (status === "saving" || status === "saved") return;
-      setHoldingSlot(slot.startTime);
-      setStatus("holding");
-      setError(null);
-      holdStart.current = Date.now();
-      if (navigator.vibrate) navigator.vibrate(30);
-      animFrame.current = requestAnimationFrame(animateProgress);
-
-      holdTimer.current = setTimeout(() => {
-        if (navigator.vibrate) navigator.vibrate([30, 50, 30]);
-        setStatus("saving");
-        setHoldProgress(1);
-        startTransition(async () => {
-          const result = await onConfirm({
-            date: selectedDate,
-            startTime: slot.startTime,
-            endTime: slot.endTime,
-          });
-          if (result?.error) {
-            setStatus("error");
-            setError(result.error);
-            setHoldProgress(0);
-            setHoldingSlot(null);
-          } else {
-            setStatus("saved");
-            setHoldingSlot(null);
-            setHoldProgress(0);
-          }
-        });
-      }, HOLD_MS);
-    },
-    [disabled, status, selectedDate, animateProgress, onConfirm],
-  );
-
-  const cancelHold = useCallback(() => {
-    if (holdTimer.current) {
-      clearTimeout(holdTimer.current);
-      holdTimer.current = null;
-    }
-    if (animFrame.current) {
-      cancelAnimationFrame(animFrame.current);
-      animFrame.current = null;
-    }
-    if (status === "holding") {
-      setStatus("idle");
-      setHoldProgress(0);
-      setHoldingSlot(null);
-    }
-  }, [status]);
+  // If duration changed and the previously-selected slot's
+  // startTime is no longer available, drop the selection so the
+  // parent doesn't submit a stale slot.
+  useEffect(() => {
+    if (!selectedSlot) return;
+    if (slots.length === 0) return;
+    if (selectedDate !== selectedSlot.date) return;
+    const stillThere = slots.some(
+      (s) => s.startTime === selectedSlot.startTime,
+    );
+    if (!stillThere) onSlotChange(null);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [slots, selectedDate]);
 
   // Date pill window: 5 pills centred on the selection, clamped to
   // the available range. Same logic as QuickRebook for visual parity.
@@ -245,10 +191,23 @@ export default function QuickBookCalendar({
   }
   const visibleDates = availableDates.slice(windowStart, windowEnd);
 
+  function pickSlot(slot: QuickBookSlot) {
+    onSlotChange({
+      date: selectedDate,
+      startTime: slot.startTime,
+      endTime: slot.endTime,
+    });
+  }
+
   const isCurrentSlot = (slot: QuickBookSlot) =>
     !!currentSlot &&
     selectedDate === currentSlot.date &&
     slot.startTime === currentSlot.startTime;
+
+  const isSelectedSlot = (slot: QuickBookSlot) =>
+    !!selectedSlot &&
+    selectedDate === selectedSlot.date &&
+    slot.startTime === selectedSlot.startTime;
 
   return (
     <div className="rounded-lg border border-green-100 bg-green-50/50 p-4">
@@ -315,27 +274,7 @@ export default function QuickBookCalendar({
         </div>
       )}
 
-      {/* Saved confirmation toast */}
-      {status === "saved" && (
-        <div className="mb-3 flex items-center gap-2 rounded-md bg-green-100 px-3 py-2 text-xs font-medium text-green-800 animate-in fade-in">
-          <svg
-            className="h-4 w-4 shrink-0 text-green-600"
-            fill="none"
-            viewBox="0 0 24 24"
-            stroke="currentColor"
-            strokeWidth={2.5}
-          >
-            <path
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              d="M5 13l4 4L19 7"
-            />
-          </svg>
-          {t("editBookingQB.saved", locale)}
-        </div>
-      )}
-
-      {/* Slots */}
+      {/* Slot list */}
       {isPending && slots.length === 0 ? (
         <div className="flex items-center gap-2 py-4 text-sm text-green-500">
           <svg className="h-4 w-4 animate-spin" viewBox="0 0 24 24" fill="none">
@@ -355,56 +294,32 @@ export default function QuickBookCalendar({
           )}
         </div>
       ) : (
-        <>
-          <p className="mb-1.5 text-[11px] italic text-green-500">
-            {t("editBookingQB.holdHint", locale)}
-          </p>
-          <div className="mb-3 flex flex-wrap gap-1.5">
-            {slots.map((slot) => {
-              const isHolding = holdingSlot === slot.startTime && status === "holding";
-              const isSaving = holdingSlot === slot.startTime && status === "saving";
-              const isCurrent = isCurrentSlot(slot);
-              return (
-                <button
-                  key={slot.startTime}
-                  type="button"
-                  onPointerDown={() => startHold(slot)}
-                  onPointerUp={cancelHold}
-                  onPointerLeave={cancelHold}
-                  onContextMenu={(e) => e.preventDefault()}
-                  disabled={status === "saving" || disabled}
-                  className={`relative overflow-hidden rounded-md border px-3 py-2 text-xs font-medium transition-colors select-none disabled:opacity-60 ${
-                    isHolding || isSaving
-                      ? "border-gold-500 bg-gold-50 text-gold-700"
-                      : isCurrent
-                        ? "border-gold-400 bg-gold-50 text-gold-700"
-                        : "border-green-200 text-green-700 hover:border-green-300"
-                  }`}
-                >
-                  {isHolding && (
-                    <div
-                      className="absolute inset-0 bg-gold-200 transition-none"
-                      style={{ width: `${holdProgress * 100}%` }}
-                    />
-                  )}
-                  <span className="relative">
-                    {isSaving ? "..." : slot.startTime}
-                    {isCurrent && (
-                      <span className="ml-1 text-[9px] uppercase opacity-70">
-                        {t("editBookingQB.currentBadge", locale)}
-                      </span>
-                    )}
+        <div className="flex flex-wrap gap-1.5">
+          {slots.map((slot) => {
+            const isCurrent = isCurrentSlot(slot);
+            const isSelected = isSelectedSlot(slot);
+            return (
+              <button
+                key={slot.startTime}
+                type="button"
+                onClick={() => pickSlot(slot)}
+                className={`relative rounded-md border px-3 py-2 text-xs font-medium transition-colors select-none ${
+                  isSelected
+                    ? "border-gold-500 bg-gold-100 text-gold-800"
+                    : isCurrent
+                      ? "border-gold-300 bg-gold-50 text-gold-700"
+                      : "border-green-200 text-green-700 hover:border-green-300"
+                }`}
+              >
+                {slot.startTime}
+                {isCurrent && !isSelected && (
+                  <span className="ml-1 text-[9px] uppercase opacity-70">
+                    {t("editBookingQB.currentBadge", locale)}
                   </span>
-                </button>
-              );
-            })}
-          </div>
-        </>
-      )}
-
-      {error && (
-        <div className="rounded-md border border-red-200 bg-red-50 px-3 py-2 text-xs text-red-700">
-          {error}
+                )}
+              </button>
+            );
+          })}
         </div>
       )}
     </div>
