@@ -7,6 +7,7 @@ import {
   proProfiles,
   proLocations,
   locations,
+  proStudents,
 } from "@/lib/db/schema";
 import { and, eq, asc } from "drizzle-orm";
 import { getSession, hasRole } from "@/lib/auth";
@@ -72,6 +73,26 @@ export default async function EditMemberBookingPage({ params }: Props) {
     .where(eq(lessonParticipants.bookingId, bookingId))
     .orderBy(asc(lessonParticipants.id));
 
+  // Pull the proStudent relationship so the edit form can render
+  // the same "In a week / 2 weeks / month" interval pills as
+  // QuickBook on the member dashboard. Each pill toggles the
+  // relationship's preferredInterval for future suggestions —
+  // doesn't change THIS booking's date, but matches the UX the
+  // user expects from the booking flow.
+  const [rel] = await db
+    .select({
+      id: proStudents.id,
+      preferredInterval: proStudents.preferredInterval,
+    })
+    .from(proStudents)
+    .where(
+      and(
+        eq(proStudents.proProfileId, row.proProfileId),
+        eq(proStudents.userId, session.userId),
+      ),
+    )
+    .limit(1);
+
   const duration =
     (row.endTime.split(":").reduce((h, m) => Number(h) * 60 + Number(m), 0) -
       row.startTime.split(":").reduce((h, m) => Number(h) * 60 + Number(m), 0));
@@ -113,6 +134,8 @@ export default async function EditMemberBookingPage({ params }: Props) {
           cancelHref="/member/bookings"
           durations={(row.lessonDurations as number[] | null) ?? [60]}
           maxGroupSize={row.maxGroupSize ?? 1}
+          proStudentId={rel?.id ?? null}
+          currentInterval={rel?.preferredInterval ?? null}
           locale={locale}
         />
       </div>

@@ -8,6 +8,7 @@ import type { Locale } from "@/lib/i18n";
 import QuickBookCalendar, {
   type QuickBookSelection,
 } from "@/components/booking/QuickBookCalendar";
+import { updatePreferredInterval } from "@/app/(member)/member/book/actions";
 
 interface BookingDetails {
   id: number;
@@ -38,6 +39,17 @@ interface Props {
   durations: number[];
   /** Max group size for this pro. */
   maxGroupSize: number;
+  /**
+   * Member-side only — the pro_students.id for this golfer↔pro
+   * relationship. When set together with `currentInterval`, the
+   * form renders the same "In a week / 2 weeks / month" pills
+   * QuickBook shows on the member dashboard. Pro-side edits
+   * leave this null and the pills stay hidden (a pro setting the
+   * golfer's recurrence preference doesn't fit the model).
+   */
+  proStudentId?: number | null;
+  /** Member-side only — current preferredInterval, drives which pill is highlighted. */
+  currentInterval?: string | null;
   /** Viewer locale — drives all form labels + button text. */
   locale: Locale;
 }
@@ -57,10 +69,15 @@ export default function EditBookingForm({
   cancelHref,
   durations,
   maxGroupSize,
+  proStudentId,
+  currentInterval,
   locale,
 }: Props) {
   const router = useRouter();
   const [duration, setDuration] = useState(booking.duration);
+  const [interval, setInterval] = useState<string | null>(
+    currentInterval ?? null,
+  );
   const [participantCount, setParticipantCount] = useState(
     booking.participantCount,
   );
@@ -310,6 +327,37 @@ export default function EditBookingForm({
           onSlotChange={setSelectedSlot}
           locale={locale}
         />
+        {proStudentId != null && (
+          <div className="mt-2 flex items-center gap-1">
+            {([
+              { value: "weekly", label: t("memberQB.inAWeek", locale) },
+              { value: "biweekly", label: t("memberQB.inTwoWeeks", locale) },
+              { value: "monthly", label: t("memberQB.inAMonth", locale) },
+            ] as const).map((iv) => (
+              <button
+                key={iv.value}
+                type="button"
+                onClick={() => {
+                  // Toggle off if already selected — same gesture
+                  // QuickBook uses on the member dashboard.
+                  const newVal = interval === iv.value ? null : iv.value;
+                  setInterval(newVal);
+                  startTransition(async () => {
+                    await updatePreferredInterval(proStudentId, newVal);
+                    router.refresh();
+                  });
+                }}
+                className={`rounded-full px-2 py-0.5 text-[10px] font-medium transition-colors ${
+                  interval === iv.value
+                    ? "bg-green-700 text-white"
+                    : "bg-green-50 text-green-500 hover:text-green-700"
+                }`}
+              >
+                {iv.label}
+              </button>
+            ))}
+          </div>
+        )}
       </div>
 
       <p className="text-xs text-green-600">
