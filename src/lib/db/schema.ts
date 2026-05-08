@@ -449,6 +449,14 @@ export const proStudents = pgTable("pro_students", {
   source: varchar("source", { length: 20 }).notNull().default("self"),
   status: varchar("status", { length: 20 }).notNull().default("active"),
   lastMessageAt: timestamp("last_message_at"),
+  // Per-side read marker for the coaching chat (task 122). Updated
+  // when the relevant party opens /member/coaching/[id] or
+  // /pro/students/[id]'s chat tab. Used to compute unread badges on
+  // the lists + WhatsApp-style read-receipt ticks inside the
+  // conversation: a message is "read" iff
+  // otherSide.lastSeenAt > comment.createdAt.
+  studentLastSeenAt: timestamp("student_last_seen_at"),
+  proLastSeenAt: timestamp("pro_last_seen_at"),
   // Booking preferences (auto-populated from booking history)
   preferredLocationId: integer("preferred_location_id").references(
     () => proLocations.id
