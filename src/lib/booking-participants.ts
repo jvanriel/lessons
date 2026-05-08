@@ -18,7 +18,11 @@ import {
   getParticipantBookingCancelledSubject,
 } from "@/lib/email-templates";
 import { resolveLocale } from "@/lib/i18n";
-import { formatLocationFull } from "@/lib/location-display";
+import {
+  formatLocationFull,
+  wazeUrl,
+  googleMapsUrl,
+} from "@/lib/location-display";
 import * as Sentry from "@sentry/nextjs";
 
 /**
@@ -110,6 +114,8 @@ async function loadBookingForFanout(bookingId: number) {
       locationName: locations.name,
       locationAddress: locations.address,
       locationCity: locations.city,
+      locationLat: locations.lat,
+      locationLng: locations.lng,
       locationTimezone: locations.timezone,
       bookerFirstName: users.firstName,
       bookerLastName: users.lastName,
@@ -216,6 +222,11 @@ export async function sendParticipantBookingNotifications(
       address: data.locationAddress,
       city: data.locationCity,
     });
+    const navLoc = {
+      lat: data.locationLat,
+      lng: data.locationLng,
+      address: data.locationAddress,
+    };
     const duration = durationMinutes(data.startTime, data.endTime);
 
     const ics = buildIcs({
@@ -256,6 +267,8 @@ export async function sendParticipantBookingNotifications(
             proEmail: data.proPublicEmail,
             proPhone: data.proContactPhone,
             locationName: locationLabel,
+            wazeUrl: wazeUrl(navLoc),
+            googleMapsUrl: googleMapsUrl(navLoc),
             date: data.date,
             startTime: data.startTime,
             endTime: data.endTime,

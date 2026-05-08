@@ -40,7 +40,11 @@ import {
 } from "@/lib/email-templates";
 import { resolveLocale, type Locale } from "@/lib/i18n";
 import { t } from "@/lib/i18n/translations";
-import { formatLocationFull } from "@/lib/location-display";
+import {
+  formatLocationFull,
+  wazeUrl,
+  googleMapsUrl,
+} from "@/lib/location-display";
 import { getLocale } from "@/lib/locale";
 import { addDaysToDateString, todayInTZ } from "@/lib/local-date";
 import { computeSuggestedDate } from "@/lib/booking-suggestion";
@@ -632,6 +636,8 @@ export async function createBooking(formData: FormData) {
       name: locations.name,
       address: locations.address,
       city: locations.city,
+      lat: locations.lat,
+      lng: locations.lng,
       timezone: locations.timezone,
     })
     .from(proLocations)
@@ -713,6 +719,8 @@ export async function createBooking(formData: FormData) {
             proEmail: pro.proEmail,
             proPhone: pro.contactPhone,
             locationName,
+            wazeUrl: wazeUrl(loc),
+            googleMapsUrl: googleMapsUrl(loc),
             date,
             startTime,
             endTime,
@@ -1213,6 +1221,8 @@ export async function quickCreateBooking(data: {
       name: locations.name,
       address: locations.address,
       city: locations.city,
+      lat: locations.lat,
+      lng: locations.lng,
       timezone: locations.timezone,
     })
     .from(proLocations)

@@ -54,7 +54,11 @@ import { getProLocationTimezone } from "@/lib/pro";
 import { fromZonedTime } from "date-fns-tz";
 import { resolveLocale } from "@/lib/i18n";
 import { createNotification } from "@/lib/notifications";
-import { formatLocationFull } from "@/lib/location-display";
+import {
+  formatLocationFull,
+  wazeUrl,
+  googleMapsUrl,
+} from "@/lib/location-display";
 import {
   computeAvailableSlots,
   buildIcs,
@@ -1180,6 +1184,8 @@ export async function proQuickBookForStudent(data: {
       name: locations.name,
       address: locations.address,
       city: locations.city,
+      lat: locations.lat,
+      lng: locations.lng,
       timezone: locations.timezone,
     })
     .from(proLocations)
@@ -1242,6 +1248,8 @@ export async function proQuickBookForStudent(data: {
             proEmail: proRow.proEmail,
             proPhone: proRow.contactPhone,
             locationName,
+            wazeUrl: wazeUrl(loc),
+            googleMapsUrl: googleMapsUrl(loc),
             date: data.date,
             startTime: data.startTime,
             endTime: data.endTime,

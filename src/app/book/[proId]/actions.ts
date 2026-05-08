@@ -704,6 +704,8 @@ export async function createPublicBooking(formData: FormData) {
       name: locations.name,
       address: locations.address,
       city: locations.city,
+      lat: locations.lat,
+      lng: locations.lng,
       timezone: locations.timezone,
     })
     .from(proLocations)

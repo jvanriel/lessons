@@ -10,6 +10,11 @@ import {
   getStudentBookingConfirmationSubject,
 } from "@/lib/email-templates";
 import { resolveLocale } from "@/lib/i18n";
+import {
+  formatLocationFull,
+  wazeUrl,
+  googleMapsUrl,
+} from "@/lib/location-display";
 
 /**
  * GET /api/admin/resend-booking-confirmation?id=<bookingId>
@@ -49,6 +54,10 @@ export async function GET(request: NextRequest) {
       studentEmail: users.email,
       studentLocale: users.preferredLocale,
       locationName: locations.name,
+      locationAddress: locations.address,
+      locationCity: locations.city,
+      locationLat: locations.lat,
+      locationLng: locations.lng,
       locationTz: locations.timezone,
     })
     .from(lessonBookings)
@@ -75,12 +84,23 @@ export async function GET(request: NextRequest) {
   const cashOnly = row.proAllowCash === true;
   const studentLocale = resolveLocale(row.studentLocale);
 
+  const navLoc = {
+    lat: row.locationLat,
+    lng: row.locationLng,
+    address: row.locationAddress,
+  };
+  const locationLabel = formatLocationFull({
+    name: row.locationName,
+    address: row.locationAddress,
+    city: row.locationCity,
+  });
+
   const ics = buildIcs({
     date: row.date,
     startTime: row.startTime,
     endTime: row.endTime,
     summary: `Golf lesson with ${row.proName}`,
-    location: row.locationName,
+    location: locationLabel,
     description: `Booked via golflessons.be — ${row.studentFirstName} ${row.studentLastName}${row.notes ? ` — Notes: ${row.notes}` : ""}`,
     bookingId: row.id,
     tz: row.locationTz,
@@ -94,7 +114,9 @@ export async function GET(request: NextRequest) {
       proName: row.proName,
       proEmail: proUser?.email ?? "",
       proPhone: row.proPhone,
-      locationName: row.locationName,
+      locationName: locationLabel,
+      wazeUrl: wazeUrl(navLoc),
+      googleMapsUrl: googleMapsUrl(navLoc),
       date: row.date,
       startTime: row.startTime,
       endTime: row.endTime,

@@ -832,12 +832,38 @@ function detailsTable(rows: Array<DetailRow>): string {
   `;
 }
 
+/**
+ * "🚗 Waze | 📍 Google Maps" deep-link buttons rendered as a row
+ * below the booking details. Both args are nullable — the helper
+ * returns the empty string when neither URL is available, so the
+ * caller can drop the entire block by interpolating the result
+ * directly. Brand names ("Waze", "Google Maps") deliberately
+ * un-localised. Per task 116.
+ */
+function navigationButtonsHtml(
+  waze: string | null | undefined,
+  gmaps: string | null | undefined,
+): string {
+  if (!waze && !gmaps) return "";
+  const wazeBtn = waze
+    ? `<a href="${waze}" style="display:inline-block;background:#2563eb;color:#fff;padding:10px 16px;border-radius:6px;text-decoration:none;font-weight:600;font-size:13px;margin:0 8px 8px 0;">🚗 Waze</a>`
+    : "";
+  const gmapsBtn = gmaps
+    ? `<a href="${gmaps}" style="display:inline-block;background:#15803d;color:#fff;padding:10px 16px;border-radius:6px;text-decoration:none;font-weight:600;font-size:13px;margin:0 0 8px 0;">📍 Google Maps</a>`
+    : "";
+  return `<p style="margin:0 0 24px 0;">${wazeBtn}${gmapsBtn}</p>`;
+}
+
 export function buildStudentBookingConfirmationEmail(opts: {
   firstName: string;
   proName: string;
   proEmail?: string | null;
   proPhone?: string | null;
   locationName: string;
+  /** Optional Waze deep link (built by location-display.ts on the caller side). */
+  wazeUrl?: string | null;
+  /** Optional Google Maps deep link. */
+  googleMapsUrl?: string | null;
   date: string;
   startTime: string;
   endTime: string;
@@ -876,6 +902,7 @@ export function buildStudentBookingConfirmationEmail(opts: {
     </h2>
     <p style="margin:0 0 20px 0;">${s.body}</p>
     ${detailsTable(rows)}
+    ${navigationButtonsHtml(opts.wazeUrl, opts.googleMapsUrl)}
     <p style="margin:0 0 24px 0;">
       <a href="${getBaseUrl()}/member/bookings" style="display:inline-block;background:${COLORS.gold600};color:${COLORS.white};padding:12px 28px;border-radius:6px;text-decoration:none;font-weight:700;font-size:14px;">
         ${s.cta}
@@ -984,6 +1011,8 @@ export function buildParticipantBookingNotificationEmail(opts: {
   proEmail?: string | null;
   proPhone?: string | null;
   locationName: string;
+  wazeUrl?: string | null;
+  googleMapsUrl?: string | null;
   date: string;
   startTime: string;
   endTime: string;
@@ -1006,6 +1035,7 @@ export function buildParticipantBookingNotificationEmail(opts: {
     </h2>
     <p style="margin:0 0 20px 0;">${s.body(opts.bookerName, opts.proName)}</p>
     ${detailsTable(rows)}
+    ${navigationButtonsHtml(opts.wazeUrl, opts.googleMapsUrl)}
     <p style="color:#666;font-size:13px;margin:0;">${s.helper(opts.bookerName)}</p>
   `;
   return emailLayout(body, undefined, opts.locale);
