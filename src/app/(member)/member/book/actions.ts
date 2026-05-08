@@ -40,6 +40,7 @@ import {
 } from "@/lib/email-templates";
 import { resolveLocale, type Locale } from "@/lib/i18n";
 import { t } from "@/lib/i18n/translations";
+import { formatLocationFull } from "@/lib/location-display";
 import { getLocale } from "@/lib/locale";
 import { addDaysToDateString, todayInTZ } from "@/lib/local-date";
 import { computeSuggestedDate } from "@/lib/booking-suggestion";
@@ -629,6 +630,7 @@ export async function createBooking(formData: FormData) {
   const [loc] = await db
     .select({
       name: locations.name,
+      address: locations.address,
       city: locations.city,
       timezone: locations.timezone,
     })
@@ -641,7 +643,7 @@ export async function createBooking(formData: FormData) {
       `createBooking: location lookup missing for proLocationId=${proLocationId} (booking ${booking.id})`,
     );
   }
-  const locationName = loc.city ? `${loc.name}, ${loc.city}` : loc.name;
+  const locationName = formatLocationFull(loc);
   const locationTz = loc.timezone;
 
   if (pro) {
@@ -1209,6 +1211,7 @@ export async function quickCreateBooking(data: {
   const [loc] = await db
     .select({
       name: locations.name,
+      address: locations.address,
       city: locations.city,
       timezone: locations.timezone,
     })
@@ -1221,7 +1224,7 @@ export async function quickCreateBooking(data: {
       `quickCreateBooking: location lookup missing for proLocationId=${data.proLocationId} (booking ${booking.id})`,
     );
   }
-  const locationName = loc.city ? `${loc.name}, ${loc.city}` : loc.name;
+  const locationName = formatLocationFull(loc);
   const locationTz = loc.timezone;
 
   if (pro) {

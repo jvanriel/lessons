@@ -18,6 +18,7 @@ import {
   getParticipantBookingCancelledSubject,
 } from "@/lib/email-templates";
 import { resolveLocale } from "@/lib/i18n";
+import { formatLocationFull } from "@/lib/location-display";
 import * as Sentry from "@sentry/nextjs";
 
 /**
@@ -107,6 +108,7 @@ async function loadBookingForFanout(bookingId: number) {
       // locale (participants may not have an account on file).
       bookerLocale: users.preferredLocale,
       locationName: locations.name,
+      locationAddress: locations.address,
       locationCity: locations.city,
       locationTimezone: locations.timezone,
       bookerFirstName: users.firstName,
@@ -209,9 +211,11 @@ export async function sendParticipantBookingNotifications(
     const bookerName =
       `${data.bookerFirstName ?? ""} ${data.bookerLastName ?? ""}`.trim() ||
       data.bookerEmail;
-    const locationLabel = data.locationCity
-      ? `${data.locationName}, ${data.locationCity}`
-      : data.locationName;
+    const locationLabel = formatLocationFull({
+      name: data.locationName,
+      address: data.locationAddress,
+      city: data.locationCity,
+    });
     const duration = durationMinutes(data.startTime, data.endTime);
 
     const ics = buildIcs({
@@ -292,9 +296,11 @@ export async function sendParticipantCancellationNotifications(
     const bookerName =
       `${data.bookerFirstName ?? ""} ${data.bookerLastName ?? ""}`.trim() ||
       data.bookerEmail;
-    const locationLabel = data.locationCity
-      ? `${data.locationName}, ${data.locationCity}`
-      : data.locationName;
+    const locationLabel = formatLocationFull({
+      name: data.locationName,
+      address: data.locationAddress,
+      city: data.locationCity,
+    });
 
     const cancelIcs = buildCancelIcs({
       date: data.date,

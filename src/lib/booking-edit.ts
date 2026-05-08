@@ -19,6 +19,7 @@ import {
   type EmailPaymentChange,
 } from "@/lib/email-templates";
 import { resolveLocale } from "@/lib/i18n";
+import { formatLocationFull } from "@/lib/location-display";
 import {
   parseExtraParticipants,
   validateExtraParticipants,
@@ -274,6 +275,7 @@ async function loadBookingForUpdate(bookingId: number) {
       proLocale: proUser.preferredLocale,
       bookerLocale: users.preferredLocale,
       locationName: locations.name,
+      locationAddress: locations.address,
       locationCity: locations.city,
       locationTimezone: locations.timezone,
       bookerFirstName: users.firstName,
@@ -331,9 +333,11 @@ export async function sendBookingUpdatedNotifications(
     const bookerName =
       `${data.bookerFirstName ?? ""} ${data.bookerLastName ?? ""}`.trim() ||
       data.bookerEmail;
-    const locationLabel = data.locationCity
-      ? `${data.locationName}, ${data.locationCity}`
-      : data.locationName;
+    const locationLabel = formatLocationFull({
+      name: data.locationName,
+      address: data.locationAddress,
+      city: data.locationCity,
+    });
     const duration = durationMinutes(data.startTime, data.endTime);
     const bookerLocale = resolveLocale(data.bookerLocale);
     const proLocale = resolveLocale(data.proLocale);

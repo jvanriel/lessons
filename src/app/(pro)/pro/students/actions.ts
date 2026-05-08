@@ -54,6 +54,7 @@ import { getProLocationTimezone } from "@/lib/pro";
 import { fromZonedTime } from "date-fns-tz";
 import { resolveLocale } from "@/lib/i18n";
 import { createNotification } from "@/lib/notifications";
+import { formatLocationFull } from "@/lib/location-display";
 import {
   computeAvailableSlots,
   buildIcs,
@@ -1177,6 +1178,7 @@ export async function proQuickBookForStudent(data: {
   const [loc] = await db
     .select({
       name: locations.name,
+      address: locations.address,
       city: locations.city,
       timezone: locations.timezone,
     })
@@ -1189,7 +1191,7 @@ export async function proQuickBookForStudent(data: {
       `proCreateBooking: location lookup missing for proLocationId=${data.proLocationId} (booking ${booking.id})`,
     );
   }
-  const locationName = loc.city ? `${loc.name}, ${loc.city}` : loc.name;
+  const locationName = formatLocationFull(loc);
   const locationTz = loc.timezone;
 
   const [studentRow] = await db
@@ -1385,6 +1387,7 @@ export async function proCancelBooking(bookingId: number) {
   const [loc] = await db
     .select({
       name: locations.name,
+      address: locations.address,
       city: locations.city,
       timezone: locations.timezone,
     })
@@ -1397,7 +1400,7 @@ export async function proCancelBooking(bookingId: number) {
       `proCancelBooking: location lookup missing for proLocationId=${booking.proLocationId} (booking ${booking.id})`,
     );
   }
-  const locationName = loc.city ? `${loc.name}, ${loc.city}` : loc.name;
+  const locationName = formatLocationFull(loc);
   const locationTz = loc.timezone;
   const lessonStart = fromZonedTime(
     `${booking.date}T${booking.startTime}:00`,

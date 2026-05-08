@@ -41,6 +41,7 @@ import {
   getProBookingNotificationSubject,
 } from "@/lib/email-templates";
 import { resolveLocale, type Locale } from "@/lib/i18n";
+import { formatLocationFull } from "@/lib/location-display";
 import { t } from "@/lib/i18n/translations";
 import { getLocale } from "@/lib/locale";
 import { addDaysToDateString, todayInTZ } from "@/lib/local-date";
@@ -701,6 +702,7 @@ export async function createPublicBooking(formData: FormData) {
   const [loc] = await db
     .select({
       name: locations.name,
+      address: locations.address,
       city: locations.city,
       timezone: locations.timezone,
     })
@@ -713,7 +715,7 @@ export async function createPublicBooking(formData: FormData) {
       `createPublicBooking: location lookup missing for proLocationId=${proLocationId} (booking ${booking.id})`,
     );
   }
-  const locationName = loc.city ? `${loc.name}, ${loc.city}` : loc.name;
+  const locationName = formatLocationFull(loc);
   const locationTz = loc.timezone;
 
   // Single .ics shared between the student and pro emails — both
