@@ -19,12 +19,11 @@ import * as Sentry from "@sentry/nextjs";
  */
 async function geocodeLocationInBackground(
   locationId: number,
-  name: string,
-  address: string | null,
+  address: string,
   city: string | null,
 ) {
   try {
-    const coords = await geocodeAddress({ name, address, city });
+    const coords = await geocodeAddress({ address, city });
     if (!coords) return;
     await db
       .update(locations)
@@ -33,7 +32,7 @@ async function geocodeLocationInBackground(
   } catch (err) {
     Sentry.captureException(err, {
       tags: { area: "geocode" },
-      extra: { locationId, name, address, city },
+      extra: { locationId, address, city },
     });
   }
 }
@@ -120,12 +119,15 @@ export async function createLocation(
       .values({ name, address, city, country, timezone })
       .returning({ id: locations.id });
     locationId = inserted.id;
-    // New location: kick off a background geocode so the booking
-    // emails / Waze links light up automatically. Even nameless-
-    // address rows can resolve via the address-only path; a
-    // pure-name row resolves via the POI fallback.
-    const newId = locationId;
-    after(() => geocodeLocationInBackground(newId, name, address, city));
+    // New location with an address: kick off a background geocode
+    // so the booking emails / Waze links light up automatically.
+    // Address-less rows skip the call — Nominatim has nothing to
+    // geocode without a street.
+    if (address) {
+      const newId = locationId;
+      const a = address;
+      after(() => geocodeLocationInBackground(newId, a, city));
+    }
   }
 
   // Check if pro already has this location
@@ -241,13 +243,12 @@ export async function updateProLocation(
     .where(eq(locations.id, link.locationId));
 
   const addressChanged =
-    prev?.address !== address || prev?.city !== city;
+    address && (prev?.address !== address || prev?.city !== city);
   if (addressChanged) {
     const id = link.locationId;
-    const n = name;
     const a = address;
     const c = city;
-    after(() => geocodeLocationInBackground(id, n, a, c));
+    after(() => geocodeLocationInBackground(id, a, c));
   }
   await db
     .update(proLocations)

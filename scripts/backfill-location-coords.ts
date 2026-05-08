@@ -43,19 +43,18 @@ async function backfill(target: Target) {
   console.log(`\n=== ${target.toUpperCase()} ===`);
   const sql = neon(urlFor(target));
 
-  // Backfill: only rows that have at least one signal (name with
-  // address, or name alone) but no coordinates yet. We don't filter
-  // out null-address rows — `geocodeAddress` falls back to a POI
-  // lookup on the name, which often resolves Belgian golf clubs.
+  // Backfill: rows with an address but no coordinates yet.
   const rows = (await sql`
     SELECT id, name, address, city
     FROM locations
-    WHERE (lat IS NULL OR lng IS NULL)
+    WHERE address IS NOT NULL
+      AND TRIM(address) <> ''
+      AND (lat IS NULL OR lng IS NULL)
     ORDER BY id
   `) as Array<{
     id: number;
     name: string;
-    address: string | null;
+    address: string;
     city: string | null;
   }>;
 
@@ -63,18 +62,14 @@ async function backfill(target: Target) {
   let hits = 0;
   let misses = 0;
   for (const r of rows) {
-    const coords = await geocodeAddress({
-      name: r.name,
-      address: r.address,
-      city: r.city,
-    });
+    const coords = await geocodeAddress({ address: r.address, city: r.city });
     if (!coords) {
       misses++;
-      console.log(`  ✗ id=${r.id} "${r.name}" — no match`);
+      console.log(`  ✗ id=${r.id} "${r.name}" — no match for "${r.address}"`);
     } else {
       hits++;
       console.log(
-        `  ✓ id=${r.id} "${r.name}" → ${coords.lat}, ${coords.lng} via "${coords.matchedQuery}" (${coords.displayName.slice(0, 60)}...)`,
+        `  ✓ id=${r.id} "${r.name}" → ${coords.lat}, ${coords.lng} (${coords.displayName.slice(0, 60)}...)`,
       );
       await sql`
         UPDATE locations

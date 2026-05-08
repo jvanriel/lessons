@@ -3,20 +3,22 @@
  * `locations` rows that drive the booking emails / .ics / Waze /
  * Google Maps deep links (task 116 follow-up).
  *
- * Why Nominatim: free, no API key, excellent Belgian coverage
- * (CRAB/AGIV cadastre data feeds OSM rooftop-precise on real golf
- * club addresses). Trade-off — small private ranges sometimes
- * resolve to street centroid rather than rooftop; pros can override
- * by pasting coords manually.
+ * The whole pipeline is "trust the pro": pros know the precise
+ * address of the place they teach at. We send that address to
+ * Nominatim, save lat/lng on a hit, leave NULL on a miss. If the
+ * pro mistypes the street name, that's the pro's problem to fix
+ * in the location editor — not ours to second-guess with LLM
+ * lookups or POI fallbacks (we tried, both produced false
+ * positives on test data and didn't help with real obscure
+ * clubs anyway).
  *
  * Policy compliance:
  *   - Hard requirement: a User-Agent identifying the calling app +
  *     a contact email. Anonymous traffic gets blocked.
  *     https://operations.osmfoundation.org/policies/nominatim/
- *   - Hard requirement: 1 req/sec absolute max — bulk callers
- *     (the backfill script) MUST sleep between requests. Live
- *     traffic from a pro saving a location is naturally well below
- *     that ceiling.
+ *   - Hard requirement: 1 req/sec absolute max — the backfill
+ *     script throttles itself; live traffic from a pro saving a
+ *     location is well below that ceiling.
  *
  * The `countrycodes=be` filter is currently hardcoded — golflessons.be
  * is Belgium-only today; revisit when expanding to NL/FR/UK.
@@ -40,21 +42,33 @@ export interface Coords {
    * persisted; pure observability.
    */
   displayName: string;
-  /**
-   * Which of the input candidates produced this hit. Lets callers
-   * log "matched on the POI name, not the address" so subtle
-   * data quality issues (the address in the DB pointing at the
-   * club's office instead of the course gate) become visible.
-   */
-  matchedQuery: string;
 }
 
 /**
- * Run a single Nominatim query. Returns `null` on a miss. Used
- * internally by `geocodeAddress` which tries a sequence of
- * fallback queries.
+ * Geocode a `locations` row's address. Composes
+ * "address, city" when both are present (helps Nominatim
+ * disambiguate same-named streets across municipalities) and
+ * falls back to the address alone when the row has no city.
+ *
+ * Returns `null` on no result, network error, or malformed
+ * response — the caller treats null as "leave lat/lng NULL,
+ * URL-encoded address links keep working".
  */
-async function nominatimSingle(query: string): Promise<Coords | null> {
+export async function geocodeAddress(input: {
+  address: string | null;
+  city: string | null;
+}): Promise<Coords | null> {
+  const addr = input.address?.trim();
+  if (!addr) return null;
+  const city = input.city?.trim();
+  // Only append city when the address doesn't already include
+  // it (most pros type "Streetname N, postcode City"; double-
+  // tagging makes Nominatim return zero results).
+  const query =
+    city && !addr.toLowerCase().includes(city.toLowerCase())
+      ? `${addr}, ${city}`
+      : addr;
+
   const url = new URL(NOMINATIM_BASE);
   url.searchParams.set("format", "json");
   url.searchParams.set("q", query);
@@ -82,49 +96,5 @@ async function nominatimSingle(query: string): Promise<Coords | null> {
     lat: top.lat,
     lng: top.lon,
     displayName: top.display_name ?? "",
-    matchedQuery: query,
   };
-}
-
-/**
- * Sleep between Nominatim calls. The published policy is "absolute
- * max 1 req/sec, please leave headroom". 1100ms is the convention
- * we use across the backfill script + this fallback chain.
- */
-function sleep(ms: number) {
-  return new Promise((r) => setTimeout(r, ms));
-}
-
-/**
- * Resolve a `locations` row to coordinates. Tries the address
- * verbatim first (rooftop precision when OSM has the house), then
- * falls back to a POI lookup on the club name + city — Belgian
- * golf courses are usually OSM POIs even when the cadastre lacks
- * the street number.
- *
- * Returns `null` only when both attempts fail. Callers should
- * leave lat/lng NULL on a miss; the helpers in
- * `location-display.ts` fall back to URL-encoded address-based
- * deep links.
- */
-export async function geocodeAddress(input: {
-  name: string;
-  address: string | null;
-  city: string | null;
-}): Promise<Coords | null> {
-  const candidates: string[] = [];
-  if (input.address?.trim()) candidates.push(input.address.trim());
-  if (input.name?.trim()) {
-    candidates.push(
-      input.city ? `${input.name.trim()}, ${input.city.trim()}` : input.name.trim(),
-    );
-  }
-  if (candidates.length === 0) return null;
-
-  for (let i = 0; i < candidates.length; i++) {
-    const hit = await nominatimSingle(candidates[i]);
-    if (hit) return hit;
-    if (i < candidates.length - 1) await sleep(1100);
-  }
-  return null;
 }
