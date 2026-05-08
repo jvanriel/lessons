@@ -388,11 +388,9 @@ export default function QuickBookCalendar({
           the member dashboard. Hidden on the pro side (no proStudentId
           / proId), and visually identical otherwise so a student
           debating a date change with their pro sees the same surface
-          as on their dashboard. flex-wrap so on narrow mobile widths
-          the link drops below the pills instead of compressing
-          them. */}
+          as on their dashboard. */}
       {showIntervalRow && (
-        <div className="flex flex-wrap items-center justify-between gap-y-2">
+        <div className="flex items-center justify-between">
           <IntervalPills
             value={interval}
             onChange={handleIntervalChange}

@@ -481,7 +481,7 @@ export function QuickBook({ data, proId, proName, hasPaymentMethod = true, allow
           )}
 
           {/* Next lesson timing + more options */}
-          <div className="flex flex-wrap items-center justify-between gap-y-2">
+          <div className="flex items-center justify-between">
             <IntervalPills
               value={interval as IntervalValue}
               onChange={(newVal) => {

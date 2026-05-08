@@ -40,7 +40,7 @@ export default function IntervalPills({ value, onChange, locale }: Props) {
             key={iv.value}
             type="button"
             onClick={() => onChange(active ? null : iv.value)}
-            className={`whitespace-nowrap rounded-full px-2 py-0.5 text-[10px] font-medium transition-colors ${
+            className={`rounded-full px-2 py-0.5 text-[10px] font-medium transition-colors ${
               active
                 ? "bg-green-700 text-white"
                 : "bg-green-50 text-green-500 hover:text-green-700"
