@@ -81,6 +81,23 @@ function requireMember() {
   });
 }
 
+/**
+ * Lighter guard for the read-only "what's available" lookups
+ * (getAvailableDates / getAvailableSlots / getDateBlockReason).
+ * Pros need to call these from the booking-edit page too; the data
+ * being returned ("which dates does this pro have open?") is the
+ * same info exposed in the public booking flow, so requiring a
+ * specific role is overkill — just need any signed-in viewer.
+ */
+function requireSignedIn() {
+  return getSession().then((session) => {
+    if (!session) {
+      redirect("/login");
+    }
+    return session;
+  });
+}
+
 export async function getBookablePros() {
   await requireMember();
 
@@ -133,9 +150,16 @@ export async function getProLocations(proProfileId: number) {
 export async function getAvailableDates(
   proProfileId: number,
   locationId: number,
-  duration: number
+  duration: number,
+  /**
+   * Optional booking id to exclude from the conflict check — same
+   * semantics as `getAvailableSlots`. Used by the booking-edit
+   * calendar so the booking being edited doesn't make the dates
+   * around it look fully booked.
+   */
+  excludeBookingId?: number,
 ) {
-  await requireMember();
+  await requireSignedIn();
 
   // Get the pro's booking horizon
   const [pro] = await db
@@ -204,7 +228,10 @@ export async function getAvailableDates(
         eq(lessonBookings.proLocationId, locationId),
         eq(lessonBookings.status, "confirmed"),
         gte(lessonBookings.date, todayStr),
-        lte(lessonBookings.date, horizonStr)
+        lte(lessonBookings.date, horizonStr),
+        ...(excludeBookingId
+          ? [ne(lessonBookings.id, excludeBookingId)]
+          : []),
       )
     );
 
@@ -255,7 +282,7 @@ export async function getAvailableSlots(
    */
   excludeBookingId?: number,
 ) {
-  await requireMember();
+  await requireSignedIn();
 
   const [pro] = await db
     .select({ bookingNotice: proProfiles.bookingNotice })
@@ -347,7 +374,7 @@ export async function getDateBlockReason(
   locationId: number,
   date: string,
 ): Promise<string | null> {
-  await requireMember();
+  await requireSignedIn();
   const overrides = await db
     .select({
       type: proAvailabilityOverrides.type,

@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { t } from "@/lib/i18n/translations";
 import type { Locale } from "@/lib/i18n";
+import QuickBookCalendar from "@/components/booking/QuickBookCalendar";
 
 interface BookingDetails {
   id: number;
@@ -13,6 +14,8 @@ interface BookingDetails {
   endTime: string;
   duration: number;
   participantCount: number;
+  proProfileId: number;
+  proLocationId: number;
   proName: string;
   locationLabel: string;
   /** All participants including the booker as #1. */
@@ -55,8 +58,6 @@ export default function EditBookingForm({
   locale,
 }: Props) {
   const router = useRouter();
-  const [date, setDate] = useState(booking.date);
-  const [startTime, setStartTime] = useState(booking.startTime);
   const [duration, setDuration] = useState(booking.duration);
   const [participantCount, setParticipantCount] = useState(
     booking.participantCount,
@@ -87,24 +88,36 @@ export default function EditBookingForm({
   }, [participantCount]);
 
   const [error, setError] = useState<string | null>(null);
-  const [pending, startTransition] = useTransition();
+  const [, startTransition] = useTransition();
 
-  const computedEndTime = endTimeFor(startTime, duration);
-
-  function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
-    e.preventDefault();
+  // The QuickBookCalendar handles slot picking + the hold-to-save
+  // gesture itself. This callback receives the picked slot, packs
+  // the rest of the form state into FormData, and calls the parent-
+  // supplied server action. Returning an error surfaces inline; on
+  // success we redirect.
+  async function handleConfirm(slot: {
+    date: string;
+    startTime: string;
+    endTime: string;
+  }): Promise<{ error?: string } | void> {
     setError(null);
 
-    if (!date || !startTime || !duration) {
-      setError(t("editBooking.errFillRequired", locale));
-      return;
+    // Validate extra-participant rows before committing — same rule
+    // as the booking flow: each extra participant needs first +
+    // last name (email is optional).
+    for (const p of extraParticipants) {
+      if (!p.firstName.trim() || !p.lastName.trim()) {
+        const msg = t("editBooking.errFillRequired", locale);
+        setError(msg);
+        return { error: msg };
+      }
     }
 
     const fd = new FormData();
     fd.set("bookingId", String(booking.id));
-    fd.set("date", date);
-    fd.set("startTime", startTime);
-    fd.set("endTime", computedEndTime);
+    fd.set("date", slot.date);
+    fd.set("startTime", slot.startTime);
+    fd.set("endTime", endTimeFor(slot.startTime, duration));
     fd.set("duration", String(duration));
     fd.set("participantCount", String(participantCount));
     extraParticipants.forEach((p, i) => {
@@ -113,64 +126,46 @@ export default function EditBookingForm({
       fd.set(`participants[${i}].email`, p.email.trim());
     });
 
-    startTransition(async () => {
-      const result = await action(fd);
-      if (result.error) {
-        setError(result.error);
-        return;
-      }
-      router.push(successHref);
-      router.refresh();
+    const result = await action(fd);
+    if (result.error) {
+      setError(result.error);
+      return { error: result.error };
+    }
+    // After the QuickBookCalendar flips to its "saved" state, give
+    // the toast a moment to register before navigating away.
+    startTransition(() => {
+      setTimeout(() => {
+        router.push(successHref);
+        router.refresh();
+      }, 600);
     });
   }
 
+  const hasInvalidParticipants = extraParticipants.some(
+    (p) => !p.firstName.trim() || !p.lastName.trim(),
+  );
+
   return (
-    <form
-      onSubmit={handleSubmit}
-      className="space-y-5 rounded-xl border border-green-200 bg-white p-6"
-    >
+    <div className="space-y-5 rounded-xl border border-green-200 bg-white p-6">
       <div>
-        <p className="text-xs uppercase text-green-500">{t("editBooking.proLabel", locale)}</p>
+        <p className="text-xs uppercase text-green-500">
+          {t("editBooking.proLabel", locale)}
+        </p>
         <p className="text-green-900">{booking.proName}</p>
       </div>
       <div>
-        <p className="text-xs uppercase text-green-500">{t("editBooking.locationLabel", locale)}</p>
+        <p className="text-xs uppercase text-green-500">
+          {t("editBooking.locationLabel", locale)}
+        </p>
         <p className="text-green-900">{booking.locationLabel}</p>
       </div>
 
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
         <div className="min-w-0">
-          <label htmlFor="date" className="mb-1 block text-sm font-medium text-green-700">
-            {t("editBooking.dateLabel", locale)}
-          </label>
-          <input
-            id="date"
-            type="date"
-            value={date}
-            onChange={(e) => setDate(e.target.value)}
-            required
-            className="w-full rounded-md border border-green-200 bg-white px-3 py-2 text-sm text-green-900 focus:border-green-400 focus:outline-none focus:ring-1 focus:ring-green-400"
-          />
-        </div>
-        <div className="min-w-0">
-          <label htmlFor="startTime" className="mb-1 block text-sm font-medium text-green-700">
-            {t("editBooking.startTimeLabel", locale)}
-          </label>
-          <input
-            id="startTime"
-            type="time"
-            value={startTime}
-            onChange={(e) => setStartTime(e.target.value)}
-            required
-            step={300}
-            className="w-full rounded-md border border-green-200 bg-white px-3 py-2 text-sm text-green-900 focus:border-green-400 focus:outline-none focus:ring-1 focus:ring-green-400"
-          />
-        </div>
-      </div>
-
-      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-        <div className="min-w-0">
-          <label htmlFor="duration" className="mb-1 block text-sm font-medium text-green-700">
+          <label
+            htmlFor="duration"
+            className="mb-1 block text-sm font-medium text-green-700"
+          >
             {t("editBooking.durationLabel", locale)}
           </label>
           <select
@@ -186,36 +181,34 @@ export default function EditBookingForm({
             ))}
           </select>
         </div>
-        <div className="min-w-0">
-          <p className="mb-1 block text-sm font-medium text-green-700">{t("editBooking.endTimeLabel", locale)}</p>
-          <p className="rounded-md border border-green-100 bg-green-50/40 px-3 py-2 text-sm text-green-900">
-            {computedEndTime}
-          </p>
-        </div>
+        {maxGroupSize > 1 && (
+          <div className="min-w-0">
+            <label
+              htmlFor="participantCount"
+              className="mb-1 block text-sm font-medium text-green-700"
+            >
+              {t("editBooking.participantCountLabel", locale)}
+            </label>
+            <select
+              id="participantCount"
+              value={participantCount}
+              onChange={(e) => setParticipantCount(Number(e.target.value))}
+              className="w-full rounded-md border border-green-200 bg-white px-3 py-2 text-sm text-green-900 focus:border-green-400 focus:outline-none focus:ring-1 focus:ring-green-400"
+            >
+              {Array.from({ length: maxGroupSize }, (_, i) => i + 1).map(
+                (n) => (
+                  <option key={n} value={n}>
+                    {n}{" "}
+                    {n === 1
+                      ? t("book.participant", locale)
+                      : t("book.participantsPlural", locale)}
+                  </option>
+                ),
+              )}
+            </select>
+          </div>
+        )}
       </div>
-
-      {maxGroupSize > 1 && (
-        <div>
-          <label htmlFor="participantCount" className="mb-1 block text-sm font-medium text-green-700">
-            {t("editBooking.participantCountLabel", locale)}
-          </label>
-          <select
-            id="participantCount"
-            value={participantCount}
-            onChange={(e) => setParticipantCount(Number(e.target.value))}
-            className="w-full rounded-md border border-green-200 bg-white px-3 py-2 text-sm text-green-900 focus:border-green-400 focus:outline-none focus:ring-1 focus:ring-green-400"
-          >
-            {Array.from({ length: maxGroupSize }, (_, i) => i + 1).map((n) => (
-              <option key={n} value={n}>
-                {n}{" "}
-                {n === 1
-                  ? t("book.participant", locale)
-                  : t("book.participantsPlural", locale)}
-              </option>
-            ))}
-          </select>
-        </div>
-      )}
 
       {extraParticipants.length > 0 && (
         <div className="space-y-3 rounded-lg border border-green-100 bg-green-50/40 p-4">
@@ -229,23 +222,24 @@ export default function EditBookingForm({
             <div key={i} className="space-y-2">
               <div className="flex items-center justify-between">
                 <p className="text-xs font-medium text-green-700">
-                  {t("book.extraParticipantHeading", locale).replace("{n}", String(i + 2))}
+                  {t("book.extraParticipantHeading", locale).replace(
+                    "{n}",
+                    String(i + 2),
+                  )}
                 </p>
                 <button
                   type="button"
                   onClick={() => {
-                    // Drop this row AND decrement the count together,
-                    // so the participantCount selector + the rows
-                    // stay in sync. We pin the participantCount to
-                    // the new length explicitly to avoid the
-                    // syncing useEffect re-padding from the bottom.
                     setExtraParticipants((prev) =>
                       prev.filter((_, j) => j !== i),
                     );
                     setParticipantCount((c) => Math.max(1, c - 1));
                   }}
                   className="text-xs text-red-500 hover:text-red-600"
-                  aria-label={t("editBooking.removeParticipantAria", locale).replace("{n}", String(i + 2))}
+                  aria-label={t(
+                    "editBooking.removeParticipantAria",
+                    locale,
+                  ).replace("{n}", String(i + 2))}
                 >
                   {t("editBooking.removeParticipant", locale)}
                 </button>
@@ -298,6 +292,27 @@ export default function EditBookingForm({
         </div>
       )}
 
+      <div>
+        <p className="mb-2 text-sm font-medium text-green-700">
+          {t("editBooking.dateLabel", locale)} &amp;{" "}
+          {t("editBooking.startTimeLabel", locale)}
+        </p>
+        <QuickBookCalendar
+          proProfileId={booking.proProfileId}
+          proLocationId={booking.proLocationId}
+          duration={duration}
+          excludeBookingId={booking.id}
+          currentSlot={{
+            date: booking.date,
+            startTime: booking.startTime,
+            endTime: booking.endTime,
+          }}
+          disabled={hasInvalidParticipants}
+          onConfirm={handleConfirm}
+          locale={locale}
+        />
+      </div>
+
       <p className="text-xs text-green-600">
         {t("editBooking.priceDisclaimer", locale)}
       </p>
@@ -309,15 +324,6 @@ export default function EditBookingForm({
       )}
 
       <div className="flex items-center gap-3">
-        <button
-          type="submit"
-          disabled={pending}
-          className="rounded-md bg-gold-600 px-4 py-2 text-sm font-medium text-white hover:bg-gold-500 disabled:opacity-50"
-        >
-          {pending
-            ? t("editBooking.saving", locale)
-            : t("editBooking.save", locale)}
-        </button>
         <Link
           href={cancelHref}
           className="text-sm text-green-600 hover:text-green-700"
@@ -325,6 +331,6 @@ export default function EditBookingForm({
           {t("editBooking.cancel", locale)}
         </Link>
       </div>
-    </form>
+    </div>
   );
 }
