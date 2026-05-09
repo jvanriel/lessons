@@ -615,6 +615,29 @@ function TaskDetailPanel({
                 }
                 return res.json();
               }}
+              onCreateGoogleDoc={async (type, title) => {
+                const res = await fetch(
+                  "/api/admin/tasks/google-create",
+                  {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({
+                      taskId: task.id,
+                      type,
+                      title,
+                    }),
+                  },
+                );
+                if (!res.ok) {
+                  const body = (await res
+                    .json()
+                    .catch(() => ({}))) as { error?: string };
+                  throw new Error(
+                    body.error ?? "Failed to create Google file",
+                  );
+                }
+                return res.json();
+              }}
             />
           )}
           {activeTab === "share" && (

@@ -17,6 +17,13 @@ If any role inside the brackets is unknown (typo), the parser falls
 back to treating the brackets as literal text — better to over-show
 than silently hide.
 
+## 2026-05-09 — v1.1.61
+
+- **[admin,pro] Native Google Docs/Sheets/Slides on tasks.** Create a
+  Google Doc, Sheet, or Slides directly from a task's Comments tab —
+  the file lands in a per-task Drive folder and is attached as a
+  comment.
+
 ## 2026-05-08 — v1.1.60
 
 - **Editing a booking now uses the QuickBook surface.** Date pill row,
