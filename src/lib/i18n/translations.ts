@@ -2967,7 +2967,7 @@ const translations: Record<Locale, Record<string, string>> = {
     "onboarding.of": "van",
     "onboarding.continue": "Verder",
     "onboarding.registerAsPro": "Registreer als pro",
-    "onboarding.registerAsStudent": "Registreer als student",
+    "onboarding.registerAsStudent": "Registreer als golfer",
     "onboarding.accountTypeHint": "Gratis voor golfspelers — een pro-account vereist een abonnement.",
     "onboarding.back": "Terug",
     "onboarding.saving": "Opslaan...",
