@@ -268,7 +268,15 @@ export default async function MemberDashboard() {
 
         {upcomingBookings.length === 0 ? (
           <p className="mt-2 text-sm text-green-600">
-            {t("member.noLessons", locale)}
+            {/* Copy depends on whether the golfer is already
+                connected to a pro (task 11). With pros: nudge to
+                book; without: nudge to browse. */}
+            {t(
+              myPros.length > 0
+                ? "member.noLessonsHasPro"
+                : "member.noLessons",
+              locale,
+            )}
           </p>
         ) : (
           <div className="mt-4 space-y-3">

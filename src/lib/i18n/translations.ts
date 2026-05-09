@@ -1287,6 +1287,7 @@ const translations: Record<Locale, Record<string, string>> = {
     "book.errorFillDetails": "Please fill in your name and email.",
     "member.yourLessons": "Your Lessons",
     "member.noLessons": "No upcoming lessons. Browse our pros to book your first lesson.",
+    "member.noLessonsHasPro": "No upcoming lessons. Book one now with one of your pros.",
 
     // Navigation (new pages)
     "nav.forStudents": "Info for Golfers",
@@ -2790,6 +2791,7 @@ const translations: Record<Locale, Record<string, string>> = {
     "book.errorFillDetails": "Vul je naam en e-mailadres in.",
     "member.yourLessons": "Jouw Lessen",
     "member.noLessons": "Geen aankomende lessen. Blader door onze pro's om je eerste les te boeken.",
+    "member.noLessonsHasPro": "Geen aankomende lessen. Boek er nu eentje bij een van je pro's.",
 
     "nav.forStudents": "Info Golfspelers",
     "nav.forPros": "Info Pro's",
@@ -4289,6 +4291,7 @@ const translations: Record<Locale, Record<string, string>> = {
     "book.errorFillDetails": "Veuillez remplir votre nom et votre e-mail.",
     "member.yourLessons": "Vos Cours",
     "member.noLessons": "Aucun cours à venir. Parcourez nos pros pour réserver votre premier cours.",
+    "member.noLessonsHasPro": "Aucun cours à venir. Réservez-en un maintenant chez l'un de vos pros.",
 
     "nav.forStudents": "Info Golfeurs",
     "nav.forPros": "Info Pros",
