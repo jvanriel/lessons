@@ -604,9 +604,14 @@ function TaskDetailPanel({
                   body: formData,
                 });
                 if (!res.ok) {
-                  const err = await res.json().catch(() => ({ error: "Upload failed" }));
-                  console.error("Task upload error:", err.error);
-                  return null;
+                  const body = (await res
+                    .json()
+                    .catch(() => ({}))) as { error?: string };
+                  // Throw so Comments.tsx can show the message
+                  // (task 16 — Nadine flagged that silent failures
+                  // gave no feedback for too-large / wrong-type
+                  // uploads).
+                  throw new Error(body.error ?? "Upload failed");
                 }
                 return res.json();
               }}

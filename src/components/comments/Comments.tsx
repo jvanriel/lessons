@@ -111,6 +111,7 @@ export default function Comments({
   const [mentionFilter, setMentionFilter] = useState("");
   const [mentionCursorPos, setMentionCursorPos] = useState(0);
   const [uploading, setUploading] = useState(false);
+  const [uploadError, setUploadError] = useState<string | null>(null);
   const [dragOver, setDragOver] = useState(false);
   const [lightboxUrl, setLightboxUrl] = useState<string | null>(null);
   const [videoUrl, setVideoUrl] = useState<string | null>(null);
@@ -233,11 +234,16 @@ export default function Comments({
   async function handleFileUpload(file: File) {
     if (!onUpload || uploading) return;
     setUploading(true);
+    setUploadError(null);
     shouldAutoScroll.current = true;
 
     try {
       const attachment = await onUpload(file);
-      if (!attachment) return;
+      if (!attachment) {
+        // The caller signalled "nothing to attach" without throwing —
+        // treat as a silent skip (e.g. user cancelled mid-upload).
+        return;
+      }
 
       // Create a comment with the attachment
       const caption = isImageType(attachment.contentType)
@@ -260,9 +266,21 @@ export default function Comments({
       if (res.ok) {
         const newComment: Comment = await res.json();
         setComments((prev) => [...prev, newComment]);
+      } else {
+        const body = (await res.json().catch(() => ({}))) as {
+          error?: string;
+        };
+        setUploadError(body.error ?? "Upload failed.");
       }
-    } catch {
-      // Handle silently
+    } catch (err) {
+      // Surface the message instead of swallowing it (task 16) —
+      // users were getting no feedback on too-large / wrong-type
+      // uploads.
+      const msg =
+        err instanceof Error && err.message
+          ? err.message
+          : "Upload failed.";
+      setUploadError(msg);
     } finally {
       setUploading(false);
     }
@@ -981,13 +999,42 @@ export default function Comments({
         </div>
       )}
 
+      {/* Upload error — surfaces server-side validation (file too
+          large, type not allowed) and transport failures. Pre-fix
+          the catch-block was a silent `Handle silently` (task 16). */}
+      {uploadError && (
+        <div className="flex items-start gap-2 border-t border-red-100 bg-red-50 px-4 py-2">
+          <span className="flex-1 text-xs text-red-700">{uploadError}</span>
+          <button
+            type="button"
+            onClick={() => setUploadError(null)}
+            className="text-red-400 hover:text-red-600"
+            aria-label="Dismiss"
+          >
+            <svg
+              className="h-3.5 w-3.5"
+              fill="none"
+              viewBox="0 0 24 24"
+              stroke="currentColor"
+              strokeWidth={2}
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                d="M6 18L18 6M6 6l12 12"
+              />
+            </svg>
+          </button>
+        </div>
+      )}
+
       {/* Hidden file input */}
       {onUpload && (
         <input
           ref={fileInputRef}
           type="file"
           className="hidden"
-          accept="image/jpeg,image/png,image/gif,image/webp,video/mp4,video/quicktime,video/webm,application/pdf,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document,application/vnd.ms-excel,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+          accept="image/jpeg,image/png,image/gif,image/webp,image/heic,image/heif,video/mp4,video/quicktime,video/webm,application/pdf,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document,application/vnd.ms-excel,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/vnd.ms-powerpoint,application/vnd.openxmlformats-officedocument.presentationml.presentation,text/csv,text/plain,text/markdown"
           onChange={(e) => {
             const file = e.target.files?.[0];
             if (file) handleFileUpload(file);

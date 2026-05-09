@@ -9,17 +9,34 @@ import { withRetry } from "@/lib/retry";
 
 const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10MB
 
+// Allowed MIME types for task attachments. Includes the common
+// Microsoft Office + plain-text formats so Nadine can attach
+// spreadsheets / docs / CSVs (task 16) in addition to images,
+// video and PDF. Native Google Docs/Sheets are URL-based and would
+// need the Drive API integration — tracked separately.
 const ALLOWED_TYPES = new Set([
+  // Images
   "image/jpeg",
   "image/png",
   "image/gif",
   "image/webp",
   "image/heic",
   "image/heif",
+  // Video
   "video/mp4",
   "video/quicktime",
   "video/webm",
+  // Documents
   "application/pdf",
+  "application/msword", // .doc
+  "application/vnd.openxmlformats-officedocument.wordprocessingml.document", // .docx
+  "application/vnd.ms-excel", // .xls
+  "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", // .xlsx
+  "application/vnd.ms-powerpoint", // .ppt
+  "application/vnd.openxmlformats-officedocument.presentationml.presentation", // .pptx
+  "text/csv",
+  "text/plain",
+  "text/markdown",
 ]);
 
 export async function POST(request: NextRequest) {
