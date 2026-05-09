@@ -332,14 +332,14 @@ export default function Comments({
     shouldAutoScroll.current = true;
     try {
       const attachment = await onCreateGoogleDoc(type, trimmed);
-      const caption = `📄 ${attachment.name}`;
+      // No caption — the file card already shows the title.
       const res = await fetch("/api/comments", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           contextType,
           contextId,
-          content: caption,
+          content: "",
           attachments: [attachment],
         }),
       });
@@ -768,22 +768,32 @@ export default function Comments({
                                     <p className={`truncate text-xs font-medium ${isOwn ? "text-white" : "text-green-800"}`}>
                                       {att.name}
                                     </p>
-                                    <p className={`text-[10px] ${isOwn ? "text-green-200" : "text-green-400"}`}>
-                                      {formatFileSize(att.size)}
-                                    </p>
+                                    {att.size > 0 && (
+                                      <p className={`text-[10px] ${isOwn ? "text-green-200" : "text-green-400"}`}>
+                                        {formatFileSize(att.size)}
+                                      </p>
+                                    )}
                                   </div>
-                                  <svg className={`h-4 w-4 shrink-0 ${isOwn ? "text-green-200" : "text-green-400"}`} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                                    <path strokeLinecap="round" strokeLinejoin="round" d="M3 16.5v2.25A2.25 2.25 0 0 0 5.25 21h13.5A2.25 2.25 0 0 0 21 18.75V16.5M16.5 12 12 16.5m0 0L7.5 12m4.5 4.5V3" />
-                                  </svg>
+                                  {att.contentType?.startsWith("application/vnd.google-apps.") ? (
+                                    <svg className={`h-4 w-4 shrink-0 ${isOwn ? "text-green-200" : "text-green-400"}`} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                                      <path strokeLinecap="round" strokeLinejoin="round" d="M16.862 4.487l1.687-1.688a1.875 1.875 0 1 1 2.652 2.652L10.582 16.07a4.5 4.5 0 0 1-1.897 1.13L6 18l.8-2.685a4.5 4.5 0 0 1 1.13-1.897l8.932-8.931Zm0 0L19.5 7.125" />
+                                    </svg>
+                                  ) : (
+                                    <svg className={`h-4 w-4 shrink-0 ${isOwn ? "text-green-200" : "text-green-400"}`} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                                      <path strokeLinecap="round" strokeLinejoin="round" d="M3 16.5v2.25A2.25 2.25 0 0 0 5.25 21h13.5A2.25 2.25 0 0 0 21 18.75V16.5M16.5 12 12 16.5m0 0L7.5 12m4.5 4.5V3" />
+                                    </svg>
+                                  )}
                                 </a>
                               );
                             })}
                           </div>
                         )}
 
-                        <p className="whitespace-pre-wrap text-sm leading-relaxed">
-                          {renderContentWithMentions(comment.content)}
-                        </p>
+                        {comment.content && (
+                          <p className="whitespace-pre-wrap text-sm leading-relaxed">
+                            {renderContentWithMentions(comment.content)}
+                          </p>
+                        )}
 
                         {/* Chevron menu — top right inside bubble */}
                         <div className="absolute right-1 top-1">
