@@ -41,7 +41,7 @@ export async function getPublishedPros() {
   const prosWithLocations = await Promise.all(
     pros.map(async (pro) => {
       const locs = await db
-        .select({ city: locations.city })
+        .select({ name: locations.name, city: locations.city })
         .from(proLocations)
         .innerJoin(locations, eq(proLocations.locationId, locations.id))
         .where(
@@ -51,7 +51,8 @@ export async function getPublishedPros() {
           )
         );
       const cities = [...new Set(locs.map((l) => l.city).filter(Boolean))];
-      return { ...pro, cities };
+      const courses = [...new Set(locs.map((l) => l.name).filter(Boolean))];
+      return { ...pro, cities, courses };
     })
   );
 

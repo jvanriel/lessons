@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback, useMemo } from "react";
 import { Button } from "@/components/ui/button";
 import {
   Elements,
@@ -580,6 +580,23 @@ function GolfProfileStep({
 // ─── Step 3: Choose Pros ───────────────────────────────
 
 function ChooseProsStep({ pros, selected, onToggle, locale }: { pros: Pro[]; selected: Set<number>; onToggle: (id: number) => void; locale: Locale }) {
+  const [query, setQuery] = useState("");
+  const filtered = useMemo(() => {
+    const q = query.trim().toLowerCase();
+    if (!q) return pros;
+    return pros.filter((p) => {
+      const haystack = [
+        p.displayName,
+        p.specialties ?? "",
+        p.cities.filter(Boolean).join(" "),
+        p.locations.map((l) => `${l.name} ${l.city ?? ""}`).join(" "),
+      ]
+        .join(" ")
+        .toLowerCase();
+      return haystack.includes(q);
+    });
+  }, [pros, query]);
+
   if (pros.length === 0) {
     return (
       <div className="rounded-xl border border-green-200 bg-white p-8 text-center">
@@ -590,26 +607,44 @@ function ChooseProsStep({ pros, selected, onToggle, locale }: { pros: Pro[]; sel
   return (
     <div className="space-y-4">
       <p className="text-sm text-green-600">{t("onboarding.chooseProsDesc", locale)}</p>
-      <div className="grid gap-4 sm:grid-cols-2">
-        {pros.map((pro) => {
-          const isSelected = selected.has(pro.id);
-          return (
-            <button key={pro.id} type="button" onClick={() => onToggle(pro.id)} className={`relative rounded-xl border p-5 text-left transition-all ${isSelected ? "border-gold-500 bg-gold-50 shadow-md ring-1 ring-gold-400" : "border-green-200 bg-white hover:border-green-300 hover:shadow-sm"}`}>
-              <div className="flex items-center gap-3">
-                {pro.photoUrl ? <img src={pro.photoUrl} alt={pro.displayName} className="h-14 w-14 rounded-full object-cover" /> : <div className="flex h-14 w-14 items-center justify-center rounded-full bg-green-100 text-lg font-medium text-green-600">{pro.displayName.charAt(0)}</div>}
-                <div className="min-w-0 flex-1">
-                  <p className="truncate font-medium text-green-900">{pro.displayName}</p>
-                  {pro.specialties && <p className="mt-0.5 truncate text-xs text-gold-600">{pro.specialties}</p>}
-                  {pro.cities.length > 0 && <p className="mt-0.5 truncate text-xs text-green-500">{pro.cities.join(", ")}</p>}
-                </div>
-              </div>
-              <div className={`absolute left-3 top-3 flex h-5 w-5 items-center justify-center rounded-full border ${isSelected ? "border-gold-500 bg-gold-500 text-white" : "border-green-300 bg-white"}`}>
-                {isSelected && <svg className="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}><path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" /></svg>}
-              </div>
-            </button>
-          );
-        })}
+      <div className="relative">
+        <svg className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-green-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+          <path strokeLinecap="round" strokeLinejoin="round" d="m21 21-5.197-5.197m0 0A7.5 7.5 0 1 0 5.196 5.196a7.5 7.5 0 0 0 10.607 10.607Z" />
+        </svg>
+        <input
+          type="search"
+          value={query}
+          onChange={(e) => setQuery(e.target.value)}
+          placeholder={t("choosePros.searchPlaceholder", locale)}
+          className="w-full rounded-md border border-green-200 bg-white py-2 pl-9 pr-3 text-sm text-green-800 placeholder:text-green-300 focus:border-green-400 focus:outline-none"
+        />
       </div>
+      {filtered.length === 0 ? (
+        <div className="rounded-xl border border-green-200 bg-white p-8 text-center">
+          <p className="text-green-600">{t("choosePros.noMatches", locale)}</p>
+        </div>
+      ) : (
+        <div className="grid gap-4 sm:grid-cols-2">
+          {filtered.map((pro) => {
+            const isSelected = selected.has(pro.id);
+            return (
+              <button key={pro.id} type="button" onClick={() => onToggle(pro.id)} className={`relative rounded-xl border p-5 text-left transition-all ${isSelected ? "border-gold-500 bg-gold-50 shadow-md ring-1 ring-gold-400" : "border-green-200 bg-white hover:border-green-300 hover:shadow-sm"}`}>
+                <div className="flex items-center gap-3">
+                  {pro.photoUrl ? <img src={pro.photoUrl} alt={pro.displayName} className="h-14 w-14 rounded-full object-cover" /> : <div className="flex h-14 w-14 items-center justify-center rounded-full bg-green-100 text-lg font-medium text-green-600">{pro.displayName.charAt(0)}</div>}
+                  <div className="min-w-0 flex-1">
+                    <p className="truncate font-medium text-green-900">{pro.displayName}</p>
+                    {pro.specialties && <p className="mt-0.5 truncate text-xs text-gold-600">{pro.specialties}</p>}
+                    {pro.cities.length > 0 && <p className="mt-0.5 truncate text-xs text-green-500">{pro.cities.join(", ")}</p>}
+                  </div>
+                </div>
+                <div className={`absolute left-3 top-3 flex h-5 w-5 items-center justify-center rounded-full border ${isSelected ? "border-gold-500 bg-gold-500 text-white" : "border-green-300 bg-white"}`}>
+                  {isSelected && <svg className="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}><path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" /></svg>}
+                </div>
+              </button>
+            );
+          })}
+        </div>
+      )}
     </div>
   );
 }

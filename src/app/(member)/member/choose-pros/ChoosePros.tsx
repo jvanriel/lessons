@@ -14,6 +14,7 @@ interface Pro {
   specialties: string | null;
   bio: string | null;
   cities: (string | null)[];
+  courses: string[];
 }
 
 interface UpcomingBooking {
@@ -46,7 +47,25 @@ export default function ChoosePros({
   const [isPending, startTransition] = useTransition();
   const [confirmOpen, setConfirmOpen] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [query, setQuery] = useState("");
   const backdropRef = useRef<HTMLDivElement>(null);
+
+  const filteredPros = useMemo(() => {
+    const q = query.trim().toLowerCase();
+    if (!q) return pros;
+    return pros.filter((p) => {
+      const haystack = [
+        p.displayName,
+        p.specialties ?? "",
+        p.bio ?? "",
+        p.cities.filter(Boolean).join(" "),
+        p.courses.join(" "),
+      ]
+        .join(" ")
+        .toLowerCase();
+      return haystack.includes(q);
+    });
+  }, [pros, query]);
 
   const prosById = useMemo(
     () => new Map(pros.map((p) => [p.id, p])),
@@ -125,8 +144,25 @@ export default function ChoosePros({
         </div>
       ) : (
         <>
-          <div className="mt-8 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-            {pros.map((pro) => {
+          <div className="relative mt-6">
+            <svg className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-green-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="m21 21-5.197-5.197m0 0A7.5 7.5 0 1 0 5.196 5.196a7.5 7.5 0 0 0 10.607 10.607Z" />
+            </svg>
+            <input
+              type="search"
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+              placeholder={t("choosePros.searchPlaceholder", locale)}
+              className="w-full rounded-md border border-green-200 bg-white py-2 pl-9 pr-3 text-sm text-green-800 placeholder:text-green-300 focus:border-green-400 focus:outline-none"
+            />
+          </div>
+          {filteredPros.length === 0 ? (
+            <div className="mt-6 rounded-xl border border-green-200 bg-white p-8 text-center">
+              <p className="text-green-600">{t("choosePros.noMatches", locale)}</p>
+            </div>
+          ) : (
+          <div className="mt-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+            {filteredPros.map((pro) => {
               const isSelected = selected.has(pro.id);
               const isExisting = existingProIds.includes(pro.id);
               return (
@@ -191,6 +227,7 @@ export default function ChoosePros({
               );
             })}
           </div>
+          )}
 
           {error && (
             <div className="mt-6 rounded-md border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
