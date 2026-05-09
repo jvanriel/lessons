@@ -138,6 +138,16 @@ export default function Comments({
   // three options share the same code path.
   const [driveMenuOpen, setDriveMenuOpen] = useState(false);
   const [creatingGoogleDoc, setCreatingGoogleDoc] = useState(false);
+  // Styled prompt dialog (task 124) — replaces the browser's native
+  // `prompt()` for collecting the title or URL. Same shape as the
+  // app's other modals (e.g. CancelBookingDialog).
+  type DrivePromptState =
+    | null
+    | { mode: "create"; type: "document" | "spreadsheet" | "presentation" }
+    | { mode: "attach" };
+  const [drivePrompt, setDrivePrompt] = useState<DrivePromptState>(null);
+  const [drivePromptValue, setDrivePromptValue] = useState("");
+  const drivePromptInputRef = useRef<HTMLInputElement>(null);
   const [dragOver, setDragOver] = useState(false);
   const [lightboxUrl, setLightboxUrl] = useState<string | null>(null);
   const [videoUrl, setVideoUrl] = useState<string | null>(null);
@@ -216,6 +226,17 @@ export default function Comments({
       scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
     }
   }, [comments]);
+
+  // Focus + select the Drive prompt input whenever it opens.
+  useEffect(() => {
+    if (drivePrompt) {
+      const id = setTimeout(() => {
+        drivePromptInputRef.current?.focus();
+        drivePromptInputRef.current?.select();
+      }, 0);
+      return () => clearTimeout(id);
+    }
+  }, [drivePrompt]);
 
   function handleScroll() {
     if (!scrollRef.current) return;
@@ -313,12 +334,11 @@ export default function Comments({
   }
 
   /**
-   * Create a Google Doc / Sheet / Slides via the parent's
-   * `onCreateGoogleDoc` callback and post the resulting webViewLink
-   * as a comment attachment (task 16). Caller has done the actual
-   * Drive create; we just post the comment.
+   * Open the styled "Create new Google file" prompt. The actual
+   * Drive create + comment post happens in `submitDrivePrompt`
+   * once the user confirms.
    */
-  async function handleCreateGoogleDoc(
+  function openCreateDrivePrompt(
     type: "document" | "spreadsheet" | "presentation",
   ) {
     if (!onCreateGoogleDoc || creatingGoogleDoc) return;
@@ -328,69 +348,42 @@ export default function Comments({
         : type === "spreadsheet"
           ? "Untitled spreadsheet"
           : "Untitled presentation";
-    const title = window.prompt(
-      "Title for the new Google file:",
-      defaultTitle,
-    );
-    if (title === null) return; // user cancelled
-    const trimmed = title.trim() || defaultTitle;
     setDriveMenuOpen(false);
-    setCreatingGoogleDoc(true);
-    setUploadError(null);
-    shouldAutoScroll.current = true;
-    try {
-      const attachment = await onCreateGoogleDoc(type, trimmed);
-      // No caption — the file card already shows the title.
-      const res = await fetch("/api/comments", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          contextType,
-          contextId,
-          content: "",
-          attachments: [attachment],
-        }),
-      });
-      if (res.ok) {
-        const newComment: Comment = await res.json();
-        setComments((prev) => [...prev, newComment]);
-      } else {
-        const body = (await res.json().catch(() => ({}))) as {
-          error?: string;
-        };
-        setUploadError(body.error ?? "Failed to attach Google file.");
-      }
-    } catch (err) {
-      const msg =
-        err instanceof Error && err.message
-          ? err.message
-          : "Failed to create Google file.";
-      setUploadError(msg);
-    } finally {
-      setCreatingGoogleDoc(false);
-    }
+    setDrivePromptValue(defaultTitle);
+    setDrivePrompt({ mode: "create", type });
+  }
+
+  /** Open the styled "Attach existing Drive URL" prompt. */
+  function openAttachDrivePrompt() {
+    if (!onAttachGoogleLink || creatingGoogleDoc) return;
+    setDriveMenuOpen(false);
+    setDrivePromptValue("");
+    setDrivePrompt({ mode: "attach" });
   }
 
   /**
-   * Attach an existing Drive file by URL (task 124). Reuses the
-   * creatingGoogleDoc flag for the in-flight indicator since the
-   * UX is identical from the user's point of view.
+   * Run the Drive create-or-attach flow with the value currently in
+   * the dialog input. Posts the resulting attachment as a comment
+   * with no caption — the file card already shows the title.
    */
-  async function handleAttachGoogleLink() {
-    if (!onAttachGoogleLink || creatingGoogleDoc) return;
-    const url = window.prompt(
-      "Paste a Google Drive / Docs / Sheets / Slides URL:",
-      "",
-    );
-    if (url === null) return;
-    const trimmed = url.trim();
-    if (!trimmed) return;
-    setDriveMenuOpen(false);
+  async function submitDrivePrompt() {
+    if (!drivePrompt || creatingGoogleDoc) return;
+    const value = drivePromptValue.trim();
+    if (!value) return;
+    const mode = drivePrompt;
+    setDrivePrompt(null);
     setCreatingGoogleDoc(true);
     setUploadError(null);
     shouldAutoScroll.current = true;
     try {
-      const attachment = await onAttachGoogleLink(trimmed);
+      let attachment: Attachment | undefined;
+      if (mode.mode === "create") {
+        if (!onCreateGoogleDoc) return;
+        attachment = await onCreateGoogleDoc(mode.type, value);
+      } else {
+        if (!onAttachGoogleLink) return;
+        attachment = await onAttachGoogleLink(value);
+      }
       const res = await fetch("/api/comments", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -414,7 +407,9 @@ export default function Comments({
       const msg =
         err instanceof Error && err.message
           ? err.message
-          : "Failed to attach Google file.";
+          : mode.mode === "create"
+            ? "Failed to create Google file."
+            : "Failed to attach Google file.";
       setUploadError(msg);
     } finally {
       setCreatingGoogleDoc(false);
@@ -651,6 +646,69 @@ export default function Comments({
             </svg>
           </button>
           <img src={lightboxUrl} alt="" className="max-h-[90vh] max-w-[90vw] rounded-lg object-contain" />
+        </div>
+      )}
+
+      {/* Drive prompt dialog (task 124) — replaces window.prompt
+          for the title (create) and URL (attach) flows. */}
+      {drivePrompt && (
+        <div
+          className="fixed inset-0 z-[100] flex items-center justify-center bg-black/50 p-4"
+          onClick={(e) => {
+            if (e.target === e.currentTarget) setDrivePrompt(null);
+          }}
+        >
+          <div className="mx-4 w-full max-w-sm rounded-xl border border-green-200 bg-white p-6 shadow-2xl">
+            <h3 className="font-display text-lg font-semibold text-green-900">
+              {drivePrompt.mode === "create"
+                ? drivePrompt.type === "document"
+                  ? "New Google Doc"
+                  : drivePrompt.type === "spreadsheet"
+                    ? "New Google Sheet"
+                    : "New Google Slides"
+                : "Attach Google file"}
+            </h3>
+            <p className="mt-2 text-sm text-green-600">
+              {drivePrompt.mode === "create"
+                ? "Choose a title."
+                : "Paste a Google Drive / Docs / Sheets / Slides URL."}
+            </p>
+            <input
+              ref={drivePromptInputRef}
+              type={drivePrompt.mode === "create" ? "text" : "url"}
+              value={drivePromptValue}
+              onChange={(e) => setDrivePromptValue(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") {
+                  e.preventDefault();
+                  void submitDrivePrompt();
+                } else if (e.key === "Escape") {
+                  setDrivePrompt(null);
+                }
+              }}
+              placeholder={
+                drivePrompt.mode === "create"
+                  ? "Untitled"
+                  : "https://docs.google.com/document/d/…"
+              }
+              className="mt-4 w-full rounded-md border border-green-200 bg-white px-3 py-2 text-sm text-green-800 placeholder:text-green-300 focus:border-green-400 focus:outline-none"
+            />
+            <div className="mt-5 flex gap-3">
+              <button
+                onClick={() => setDrivePrompt(null)}
+                className="flex-1 rounded-md border border-green-200 px-4 py-2 text-sm font-medium text-green-700 transition-colors hover:bg-green-50"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={submitDrivePrompt}
+                disabled={!drivePromptValue.trim()}
+                className="flex-1 rounded-md bg-gold-600 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-gold-500 disabled:opacity-50"
+              >
+                {drivePrompt.mode === "create" ? "Create" : "Attach"}
+              </button>
+            </div>
+          </div>
         </div>
       )}
 
@@ -1291,21 +1349,21 @@ export default function Comments({
                     <>
                       <button
                         type="button"
-                        onClick={() => handleCreateGoogleDoc("document")}
+                        onClick={() => openCreateDrivePrompt("document")}
                         className="block w-full px-3 py-1.5 text-left text-xs text-green-800 hover:bg-green-50"
                       >
                         📄 New Google Doc
                       </button>
                       <button
                         type="button"
-                        onClick={() => handleCreateGoogleDoc("spreadsheet")}
+                        onClick={() => openCreateDrivePrompt("spreadsheet")}
                         className="block w-full px-3 py-1.5 text-left text-xs text-green-800 hover:bg-green-50"
                       >
                         📊 New Google Sheet
                       </button>
                       <button
                         type="button"
-                        onClick={() => handleCreateGoogleDoc("presentation")}
+                        onClick={() => openCreateDrivePrompt("presentation")}
                         className="block w-full px-3 py-1.5 text-left text-xs text-green-800 hover:bg-green-50"
                       >
                         🎬 New Google Slides
@@ -1318,7 +1376,7 @@ export default function Comments({
                   {onAttachGoogleLink && (
                     <button
                       type="button"
-                      onClick={handleAttachGoogleLink}
+                      onClick={openAttachDrivePrompt}
                       className="block w-full px-3 py-1.5 text-left text-xs text-green-800 hover:bg-green-50"
                     >
                       🔗 Attach existing file…
