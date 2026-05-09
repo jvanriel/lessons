@@ -169,6 +169,58 @@ export interface CreatedGoogleDoc {
 }
 
 /**
+ * Pull a Drive file id out of a Google URL. Handles the
+ * `/d/{ID}/` shape used by Docs / Sheets / Slides / drive.google.com
+ * file links, and the legacy `?id=` shape (drive.google.com/open).
+ * Returns null if the URL doesn't look like a Drive link.
+ */
+export function parseDriveFileId(url: string): string | null {
+  const slashD = url.match(/\/d\/([a-zA-Z0-9_-]{10,})/);
+  if (slashD) return slashD[1];
+  try {
+    const u = new URL(url);
+    const id = u.searchParams.get("id");
+    if (id) return id;
+  } catch {
+    // not a parseable URL — fall through
+  }
+  return null;
+}
+
+/**
+ * Fetch metadata for an existing Drive file from a paste-ready URL.
+ * The service account must have at least read access to the file
+ * (anyone-with-link or explicit share). Used to attach an existing
+ * Google Doc / Sheet / Slides / file to a task comment.
+ */
+export async function getDriveFileByUrl(url: string): Promise<CreatedGoogleDoc & { size: number }> {
+  const id = parseDriveFileId(url);
+  if (!id) {
+    throw new Error("Could not parse a Google Drive file id from that URL.");
+  }
+  const drive = getDriveClient();
+  const res = await drive.files.get({
+    fileId: id,
+    fields: "id, name, mimeType, webViewLink, size",
+    supportsAllDrives: true,
+  });
+  const f = res.data;
+  if (!f.id || !f.name || !f.mimeType) {
+    throw new Error("Drive returned incomplete metadata for that file.");
+  }
+  if (!f.webViewLink) {
+    throw new Error("That file has no webViewLink (check sharing settings).");
+  }
+  return {
+    googleFileId: f.id,
+    url: f.webViewLink,
+    name: f.name,
+    contentType: f.mimeType,
+    size: f.size ? parseInt(f.size, 10) || 0 : 0,
+  };
+}
+
+/**
  * Create a Google Doc / Sheet / Slides in the per-task folder
  * and grant anyone-with-link writer access. Returns the bits the
  * comments component needs to attach the file.

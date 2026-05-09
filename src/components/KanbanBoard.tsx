@@ -638,6 +638,28 @@ function TaskDetailPanel({
                 }
                 return res.json();
               }}
+              onAttachGoogleLink={async (url: string) => {
+                const res = await fetch(
+                  "/api/admin/tasks/google-attach",
+                  {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({
+                      taskId: task.id,
+                      url,
+                    }),
+                  },
+                );
+                if (!res.ok) {
+                  const body = (await res
+                    .json()
+                    .catch(() => ({}))) as { error?: string };
+                  throw new Error(
+                    body.error ?? "Failed to attach Google file",
+                  );
+                }
+                return res.json();
+              }}
             />
           )}
           {activeTab === "share" && (

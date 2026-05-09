@@ -66,6 +66,13 @@ interface CommentsProps {
     type: "document" | "spreadsheet" | "presentation",
     title: string,
   ) => Promise<Attachment>;
+  /**
+   * Optional companion to `onCreateGoogleDoc` (task 124): attach an
+   * existing Drive file to a comment by pasting its URL. The caller
+   * resolves the URL → metadata via Drive (anyone-with-link or
+   * service-account-readable files) and returns the attachment.
+   */
+  onAttachGoogleLink?: (url: string) => Promise<Attachment>;
   fillHeight?: boolean;
   emptyText?: string;
   /**
@@ -108,6 +115,7 @@ export default function Comments({
   mentionUsers = [],
   onUpload,
   onCreateGoogleDoc,
+  onAttachGoogleLink,
   fillHeight = false,
   emptyText = "No comments yet. Start the conversation.",
   readReceiptOtherSeenAt,
@@ -357,6 +365,56 @@ export default function Comments({
         err instanceof Error && err.message
           ? err.message
           : "Failed to create Google file.";
+      setUploadError(msg);
+    } finally {
+      setCreatingGoogleDoc(false);
+    }
+  }
+
+  /**
+   * Attach an existing Drive file by URL (task 124). Reuses the
+   * creatingGoogleDoc flag for the in-flight indicator since the
+   * UX is identical from the user's point of view.
+   */
+  async function handleAttachGoogleLink() {
+    if (!onAttachGoogleLink || creatingGoogleDoc) return;
+    const url = window.prompt(
+      "Paste a Google Drive / Docs / Sheets / Slides URL:",
+      "",
+    );
+    if (url === null) return;
+    const trimmed = url.trim();
+    if (!trimmed) return;
+    setDriveMenuOpen(false);
+    setCreatingGoogleDoc(true);
+    setUploadError(null);
+    shouldAutoScroll.current = true;
+    try {
+      const attachment = await onAttachGoogleLink(trimmed);
+      const res = await fetch("/api/comments", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          contextType,
+          contextId,
+          content: "",
+          attachments: [attachment],
+        }),
+      });
+      if (res.ok) {
+        const newComment: Comment = await res.json();
+        setComments((prev) => [...prev, newComment]);
+      } else {
+        const body = (await res.json().catch(() => ({}))) as {
+          error?: string;
+        };
+        setUploadError(body.error ?? "Failed to attach Google file.");
+      }
+    } catch (err) {
+      const msg =
+        err instanceof Error && err.message
+          ? err.message
+          : "Failed to attach Google file.";
       setUploadError(msg);
     } finally {
       setCreatingGoogleDoc(false);
@@ -1090,7 +1148,7 @@ export default function Comments({
       {creatingGoogleDoc && (
         <div className="flex items-center gap-2 border-t border-green-100 bg-gold-50 px-4 py-2">
           <div className="h-4 w-4 animate-spin rounded-full border-2 border-gold-400 border-t-transparent" />
-          <span className="text-xs text-gold-700">Creating Google file...</span>
+          <span className="text-xs text-gold-700">Working on Google file...</span>
         </div>
       )}
 
@@ -1201,14 +1259,14 @@ export default function Comments({
             Three-option popover for Doc / Sheet / Slides; uses a
             window.prompt() to capture the title (low-overhead UI;
             replace with a styled dialog if it gets popular). */}
-        {onCreateGoogleDoc && (
+        {(onCreateGoogleDoc || onAttachGoogleLink) && (
           <div className="relative">
             <button
               type="button"
               onClick={() => setDriveMenuOpen((v) => !v)}
               disabled={creatingGoogleDoc}
               className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-green-400 transition-colors hover:bg-green-50 hover:text-green-600 disabled:opacity-40"
-              title="Create Google Doc / Sheet / Slides"
+              title="Create or attach a Google file"
             >
               <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                 <path strokeLinecap="round" strokeLinejoin="round" d="M19.5 14.25v-2.625a3.375 3.375 0 0 0-3.375-3.375h-1.5A1.125 1.125 0 0 1 13.5 7.125v-1.5a3.375 3.375 0 0 0-3.375-3.375H8.25M12 9v6m3-3H9m1.5-7.5h-5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 0 0-9-9Z" />
@@ -1220,28 +1278,44 @@ export default function Comments({
                   className="fixed inset-0 z-10"
                   onClick={() => setDriveMenuOpen(false)}
                 />
-                <div className="absolute bottom-10 left-0 z-20 min-w-[160px] rounded-md border border-green-200 bg-white py-1 shadow-lg">
-                  <button
-                    type="button"
-                    onClick={() => handleCreateGoogleDoc("document")}
-                    className="block w-full px-3 py-1.5 text-left text-xs text-green-800 hover:bg-green-50"
-                  >
-                    📄 Google Doc
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => handleCreateGoogleDoc("spreadsheet")}
-                    className="block w-full px-3 py-1.5 text-left text-xs text-green-800 hover:bg-green-50"
-                  >
-                    📊 Google Sheet
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => handleCreateGoogleDoc("presentation")}
-                    className="block w-full px-3 py-1.5 text-left text-xs text-green-800 hover:bg-green-50"
-                  >
-                    🎬 Google Slides
-                  </button>
+                <div className="absolute bottom-10 left-0 z-20 min-w-[180px] rounded-md border border-green-200 bg-white py-1 shadow-lg">
+                  {onCreateGoogleDoc && (
+                    <>
+                      <button
+                        type="button"
+                        onClick={() => handleCreateGoogleDoc("document")}
+                        className="block w-full px-3 py-1.5 text-left text-xs text-green-800 hover:bg-green-50"
+                      >
+                        📄 New Google Doc
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => handleCreateGoogleDoc("spreadsheet")}
+                        className="block w-full px-3 py-1.5 text-left text-xs text-green-800 hover:bg-green-50"
+                      >
+                        📊 New Google Sheet
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => handleCreateGoogleDoc("presentation")}
+                        className="block w-full px-3 py-1.5 text-left text-xs text-green-800 hover:bg-green-50"
+                      >
+                        🎬 New Google Slides
+                      </button>
+                    </>
+                  )}
+                  {onCreateGoogleDoc && onAttachGoogleLink && (
+                    <div className="my-1 border-t border-green-100" />
+                  )}
+                  {onAttachGoogleLink && (
+                    <button
+                      type="button"
+                      onClick={handleAttachGoogleLink}
+                      className="block w-full px-3 py-1.5 text-left text-xs text-green-800 hover:bg-green-50"
+                    >
+                      🔗 Attach existing file…
+                    </button>
+                  )}
                 </div>
               </>
             )}
