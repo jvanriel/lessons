@@ -628,7 +628,7 @@ function ChooseProsStep({ pros, selected, onToggle, locale }: { pros: Pro[]; sel
           {filtered.map((pro) => {
             const isSelected = selected.has(pro.id);
             return (
-              <button key={pro.id} type="button" onClick={() => onToggle(pro.id)} className={`relative rounded-xl border p-5 text-left transition-all ${isSelected ? "border-gold-500 bg-gold-50 shadow-md ring-1 ring-gold-400" : "border-green-200 bg-white hover:border-green-300 hover:shadow-sm"}`}>
+              <button key={pro.id} type="button" onClick={() => onToggle(pro.id)} className={`relative w-full min-w-0 rounded-xl border p-5 text-left transition-all ${isSelected ? "border-gold-500 bg-gold-50 shadow-md ring-1 ring-gold-400" : "border-green-200 bg-white hover:border-green-300 hover:shadow-sm"}`}>
                 <div className="flex items-center gap-3">
                   {pro.photoUrl ? <img src={pro.photoUrl} alt={pro.displayName} className="h-14 w-14 rounded-full object-cover" /> : <div className="flex h-14 w-14 items-center justify-center rounded-full bg-green-100 text-lg font-medium text-green-600">{pro.displayName.charAt(0)}</div>}
                   <div className="min-w-0 flex-1">

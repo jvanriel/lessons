@@ -170,7 +170,7 @@ export default function ChoosePros({
                   key={pro.id}
                   type="button"
                   onClick={() => toggle(pro.id)}
-                  className={`relative rounded-xl border p-5 text-left transition-all ${
+                  className={`relative w-full min-w-0 rounded-xl border p-5 text-left transition-all ${
                     isSelected
                       ? "border-gold-500 bg-gold-50 shadow-md ring-1 ring-gold-400"
                       : "border-green-200 bg-white hover:border-green-300 hover:shadow-sm"
