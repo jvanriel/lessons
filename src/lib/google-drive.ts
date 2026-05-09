@@ -24,12 +24,30 @@ import { drive, auth as driveAuth } from "@googleapis/drive";
 
 // ─── Service account (shared with Gmail in mail.ts) ────────
 
+/**
+ * Strip surrounding double/single quotes and trim whitespace.
+ * Vercel pastes can leave the env var wrapped in quotes; without
+ * this, the PEM parser blows up with
+ * "error:1E08010C:DECODER routines::unsupported". Mirrors
+ * `stripQuotesAndTrim` in mail.ts.
+ */
+function stripQuotesAndTrim(raw: string | undefined): string {
+  if (!raw) return "";
+  let v = raw.trim();
+  if (
+    (v.startsWith('"') && v.endsWith('"')) ||
+    (v.startsWith("'") && v.endsWith("'"))
+  ) {
+    v = v.slice(1, -1).trim();
+  }
+  return v;
+}
+
 function getCredentials() {
-  const email = process.env.GOOGLE_SERVICE_ACCOUNT_EMAIL?.trim();
-  const key = process.env.GOOGLE_SERVICE_ACCOUNT_PRIVATE_KEY?.replace(
-    /\\n/g,
-    "\n",
-  );
+  const email = stripQuotesAndTrim(process.env.GOOGLE_SERVICE_ACCOUNT_EMAIL);
+  const key = stripQuotesAndTrim(
+    process.env.GOOGLE_SERVICE_ACCOUNT_PRIVATE_KEY,
+  ).replace(/\\n/g, "\n");
   if (!email || !key) {
     throw new Error("Google service account credentials not configured");
   }
