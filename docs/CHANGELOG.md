@@ -17,6 +17,12 @@ If any role inside the brackets is unknown (typo), the parser falls
 back to treating the brackets as literal text — better to over-show
 than silently hide.
 
+## 2026-05-09 — v1.1.62
+
+- **Search field for choosing your pros.** A live search now sits
+  above the pro cards on both registration and the Manage Pros page
+  — matches any text on the card (name, specialty, course or city).
+
 ## 2026-05-09 — v1.1.61
 
 - **[admin,pro] Native Google Docs/Sheets/Slides on tasks.** Create a
