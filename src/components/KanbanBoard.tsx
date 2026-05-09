@@ -86,8 +86,8 @@ const COLOR_MAP: Record<string, string> = {
 type DetailTab = "task" | "comments" | "share";
 
 const TABS: { id: DetailTab; label: string }[] = [
-  { id: "task", label: "Task" },
   { id: "comments", label: "Comments" },
+  { id: "task", label: "Task" },
   { id: "share", label: "Share" },
 ];
 
@@ -521,12 +521,12 @@ function TaskDetailPanel({
   onDelete: (id: number) => void;
   onUpdate: (task: SerializedTask) => void;
 }) {
-  const [activeTab, setActiveTab] = useState<DetailTab>("task");
+  const [activeTab, setActiveTab] = useState<DetailTab>("comments");
   const [prevTaskId, setPrevTaskId] = useState(task.id);
 
   if (prevTaskId !== task.id) {
     setPrevTaskId(task.id);
-    setActiveTab("task");
+    setActiveTab("comments");
   }
 
   return (
