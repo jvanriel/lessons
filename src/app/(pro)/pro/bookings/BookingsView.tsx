@@ -157,12 +157,15 @@ export function BookingsView({
   locale: Locale;
   timezone: string;
 }) {
+  // Default to "list" — pros open this page to scan the upcoming
+  // bookings; the calendar view is a secondary lens. Persisted choice
+  // wins when present.
   const [view, setView] = useState<"calendar" | "list">(() => {
     if (typeof window !== "undefined") {
       const stored = localStorage.getItem("bookings-view");
-      if (stored === "list") return "list";
+      if (stored === "calendar") return "calendar";
     }
-    return "calendar";
+    return "list";
   });
 
   function switchView(v: "calendar" | "list") {
@@ -172,22 +175,9 @@ export function BookingsView({
 
   return (
     <div>
-      {/* View toggle */}
+      {/* View toggle — list is the default + first tab so it reads as
+          the primary surface. Calendar is the alternate lens. */}
       <div className="mb-4 flex items-center gap-1 rounded-lg border border-green-200 bg-white p-0.5 w-fit">
-        <button
-          type="button"
-          onClick={() => switchView("calendar")}
-          className={`flex items-center gap-1.5 rounded-md px-3 py-1.5 text-xs font-medium transition-colors ${
-            view === "calendar"
-              ? "bg-green-700 text-white"
-              : "text-green-600 hover:text-green-800"
-          }`}
-        >
-          <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
-            <path strokeLinecap="round" strokeLinejoin="round" d="M6.75 3v2.25M17.25 3v2.25M3 18.75V7.5a2.25 2.25 0 0 1 2.25-2.25h13.5A2.25 2.25 0 0 1 21 7.5v11.25m-18 0A2.25 2.25 0 0 0 5.25 21h13.5A2.25 2.25 0 0 0 21 18.75m-18 0v-7.5A2.25 2.25 0 0 1 5.25 9h13.5A2.25 2.25 0 0 1 21 11.25v7.5" />
-          </svg>
-          {t("proBookingsView.calendar", locale)}
-        </button>
         <button
           type="button"
           onClick={() => switchView("list")}
@@ -201,6 +191,20 @@ export function BookingsView({
             <path strokeLinecap="round" strokeLinejoin="round" d="M8.25 6.75h12M8.25 12h12m-12 5.25h12M3.75 6.75h.007v.008H3.75V6.75Zm.375 0a.375.375 0 1 1-.75 0 .375.375 0 0 1 .75 0ZM3.75 12h.007v.008H3.75V12Zm.375 0a.375.375 0 1 1-.75 0 .375.375 0 0 1 .75 0Zm-.375 5.25h.007v.008H3.75v-.008Zm.375 0a.375.375 0 1 1-.75 0 .375.375 0 0 1 .75 0Z" />
           </svg>
           {t("proBookingsView.list", locale)}
+        </button>
+        <button
+          type="button"
+          onClick={() => switchView("calendar")}
+          className={`flex items-center gap-1.5 rounded-md px-3 py-1.5 text-xs font-medium transition-colors ${
+            view === "calendar"
+              ? "bg-green-700 text-white"
+              : "text-green-600 hover:text-green-800"
+          }`}
+        >
+          <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+            <path strokeLinecap="round" strokeLinejoin="round" d="M6.75 3v2.25M17.25 3v2.25M3 18.75V7.5a2.25 2.25 0 0 1 2.25-2.25h13.5A2.25 2.25 0 0 1 21 7.5v11.25m-18 0A2.25 2.25 0 0 0 5.25 21h13.5A2.25 2.25 0 0 0 21 18.75m-18 0v-7.5A2.25 2.25 0 0 1 5.25 9h13.5A2.25 2.25 0 0 1 21 11.25v7.5" />
+          </svg>
+          {t("proBookingsView.calendar", locale)}
         </button>
       </div>
 
