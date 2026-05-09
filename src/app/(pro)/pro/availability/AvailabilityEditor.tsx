@@ -31,9 +31,14 @@ const DAY_KEYS = [
   "book.day.sat",
   "book.day.sun",
 ] as const;
-const GRID_START_HOUR = 7;
-const GRID_END_HOUR = 22;
-const ROWS = (GRID_END_HOUR - GRID_START_HOUR) * 2; // 30 half-hour rows
+// Storage range is the full 24h day so the per-period display window
+// (task 119) can be set to any start/end without clamping at the
+// edges. Pre-fix the storage was 07:00–22:00 (30 half-hour rows), so
+// a pro who set displayEndTime="23:00" still saw the grid stop at
+// 22:00 because Math.min(ROWS, …) capped the row index.
+const GRID_START_HOUR = 0;
+const GRID_END_HOUR = 24;
+const ROWS = (GRID_END_HOUR - GRID_START_HOUR) * 2; // 48 half-hour rows
 const CELL_H_DESKTOP = 22;
 const CELL_H_TOUCH = 52;
 
