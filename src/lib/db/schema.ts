@@ -305,6 +305,18 @@ export const proSchedulePeriods = pgTable("pro_schedule_periods", {
     .notNull(),
   validFrom: date("valid_from"),
   validUntil: date("valid_until"),
+  // Per-period display window for the availability editor grid
+  // (task 119). Pure rendering — narrows the visible row range on
+  // /pro/availability so a pro who only teaches 09:00–18:00 doesn't
+  // see empty 07:00 and 19:00–22:00 rows. Doesn't affect actual
+  // availability calculations: rows outside the window stay
+  // editable in DB and saved verbatim.
+  displayStartTime: varchar("display_start_time", { length: 5 })
+    .notNull()
+    .default("09:00"),
+  displayEndTime: varchar("display_end_time", { length: 5 })
+    .notNull()
+    .default("22:00"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
 

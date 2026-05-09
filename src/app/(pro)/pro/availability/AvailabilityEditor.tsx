@@ -83,6 +83,13 @@ interface Period {
   id: string;
   validFrom: string | null;
   validUntil: string | null;
+  /** Per-period grid render window (task 119). "HH:MM" strings;
+   *  WeeklyTemplateGrid renders only the rows in
+   *  [displayStartTime, displayEndTime). Doesn't affect saved
+   *  availability rows — values outside the window are preserved
+   *  on save. */
+  displayStartTime: string;
+  displayEndTime: string;
   grid: LocationGrid;
 }
 
@@ -139,6 +146,8 @@ function buildPeriods(
       id: `p${d.id}`,
       validFrom: d.validFrom,
       validUntil: d.validUntil,
+      displayStartTime: d.displayStartTime ?? "09:00",
+      displayEndTime: d.displayEndTime ?? "22:00",
       grid: availabilityToLocationGrid(matched),
     };
   });
@@ -147,6 +156,8 @@ function buildPeriods(
       id: "p-default",
       validFrom: null,
       validUntil: null,
+      displayStartTime: "09:00",
+      displayEndTime: "22:00",
       grid: emptyGrid(),
     });
   }
@@ -548,6 +559,8 @@ function SchedulePeriodsSection({
     grid: LocationGrid;
     defaultFrom: string;
     defaultUntil: string;
+    displayStartTime: string;
+    displayEndTime: string;
   } | null>(null);
   const [pendingRemoveId, setPendingRemoveId] = useState<string | null>(null);
   // When the user removes the chronologically last period, the dialog
@@ -579,6 +592,8 @@ function SchedulePeriodsSection({
       periods: periods.map((p) => ({
         validFrom: p.validFrom,
         validUntil: p.validUntil,
+        displayStartTime: p.displayStartTime,
+        displayEndTime: p.displayEndTime,
         slots: locations.flatMap((loc) =>
           gridToSlotsForLocation(p.grid, loc.id).map((s) => ({
             proLocationId: loc.id,
@@ -620,12 +635,19 @@ function SchedulePeriodsSection({
     return () => clearTimeout(debounceRef.current);
   }, [periods, locations]);
 
-  function addPeriod(validFrom: string, validUntil: string) {
+  function addPeriod(
+    validFrom: string,
+    validUntil: string,
+    displayStartTime: string,
+    displayEndTime: string,
+  ) {
     const id = `p${Date.now()}`;
     const inserted: Period = {
       id,
       validFrom,
       validUntil,
+      displayStartTime,
+      displayEndTime,
       grid: emptyGrid(),
     };
     onPeriodsChange(insertWithSplit(periods, inserted).sort(sortPeriods));
@@ -646,16 +668,25 @@ function SchedulePeriodsSection({
       grid: cloneGrid(activePeriod.grid),
       defaultFrom: fromAnchor,
       defaultUntil,
+      displayStartTime: activePeriod.displayStartTime,
+      displayEndTime: activePeriod.displayEndTime,
     });
   }
 
-  function commitDuplicate(validFrom: string, validUntil: string) {
+  function commitDuplicate(
+    validFrom: string,
+    validUntil: string,
+    displayStartTime: string,
+    displayEndTime: string,
+  ) {
     if (!pendingDuplicate) return;
     const id = `p${Date.now()}`;
     const inserted: Period = {
       id,
       validFrom,
       validUntil,
+      displayStartTime,
+      displayEndTime,
       grid: pendingDuplicate.grid,
     };
     onPeriodsChange(insertWithSplit(periods, inserted).sort(sortPeriods));
@@ -699,7 +730,14 @@ function SchedulePeriodsSection({
     // grid has somewhere to render. If the user removes the last
     // period, recreate an empty unbounded one.
     if (next.length === 0) {
-      next.push({ id: `p${Date.now()}`, validFrom: null, validUntil: null, grid: emptyGrid() });
+      next.push({
+        id: `p${Date.now()}`,
+        validFrom: null,
+        validUntil: null,
+        displayStartTime: "09:00",
+        displayEndTime: "22:00",
+        grid: emptyGrid(),
+      });
     }
     onPeriodsChange(next);
     if (activePeriodId === id) {
@@ -711,11 +749,21 @@ function SchedulePeriodsSection({
     id: string,
     validFrom: string | null,
     validUntil: string | null,
+    displayStartTime?: string,
+    displayEndTime?: string,
   ) {
     onPeriodsChange(
       periods
         .map((p) =>
-          p.id === id ? { ...p, validFrom, validUntil } : p,
+          p.id === id
+            ? {
+                ...p,
+                validFrom,
+                validUntil,
+                displayStartTime: displayStartTime ?? p.displayStartTime,
+                displayEndTime: displayEndTime ?? p.displayEndTime,
+              }
+            : p,
         )
         .sort(sortPeriods),
     );
@@ -822,6 +870,8 @@ function SchedulePeriodsSection({
             onActiveLocationChange={onActiveLocationChange}
             grid={activePeriod.grid}
             onGridChange={onGridChange}
+            displayStartTime={activePeriod.displayStartTime}
+            displayEndTime={activePeriod.displayEndTime}
             locale={locale}
           />
         </div>
@@ -862,6 +912,8 @@ function SchedulePeriodsSection({
             mode="edit"
             initialFrom={p.validFrom}
             initialUntil={p.validUntil}
+            initialDisplayStartTime={p.displayStartTime}
+            initialDisplayEndTime={p.displayEndTime}
             allowOpenStart={idx === 0}
             allowOpenEnd={idx === periods.length - 1}
             locale={locale}
@@ -872,8 +924,14 @@ function SchedulePeriodsSection({
                 from: x.validFrom!,
                 until: x.validUntil!,
               }))}
-            onSubmit={(from, until) =>
-              updatePeriodDates(p.id, from || null, until || null)
+            onSubmit={(from, until, dStart, dEnd) =>
+              updatePeriodDates(
+                p.id,
+                from || null,
+                until || null,
+                dStart,
+                dEnd,
+              )
             }
             onClose={() => setEditingDatesFor(null)}
           />
@@ -884,6 +942,8 @@ function SchedulePeriodsSection({
           mode="add"
           initialFrom={pendingDuplicate.defaultFrom}
           initialUntil={pendingDuplicate.defaultUntil}
+          initialDisplayStartTime={pendingDuplicate.displayStartTime}
+          initialDisplayEndTime={pendingDuplicate.displayEndTime}
           locale={locale}
           existingBoundedRanges={periods
             .filter((p) => p.validFrom && p.validUntil)
@@ -1044,6 +1104,8 @@ function insertWithSplit(existing: Period[], inserted: Period): Period[] {
       id: `p${Date.now()}b`,
       validFrom: beforeFrom,
       validUntil: beforeUntil,
+      displayStartTime: containing.displayStartTime,
+      displayEndTime: containing.displayEndTime,
       grid: cloneGrid(containing.grid),
     });
   }
@@ -1053,6 +1115,8 @@ function insertWithSplit(existing: Period[], inserted: Period): Period[] {
       id: `p${Date.now()}a`,
       validFrom: afterFrom,
       validUntil: afterUntil,
+      displayStartTime: containing.displayStartTime,
+      displayEndTime: containing.displayEndTime,
       grid: cloneGrid(containing.grid),
     });
   }
@@ -1078,6 +1142,8 @@ function PeriodDatesDialog({
   mode,
   initialFrom,
   initialUntil,
+  initialDisplayStartTime,
+  initialDisplayEndTime,
   existingBoundedRanges,
   locale,
   onSubmit,
@@ -1088,11 +1154,20 @@ function PeriodDatesDialog({
   mode: "add" | "edit";
   initialFrom?: string | null;
   initialUntil?: string | null;
+  /** Optional initial display window (task 119). Defaults to
+   *  09:00 / 22:00 when not supplied. */
+  initialDisplayStartTime?: string;
+  initialDisplayEndTime?: string;
   existingBoundedRanges: Array<{ id: string; from: string; until: string }>;
   locale: Locale;
   // Sends `""` (empty) for boundary fields the user wants to clear.
   // Callers convert that to `null` before persisting.
-  onSubmit: (from: string, until: string) => void;
+  onSubmit: (
+    from: string,
+    until: string,
+    displayStartTime: string,
+    displayEndTime: string,
+  ) => void;
   onClose: () => void;
   // Task 78 — only the chronologically first period may have null
   // `validFrom` and only the last may have null `validUntil`. The
@@ -1107,6 +1182,12 @@ function PeriodDatesDialog({
   );
   const [openEnd, setOpenEnd] = useState(
     allowOpenEnd && initialUntil === null,
+  );
+  const [displayStart, setDisplayStart] = useState(
+    initialDisplayStartTime ?? "09:00",
+  );
+  const [displayEnd, setDisplayEnd] = useState(
+    initialDisplayEndTime ?? "22:00",
   );
   const [submitError, setSubmitError] = useState<string | null>(null);
 
@@ -1126,6 +1207,9 @@ function PeriodDatesDialog({
         }
       }
     }
+    if (displayStart && displayEnd && displayStart >= displayEnd) {
+      return t("proAvail.displayRangeInvalid", locale);
+    }
     return null;
   })();
 
@@ -1144,7 +1228,7 @@ function PeriodDatesDialog({
       setSubmitError(inlineError);
       return;
     }
-    onSubmit(fromValue, untilValue);
+    onSubmit(fromValue, untilValue, displayStart, displayEnd);
   }
 
   const error = inlineError ?? submitError;
@@ -1205,6 +1289,34 @@ function PeriodDatesDialog({
               </span>
             )}
           </label>
+          {/* Display window (task 119) — narrows the visible row range
+              of the editor + preview grids without affecting saved
+              availability. Defaults 09:00 – 22:00. */}
+          <div className="mt-2 rounded-md border border-green-100 bg-green-50/40 p-2">
+            <p className="mb-1 text-[11px] font-medium text-green-700">
+              {t("proAvail.displayRangeLabel", locale)}
+            </p>
+            <p className="mb-2 text-[10px] text-green-600">
+              {t("proAvail.displayRangeHelp", locale)}
+            </p>
+            <div className="flex items-center gap-2">
+              <input
+                type="time"
+                value={displayStart}
+                onChange={(e) => setDisplayStart(e.target.value)}
+                step={1800}
+                className="flex-1 rounded-md border border-green-200 bg-white px-2 py-1 text-xs text-green-900 focus:border-green-400 focus:outline-none focus:ring-1 focus:ring-green-400"
+              />
+              <span className="text-xs text-green-500">–</span>
+              <input
+                type="time"
+                value={displayEnd}
+                onChange={(e) => setDisplayEnd(e.target.value)}
+                step={1800}
+                className="flex-1 rounded-md border border-green-200 bg-white px-2 py-1 text-xs text-green-900 focus:border-green-400 focus:outline-none focus:ring-1 focus:ring-green-400"
+              />
+            </div>
+          </div>
           {error && <p className="text-xs text-red-600">{error}</p>}
         </div>
         <div className="mt-5 flex gap-3">
@@ -1238,6 +1350,8 @@ function WeeklyTemplateGrid({
   onActiveLocationChange,
   grid,
   onGridChange,
+  displayStartTime,
+  displayEndTime,
   locale,
 }: {
   locations: SerializedProLocationWithName[];
@@ -1246,8 +1360,21 @@ function WeeklyTemplateGrid({
   onActiveLocationChange: (id: number) => void;
   grid: LocationGrid;
   onGridChange: (grid: LocationGrid) => void;
+  /** Per-period grid render window (task 119). Only rows in
+   *  [displayStartTime, displayEndTime) are rendered; underlying
+   *  grid storage stays full-day. */
+  displayStartTime: string;
+  displayEndTime: string;
   locale: Locale;
 }) {
+  // Visible row window for the editor. Clamp to the storage bounds
+  // and floor/ceil so the inputs translate cleanly to row indices
+  // (each row = 30 min).
+  const visibleStart = Math.max(0, Math.min(ROWS, timeToRow(displayStartTime)));
+  const visibleEnd = Math.max(
+    visibleStart,
+    Math.min(ROWS, timeToRow(displayEndTime)),
+  );
   const CELL_H = useCellHeight();
   // Auto-save now lives on the parent (`SchedulePeriodsSection`) so the
   // grid component stays a controlled view: edits go up via
@@ -1420,8 +1547,12 @@ function WeeklyTemplateGrid({
             </div>
           ))}
 
-          {/* Grid rows */}
-          {Array.from({ length: ROWS }, (_, row) => {
+          {/* Grid rows — windowed by the period's display range
+              (task 119). Rows outside [visibleStart, visibleEnd)
+              still exist in storage and are saved verbatim, just
+              not rendered. */}
+          {Array.from({ length: visibleEnd - visibleStart }, (_, vi) => {
+            const row = visibleStart + vi;
             const isHourBoundary = row % 2 === 0;
             return [
               <div
@@ -1449,9 +1580,14 @@ function WeeklyTemplateGrid({
                   const colorIdx = locationColorMap.get(locId) ?? 0;
                   cellStyle.backgroundColor = LOCATION_COLORS[colorIdx].bgHex;
                   cellStyle.opacity = 0.75;
-                  // Rounding for contiguous blocks
-                  const aboveSame = row > 0 && grid[day][row - 1].has(locId);
-                  const belowSame = row < ROWS - 1 && grid[day][row + 1].has(locId);
+                  // Rounding for contiguous blocks. Use the visible
+                  // window bounds (not full ROWS) so a block that
+                  // continues past the rendered edge still rounds at
+                  // the visible top / bottom (task 119).
+                  const aboveSame =
+                    row > visibleStart && grid[day][row - 1].has(locId);
+                  const belowSame =
+                    row < visibleEnd - 1 && grid[day][row + 1].has(locId);
                   if (!aboveSame) cellClass += " rounded-t";
                   if (!belowSame) cellClass += " rounded-b";
                 } else {
@@ -1651,6 +1787,40 @@ function PreviewBlockingGrid({
     ws.setDate(ws.getDate() - currentDow + weekOffset * 7);
     return ws;
   }, [weekOffset, today]);
+
+  // Display window for the preview grid (task 119) — union across
+  // every period whose date range overlaps the visible week, so a
+  // winter (09:00-18:00) + summer (07:00-22:00) split shows the
+  // right rows on each week. Falls back to 09:00–22:00 when no
+  // periods match (defensive — should never render with empty
+  // periods).
+  const { previewVisibleStart, previewVisibleEnd } = useMemo(() => {
+    const dates = days.map((d) => d.date);
+    const visible = periods.filter((p) =>
+      dates.some(
+        (d) =>
+          (p.validFrom === null || p.validFrom <= d) &&
+          (p.validUntil === null || p.validUntil >= d),
+      ),
+    );
+    const source = visible.length > 0 ? visible : periods;
+    let start = ROWS;
+    let end = 0;
+    for (const p of source) {
+      const s = timeToRow(p.displayStartTime ?? "09:00");
+      const e = timeToRow(p.displayEndTime ?? "22:00");
+      if (s < start) start = s;
+      if (e > end) end = e;
+    }
+    if (start >= end) {
+      start = timeToRow("09:00");
+      end = timeToRow("22:00");
+    }
+    return {
+      previewVisibleStart: Math.max(0, Math.min(ROWS, start)),
+      previewVisibleEnd: Math.max(0, Math.min(ROWS, end)),
+    };
+  }, [days, periods]);
 
   // ─── Brush: blocked or extra availability per location ─
   type PreviewBrush = { mode: "blocked" } | { mode: "available"; locationId: number };
@@ -2158,8 +2328,13 @@ function PreviewBlockingGrid({
             </div>
           ))}
 
-          {/* ── Data rows ── */}
-          {Array.from({ length: ROWS }, (_, row) => {
+          {/* ── Data rows ── (task 119) Windowed to the union of
+              every period's display range that overlaps the visible
+              week. */}
+          {Array.from(
+            { length: previewVisibleEnd - previewVisibleStart },
+            (_, vi) => {
+            const row = previewVisibleStart + vi;
             const isHourBoundary = row % 2 === 0;
             return [
               <div
@@ -2220,8 +2395,16 @@ function PreviewBlockingGrid({
                 let overlayClass = "";
                 if (!day.isPast && isBlocked) {
                   overlayBg = "rgba(239, 68, 68, 0.6)";
-                  const aboveBlocked = row > 0 && (isFullDay || blockedCells[dayIdx][row - 1]);
-                  const belowBlocked = row < ROWS - 1 && (isFullDay || blockedCells[dayIdx][row + 1]);
+                  // Same windowed-bounds trick as WeeklyTemplateGrid
+                  // (task 119) — round at the visible edge so blocks
+                  // that continue outside the rendered window don't
+                  // bleed past the grid border.
+                  const aboveBlocked =
+                    row > previewVisibleStart &&
+                    (isFullDay || blockedCells[dayIdx][row - 1]);
+                  const belowBlocked =
+                    row < previewVisibleEnd - 1 &&
+                    (isFullDay || blockedCells[dayIdx][row + 1]);
                   if (!aboveBlocked) overlayClass += " rounded-t";
                   if (!belowBlocked) overlayClass += " rounded-b";
                 } else if (!day.isPast && hasExtra) {
@@ -2235,14 +2418,22 @@ function PreviewBlockingGrid({
                     );
                     overlayBg = `repeating-linear-gradient(135deg, ${colors[0]}99 0px, ${colors[0]}99 3px, ${colors[1] || colors[0]}99 3px, ${colors[1] || colors[0]}99 6px)`;
                   }
-                  const aboveExtra = row > 0 && extraAvailCells[dayIdx][row - 1].size > 0;
-                  const belowExtra = row < ROWS - 1 && extraAvailCells[dayIdx][row + 1].size > 0;
+                  const aboveExtra =
+                    row > previewVisibleStart &&
+                    extraAvailCells[dayIdx][row - 1].size > 0;
+                  const belowExtra =
+                    row < previewVisibleEnd - 1 &&
+                    extraAvailCells[dayIdx][row + 1].size > 0;
                   if (!aboveExtra) overlayClass += " rounded-t";
                   if (!belowExtra) overlayClass += " rounded-b";
                 } else if (!day.isPast && booking) {
                   overlayBg = "rgba(20, 184, 166, 0.6)";
-                  const aboveBooked = row > 0 && !!bookingMap[dayIdx][row - 1];
-                  const belowBooked = row < ROWS - 1 && !!bookingMap[dayIdx][row + 1];
+                  const aboveBooked =
+                    row > previewVisibleStart &&
+                    !!bookingMap[dayIdx][row - 1];
+                  const belowBooked =
+                    row < previewVisibleEnd - 1 &&
+                    !!bookingMap[dayIdx][row + 1];
                   if (!aboveBooked) overlayClass += " rounded-t";
                   if (!belowBooked) overlayClass += " rounded-b";
                 }
@@ -2262,23 +2453,29 @@ function PreviewBlockingGrid({
                   title += ` - ${booking.bookerName ?? t("proAvail.booked", locale)}`;
                 }
 
-                // First row of a booking block — render the student
-                // name on top of the overlay so the pro can scan the
-                // grid and see which lesson sits at which slot. Only
-                // the first row gets the label so it isn't repeated
-                // on every 30-min cell of a longer booking. The label
-                // span extends downward to cover the full booking
-                // height (rowSpan * CELL_H) and flex-centres its text
-                // vertically — same visual centring the bookings
-                // calendar uses.
+                // First *visible* row of a booking block — render the
+                // student name on top of the overlay so the pro can
+                // scan the grid and see which lesson sits at which
+                // slot. Only the first row gets the label so it
+                // isn't repeated on every 30-min cell of a longer
+                // booking. The label span extends downward to cover
+                // the visible portion of the booking and flex-centres
+                // its text vertically — same visual centring the
+                // bookings calendar uses. Bookings that bleed past
+                // the display window get their label clamped to what
+                // is actually rendered (task 119).
                 const isBookingFirstRow =
                   !!booking &&
-                  (row === 0 || bookingMap[dayIdx][row - 1]?.id !== booking.id);
+                  (row === previewVisibleStart ||
+                    bookingMap[dayIdx][row - 1]?.id !== booking.id);
                 let bookingRowSpan = 0;
                 if (isBookingFirstRow && booking) {
                   bookingRowSpan = 1;
                   let r = row + 1;
-                  while (r < ROWS && bookingMap[dayIdx][r]?.id === booking.id) {
+                  while (
+                    r < previewVisibleEnd &&
+                    bookingMap[dayIdx][r]?.id === booking.id
+                  ) {
                     bookingRowSpan++;
                     r++;
                   }
@@ -2342,7 +2539,8 @@ function PreviewBlockingGrid({
                 );
               }),
             ];
-          }).flat()}
+          },
+          ).flat()}
         </div>
       </div>
 

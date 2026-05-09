@@ -45,6 +45,11 @@ export interface SerializedSchedulePeriod {
   id: number;
   validFrom: string | null;
   validUntil: string | null;
+  /** Per-period grid render window (task 119). Display-only — does
+   *  NOT affect availability calculations. Defaults to 09:00 / 22:00
+   *  for newly-created periods. */
+  displayStartTime: string;
+  displayEndTime: string;
 }
 
 export interface SerializedOverride {
@@ -123,6 +128,10 @@ export async function saveSchedulePeriods(input: {
   periods: Array<{
     validFrom: string | null;
     validUntil: string | null;
+    /** Per-period grid render window (task 119). Optional in the
+     *  payload — defaults to 09:00 / 22:00 when missing. */
+    displayStartTime?: string;
+    displayEndTime?: string;
     slots: Array<{
       proLocationId: number;
       dayOfWeek: number;
@@ -171,6 +180,8 @@ export async function saveSchedulePeriods(input: {
         proProfileId: profile.id,
         validFrom: p.validFrom,
         validUntil: p.validUntil,
+        displayStartTime: p.displayStartTime ?? "09:00",
+        displayEndTime: p.displayEndTime ?? "22:00",
       })),
     );
   }

@@ -89,6 +89,8 @@ export default async function AvailabilityPage() {
           id: proSchedulePeriods.id,
           validFrom: proSchedulePeriods.validFrom,
           validUntil: proSchedulePeriods.validUntil,
+          displayStartTime: proSchedulePeriods.displayStartTime,
+          displayEndTime: proSchedulePeriods.displayEndTime,
         })
         .from(proSchedulePeriods)
         .where(eq(proSchedulePeriods.proProfileId, proId))
@@ -179,6 +181,8 @@ export default async function AvailabilityPage() {
       id: p.id,
       validFrom: p.validFrom,
       validUntil: p.validUntil,
+      displayStartTime: p.displayStartTime,
+      displayEndTime: p.displayEndTime,
     })
   );
 
