@@ -20,6 +20,7 @@ const translations: Record<Locale, Record<string, string>> = {
     "appNav.account": "Account",
     "appNav.settings": "Settings",
     "appNav.about": "About",
+    "appNav.managePros": "Manage Pros",
     "appNav.feedback": "Feedback",
     "appNav.more": "More",
 
@@ -1583,6 +1584,7 @@ const translations: Record<Locale, Record<string, string>> = {
     "appNav.account": "Account",
     "appNav.settings": "Instellingen",
     "appNav.about": "Info",
+    "appNav.managePros": "Mijn pro's",
     "appNav.feedback": "Feedback",
     "appNav.more": "Meer",
     "pageHelp.open": "Hulp voor deze pagina",
@@ -3085,6 +3087,7 @@ const translations: Record<Locale, Record<string, string>> = {
     "appNav.account": "Compte",
     "appNav.settings": "Paramètres",
     "appNav.about": "À propos",
+    "appNav.managePros": "Mes pros",
     "appNav.feedback": "Retours",
     "appNav.more": "Plus",
     "pageHelp.open": "Aide pour cette page",
