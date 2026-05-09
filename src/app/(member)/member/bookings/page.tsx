@@ -94,7 +94,7 @@ export default async function MemberBookingsPage() {
         className="mb-8"
       >
         <Link
-          href="/pros"
+          href="/member/dashboard"
           className="rounded-md bg-gold-600 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-gold-500"
         >
           {t("memberBookings.bookLesson", locale)}
