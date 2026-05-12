@@ -39,11 +39,14 @@ import { and, eq, sql } from "drizzle-orm";
  */
 
 // The mailbox bounces land in when the app emails a bad/mis-typed
-// recipient (also where the golflessons.be alias chain resolves —
-// see memory/reference_dummy_email_aliases.md). Override via env if
-// routing changes.
+// recipient. Transactional mail is sent impersonating GMAIL_SEND_AS
+// (`noreply@golflessons.be`); golflessons.be is a user-alias-domain
+// chained through silverswing.golf to the ges.golf primary, so that
+// address resolves to the `it.admin@ges.golf` mailbox — that's where
+// the MAILER-DAEMON DSNs come back to. Override via GMAIL_BOUNCE_INBOX
+// if the send-as or domain routing changes.
 const INBOX_TO_WATCH =
-  process.env.GMAIL_BOUNCE_INBOX || "jan.vanriel@silverswing.golf";
+  process.env.GMAIL_BOUNCE_INBOX || "it.admin@ges.golf";
 const QUERY = "from:mailer-daemon newer_than:2d label:inbox";
 
 function stripQuotesAndTrim(raw: string | undefined): string {
