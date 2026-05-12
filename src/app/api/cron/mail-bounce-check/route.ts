@@ -5,38 +5,46 @@ import { getSession, hasRole } from "@/lib/auth";
 import { logEvent } from "@/lib/events";
 import { db } from "@/lib/db";
 import { events } from "@/lib/db/schema";
-import { and, desc, eq, gte } from "drizzle-orm";
+import { and, eq, sql } from "drizzle-orm";
 
 /**
- * GET /api/cron/mail-bounce-check
+ * GET /api/cron/mail-bounce-check  (Vercel cron: every 10 min — see vercel.json)
  *
- * Every 10 minutes: inspect the shared it.admin inbox for
- * MAILER-DAEMON Delivery Status Notifications — those are the
- * bounces our transactional sends produce when the recipient doesn't
- * exist or rejects the mail. For each new bounce, fire an ntfy alert
- * and write a single `email.bounced` row to the events table (keyed
- * by the Gmail message id so re-runs don't spam).
+ * Inspect the watched inbox for MAILER-DAEMON Delivery Status
+ * Notifications — those are the bounces our transactional sends
+ * produce when the recipient doesn't exist or rejects the mail. For
+ * each *new* bounce, fire an ntfy alert and write one `email.bounced`
+ * row to the events table.
  *
- * Runs on BOTH preview and production — bounces in production are
- * the signal that matters most but catching them on preview is also
- * useful (and cheap). The same bounce will ping ntfy twice if both
- * environments see it, which is worth flagging now so we can tighten
- * later if it gets noisy.
+ * De-dup is keyed on the Gmail message id and looks across the WHOLE
+ * retained `events` history (events are purged at 90 days, so the
+ * window is effectively "as long as the bounce could still be sitting
+ * in the inbox"). A previous version only looked back 120 min, so a
+ * stale DSN that lingers in the inbox would re-alert every ~2h forever
+ * — that's the bug this fixes. Pair it with archiving the DSN out of
+ * the inbox (done manually for the 2026-05-11 golflessons.be batch;
+ * the cron itself can't archive without `gmail.modify` scope).
+ *
+ * The Gmail query looks back 2 days (not 30 min) so a missed cron run
+ * doesn't silently drop bounces — the per-message de-dup keeps it from
+ * spamming.
+ *
+ * Runs on BOTH preview and production. The same bounce can ping ntfy
+ * once per environment (separate events tables) — acceptable; tighten
+ * if it gets noisy.
  *
  * Scope needed on the service account: `gmail.readonly`, whitelisted
  * in Workspace Admin → Security → API controls → Domain-wide delegation.
- * Subject: GMAIL_BOUNCE_INBOX env (defaults to it.admin@silverswing.golf —
- * the account the golflessons.be aliases resolve to).
+ * Subject: GMAIL_BOUNCE_INBOX env.
  */
 
-// The mailbox the dummy-test aliases resolve to (see
-// memory/reference_dummy_email_aliases.md). Bounces and delivery
-// status notifications land here when the app tries to email a
-// mis-typed student/pro address. Override via env if routing changes.
+// The mailbox bounces land in when the app emails a bad/mis-typed
+// recipient (also where the golflessons.be alias chain resolves —
+// see memory/reference_dummy_email_aliases.md). Override via env if
+// routing changes.
 const INBOX_TO_WATCH =
   process.env.GMAIL_BOUNCE_INBOX || "jan.vanriel@silverswing.golf";
-const QUERY = "from:mailer-daemon newer_than:30m label:inbox";
-const LOOKBACK_MINUTES = 120;
+const QUERY = "from:mailer-daemon newer_than:2d label:inbox";
 
 function stripQuotesAndTrim(raw: string | undefined): string {
   if (!raw) return "";
@@ -57,22 +65,19 @@ interface BouncePayload {
 }
 
 async function alreadyReported(gmailMessageId: string): Promise<boolean> {
-  const since = new Date(Date.now() - LOOKBACK_MINUTES * 60 * 1000);
-  const rows = await db
-    .select({ payload: events.payload })
+  // Match on the Gmail message id across the full retained events
+  // history (no time bound — events are purged at 90 days anyway).
+  const [row] = await db
+    .select({ id: events.id })
     .from(events)
     .where(
       and(
         eq(events.type, "email.bounced"),
-        gte(events.createdAt, since),
+        sql`${events.payload} ->> 'gmailMessageId' = ${gmailMessageId}`,
       ),
     )
-    .orderBy(desc(events.createdAt))
-    .limit(50);
-  return rows.some((r) => {
-    const p = r.payload as BouncePayload | null;
-    return p?.gmailMessageId === gmailMessageId;
-  });
+    .limit(1);
+  return row !== undefined;
 }
 
 async function fireNtfy(failedTo: string | null, subject: string | null) {
@@ -133,7 +138,7 @@ export async function GET(request: NextRequest) {
 
   let list;
   try {
-    list = await g.users.messages.list({ userId: "me", q: QUERY, maxResults: 20 });
+    list = await g.users.messages.list({ userId: "me", q: QUERY, maxResults: 50 });
   } catch (err) {
     console.error("[mail-bounce-check] gmail.list failed:", err);
     return NextResponse.json(
