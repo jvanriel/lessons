@@ -82,9 +82,48 @@ export async function POST(request: NextRequest) {
       contentType: f.contentType,
     });
   } catch (err) {
+    // Classify: user-actionable failures (bad URL / not shared with the
+    // service account) should not pollute Sentry — they're a normal
+    // outcome of pasting an arbitrary URL. Genuine credential/network
+    // failures still get captured.
+    const e = err as {
+      code?: number | string;
+      response?: { status?: number };
+      message?: string;
+    };
+    const statusRaw = typeof e.code === "number" ? e.code
+      : typeof e.code === "string" ? parseInt(e.code, 10)
+      : e.response?.status;
+    const status = Number.isFinite(statusRaw) ? (statusRaw as number) : undefined;
+
+    if (status === 404) {
+      return NextResponse.json(
+        {
+          error:
+            "Drive file not found. Double-check the URL, or share the file with it.admin@silverswing.golf (viewer is enough) so the service account can read it.",
+        },
+        { status: 404 },
+      );
+    }
+    if (status === 403) {
+      return NextResponse.json(
+        {
+          error:
+            "The service account can't access that Drive file. Share it with it.admin@silverswing.golf (viewer is enough) and try again.",
+        },
+        { status: 403 },
+      );
+    }
+    if (e.message && /could not parse a google drive file id/i.test(e.message)) {
+      return NextResponse.json(
+        { error: "That doesn't look like a Google Drive URL. Paste the file's share link." },
+        { status: 400 },
+      );
+    }
+
     Sentry.captureException(err, {
       tags: { area: "admin-tasks-google-attach" },
-      extra: { taskId, url: trimmed },
+      extra: { taskId, url: trimmed, status },
     });
     const msg =
       err instanceof Error ? err.message : "Failed to attach Google file";
