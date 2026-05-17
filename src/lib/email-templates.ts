@@ -7,6 +7,7 @@
 
 import { DEFAULT_LOCALE, type Locale } from "@/lib/i18n";
 import { formatDate } from "@/lib/format-date";
+import { formatPrice } from "@/lib/pricing";
 
 function getBaseUrl(): string {
   if (process.env.NEXT_PUBLIC_APP_URL) return process.env.NEXT_PUBLIC_APP_URL;
@@ -731,6 +732,7 @@ const BOOKING_STUDENT_STRINGS: Record<Locale, {
   time: string;
   duration: string;
   durationUnit: string;
+  participants: string;
   amount: string;
   amountOnSite: string;
   cta: string;
@@ -749,6 +751,7 @@ const BOOKING_STUDENT_STRINGS: Record<Locale, {
     time: "Time",
     duration: "Duration",
     durationUnit: "minutes",
+    participants: "Participants",
     amount: "Amount charged",
     amountOnSite: "Payable on site",
     cta: "View my bookings",
@@ -767,6 +770,7 @@ const BOOKING_STUDENT_STRINGS: Record<Locale, {
     time: "Tijd",
     duration: "Duur",
     durationUnit: "minuten",
+    participants: "Deelnemers",
     amount: "Bedrag",
     amountOnSite: "Te betalen ter plaatse",
     cta: "Mijn boekingen bekijken",
@@ -785,6 +789,7 @@ const BOOKING_STUDENT_STRINGS: Record<Locale, {
     time: "Heure",
     duration: "Durée",
     durationUnit: "minutes",
+    participants: "Participants",
     amount: "Montant facturé",
     amountOnSite: "À payer sur place",
     cta: "Voir mes réservations",
@@ -868,6 +873,8 @@ export function buildStudentBookingConfirmationEmail(opts: {
   startTime: string;
   endTime: string;
   duration: number;
+  /** Number of golfers in the lesson; surfaces when > 1 (task 136). */
+  participantCount?: number;
   priceCents?: number | null;
   /** If true, the pro is cash-only — show "payable on site" instead of "amount charged". */
   cashOnly?: boolean;
@@ -889,6 +896,9 @@ export function buildStudentBookingConfirmationEmail(opts: {
     [s.time, `${opts.startTime} – ${opts.endTime}`],
     [s.duration, `${opts.duration} ${s.durationUnit}`],
   );
+  if (typeof opts.participantCount === "number" && opts.participantCount > 1) {
+    rows.push([s.participants, String(opts.participantCount)]);
+  }
   if (typeof opts.priceCents === "number" && opts.priceCents > 0) {
     const amount = new Intl.NumberFormat(
       opts.locale === "en" ? "en-GB" : opts.locale === "nl" ? "nl-BE" : "fr-BE",
@@ -1810,6 +1820,8 @@ const CLAIM_BOOKING_STRINGS: Record<
     location: string;
     proEmail: string;
     proPhone: string;
+    participants: string;
+    price: string;
     alreadyIntro: (proName: string) => string;
     loginButton: string;
     registerHeading: string;
@@ -1832,6 +1844,8 @@ const CLAIM_BOOKING_STRINGS: Record<
     location: "Location",
     proEmail: "Pro email",
     proPhone: "Pro phone",
+    participants: "Participants",
+    price: "Price",
     alreadyIntro: (pro) =>
       `We just added a new lesson with ${pro} to your account.`,
     loginButton: "View booking",
@@ -1855,6 +1869,8 @@ const CLAIM_BOOKING_STRINGS: Record<
     location: "Locatie",
     proEmail: "E-mail pro",
     proPhone: "Telefoon pro",
+    participants: "Deelnemers",
+    price: "Prijs",
     alreadyIntro: (pro) =>
       `We hebben zojuist een nieuwe les bij ${pro} aan je account toegevoegd.`,
     loginButton: "Boeking bekijken",
@@ -1878,6 +1894,8 @@ const CLAIM_BOOKING_STRINGS: Record<
     location: "Lieu",
     proEmail: "E-mail du pro",
     proPhone: "Téléphone du pro",
+    participants: "Participants",
+    price: "Prix",
     alreadyIntro: (pro) =>
       `Nous venons d'ajouter un nouveau cours avec ${pro} à votre compte.`,
     loginButton: "Voir la réservation",
@@ -1903,6 +1921,13 @@ export function buildClaimAndVerifyBookingEmail(opts: {
   startTime: string;
   endTime: string;
   duration: number;
+  /** Number of golfers in the lesson; defaults to 1. Surfaces when
+   *  > 1 so the booker sees that extras were included (task 136). */
+  participantCount?: number;
+  /** Charged price in cents — rendered as "Price: € 80,00". Hidden
+   *  when nullish so old/legacy bookings without configured pricing
+   *  don't show "€ 0,00" (task 136). */
+  priceCents?: number | null;
   claimUrl: string;
   registerUrl: string;
   locale: Locale;
@@ -1914,6 +1939,12 @@ export function buildClaimAndVerifyBookingEmail(opts: {
     [s.duration, `${opts.duration} ${s.durationUnit}`],
     [s.location, opts.locationName],
   ];
+  if (typeof opts.participantCount === "number" && opts.participantCount > 1) {
+    rows.push([s.participants, String(opts.participantCount)]);
+  }
+  if (typeof opts.priceCents === "number" && opts.priceCents > 0) {
+    rows.push([s.price, formatPrice(opts.priceCents / 100, opts.locale)]);
+  }
   if (opts.proEmail) {
     rows.push([s.proEmail, opts.proEmail, `mailto:${opts.proEmail}`]);
   }
@@ -1964,6 +1995,9 @@ export function buildNewBookingOnAccountEmail(opts: {
   startTime: string;
   endTime: string;
   duration: number;
+  /** See buildClaimAndVerifyBookingEmail for semantics (task 136). */
+  participantCount?: number;
+  priceCents?: number | null;
   loginUrl: string;
   locale: Locale;
 }): string {
@@ -1974,6 +2008,12 @@ export function buildNewBookingOnAccountEmail(opts: {
     [s.duration, `${opts.duration} ${s.durationUnit}`],
     [s.location, opts.locationName],
   ];
+  if (typeof opts.participantCount === "number" && opts.participantCount > 1) {
+    rows.push([s.participants, String(opts.participantCount)]);
+  }
+  if (typeof opts.priceCents === "number" && opts.priceCents > 0) {
+    rows.push([s.price, formatPrice(opts.priceCents / 100, opts.locale)]);
+  }
   if (opts.proEmail) {
     rows.push([s.proEmail, opts.proEmail, `mailto:${opts.proEmail}`]);
   }

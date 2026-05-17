@@ -17,6 +17,14 @@ If any role inside the brackets is unknown (typo), the parser falls
 back to treating the brackets as literal text — better to over-show
 than silently hide.
 
+## 2026-05-17 — v1.1.73
+
+- **Booking confirmation emails show participants and price.** The
+  email a student gets after booking — both the public "confirm &
+  claim" version and the signed-in confirmation — now includes the
+  number of participants when more than one was booked, and the
+  total price charged.
+
 ## 2026-05-17 — v1.1.72
 
 - **[pro] Booking cards now show the lesson price.** The booking

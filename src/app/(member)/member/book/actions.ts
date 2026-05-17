@@ -752,6 +752,7 @@ export async function createBooking(formData: FormData) {
             startTime,
             endTime,
             duration,
+            participantCount,
             priceCents,
             cashOnly,
             locale: studentLocale,

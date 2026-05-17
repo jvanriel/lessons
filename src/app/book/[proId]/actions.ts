@@ -800,6 +800,8 @@ export async function createPublicBooking(formData: FormData) {
             startTime,
             endTime,
             duration,
+            participantCount,
+            priceCents,
             claimUrl,
             registerUrl,
             locale: recipientLocale,
@@ -823,6 +825,8 @@ export async function createPublicBooking(formData: FormData) {
             startTime,
             endTime,
             duration,
+            participantCount,
+            priceCents,
             loginUrl: `${getBaseUrl()}/login?email=${encodeURIComponent(email)}`,
             locale: recipientLocale,
           }),
@@ -1009,6 +1013,8 @@ async function _sendClaimEmail(manageToken: string) {
       date: lessonBookings.date,
       startTime: lessonBookings.startTime,
       endTime: lessonBookings.endTime,
+      participantCount: lessonBookings.participantCount,
+      priceCents: lessonBookings.priceCents,
     })
     .from(lessonBookings)
     .where(eq(lessonBookings.manageToken, manageToken))
@@ -1094,6 +1100,8 @@ async function _sendClaimEmail(manageToken: string) {
       startTime: booking.startTime,
       endTime: booking.endTime,
       duration,
+      participantCount: booking.participantCount,
+      priceCents: booking.priceCents,
       claimUrl,
       registerUrl,
       locale: recipientLocale,
