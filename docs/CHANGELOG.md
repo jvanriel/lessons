@@ -17,6 +17,15 @@ If any role inside the brackets is unknown (typo), the parser falls
 back to treating the brackets as literal text — better to over-show
 than silently hide.
 
+## 2026-05-17 — v1.1.69
+
+- **[pro] Stricter IBAN check during registration and billing.**
+  Incomplete IBANs (e.g. "BE12 1234") used to slip past the form
+  silently after the first eight characters were typed. The
+  validator now enforces the correct country-specific length and
+  the ISO mod-97 checksum, so typos and partial entries are caught
+  immediately.
+
 ## 2026-05-17 — v1.1.68
 
 - **[pro] Locations now own their lesson durations, prices, and group

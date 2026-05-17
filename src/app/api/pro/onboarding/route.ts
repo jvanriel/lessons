@@ -9,8 +9,7 @@ import {
 } from "@/lib/db/schema";
 import { eq, inArray } from "drizzle-orm";
 import { isValidIanaTimezone } from "@/lib/timezones";
-
-const IBAN_REGEX = /^[A-Z]{2}\d{2}[A-Z0-9]{4,30}$/;
+import { isValidIban, normalizeIban } from "@/lib/iban";
 
 export async function POST(request: Request) {
   const session = await getSession();
@@ -208,10 +207,10 @@ export async function POST(request: Request) {
       if (!accountHolder?.trim()) {
         return NextResponse.json({ error: "Account holder is required" }, { status: 400 });
       }
-      const cleanIban = iban?.replace(/\s/g, "").toUpperCase();
-      if (!cleanIban || !IBAN_REGEX.test(cleanIban)) {
+      if (!isValidIban(iban)) {
         return NextResponse.json({ error: "Invalid IBAN format" }, { status: 400 });
       }
+      const cleanIban = normalizeIban(iban);
       await db
         .update(proProfiles)
         .set({
