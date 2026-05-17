@@ -37,6 +37,7 @@ import {
 import { loadBookingPricing } from "@/lib/booking-charge";
 import type { EmailPaymentChange } from "@/lib/email-templates";
 import { getAvailableSlots } from "@/app/(member)/member/book/actions";
+import { findStudentOverlap } from "@/lib/booking-overlap";
 import { lessonParticipants } from "@/lib/db/schema";
 import { isSlotConflictError } from "@/lib/db";
 import { after } from "next/server";
@@ -480,6 +481,22 @@ export async function updateBooking(formData: FormData) {
     );
     if (taken) {
       return { error: t("bookErr.slotUnavailable", locale) };
+    }
+    // Cross-pro double-booking guard. (task 143) Edit path excludes
+    // the booking being edited from the check.
+    const overlap = await findStudentOverlap({
+      userId: session.userId,
+      date: changes.date,
+      startTime: changes.startTime,
+      endTime: changes.endTime,
+      excludeBookingId: booking.id,
+    });
+    if (overlap) {
+      return {
+        error: t("bookErr.studentOverlapSelf", locale)
+          .replace("{start}", overlap.startTime)
+          .replace("{end}", overlap.endTime),
+      };
     }
   }
 

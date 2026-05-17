@@ -47,6 +47,7 @@ import { getLocale } from "@/lib/locale";
 import { addDaysToDateString, todayInTZ } from "@/lib/local-date";
 import { getProLocationTimezone } from "@/lib/pro";
 import { updateBookingPreferences } from "@/lib/booking-preferences";
+import { findStudentOverlap } from "@/lib/booking-overlap";
 import {
   limitByKey,
   publicBookingLimiter,
@@ -606,6 +607,26 @@ export async function createPublicBooking(formData: FormData) {
     userId = existing[0].id;
     branch = "verified";
     recipientLocale = resolveLocale(existing[0].preferredLocale);
+  }
+
+  // Cross-pro double-booking guard. (task 143) Skip for brand-new
+  // users — they can't have prior bookings. For "unverified" and
+  // "verified" branches the user pre-existed, so check their
+  // calendar across all pros.
+  if (branch !== "new") {
+    const overlap = await findStudentOverlap({
+      userId,
+      date,
+      startTime,
+      endTime,
+    });
+    if (overlap) {
+      return {
+        error: t("bookErr.studentOverlapSelf", uiLocale)
+          .replace("{start}", overlap.startTime)
+          .replace("{end}", overlap.endTime),
+      };
+    }
   }
 
   // ─── Insert the booking ──────────────────────────────

@@ -17,6 +17,16 @@ If any role inside the brackets is unknown (typo), the parser falls
 back to treating the brackets as literal text — better to over-show
 than silently hide.
 
+## 2026-05-17 — v1.1.78
+
+- **No more double-booking yourself across pros.** If you already
+  have a confirmed lesson at a given time, you can no longer book a
+  second lesson with another pro that overlaps. The booking and
+  edit forms (member, public, and pro-on-behalf-of-student) now
+  refuse the conflict with a clear "you already have a lesson from
+  X to Y" message. Back-to-back lessons (10:00–11:00 then 11:00–
+  12:00) still work.
+
 ## 2026-05-17 — v1.1.77
 
 - **[pro] Address confirmation when saving a location.** Saving a

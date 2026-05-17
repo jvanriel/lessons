@@ -929,6 +929,10 @@ const translations: Record<Locale, Record<string, string>> = {
     "bookings.cancelLesson": "Cancel lesson",
     "bookErr.fillRequired": "Please fill in all required fields.",
     "bookErr.slotUnavailable": "This time slot is no longer available. Please choose a different time.",
+    "bookErr.studentOverlapSelf":
+      "You already have a lesson booked from {start} to {end}. Please pick a different time.",
+    "bookErr.studentOverlapForPro":
+      "This student already has a lesson from {start} to {end}. Pick a different time.",
     "bookErr.userNotFound": "Account not found. Please log out and back in.",
     "bookErr.paymentMethodRequired": "A payment method is required to book with this pro. Add one in your profile.",
     "bookErr.noPriceForDuration": "This pro hasn't set a price for this duration yet. Please pick another duration or contact the pro.",
@@ -2480,6 +2484,10 @@ const translations: Record<Locale, Record<string, string>> = {
     "bookings.cancelLesson": "Les annuleren",
     "bookErr.fillRequired": "Vul alle verplichte velden in.",
     "bookErr.slotUnavailable": "Dit tijdslot is niet meer beschikbaar. Kies een ander tijdstip.",
+    "bookErr.studentOverlapSelf":
+      "Je hebt al een les geboekt van {start} tot {end}. Kies een ander moment.",
+    "bookErr.studentOverlapForPro":
+      "Deze leerling heeft al een les van {start} tot {end}. Kies een ander moment.",
     "bookErr.userNotFound": "Account niet gevonden. Log uit en weer in.",
     "bookErr.paymentMethodRequired": "Een betaalmethode is verplicht om bij deze pro te boeken. Voeg er een toe in je profiel.",
     "bookErr.noPriceForDuration": "Deze pro heeft nog geen prijs ingesteld voor deze duur. Kies een andere duur of neem contact op met de pro.",
@@ -4027,6 +4035,10 @@ const translations: Record<Locale, Record<string, string>> = {
     "bookings.cancelLesson": "Annuler le cours",
     "bookErr.fillRequired": "Veuillez remplir tous les champs obligatoires.",
     "bookErr.slotUnavailable": "Ce créneau n'est plus disponible. Choisissez un autre horaire.",
+    "bookErr.studentOverlapSelf":
+      "Vous avez déjà une leçon réservée de {start} à {end}. Choisissez un autre horaire.",
+    "bookErr.studentOverlapForPro":
+      "Cet élève a déjà une leçon de {start} à {end}. Choisissez un autre horaire.",
     "bookErr.userNotFound": "Compte introuvable. Déconnectez-vous puis reconnectez-vous.",
     "bookErr.paymentMethodRequired": "Un moyen de paiement est requis pour réserver avec ce pro. Ajoutez-en un dans votre profil.",
     "bookErr.noPriceForDuration": "Ce pro n'a pas encore défini de prix pour cette durée. Choisissez une autre durée ou contactez le pro.",

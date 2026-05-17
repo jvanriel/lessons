@@ -49,6 +49,7 @@ import { getLocale } from "@/lib/locale";
 import { addDaysToDateString, todayInTZ } from "@/lib/local-date";
 import { computeSuggestedDate } from "@/lib/booking-suggestion";
 import { getProLocationTimezone } from "@/lib/pro";
+import { findStudentOverlap } from "@/lib/booking-overlap";
 import { updateBookingPreferences } from "@/lib/booking-preferences";
 import {
   parseExtraParticipants,
@@ -505,6 +506,21 @@ export async function createBooking(formData: FormData) {
 
   if (!slotAvailable) {
     return { error: t("bookErr.slotUnavailable", locale) };
+  }
+
+  // Cross-pro double-booking guard. (task 143)
+  const overlap = await findStudentOverlap({
+    userId: session.userId,
+    date,
+    startTime,
+    endTime,
+  });
+  if (overlap) {
+    return {
+      error: t("bookErr.studentOverlapSelf", locale)
+        .replace("{start}", overlap.startTime)
+        .replace("{end}", overlap.endTime),
+    };
   }
 
   // Pricing + payment-status resolution — shared with `quickCreateBooking`
@@ -1135,6 +1151,21 @@ export async function quickCreateBooking(data: {
 
   if (!slotAvailable) {
     return { error: t("bookErr.slotUnavailable", locale) };
+  }
+
+  // Cross-pro double-booking guard. (task 143)
+  const overlap = await findStudentOverlap({
+    userId: session.userId,
+    date: data.date,
+    startTime: data.startTime,
+    endTime: data.endTime,
+  });
+  if (overlap) {
+    return {
+      error: t("bookErr.studentOverlapSelf", locale)
+        .replace("{start}", overlap.startTime)
+        .replace("{end}", overlap.endTime),
+    };
   }
 
   // Pricing + payment-status resolution — shared with `createBooking`

@@ -70,6 +70,7 @@ import {
   type ExistingBooking,
 } from "@/lib/lesson-slots";
 import { cancelBookingByPro } from "@/lib/booking-cancel";
+import { findStudentOverlap } from "@/lib/booking-overlap";
 import { after } from "next/server";
 import crypto from "node:crypto";
 
@@ -1102,6 +1103,25 @@ export async function proQuickBookForStudent(data: {
     return { error: "This time slot is no longer available." };
   }
 
+  // Cross-pro double-booking guard. (task 143) Pro is creating on
+  // behalf of the student — if the student already has a confirmed
+  // booking that overlaps (with this pro or any other), refuse so
+  // the student isn't stranded between two parallel lessons.
+  const proBookingOverlap = await findStudentOverlap({
+    userId: rel.userId,
+    date: data.date,
+    startTime: data.startTime,
+    endTime: data.endTime,
+  });
+  if (proBookingOverlap) {
+    const proLocale = await getLocale();
+    return {
+      error: t("bookErr.studentOverlapForPro", proLocale)
+        .replace("{start}", proBookingOverlap.startTime)
+        .replace("{end}", proBookingOverlap.endTime),
+    };
+  }
+
   // Create booking (booked by the student, initiated by pro). Atomic
   // insert + participant — the pro/student relationship already
   // exists (this is a pro-initiated booking against an existing
@@ -1550,6 +1570,21 @@ export async function proUpdateBooking(formData: FormData) {
       booking.id,
     );
     if (taken) return { error: t("bookErr.slotUnavailable", localeForSlot) };
+    // Cross-pro double-booking guard for the student. (task 143)
+    const studentOverlap = await findStudentOverlap({
+      userId: booking.bookedById,
+      date: changes.date,
+      startTime: changes.startTime,
+      endTime: changes.endTime,
+      excludeBookingId: booking.id,
+    });
+    if (studentOverlap) {
+      return {
+        error: t("bookErr.studentOverlapForPro", localeForSlot)
+          .replace("{start}", studentOverlap.startTime)
+          .replace("{end}", studentOverlap.endTime),
+      };
+    }
   }
 
   // Pre-edit snapshot for the booking-updated emails. Mirror of the
