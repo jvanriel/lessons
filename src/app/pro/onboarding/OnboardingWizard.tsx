@@ -1176,6 +1176,20 @@ function SubscriptionStep({ onSuccess, locale }: { onSuccess: () => void; locale
           <p className="mt-1 text-xs text-green-500">
             {t("proOnb.sub.firstChargeOn", locale).replace("{date}", firstChargeDate)}
           </p>
+          <button
+            type="button"
+            onClick={() => {
+              // Drop the SetupIntent so the plan picker re-renders.
+              // Without this the pro can't switch monthly/annual or
+              // recover from a weird Stripe Link state without
+              // hitting wizard-Back-then-Next (task 132).
+              setClientSecret(null);
+              setBillingPrefill(null);
+            }}
+            className="mt-3 text-xs font-medium text-green-700 underline hover:text-green-900"
+          >
+            {t("proOnb.sub.changePlan", locale)}
+          </button>
         </div>
         <Elements
           stripe={getStripe()}
@@ -1188,6 +1202,18 @@ function SubscriptionStep({ onSuccess, locale }: { onSuccess: () => void; locale
             billingPrefill={billingPrefill}
           />
         </Elements>
+        <p className="text-xs text-green-500">
+          {t("proOnb.sub.termsPrefix", locale)}{" "}
+          <a
+            href="/terms"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="underline hover:text-green-700"
+          >
+            {t("proOnb.sub.termsLink", locale)}
+          </a>
+          {t("proOnb.sub.termsSuffix", locale)}
+        </p>
       </div>
     );
   }

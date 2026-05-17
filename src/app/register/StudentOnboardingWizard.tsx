@@ -749,6 +749,16 @@ function PaymentStep({
             <li>{t("onboarding.paymentScopeBullet2", locale)}</li>
           </ul>
         </div>
+        {/* Drop the SetupIntent so the "Enable quick-book" intro
+            re-renders. Used to recover from a weird Stripe Link state
+            without losing the student's wizard progress (task 132). */}
+        <button
+          type="button"
+          onClick={() => setClientSecret(null)}
+          className="text-xs font-medium text-green-700 underline hover:text-green-900"
+        >
+          {t("onboarding.paymentBack", locale)}
+        </button>
         <Elements stripe={getStripe()} options={{ clientSecret, ...stripeElementsOptions }}>
           <PaymentForm onSuccess={onSuccess} locale={locale} billing={billing} />
         </Elements>

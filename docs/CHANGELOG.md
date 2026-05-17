@@ -17,6 +17,19 @@ If any role inside the brackets is unknown (typo), the parser falls
 back to treating the brackets as literal text — better to over-show
 than silently hide.
 
+## 2026-05-17 — v1.1.70
+
+- **[pro,member] "Back" out of the payment form.** The pro
+  subscription step and the student payment step both now have a
+  link above the Stripe form that drops the SetupIntent and returns
+  you to the previous screen — so you can switch monthly/annual or
+  recover from a confused Stripe Link state without having to use
+  wizard Back + Next.
+- **[pro] Terms link above the trial-start button.** A small "by
+  starting your trial you accept our Terms & Conditions" line is
+  now visible right under the Stripe form on the subscription step,
+  matching the pattern the student payment step already has.
+
 ## 2026-05-17 — v1.1.69
 
 - **[pro] Stricter IBAN check during registration and billing.**
