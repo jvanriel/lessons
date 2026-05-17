@@ -5,7 +5,11 @@ import Script from "next/script";
 import { Button } from "@/components/ui/button";
 import type { Locale } from "@/lib/i18n";
 import { t } from "@/lib/i18n/translations";
-import { formatPrice, computeBookingPriceCents } from "@/lib/pricing";
+import {
+  formatPrice,
+  computeBookingPriceBreakdown,
+} from "@/lib/pricing";
+import { PriceBreakdown } from "@/components/booking/PriceBreakdown";
 import { formatDate as formatDateLocale } from "@/lib/format-date";
 import PhoneField, { isValidPhoneNumber } from "@/components/PhoneField";
 import { BookingCalendar } from "@/components/BookingCalendar";
@@ -236,19 +240,20 @@ export default function PublicBookingWizard({
       .finally(() => setLoadingSlots(false));
   }, [pro, locationId, duration, date]);
 
-  const priceCents = useMemo(() => {
+  const priceBreakdown = useMemo(() => {
     if (!activeLocation || !duration) return null;
-    // Group-rate aware: base + extra * (N - 1). Pre-fix this only
-    // returned the base price, so the summary line and the resulting
-    // booking row understated the total for groups (task 100).
-    // Pricing now sourced per-location (task 109).
-    return computeBookingPriceCents({
+    // Group-rate aware: base + extra * (N - 1). Pre-fix the public
+    // wizard only displayed the base price for groups (task 100).
+    // Returning a breakdown — not just the total — lets the summary
+    // show the math behind multi-participant totals (task 100 follow-up).
+    return computeBookingPriceBreakdown({
       lessonPricing: activeLocation.lessonPricing,
       extraStudentPricing: activeLocation.extraStudentPricing,
       duration,
       participantCount,
     });
   }, [activeLocation, duration, participantCount]);
+  const priceCents = priceBreakdown?.totalCents ?? null;
 
   const trimmedFirst = firstName.trim();
   const trimmedLast = lastName.trim();
@@ -1009,13 +1014,17 @@ export default function PublicBookingWizard({
             }}
           />
 
-          {priceCents !== null && (
-            <p className="mt-4 text-sm text-green-700">
-              {t("publicBook.priceNote", locale).replace(
-                "{price}",
-                formatPrice(priceCents / 100, locale)
-              )}
-            </p>
+          {priceBreakdown !== null && (
+            <>
+              <PriceBreakdown
+                breakdown={priceBreakdown}
+                duration={duration!}
+                locale={locale}
+              />
+              <p className="mt-2 text-[11px] text-green-600">
+                {t("publicBook.priceNoteSuffix", locale)}
+              </p>
+            </>
           )}
 
           {error && (

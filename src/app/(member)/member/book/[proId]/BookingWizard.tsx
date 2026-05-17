@@ -13,7 +13,11 @@ import {
 import { t } from "@/lib/i18n/translations";
 import type { Locale } from "@/lib/i18n";
 import { formatDate as formatDateLocale } from "@/lib/format-date";
-import { formatPrice, computeBookingPriceCents } from "@/lib/pricing";
+import {
+  formatPrice,
+  computeBookingPriceBreakdown,
+} from "@/lib/pricing";
+import { PriceBreakdown } from "@/components/booking/PriceBreakdown";
 
 // ─── Types ──────────────────────────────────────────
 
@@ -288,15 +292,16 @@ export function BookingWizard({
     return typeof p === "number" && p > 0 ? p : null;
   }, [activeLocation, duration]);
 
-  const totalCents = useMemo(() => {
+  const priceBreakdown = useMemo(() => {
     if (!duration || !activeLocation) return null;
-    return computeBookingPriceCents({
+    return computeBookingPriceBreakdown({
       lessonPricing: activeLocation.lessonPricing,
       extraStudentPricing: activeLocation.extraStudentPricing,
       duration,
       participantCount,
     });
   }, [activeLocation, duration, participantCount]);
+  const totalCents = priceBreakdown?.totalCents ?? null;
 
   const paymentBlocked = !hasPaymentMethod && !allowBookingWithoutPayment;
   const requiresPriceButNone =
@@ -662,16 +667,14 @@ export function BookingWizard({
             className="mt-4 w-full rounded-md border border-green-200 bg-white px-3 py-2 text-sm text-green-900 focus:border-green-400 focus:outline-none focus:ring-1 focus:ring-green-400"
           />
 
-          {/* Price summary */}
-          {totalCents !== null && (
-            <div className="mt-4 flex items-center justify-between rounded-lg bg-green-50/70 px-4 py-3 text-sm">
-              <span className="text-green-700">
-                {t("book.summary.total", locale)}
-              </span>
-              <span className="font-semibold text-green-900">
-                {formatPrice(totalCents / 100, locale)}
-              </span>
-            </div>
+          {/* Price summary — per-row breakdown for groups, one-liner
+              for solo bookings. Task 100 follow-up. */}
+          {priceBreakdown !== null && (
+            <PriceBreakdown
+              breakdown={priceBreakdown}
+              duration={duration!}
+              locale={locale}
+            />
           )}
 
           {/* Payment method messaging */}

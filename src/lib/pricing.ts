@@ -126,3 +126,40 @@ export function computeBookingPriceCents(opts: {
     typeof extraRate === "number" && extraRate >= 0 ? extraRate : 0;
   return base + extra * (count - 1);
 }
+
+/**
+ * Same total as `computeBookingPriceCents` but returns the parts so the
+ * booking wizard can render a per-row breakdown (base lesson + N extra
+ * participants → total). Task 100: students wanted to see the math
+ * behind the total, not just the result.
+ *
+ * Returns null when there's no configured base price, mirroring the
+ * total-only helper.
+ */
+export interface BookingPriceBreakdown {
+  baseCents: number;
+  extraPerCents: number;
+  extraCount: number;
+  totalCents: number;
+}
+
+export function computeBookingPriceBreakdown(opts: {
+  lessonPricing: Record<string, number> | null | undefined;
+  extraStudentPricing?: Record<string, number> | null;
+  duration: number;
+  participantCount: number;
+}): BookingPriceBreakdown | null {
+  const base = opts.lessonPricing?.[String(opts.duration)];
+  if (typeof base !== "number" || base <= 0) return null;
+  const count = Math.max(1, Math.floor(opts.participantCount));
+  const extraRate = opts.extraStudentPricing?.[String(opts.duration)];
+  const extraPer =
+    typeof extraRate === "number" && extraRate >= 0 ? extraRate : 0;
+  const extraCount = count - 1;
+  return {
+    baseCents: base,
+    extraPerCents: extraPer,
+    extraCount,
+    totalCents: base + extraPer * extraCount,
+  };
+}

@@ -17,6 +17,13 @@ If any role inside the brackets is unknown (typo), the parser falls
 back to treating the brackets as literal text — better to over-show
 than silently hide.
 
+## 2026-05-17 — v1.1.64
+
+- **Price breakdown on group bookings.** When you book a lesson with
+  extra participants and the pro has set an extra-student rate, the
+  summary now shows the math — base lesson, extras × rate, and total
+  — so you can verify the total before confirming.
+
 ## 2026-05-17 — v1.1.63
 
 - **[pro] Blocking a time slot now cancels overlapping bookings.** In
