@@ -17,6 +17,17 @@ If any role inside the brackets is unknown (typo), the parser falls
 back to treating the brackets as literal text — better to over-show
 than silently hide.
 
+## 2026-05-17 — v1.1.80
+
+- **Clearer terms link on the registration payment step.** The
+  Stripe card form mentions "their terms" but doesn't always render
+  a clickable link. We now put our Terms-of-Use link directly above
+  the Stripe block (where Stripe's text appears) with wording that
+  explicitly bridges the two: "the 'their terms' Stripe mentions
+  below are our [Terms of Use]". The duplicate link that used to
+  appear below the submit button is removed, so there's one clear
+  place to read the conditions.
+
 ## 2026-05-17 — v1.1.79
 
 - **Chat notifications update faster.** The unread-chat badge in
