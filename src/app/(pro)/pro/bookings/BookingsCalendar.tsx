@@ -373,9 +373,15 @@ export function BookingsCalendar({
                   })}
 
                   {/* Booking blocks — coloured by location (same palette as
-                      the availability editor). Cancelled bookings keep the
-                      location colour but render with a strike-through and
-                      reduced opacity so the status is still legible. */}
+                      the availability editor). Cancelled bookings used to
+                      render as full blocks with strike-through + opacity-50
+                      but Jan flagged that they then overlap visually with
+                      any replacement booking made in the same slot. Now
+                      they render as a thin red bar at the left column edge
+                      with pointer-events disabled — the slot looks free for
+                      the new booking, but a vertical red strip still flags
+                      "there was a cancellation here". Full details remain
+                      in the list view. (task 146) */}
                   {dayBookings.map((booking) => {
                     const topMin = timeToGridRow(booking.startTime, startHour);
                     const bottomMin = timeToGridRow(booking.endTime, startHour);
@@ -387,14 +393,28 @@ export function BookingsCalendar({
                     const color = LOCATION_COLORS[colorIdx];
                     const cancelled = booking.status === "cancelled";
 
+                    if (cancelled) {
+                      return (
+                        <div
+                          key={booking.id}
+                          className="pointer-events-none absolute left-0 w-[3px] rounded-r-sm bg-red-400/80"
+                          style={{
+                            top: `${topPx}px`,
+                            height: `${heightPx}px`,
+                            zIndex: 5,
+                          }}
+                          aria-label={`Cancelled lesson ${booking.startTime}–${booking.endTime}`}
+                        />
+                      );
+                    }
+
                     return (
                       <div
                         key={booking.id}
                         className={cn(
                           "absolute left-0.5 right-0.5 flex cursor-pointer items-center overflow-hidden rounded-md border px-1.5 py-0.5 text-white shadow-sm transition-shadow hover:shadow-md",
                           color.bg,
-                          color.border,
-                          cancelled && "opacity-50 line-through"
+                          color.border
                         )}
                         style={{
                           top: `${topPx}px`,

@@ -17,6 +17,16 @@ If any role inside the brackets is unknown (typo), the parser falls
 back to treating the brackets as literal text — better to over-show
 than silently hide.
 
+## 2026-05-17 — v1.1.87
+
+- **[pro] Cancelled bookings no longer block new ones on the
+  calendar.** A cancelled lesson used to render as a full block on
+  the week calendar with strikethrough + faded colour — if you
+  booked a replacement in the same slot, the two cards overlapped.
+  Cancellations now show as a thin red bar at the left edge of the
+  slot's column so a new booking renders fully visible while the
+  cancellation is still flagged. Full details stay in the list view.
+
 ## 2026-05-17 — v1.1.86
 
 - **Booking calendar: unavailable dates now grey, not faded green.**
