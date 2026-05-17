@@ -358,7 +358,11 @@ export async function updateBooking(formData: FormData) {
   if (!bookingId) return { error: "Invalid booking ID" };
 
   const changes = parseEditBookingChanges(formData);
-  const participantError = validateEditParticipants(changes.extraParticipants);
+  const localeForParticipantCheck = await getLocale();
+  const participantError = validateEditParticipants(
+    changes.extraParticipants,
+    localeForParticipantCheck,
+  );
   if (participantError) return { error: participantError };
 
   // Load the booking + the booker's own lesson_participants row so we

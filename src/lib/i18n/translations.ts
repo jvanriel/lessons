@@ -933,6 +933,8 @@ const translations: Record<Locale, Record<string, string>> = {
       "You already have a lesson booked from {start} to {end}. Please pick a different time.",
     "bookErr.studentOverlapForPro":
       "This student already has a lesson from {start} to {end}. Pick a different time.",
+    "bookErr.extraParticipantNamesRequired":
+      "Each additional participant needs a first and last name.",
     "bookErr.userNotFound": "Account not found. Please log out and back in.",
     "bookErr.paymentMethodRequired": "A payment method is required to book with this pro. Add one in your profile.",
     "bookErr.noPriceForDuration": "This pro hasn't set a price for this duration yet. Please pick another duration or contact the pro.",
@@ -2488,6 +2490,8 @@ const translations: Record<Locale, Record<string, string>> = {
       "Je hebt al een les geboekt van {start} tot {end}. Kies een ander moment.",
     "bookErr.studentOverlapForPro":
       "Deze leerling heeft al een les van {start} tot {end}. Kies een ander moment.",
+    "bookErr.extraParticipantNamesRequired":
+      "Elke extra deelnemer heeft een voornaam en achternaam nodig.",
     "bookErr.userNotFound": "Account niet gevonden. Log uit en weer in.",
     "bookErr.paymentMethodRequired": "Een betaalmethode is verplicht om bij deze pro te boeken. Voeg er een toe in je profiel.",
     "bookErr.noPriceForDuration": "Deze pro heeft nog geen prijs ingesteld voor deze duur. Kies een andere duur of neem contact op met de pro.",
@@ -4039,6 +4043,8 @@ const translations: Record<Locale, Record<string, string>> = {
       "Vous avez déjà une leçon réservée de {start} à {end}. Choisissez un autre horaire.",
     "bookErr.studentOverlapForPro":
       "Cet élève a déjà une leçon de {start} à {end}. Choisissez un autre horaire.",
+    "bookErr.extraParticipantNamesRequired":
+      "Chaque participant supplémentaire doit avoir un prénom et un nom.",
     "bookErr.userNotFound": "Compte introuvable. Déconnectez-vous puis reconnectez-vous.",
     "bookErr.paymentMethodRequired": "Un moyen de paiement est requis pour réserver avec ce pro. Ajoutez-en un dans votre profil.",
     "bookErr.noPriceForDuration": "Ce pro n'a pas encore défini de prix pour cette durée. Choisissez une autre durée ou contactez le pro.",

@@ -17,6 +17,16 @@ If any role inside the brackets is unknown (typo), the parser falls
 back to treating the brackets as literal text — better to over-show
 than silently hide.
 
+## 2026-05-17 — v1.1.83
+
+- **Extra participants now actually required.** Adding extra
+  participants to a booking but leaving their first/last name blank
+  used to silently submit — the server dropped the empty rows so
+  validation never fired. The booking would persist with the
+  higher participant count but only the booker recorded. The form
+  now refuses with "Elke extra deelnemer heeft een voornaam en
+  achternaam nodig" (also EN/FR).
+
 ## 2026-05-17 — v1.1.82
 
 - **Logo no longer 404s for members.** Members clicking the

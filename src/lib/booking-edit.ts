@@ -22,7 +22,7 @@ import {
   type PreviousBookingValues,
 } from "@/lib/email-templates";
 import { buildCancelIcs } from "@/lib/lesson-slots";
-import { resolveLocale } from "@/lib/i18n";
+import { resolveLocale, type Locale } from "@/lib/i18n";
 import { formatLocationFull } from "@/lib/location-display";
 import {
   parseExtraParticipants,
@@ -152,8 +152,9 @@ export function validateEditAllowed(
  */
 export function validateEditParticipants(
   participants: ExtraParticipant[],
+  locale: Locale = "en",
 ): string | null {
-  return validateExtraParticipants(participants);
+  return validateExtraParticipants(participants, locale);
 }
 
 /**

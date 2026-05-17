@@ -489,7 +489,7 @@ export async function createBooking(formData: FormData) {
 
   const locale = await getUiLocale();
 
-  const participantValidationError = validateExtraParticipants(extraParticipants);
+  const participantValidationError = validateExtraParticipants(extraParticipants, locale);
   if (participantValidationError) {
     return { error: participantValidationError };
   }

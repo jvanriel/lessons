@@ -1464,7 +1464,11 @@ export async function proUpdateBooking(formData: FormData) {
   if (!bookingId) return { error: "Invalid booking ID" };
 
   const changes = parseEditBookingChanges(formData);
-  const participantError = validateEditParticipants(changes.extraParticipants);
+  const localeForParticipantCheck = await getLocale();
+  const participantError = validateEditParticipants(
+    changes.extraParticipants,
+    localeForParticipantCheck,
+  );
   if (participantError) return { error: participantError };
 
   const [booking] = await db

@@ -501,7 +501,7 @@ export async function createPublicBooking(formData: FormData) {
     return { error: t("publicBook.err.nameRequired", uiLocale) };
   }
 
-  const participantValidationError = validateExtraParticipants(extraParticipants);
+  const participantValidationError = validateExtraParticipants(extraParticipants, uiLocale);
   if (participantValidationError) {
     return { error: participantValidationError };
   }
