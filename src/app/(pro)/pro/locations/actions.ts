@@ -1,7 +1,6 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { after } from "next/server";
 import { db } from "@/lib/db";
 import { locations, proLocations, proProfiles } from "@/lib/db/schema";
 import { eq, and } from "drizzle-orm";
@@ -11,29 +10,56 @@ import { geocodeAddress } from "@/lib/geocode";
 import * as Sentry from "@sentry/nextjs";
 
 /**
- * Fill in `locations.lat` / `lng` for a single id by querying
- * Nominatim. Runs after the user's action returns (via `after()`)
- * so the editor doesn't wait on a network round-trip. Best-effort:
- * a miss leaves coords NULL and the helpers fall back to address-
- * based URLs.
+ * Result of an in-action geocode used to render the post-save
+ * confirmation card. Pre-task-142 this ran via `after()` and the pro
+ * never saw whether the address resolved — they could save a fake or
+ * mistyped address and the Waze/Google deep links would silently send
+ * students to the wrong place. Now we await the lookup so the editor
+ * can show a "we resolved this to X" preview (matched) or warn that
+ * the buttons may misfire (unmatched).
  */
-async function geocodeLocationInBackground(
+export type GeocodeFeedback =
+  | { matched: true; displayName: string; lat: string; lng: string }
+  | { matched: false };
+
+export interface LocationActionResult {
+  error?: string;
+  success?: boolean;
+  /** Only present when this save ran a geocode (new address or
+   *  changed address). Undefined → no feedback card to show. */
+  geocode?: GeocodeFeedback;
+}
+
+/**
+ * Synchronous geocode used on save: query Nominatim and, on a hit,
+ * persist lat/lng to `locations`. Returns a `GeocodeFeedback` for the
+ * UI confirmation card; a network/timeout error returns `matched:false`
+ * so the pro still sees the warning instead of a hung form.
+ */
+async function geocodeLocationOnSave(
   locationId: number,
   address: string,
   city: string | null,
-) {
+): Promise<GeocodeFeedback> {
   try {
     const coords = await geocodeAddress({ address, city });
-    if (!coords) return;
+    if (!coords) return { matched: false };
     await db
       .update(locations)
       .set({ lat: coords.lat, lng: coords.lng })
       .where(eq(locations.id, locationId));
+    return {
+      matched: true,
+      displayName: coords.displayName,
+      lat: coords.lat,
+      lng: coords.lng,
+    };
   } catch (err) {
     Sentry.captureException(err, {
       tags: { area: "geocode" },
       extra: { locationId, address, city },
     });
+    return { matched: false };
   }
 }
 
@@ -79,9 +105,9 @@ export async function getMyLocations() {
 }
 
 export async function createLocation(
-  _prev: { error?: string; success?: boolean } | null,
+  _prev: LocationActionResult | null,
   formData: FormData
-) {
+): Promise<LocationActionResult> {
   const proId = await getProProfileId();
   if (!proId) return { error: "Unauthorized" };
 
@@ -106,6 +132,7 @@ export async function createLocation(
   // pro joins the existing row; we don't overwrite its timezone since
   // another pro may have set it correctly already.
   let locationId: number;
+  let geocode: GeocodeFeedback | undefined;
   const [existing] = await db
     .select({ id: locations.id })
     .from(locations)
@@ -120,14 +147,13 @@ export async function createLocation(
       .values({ name, address, city, country, timezone })
       .returning({ id: locations.id });
     locationId = inserted.id;
-    // New location with an address: kick off a background geocode
-    // so the booking emails / Waze links light up automatically.
-    // Address-less rows skip the call — Nominatim has nothing to
-    // geocode without a street.
+    // New location with an address: geocode synchronously so the pro
+    // sees a confirmation card with the resolved name + map preview
+    // (task 142). Address-less rows skip — Nominatim has nothing to
+    // resolve and we never want a bogus "unmatched" warning for a
+    // location the pro intentionally left coordinates-free.
     if (address) {
-      const newId = locationId;
-      const a = address;
-      after(() => geocodeLocationInBackground(newId, a, city));
+      geocode = await geocodeLocationOnSave(locationId, address, city);
     }
   }
 
@@ -161,13 +187,13 @@ export async function createLocation(
 
   revalidatePath("/pro/locations");
   revalidatePath("/pro/availability");
-  return { success: true };
+  return { success: true, geocode };
 }
 
 export async function updateProLocation(
-  _prev: { error?: string; success?: boolean } | null,
+  _prev: LocationActionResult | null,
   formData: FormData
-) {
+): Promise<LocationActionResult> {
   const proId = await getProProfileId();
   if (!proId) return { error: "Unauthorized" };
 
@@ -249,13 +275,11 @@ export async function updateProLocation(
     .set({ name, address, city, country, timezone })
     .where(eq(locations.id, link.locationId));
 
+  let geocode: GeocodeFeedback | undefined;
   const addressChanged =
     address && (prev?.address !== address || prev?.city !== city);
   if (addressChanged) {
-    const id = link.locationId;
-    const a = address;
-    const c = city;
-    after(() => geocodeLocationInBackground(id, a, c));
+    geocode = await geocodeLocationOnSave(link.locationId, address, city);
   }
   await db
     .update(proLocations)
@@ -271,10 +295,12 @@ export async function updateProLocation(
 
   revalidatePath("/pro/locations");
   revalidatePath("/pro/availability");
-  return { success: true };
+  return { success: true, geocode };
 }
 
-export async function removeProLocation(proLocationId: number) {
+export async function removeProLocation(
+  proLocationId: number,
+): Promise<{ error?: string; success?: boolean }> {
   const proId = await getProProfileId();
   if (!proId) return { error: "Unauthorized" };
 

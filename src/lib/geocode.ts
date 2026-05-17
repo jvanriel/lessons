@@ -76,11 +76,21 @@ export async function geocodeAddress(input: {
   url.searchParams.set("countrycodes", "be");
   url.searchParams.set("addressdetails", "0");
 
+  // 5s timeout so the location editor doesn't hang on a slow / down
+  // Nominatim instance — the action falls back to a "not found"
+  // response and the pro can save anyway. (task 142)
+  const ac = new AbortController();
+  const timer = setTimeout(() => ac.abort(), 5000);
   let res: Response;
   try {
-    res = await fetch(url, { headers: { "User-Agent": USER_AGENT } });
+    res = await fetch(url, {
+      headers: { "User-Agent": USER_AGENT },
+      signal: ac.signal,
+    });
   } catch {
     return null;
+  } finally {
+    clearTimeout(timer);
   }
   if (!res.ok) return null;
   let data: unknown;

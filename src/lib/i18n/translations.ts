@@ -1031,6 +1031,15 @@ const translations: Record<Locale, Record<string, string>> = {
     "proLocations.maxGroupSize": "Max group size",
     "proLocations.saving": "Saving...",
     "proLocations.save": "Save",
+    "proLocations.geocode.matchedHeading": "Address found on the map",
+    "proLocations.geocode.matchedBody": "We resolved your address to:",
+    "proLocations.geocode.matchedHint":
+      "If this doesn't look like your location, edit the address — the booking emails and Waze/Google Maps buttons use this match.",
+    "proLocations.geocode.unmatchedHeading": "Address not found on the map",
+    "proLocations.geocode.unmatchedBody":
+      "We couldn't find this address. Bookings will still show your text, but the Waze/Google Maps buttons may direct students to the wrong place. Double-check the spelling and city.",
+    "proLocations.geocode.openMap": "Open in OpenStreetMap",
+    "proLocations.geocode.dismiss": "Dismiss",
     "proAvailability.pageTitle": "Availability",
     "proAvailability.pageSubtitle": "Set your weekly schedule and manage date-specific overrides.",
     "proAvailability.needLocation": "You need to add at least one teaching location before setting availability.",
@@ -2573,6 +2582,15 @@ const translations: Record<Locale, Record<string, string>> = {
     "proLocations.maxGroupSize": "Max. groepsgrootte",
     "proLocations.saving": "Opslaan...",
     "proLocations.save": "Sla op",
+    "proLocations.geocode.matchedHeading": "Adres op de kaart gevonden",
+    "proLocations.geocode.matchedBody": "We hebben je adres herleid tot:",
+    "proLocations.geocode.matchedHint":
+      "Klopt dit niet? Pas het adres aan — de bevestigingsmails en Waze/Google Maps-knoppen gebruiken deze match.",
+    "proLocations.geocode.unmatchedHeading": "Adres niet gevonden op de kaart",
+    "proLocations.geocode.unmatchedBody":
+      "We konden dit adres niet vinden. Boekingen tonen je tekst nog steeds, maar de Waze/Google Maps-knoppen kunnen leerlingen naar de verkeerde plek sturen. Controleer spelling en stad.",
+    "proLocations.geocode.openMap": "Open in OpenStreetMap",
+    "proLocations.geocode.dismiss": "Sluiten",
     "proAvailability.pageTitle": "Beschikbaarheid",
     "proAvailability.pageSubtitle": "Stel je weekrooster in en beheer datum-specifieke uitzonderingen.",
     "proAvailability.needLocation": "Je moet eerst minstens één lesgeef-locatie toevoegen voordat je je beschikbaarheid kan instellen.",
@@ -4111,6 +4129,15 @@ const translations: Record<Locale, Record<string, string>> = {
     "proLocations.maxGroupSize": "Taille max. du groupe",
     "proLocations.saving": "Enregistrement...",
     "proLocations.save": "Enregistrer",
+    "proLocations.geocode.matchedHeading": "Adresse trouvée sur la carte",
+    "proLocations.geocode.matchedBody": "Nous avons identifié votre adresse comme :",
+    "proLocations.geocode.matchedHint":
+      "Cela ne correspond pas ? Modifiez l'adresse — les emails de réservation et boutons Waze/Google Maps utilisent ce résultat.",
+    "proLocations.geocode.unmatchedHeading": "Adresse introuvable sur la carte",
+    "proLocations.geocode.unmatchedBody":
+      "Nous n'avons pas trouvé cette adresse. Les réservations afficheront votre texte, mais les boutons Waze/Google Maps peuvent diriger les élèves vers un mauvais endroit. Vérifiez l'orthographe et la ville.",
+    "proLocations.geocode.openMap": "Ouvrir sur OpenStreetMap",
+    "proLocations.geocode.dismiss": "Fermer",
     "proAvailability.pageTitle": "Disponibilité",
     "proAvailability.pageSubtitle": "Définissez votre planning hebdomadaire et gérez les exceptions par date.",
     "proAvailability.needLocation": "Vous devez ajouter au moins un lieu d'enseignement avant de définir votre disponibilité.",

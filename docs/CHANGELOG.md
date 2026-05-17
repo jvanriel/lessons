@@ -17,6 +17,15 @@ If any role inside the brackets is unknown (typo), the parser falls
 back to treating the brackets as literal text — better to over-show
 than silently hide.
 
+## 2026-05-17 — v1.1.77
+
+- **[pro] Address confirmation when saving a location.** Saving a
+  teaching location now shows you the address we found on the map
+  (with a small map preview) so you can confirm we have the right
+  place. If we can't find your address, you get a warning — without
+  it, the Waze/Google Maps buttons in student emails could quietly
+  send people to the wrong spot.
+
 ## 2026-05-17 — v1.1.76
 
 - **[pro] Pro email on edited bookings now shows the new price.**
