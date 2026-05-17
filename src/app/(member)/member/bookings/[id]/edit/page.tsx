@@ -44,8 +44,12 @@ export default async function EditMemberBookingPage({ params }: Props) {
       proProfileId: lessonBookings.proProfileId,
       proLocationId: lessonBookings.proLocationId,
       proDisplayName: proProfiles.displayName,
-      lessonDurations: proProfiles.lessonDurations,
-      maxGroupSize: proProfiles.maxGroupSize,
+      // Lesson durations + maxGroupSize live per-location since task 130
+      // — pro_profiles.* are stale; reading them here meant the edit
+      // form's duration dropdown only ever showed 60 min, so Nadine
+      // couldn't extend a booking from 60 → 90. (task 114 retest)
+      lessonDurations: proLocations.lessonDurations,
+      maxGroupSize: proLocations.maxGroupSize,
       locationName: locations.name,
       locationCity: locations.city,
     })

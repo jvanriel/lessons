@@ -43,8 +43,9 @@ export default async function EditProBookingPage({ params }: Props) {
       proProfileId: lessonBookings.proProfileId,
       proLocationId: lessonBookings.proLocationId,
       proDisplayName: proProfiles.displayName,
-      lessonDurations: proProfiles.lessonDurations,
-      maxGroupSize: proProfiles.maxGroupSize,
+      // Per-location since task 130 — see member-side edit page note.
+      lessonDurations: proLocations.lessonDurations,
+      maxGroupSize: proLocations.maxGroupSize,
       locationName: locations.name,
       locationCity: locations.city,
     })

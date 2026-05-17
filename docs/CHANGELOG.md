@@ -17,6 +17,16 @@ If any role inside the brackets is unknown (typo), the parser falls
 back to treating the brackets as literal text — better to over-show
 than silently hide.
 
+## 2026-05-17 — v1.1.84
+
+- **Booking-edit duration dropdown shows the right options again.**
+  After the per-location pricing/duration migration earlier this
+  month, the edit form was still reading the duration list from
+  the pro's old profile-level field — most pros only saw 60 min
+  and couldn't extend a booking. The form now reads durations +
+  max group size from the specific location the booking is at,
+  matching what's offered at booking time.
+
 ## 2026-05-17 — v1.1.83
 
 - **Extra participants now actually required.** Adding extra
