@@ -1,8 +1,13 @@
 import { NextResponse } from "next/server";
 import { getSession, hasRole } from "@/lib/auth";
 import { db } from "@/lib/db";
-import { proProfiles, locations, proLocations } from "@/lib/db/schema";
-import { eq } from "drizzle-orm";
+import {
+  proProfiles,
+  locations,
+  proLocations,
+  lessonBookings,
+} from "@/lib/db/schema";
+import { eq, inArray } from "drizzle-orm";
 import { isValidIanaTimezone } from "@/lib/timezones";
 
 const IBAN_REGEX = /^[A-Z]{2}\d{2}[A-Z0-9]{4,30}$/;
@@ -62,11 +67,6 @@ export async function POST(request: Request) {
         if (!loc.name?.trim()) {
           return NextResponse.json({ error: "Location name is required" }, { status: 400 });
         }
-        // The wizard's TimezonePicker auto-fills the browser TZ on
-        // mount and surfaces an explicit value via React state; an
-        // empty / invalid string reaching here means a stale client
-        // bundle or a hand-crafted POST. Reject so the column never
-        // holds a silent Brussels-default for a non-Brussels pro.
         const tz = (loc.timezone ?? "").trim();
         if (!isValidIanaTimezone(tz)) {
           return NextResponse.json(
@@ -74,7 +74,49 @@ export async function POST(request: Request) {
             { status: 400 },
           );
         }
-        // Create location and link to pro
+      }
+
+      // Replace existing pro_locations + their location rows. The pre-fix
+      // path only INSERTED, so a pro who navigated back to step 2 and
+      // hit Next again duplicated every location (task 129). Onboarding
+      // runs pre-subscription, so no lesson_bookings can reference these
+      // rows yet — the FK cascade on proLocations.locationId → locations
+      // takes care of the link rows. Defence-in-depth: if any booking
+      // *does* reference an existing pro_location (shouldn't be possible
+      // pre-subscription), abort with a 409 rather than orphaning history.
+      const existing = await db
+        .select({
+          proLocationId: proLocations.id,
+          locationId: proLocations.locationId,
+        })
+        .from(proLocations)
+        .where(eq(proLocations.proProfileId, profile.id));
+
+      if (existing.length > 0) {
+        const proLocationIds = existing.map((e) => e.proLocationId);
+        const booked = await db
+          .select({ id: lessonBookings.id })
+          .from(lessonBookings)
+          .where(inArray(lessonBookings.proLocationId, proLocationIds))
+          .limit(1);
+        if (booked.length > 0) {
+          return NextResponse.json(
+            { error: "Cannot replace locations with existing bookings" },
+            { status: 409 },
+          );
+        }
+        await db
+          .delete(locations)
+          .where(
+            inArray(
+              locations.id,
+              existing.map((e) => e.locationId),
+            ),
+          );
+      }
+
+      for (const loc of locs) {
+        const tz = (loc.timezone ?? "").trim();
         const [inserted] = await db
           .insert(locations)
           .values({

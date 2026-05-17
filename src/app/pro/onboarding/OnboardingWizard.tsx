@@ -1158,11 +1158,18 @@ function SubscriptionStep({ onSuccess, locale }: { onSuccess: () => void; locale
 export default function OnboardingWizard({
   initialStep,
   initialData,
+  initialLocations,
   hasAccount: initialHasAccount,
   locale,
 }: {
   initialStep: number;
   initialData: InitialData;
+  /** Existing locations seeded from the DB. Empty on first visit; the
+   *  one-blank-row placeholder lets the TimezonePicker auto-fill the
+   *  browser TZ on mount. Pre-fix we always rendered the placeholder,
+   *  so a pro who saved locations and navigated back saw the form
+   *  blank — and Next re-inserted duplicates server-side (task 129). */
+  initialLocations?: Location[];
   /** True when a pro session already exists on mount. Flips to true
    *  after a successful create in step 0. */
   hasAccount: boolean;
@@ -1170,12 +1177,11 @@ export default function OnboardingWizard({
 }) {
   const [step, setStep] = useState(initialStep);
   const [data, setData] = useState<InitialData>(initialData);
-  const [locations, setLocations] = useState<Location[]>([
-    // First row's TZ left empty so the picker auto-fills from the
-    // browser TZ on mount (most pros never have to interact with the
-    // picker in the common-case "I'm at home" flow).
-    { name: "", address: "", city: "", timezone: "" },
-  ]);
+  const [locations, setLocations] = useState<Location[]>(
+    initialLocations && initialLocations.length > 0
+      ? initialLocations
+      : [{ name: "", address: "", city: "", timezone: "" }],
+  );
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
   const [hasAccount, setHasAccount] = useState(initialHasAccount);

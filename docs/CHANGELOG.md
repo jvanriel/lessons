@@ -17,6 +17,15 @@ If any role inside the brackets is unknown (typo), the parser falls
 back to treating the brackets as literal text — better to over-show
 than silently hide.
 
+## 2026-05-17 — v1.1.67
+
+- **[pro] Going back in the registration wizard no longer empties or
+  duplicates locations.** Coming back to the Locations step now
+  shows the locations you already entered (previously the form was
+  blank). Hitting Next again replaces them instead of appending —
+  fixing the "I went back and now I have duplicate locations on my
+  account" issue.
+
 ## 2026-05-17 — v1.1.66
 
 - **[pro] Welcome email moved to after subscription.** The full

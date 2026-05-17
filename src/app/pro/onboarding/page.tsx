@@ -1,7 +1,12 @@
 import { getSession, hasRole } from "@/lib/auth";
 import { redirect } from "next/navigation";
 import { db } from "@/lib/db";
-import { users, proProfiles, proLocations } from "@/lib/db/schema";
+import {
+  users,
+  proProfiles,
+  proLocations,
+  locations,
+} from "@/lib/db/schema";
 import { eq } from "drizzle-orm";
 import OnboardingWizard from "./OnboardingWizard";
 import { getLocale } from "@/lib/locale";
@@ -91,10 +96,15 @@ export default async function OnboardingPage() {
   const hasProfile = !!profile.bio || !!profile.specialties;
 
   const existingLocations = await db
-    .select({ id: proLocations.id })
+    .select({
+      name: locations.name,
+      address: locations.address,
+      city: locations.city,
+      timezone: locations.timezone,
+    })
     .from(proLocations)
-    .where(eq(proLocations.proProfileId, profile.id))
-    .limit(1);
+    .innerJoin(locations, eq(proLocations.locationId, locations.id))
+    .where(eq(proLocations.proProfileId, profile.id));
   const hasLocations = existingLocations.length > 0;
 
   const pricing = (profile.lessonPricing as Record<string, number>) ?? {};
@@ -123,6 +133,12 @@ export default async function OnboardingPage() {
       initialStep={initialStep}
       hasAccount
       locale={locale}
+      initialLocations={existingLocations.map((l) => ({
+        name: l.name,
+        address: l.address ?? "",
+        city: l.city ?? "",
+        timezone: l.timezone,
+      }))}
       initialData={{
         firstName: user?.firstName ?? "",
         lastName: user?.lastName ?? "",
