@@ -17,6 +17,15 @@ If any role inside the brackets is unknown (typo), the parser falls
 back to treating the brackets as literal text — better to over-show
 than silently hide.
 
+## 2026-05-17 — v1.1.76
+
+- **[pro] Pro email on edited bookings now shows the new price.**
+  Previously the pro received "no payment change" on every edit, even
+  when the lesson price actually changed. The pro now sees the new
+  lesson price (with the old price next to it when it changed) and a
+  payment line tailored to the pro (commission update or manual-review
+  note) instead of student-card language.
+
 ## 2026-05-17 — v1.1.75
 
 - **[pro] Cancellation policy changes show up on existing bookings.**

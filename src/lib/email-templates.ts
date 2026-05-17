@@ -1199,6 +1199,7 @@ const BOOKING_UPDATED_STRINGS: Record<Locale, {
   duration: string;
   durationUnit: string;
   participants: string;
+  price: string;
   /** "(was X)" prefix used to surface the pre-edit value next to the
    *  new one on rows that actually changed. */
   was: (oldValue: string) => string;
@@ -1208,6 +1209,10 @@ const BOOKING_UPDATED_STRINGS: Record<Locale, {
   helperRefunded: (amount: string) => string;
   helperManualReview: string;
   helperCommissionChanged: (amount: string) => string;
+  /** Pro-side line when the booker's payment was settled automatically
+   *  (Stripe charge/refund). Tells the pro the price was adjusted
+   *  without exposing student card details. */
+  helperProAutoSettled: string;
   // Participant-side variants (booker re-invited an extra participant
   // when the lesson was rescheduled).
   participantSubject: (proName: string, bookerName: string) => string;
@@ -1227,6 +1232,7 @@ const BOOKING_UPDATED_STRINGS: Record<Locale, {
     duration: "Duration",
     durationUnit: "minutes",
     participants: "Participants",
+    price: "Price",
     was: (old) => `(was ${old})`,
     cta: "View my bookings",
     helperNoChange:
@@ -1239,6 +1245,8 @@ const BOOKING_UPDATED_STRINGS: Record<Locale, {
       "The price changed on this booking. Our team will reconcile the payment manually and follow up.",
     helperCommissionChanged: (amount) =>
       `Updated commission: ${amount}. The change appears on your next monthly invoice.`,
+    helperProAutoSettled:
+      "The lesson price changed — we adjusted the student's payment automatically.",
     participantSubject: (pro, booker) =>
       `Updated: your golf lesson with ${pro} (booked by ${booker})`,
     participantBody: (booker, pro) =>
@@ -1259,6 +1267,7 @@ const BOOKING_UPDATED_STRINGS: Record<Locale, {
     duration: "Duur",
     durationUnit: "minuten",
     participants: "Deelnemers",
+    price: "Prijs",
     was: (old) => `(was ${old})`,
     cta: "Mijn boekingen bekijken",
     helperNoChange:
@@ -1271,6 +1280,8 @@ const BOOKING_UPDATED_STRINGS: Record<Locale, {
       "De prijs van deze boeking is gewijzigd. Ons team verwerkt de betaling handmatig en neemt contact op.",
     helperCommissionChanged: (amount) =>
       `Bijgewerkte commissie: ${amount}. De wijziging verschijnt op je volgende maandfactuur.`,
+    helperProAutoSettled:
+      "De lesprijs is gewijzigd — we hebben de betaling van de leerling automatisch aangepast.",
     participantSubject: (pro, booker) =>
       `Bijgewerkt: je golfles bij ${pro} (geboekt door ${booker})`,
     participantBody: (booker, pro) =>
@@ -1291,6 +1302,7 @@ const BOOKING_UPDATED_STRINGS: Record<Locale, {
     duration: "Durée",
     durationUnit: "minutes",
     participants: "Participants",
+    price: "Prix",
     was: (old) => `(auparavant ${old})`,
     cta: "Voir mes réservations",
     helperNoChange:
@@ -1303,6 +1315,8 @@ const BOOKING_UPDATED_STRINGS: Record<Locale, {
       "Le prix de cette réservation a changé. Notre équipe procédera à l'ajustement manuellement et reviendra vers vous.",
     helperCommissionChanged: (amount) =>
       `Nouvelle commission : ${amount}. Le changement apparaîtra sur votre prochaine facture mensuelle.`,
+    helperProAutoSettled:
+      "Le prix du cours a changé — nous avons ajusté le paiement de l'élève automatiquement.",
     participantSubject: (pro, booker) =>
       `Mise à jour : votre cours de golf avec ${pro} (réservé par ${booker})`,
     participantBody: (booker, pro) =>
@@ -1332,11 +1346,33 @@ function formatEur(cents: number, locale: Locale): string {
   ).format(cents / 100);
 }
 
+/**
+ * The pre-task-140 default rendered "Geen betalingswijziging" on the pro
+ * email whenever `paymentChange` was undefined — but the booking-updated
+ * notify code never passed it to the pro variant, so the pro saw that
+ * line even when the student-facing price had clearly changed. Audience
+ * splits the copy: the booker sees the full payment narrative (their
+ * card was charged/refunded), while the pro sees pro-relevant facts
+ * (commission change, manual reconcile, or a neutral "price adjusted"
+ * line for auto-settled charges/refunds). Returns "" when nothing
+ * useful can be said — the caller skips the helper paragraph entirely.
+ */
 function paymentHelperFor(
   s: (typeof BOOKING_UPDATED_STRINGS)[Locale],
   change: EmailPaymentChange | undefined,
   locale: Locale,
+  audience: "booker" | "pro",
 ): string {
+  if (audience === "pro") {
+    if (!change || change.kind === "noop") return "";
+    if (change.kind === "charge" || change.kind === "refund")
+      return s.helperProAutoSettled;
+    if (change.kind === "swap_invoice_item")
+      return s.helperCommissionChanged(
+        formatEur(change.commissionCents, locale),
+      );
+    return s.helperManualReview;
+  }
   if (!change || change.kind === "noop") return s.helperNoChange;
   if (change.kind === "charge")
     return s.helperCharged(formatEur(change.amountCents, locale));
@@ -1359,6 +1395,9 @@ export interface PreviousBookingValues {
   endTime: string;
   duration: number;
   participantCount: number;
+  /** Pre-edit `lesson_bookings.price_cents`. Null when the booking was
+   *  created before the price-column was wired up. */
+  priceCents?: number | null;
 }
 
 function wasSuffix(
@@ -1380,11 +1419,22 @@ export function buildBookingUpdatedEmail(opts: {
   endTime: string;
   duration: number;
   participantCount: number;
+  /** Current `lesson_bookings.price_cents`. Null → no price row. */
+  priceCents?: number | null;
+  /** ISO 4217 lowercase, e.g. "eur". Used only for the price row. */
+  currency?: string;
   locale: Locale;
   /**
-   * What the payment-delta executor did. Only the booker email needs
-   * this; pro + participant variants don't render it. Undefined →
-   * treated as a no-op (Phase 1-style "no payment change" line).
+   * Who this email is for. Splits payment-helper copy: the booker sees
+   * the full payment narrative (their card was charged/refunded), the
+   * pro sees pro-relevant facts (commission change, manual reconcile,
+   * "price adjusted"). Defaults to "booker" for legacy callers.
+   */
+  audience?: "booker" | "pro";
+  /**
+   * What the payment-delta executor did. Both booker and pro emails
+   * render an audience-appropriate helper line based on this. Undefined
+   * → "no payment change" for the booker, omitted for the pro.
    */
   paymentChange?: EmailPaymentChange;
   /**
@@ -1412,6 +1462,13 @@ export function buildBookingUpdatedEmail(opts: {
     opts.previous && opts.previous.participantCount !== opts.participantCount
       ? String(opts.previous.participantCount)
       : null;
+  const prevPrice =
+    opts.previous &&
+    opts.previous.priceCents != null &&
+    opts.priceCents != null &&
+    opts.previous.priceCents !== opts.priceCents
+      ? formatEur(opts.previous.priceCents, opts.locale)
+      : null;
   const rows: Array<DetailRow> = [[s.pro, opts.proName]];
   if (opts.proEmail) rows.push([s.proEmail, opts.proEmail, `mailto:${opts.proEmail}`]);
   if (opts.proPhone)
@@ -1428,7 +1485,14 @@ export function buildBookingUpdatedEmail(opts: {
       String(opts.participantCount) + wasSuffix(s, prevPCount),
     ]);
   }
-  const helperLine = paymentHelperFor(s, opts.paymentChange, opts.locale);
+  if (opts.priceCents != null && opts.priceCents > 0) {
+    rows.push([
+      s.price,
+      formatEur(opts.priceCents, opts.locale) + wasSuffix(s, prevPrice),
+    ]);
+  }
+  const audience = opts.audience ?? "booker";
+  const helperLine = paymentHelperFor(s, opts.paymentChange, opts.locale, audience);
   const body = `
     <h2 style="font-family:Georgia,'Times New Roman',serif;font-size:22px;color:${COLORS.green950};margin:0 0 16px 0;font-weight:normal;">
       ${formatGreeting(s.greeting, opts.recipientFirstName, opts.locale)}
@@ -1440,7 +1504,7 @@ export function buildBookingUpdatedEmail(opts: {
         ${s.cta}
       </a>
     </p>
-    <p style="color:#666;font-size:13px;margin:0;">${helperLine}</p>
+    ${helperLine ? `<p style="color:#666;font-size:13px;margin:0;">${helperLine}</p>` : ""}
   `;
   return emailLayout(body, undefined, opts.locale);
 }

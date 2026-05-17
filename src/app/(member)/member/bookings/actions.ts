@@ -498,6 +498,7 @@ export async function updateBooking(formData: FormData) {
       (Number(booking.startTime.split(":")[0]) * 60 +
         Number(booking.startTime.split(":")[1])),
     participantCount: booking.participantCount,
+    priceCents: booking.priceCents,
   };
   // Capture the participant list BEFORE applyBookingEdit deletes +
   // reinserts. Anyone removed from the booking won't appear in the

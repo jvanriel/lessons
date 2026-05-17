@@ -1565,6 +1565,7 @@ export async function proUpdateBooking(formData: FormData) {
       (Number(booking.startTime.split(":")[0]) * 60 +
         Number(booking.startTime.split(":")[1])),
     participantCount: booking.participantCount,
+    priceCents: booking.priceCents,
   };
   // Booker email — needed by getEmailableParticipants to exclude the
   // booker from the participant fanout. Pro session is the pro, not

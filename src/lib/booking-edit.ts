@@ -273,6 +273,8 @@ async function loadBookingForUpdate(bookingId: number) {
       endTime: lessonBookings.endTime,
       participantCount: lessonBookings.participantCount,
       editCount: lessonBookings.editCount,
+      priceCents: lessonBookings.priceCents,
+      currency: lessonBookings.currency,
       proDisplayName: proProfiles.displayName,
       proPublicEmail: proUser.email,
       proContactPhone: proProfiles.contactPhone,
@@ -402,7 +404,10 @@ export async function sendBookingUpdatedNotifications(
         endTime: data.endTime,
         duration,
         participantCount: data.participantCount,
+        priceCents: data.priceCents,
+        currency: data.currency,
         locale: bookerLocale,
+        audience: "booker",
         paymentChange,
         previous,
       }),
@@ -414,7 +419,10 @@ export async function sendBookingUpdatedNotifications(
       });
     });
 
-    // Pro
+    // Pro — task 140: pass `paymentChange` + audience="pro" so the
+    // pro variant of paymentHelperFor renders pro-appropriate copy
+    // instead of falling back to "Geen betalingswijziging" on every
+    // edit (which was wrong whenever the lesson price changed).
     sendEmail({
       to: data.proPublicEmail,
       subject: getBookingUpdatedSubject(data.proDisplayName, proLocale),
@@ -429,7 +437,11 @@ export async function sendBookingUpdatedNotifications(
         endTime: data.endTime,
         duration,
         participantCount: data.participantCount,
+        priceCents: data.priceCents,
+        currency: data.currency,
         locale: proLocale,
+        audience: "pro",
+        paymentChange,
         previous,
       }),
       attachments: [icsAttachment],
