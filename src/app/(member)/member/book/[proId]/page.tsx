@@ -128,6 +128,7 @@ export default async function BookingPage({
       lessonDurations: proLocations.lessonDurations,
       lessonPricing: proLocations.lessonPricing,
       extraStudentPricing: proLocations.extraStudentPricing,
+      maxGroupSize: proLocations.maxGroupSize,
     })
     .from(proLocations)
     .innerJoin(locations, eq(proLocations.locationId, locations.id))

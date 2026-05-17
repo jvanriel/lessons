@@ -70,6 +70,7 @@ export async function getMyLocations() {
       lessonDurations: proLocations.lessonDurations,
       lessonPricing: proLocations.lessonPricing,
       extraStudentPricing: proLocations.extraStudentPricing,
+      maxGroupSize: proLocations.maxGroupSize,
     })
     .from(proLocations)
     .innerJoin(locations, eq(proLocations.locationId, locations.id))
@@ -178,6 +179,12 @@ export async function updateProLocation(
   const city = (formData.get("city") as string)?.trim() || null;
   const country = (formData.get("country") as string)?.trim() || null;
   const timezoneRaw = (formData.get("timezone") as string)?.trim() || "";
+  const maxGroupSizeRaw = formData.get("maxGroupSize");
+  let maxGroupSize = 4;
+  if (typeof maxGroupSizeRaw === "string" && maxGroupSizeRaw.trim() !== "") {
+    const n = parseInt(maxGroupSizeRaw, 10);
+    if (Number.isFinite(n) && n >= 1 && n <= 20) maxGroupSize = n;
+  }
 
   if (!name) return { error: "Location name is required." };
   if (!isValidIanaTimezone(timezoneRaw)) {
@@ -258,6 +265,7 @@ export async function updateProLocation(
       lessonDurations,
       lessonPricing,
       extraStudentPricing,
+      maxGroupSize,
     })
     .where(eq(proLocations.id, proLocationId));
 

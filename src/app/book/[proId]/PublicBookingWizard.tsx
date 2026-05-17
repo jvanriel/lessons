@@ -48,6 +48,8 @@ interface Location {
   lessonDurations: number[];
   lessonPricing: Record<string, number>;
   extraStudentPricing?: Record<string, number> | null;
+  /** Max participants in a lesson at this location (task 130). */
+  maxGroupSize: number;
 }
 
 interface Pro {
@@ -136,6 +138,16 @@ export default function PublicBookingWizard({
   const [extraParticipants, setExtraParticipants] = useState<
     Array<{ firstName: string; lastName: string; email: string }>
   >([]);
+  // Clamp participantCount when the active location's max changes
+  // (e.g. user picked location A with max=4, set count to 3, then
+  // switched to location B with max=2). Without this the dropdown
+  // would render with a value not in its options.
+  useEffect(() => {
+    if (!activeLocation) return;
+    if (participantCount > activeLocation.maxGroupSize) {
+      setParticipantCount(activeLocation.maxGroupSize);
+    }
+  }, [activeLocation, participantCount]);
   useEffect(() => {
     setExtraParticipants((prev) => {
       const target = Math.max(0, participantCount - 1);
@@ -894,7 +906,7 @@ export default function PublicBookingWizard({
             </p>
           </div>
 
-          {pro && pro.maxGroupSize > 1 && (
+          {activeLocation && activeLocation.maxGroupSize > 1 && (
             <div className="mt-3">
               <label className="mb-1 block text-xs font-medium text-green-700">
                 {t("book.participants", locale)}
@@ -904,7 +916,7 @@ export default function PublicBookingWizard({
                 onChange={(e) => setParticipantCount(Number(e.target.value))}
                 className="w-full rounded-md border border-green-200 bg-white px-3 py-2 text-sm text-green-900 focus:border-green-400 focus:outline-none focus:ring-1 focus:ring-green-400"
               >
-                {Array.from({ length: pro.maxGroupSize }, (_, i) => i + 1).map(
+                {Array.from({ length: activeLocation.maxGroupSize }, (_, i) => i + 1).map(
                   (n) => (
                     <option key={n} value={n}>
                       {n}{" "}

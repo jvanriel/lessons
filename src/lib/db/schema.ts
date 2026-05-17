@@ -269,6 +269,14 @@ export const proLocations = pgTable("pro_locations", {
     .$type<Record<string, number>>()
     .notNull()
     .default({}),
+  /**
+   * Maximum number of participants in a single lesson at this location
+   * (task 130). Per-location because a driving range fits more students
+   * than a 1-on-1 studio. Default 4 matches the previous pro-level
+   * default. Replaces `pro_profiles.max_group_size` as the source of
+   * truth — booking flows read from here.
+   */
+  maxGroupSize: integer("max_group_size").notNull().default(4),
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
 

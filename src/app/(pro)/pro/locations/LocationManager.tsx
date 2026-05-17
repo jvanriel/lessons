@@ -32,6 +32,8 @@ interface ProLocation {
   lessonPricing: Record<string, number>;
   /** Per-duration extra-student surcharge in EUR cents. */
   extraStudentPricing: Record<string, number>;
+  /** Max participants in a lesson at this location (task 130). */
+  maxGroupSize: number;
 }
 
 const DURATION_OPTIONS = [30, 45, 60, 75, 90, 120] as const;
@@ -331,6 +333,7 @@ function EditLocationForm({
       ]),
     ),
   );
+  const [maxGroupSize, setMaxGroupSize] = useState(location.maxGroupSize);
 
   return (
     <form
@@ -355,6 +358,7 @@ function EditLocationForm({
           }
         }
         formData.set("extraStudentPricing", JSON.stringify(extraCents));
+        formData.set("maxGroupSize", String(maxGroupSize));
         return action(formData);
       }}
       className="space-y-3"
@@ -539,6 +543,22 @@ function EditLocationForm({
             ))}
           </div>
         )}
+        <div className="mt-4">
+          <label className="block text-xs font-medium text-green-700">
+            {t("proLocations.maxGroupSize", locale)}
+          </label>
+          <input
+            type="number"
+            min={1}
+            max={20}
+            value={maxGroupSize}
+            onChange={(e) => {
+              const n = parseInt(e.target.value, 10);
+              setMaxGroupSize(Number.isFinite(n) && n >= 1 ? n : 1);
+            }}
+            className={inputClass + " mt-1 max-w-[140px]"}
+          />
+        </div>
       </div>
       {state?.error && (
         <p className="text-sm text-red-600">{state.error}</p>

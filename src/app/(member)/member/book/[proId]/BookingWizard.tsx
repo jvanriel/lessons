@@ -56,6 +56,8 @@ interface LocationInfo {
    * Default of `null`/missing means extra students cost nothing.
    */
   extraStudentPricing: Record<string, number> | null;
+  /** Max participants in a lesson at this location (task 130). */
+  maxGroupSize: number;
 }
 
 interface UserDetails {
@@ -285,6 +287,14 @@ export function BookingWizard({
     () => locations.find((l) => l.id === locationId) ?? null,
     [locations, locationId],
   );
+
+  // Clamp participantCount to the active location's max (task 130).
+  useEffect(() => {
+    if (!activeLocation) return;
+    if (participantCount > activeLocation.maxGroupSize) {
+      setParticipantCount(activeLocation.maxGroupSize);
+    }
+  }, [activeLocation, participantCount]);
 
   const priceCents = useMemo(() => {
     if (!duration || !activeLocation) return null;
@@ -571,7 +581,7 @@ export function BookingWizard({
             {t("book.summary.title", locale)}
           </h2>
 
-          {pro.maxGroupSize > 1 && (
+          {activeLocation && activeLocation.maxGroupSize > 1 && (
             <div className="mt-4">
               <label className="mb-1 block text-sm font-medium text-green-700">
                 {t("book.participants", locale)}
@@ -581,7 +591,7 @@ export function BookingWizard({
                 onChange={(e) => setParticipantCount(Number(e.target.value))}
                 className="w-full rounded-lg border border-green-200 bg-white px-3 py-2 text-sm text-green-900 outline-none focus:border-gold-400 focus:ring-2 focus:ring-gold-400/30"
               >
-                {Array.from({ length: pro.maxGroupSize }, (_, i) => i + 1).map(
+                {Array.from({ length: activeLocation.maxGroupSize }, (_, i) => i + 1).map(
                   (n) => (
                     <option key={n} value={n}>
                       {n}{" "}

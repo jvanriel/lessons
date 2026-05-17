@@ -115,6 +115,7 @@ export async function getAllBookablePros() {
       lessonDurations: proLocations.lessonDurations,
       lessonPricing: proLocations.lessonPricing,
       extraStudentPricing: proLocations.extraStudentPricing,
+      maxGroupSize: proLocations.maxGroupSize,
       sortOrder: proLocations.sortOrder,
     })
     .from(proLocations)
@@ -191,6 +192,7 @@ export async function getPublicLocations(proProfileId: number) {
       lessonDurations: proLocations.lessonDurations,
       lessonPricing: proLocations.lessonPricing,
       extraStudentPricing: proLocations.extraStudentPricing,
+      maxGroupSize: proLocations.maxGroupSize,
     })
     .from(proLocations)
     .innerJoin(locations, eq(proLocations.locationId, locations.id))
@@ -539,6 +541,7 @@ export async function createPublicBooking(formData: FormData) {
     .select({
       lessonPricing: proLocations.lessonPricing,
       extraStudentPricing: proLocations.extraStudentPricing,
+      maxGroupSize: proLocations.maxGroupSize,
     })
     .from(proLocations)
     .where(eq(proLocations.id, proLocationId))
