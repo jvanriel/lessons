@@ -17,6 +17,13 @@ If any role inside the brackets is unknown (typo), the parser falls
 back to treating the brackets as literal text — better to over-show
 than silently hide.
 
+## 2026-05-17 — v1.1.82
+
+- **Logo no longer 404s for members.** Members clicking the
+  brand/logo used to land on `/member/book` (a route that was
+  removed when the booking flow started requiring a chosen pro).
+  They now land on their dashboard instead.
+
 ## 2026-05-17 — v1.1.81
 
 - **[pro] Closed periods merge back into "Altijd" when removed.**
