@@ -249,7 +249,7 @@ function AccountStep({
             className={inputClass}
           />
           {firstNameMissing && (
-            <p className={errClass}>{t("authErr.allFieldsRequired", locale)}</p>
+            <p className={errClass}>{t("authErr.fieldRequired", locale)}</p>
           )}
         </div>
         <div>
@@ -264,7 +264,7 @@ function AccountStep({
             className={inputClass}
           />
           {lastNameMissing && (
-            <p className={errClass}>{t("authErr.allFieldsRequired", locale)}</p>
+            <p className={errClass}>{t("authErr.fieldRequired", locale)}</p>
           )}
         </div>
       </div>
@@ -281,7 +281,7 @@ function AccountStep({
           className={inputClass + (emailLocked ? " opacity-60" : "")}
         />
         {emailMissing && (
-          <p className={errClass}>{t("authErr.allFieldsRequired", locale)}</p>
+          <p className={errClass}>{t("authErr.fieldRequired", locale)}</p>
         )}
         {emailInvalid && (
           <p className={errClass}>{t("authErr.invalidEmail", locale)}</p>
@@ -380,7 +380,7 @@ function AccountStep({
               <p className={errClass}>
                 {pwTooShort
                   ? t("authErr.passwordTooShort", locale)
-                  : t("authErr.allFieldsRequired", locale)}
+                  : t("authErr.fieldRequired", locale)}
               </p>
             )}
           </div>
@@ -1116,7 +1116,14 @@ export default function StudentOnboardingWizard({
           <div className="mt-6 flex justify-center"><ProgressBar current={progressCurrent} total={progressSteps} /></div>
         )}
         <div className="mt-8 rounded-xl border border-green-200 bg-white p-6 shadow-sm sm:p-8">
-          <h2 className="mb-6 text-lg font-semibold text-green-900">{stepTitle}</h2>
+          <h2 className="text-lg font-semibold text-green-900">{stepTitle}</h2>
+          {step === 1 ? (
+            <p className="mb-6 mt-1 text-xs text-green-600">
+              {t("auth.requiredLegend", loc)}
+            </p>
+          ) : (
+            <div className="mb-6" />
+          )}
           {error && <div className="mb-4 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">{error}</div>}
 
           {step === 0 && <LanguageStep selected={data.preferredLocale} onChange={(v) => updateData({ preferredLocale: v })} />}

@@ -17,6 +17,14 @@ If any role inside the brackets is unknown (typo), the parser falls
 back to treating the brackets as literal text — better to over-show
 than silently hide.
 
+## 2026-05-17 — v1.1.65
+
+- **Clearer "required field" hints in registration.** Every step of
+  the pro registration wizard (and the student account step) now
+  shows a "* Verplicht in te vullen velden" legend below the
+  heading. Per-field error messages also say "Dit veld is verplicht"
+  instead of the misleading "Alle velden zijn verplicht".
+
 ## 2026-05-17 — v1.1.64
 
 - **Price breakdown on group bookings.** When you book a lesson with

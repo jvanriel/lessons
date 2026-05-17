@@ -214,7 +214,7 @@ function PersonalStep({
           required
         />
         {emailMissing && (
-          <p className={err}>{t("authErr.allFieldsRequired", locale)}</p>
+          <p className={err}>{t("authErr.fieldRequired", locale)}</p>
         )}
         {emailInvalid && (
           <p className={err}>{t("authErr.invalidEmail", locale)}</p>
@@ -1523,9 +1523,15 @@ export default function OnboardingWizard({
 
         {/* Step content */}
         <div className="mt-8 rounded-xl border border-green-200 bg-white p-6 shadow-sm sm:p-8">
-          <h2 className="mb-6 text-lg font-semibold text-green-900">
+          <h2 className="text-lg font-semibold text-green-900">
             {currentStepName}
           </h2>
+          {step < STEP_SUBSCRIPTION && (
+            <p className="mb-6 mt-1 text-xs text-green-600">
+              {t("auth.requiredLegend", locale)}
+            </p>
+          )}
+          {step >= STEP_SUBSCRIPTION && <div className="mb-6" />}
 
           {error && (
             <div className="mb-4 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
