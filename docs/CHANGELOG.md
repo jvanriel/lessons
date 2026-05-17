@@ -17,6 +17,17 @@ If any role inside the brackets is unknown (typo), the parser falls
 back to treating the brackets as literal text — better to over-show
 than silently hide.
 
+## 2026-05-17 — v1.1.81
+
+- **[pro] Closed periods merge back into "Altijd" when removed.**
+  Adding a bounded period inside your "Altijd" schedule splits it
+  into before / closed / after segments. Previously, removing the
+  closed period(s) left the two flanking segments stuck even though
+  you just wanted your single Altijd back. The editor now auto-
+  merges flanking segments back into one when their grids and
+  display windows still match — no auto-merge if you've edited them
+  apart in the meantime.
+
 ## 2026-05-17 — v1.1.80
 
 - **Clearer terms link on the registration payment step.** The

@@ -108,6 +108,40 @@ function cloneGrid(g: LocationGrid): LocationGrid {
   return g.map((col) => col.map((cell) => new Set(cell)));
 }
 
+/**
+ * Deep equality on two LocationGrids — same set of location ids in
+ * every cell. Used by the auto-merge-on-remove logic so adjacent
+ * periods that came from the same Altijd-split (and weren't edited
+ * apart since) collapse back into one when the user removes the
+ * bounded period that originally split them. (task 77 item D)
+ */
+function gridsEqual(a: LocationGrid, b: LocationGrid): boolean {
+  for (let day = 0; day < 7; day++) {
+    for (let row = 0; row < ROWS; row++) {
+      const sa = a[day][row];
+      const sb = b[day][row];
+      if (sa.size !== sb.size) return false;
+      for (const id of sa) if (!sb.has(id)) return false;
+    }
+  }
+  return true;
+}
+
+/**
+ * True iff two periods can be merged into one without loss: same
+ * display window AND identical location grids. Date adjacency is
+ * NOT required — the caller invokes this after removing the period
+ * that sat between `a` and `b`, so the gap between them is about
+ * to be filled by the merge itself. (task 77 item D)
+ */
+function periodsCanMerge(a: Period, b: Period): boolean {
+  return (
+    a.displayStartTime === b.displayStartTime &&
+    a.displayEndTime === b.displayEndTime &&
+    gridsEqual(a.grid, b.grid)
+  );
+}
+
 function availabilityToLocationGrid(slots: SerializedAvailability[]): LocationGrid {
   const grid: LocationGrid = emptyGrid();
   for (const s of slots) {
@@ -720,8 +754,30 @@ function SchedulePeriodsSection({
     const idx = periods.findIndex((p) => p.id === id);
     if (idx < 0) return;
     const wasLast = idx === periods.length - 1 && periods.length > 1;
+    // Snapshot the flanking periods BEFORE the filter — used by the
+    // auto-merge step below. (task 77 item D)
+    const prev = idx > 0 ? periods[idx - 1] : null;
+    const after = idx < periods.length - 1 ? periods[idx + 1] : null;
 
     let next = periods.filter((p) => p.id !== id);
+    // Auto-merge the flanking pair if they match (same grid + display
+    // window). Common case: Nadine adds a bounded period inside
+    // Altijd → insertWithSplit clones Altijd into before/after with
+    // the same grid → removing the bounded period leaves two
+    // identical pieces sandwiching a now-empty range. Without this,
+    // the editor would leave (null, X-1) + (Y+1, null) as two stuck
+    // tabs even though the user just wants their Altijd back.
+    if (prev && after && periodsCanMerge(prev, after)) {
+      const merged: Period = {
+        ...prev,
+        validUntil: after.validUntil,
+        grid: cloneGrid(prev.grid),
+      };
+      next = next
+        .filter((p) => p.id !== prev.id && p.id !== after.id)
+        .concat(merged)
+        .sort(sortPeriods);
+    }
     // If the user removed the chronologically last period and ticked
     // the "extend previous" toggle, clear the new-last's validUntil
     // so the timeline keeps an open end (no closing date).
