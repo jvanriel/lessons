@@ -17,6 +17,15 @@ If any role inside the brackets is unknown (typo), the parser falls
 back to treating the brackets as literal text — better to over-show
 than silently hide.
 
+## 2026-05-17 — v1.1.79
+
+- **Chat notifications update faster.** The unread-chat badge in
+  the sidebar and bottom nav now refreshes every 10 seconds (was
+  30) and updates immediately when you open or send inside a
+  conversation. While you're inside a chat your "last read" stays
+  fresh, so a message that arrives while you're reading won't keep
+  ringing the badge on your other tabs once you've seen it.
+
 ## 2026-05-17 — v1.1.78
 
 - **No more double-booking yourself across pros.** If you already

@@ -3,6 +3,7 @@
 import { useCallback, useEffect } from "react";
 import Comments from "@/components/comments/Comments";
 import { markCoachingReadAction } from "@/lib/coaching-actions";
+import { notifyCoachingUnreadChanged } from "@/hooks/useCoachingUnread";
 
 interface CoachingChatProps {
   proStudentId: number;
@@ -31,11 +32,25 @@ export default function CoachingChat({
   // anything they had unread now counts as read. The server action
   // figures out the role from the session, so a wrong client-side
   // assumption can't poison the other party's column.
+  //
+  // task 144 — also re-mark every 10s while the chat is open. The
+  // Comments component polls for new messages every 5s, so without
+  // this loop a message that arrives while the pro is reading would
+  // keep counting toward the sidebar badge until the chat re-opens.
+  // The custom event drops the badge in the parent shell within
+  // ~10s instead of waiting on the slower /api/coaching/unread poll.
   useEffect(() => {
-    void markCoachingReadAction(proStudentId);
-    // proStudentId is the only thing the action actually depends
-    // on — currentUserId / partnerRole are forwarded just to keep
-    // the linter happy for stable identity.
+    let cancelled = false;
+    async function markAndNotify() {
+      await markCoachingReadAction(proStudentId);
+      if (!cancelled) notifyCoachingUnreadChanged();
+    }
+    void markAndNotify();
+    const id = setInterval(() => void markAndNotify(), 10_000);
+    return () => {
+      cancelled = true;
+      clearInterval(id);
+    };
   }, [proStudentId]);
 
   const handleUpload = useCallback(

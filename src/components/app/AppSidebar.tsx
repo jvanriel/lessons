@@ -6,6 +6,7 @@ import { usePathname } from "next/navigation";
 import type { Locale } from "@/lib/i18n";
 import { t } from "@/lib/i18n/translations";
 import { dashboardHrefFor } from "./dashboard-href";
+import { useCoachingUnread } from "@/hooks/useCoachingUnread";
 
 interface AppSidebarProps {
   roles: string[];
@@ -369,43 +370,12 @@ export default function AppSidebar({
 }: AppSidebarProps) {
   const pathname = usePathname();
 
-  // Coaching-chat unread badge (task 122). Skipped entirely when
-  // the viewer has neither a member nor a pro role — there's
-  // nothing to badge for admin/dev-only users.
+  // Coaching-chat unread badge (task 122, refresh tightened in task 144).
+  // Skipped entirely when the viewer has neither a member nor a pro
+  // role — there's nothing to badge for admin/dev-only users.
   const showCoachingBadge =
     roles.includes("member") || roles.includes("pro");
-  const [coachingUnread, setCoachingUnread] = useState(0);
-
-  useEffect(() => {
-    if (!showCoachingBadge) return;
-    let cancelled = false;
-    async function fetchCount() {
-      try {
-        const res = await fetch("/api/coaching/unread");
-        if (!res.ok) return;
-        const data = (await res.json()) as { total?: number };
-        if (!cancelled) setCoachingUnread(data.total ?? 0);
-      } catch {
-        // Stay on whatever we last had — transient network
-        // failures shouldn't drop the badge to 0.
-      }
-    }
-    void fetchCount();
-    // 30s matches the cadence of the global notifications poller
-    // already used by AppTopBar.
-    const id = setInterval(fetchCount, 30_000);
-    // Recheck when the tab gains focus — common case is the user
-    // alt-tabs after reading a message in the other tab.
-    function onFocus() {
-      void fetchCount();
-    }
-    window.addEventListener("focus", onFocus);
-    return () => {
-      cancelled = true;
-      clearInterval(id);
-      window.removeEventListener("focus", onFocus);
-    };
-  }, [showCoachingBadge]);
+  const coachingUnread = useCoachingUnread(showCoachingBadge);
 
   const visibleSections = sections.filter((s) => {
     // `role` is optional: a section without one (e.g. utility entries

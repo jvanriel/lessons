@@ -5,6 +5,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import type { Locale } from "@/lib/i18n";
 import { t } from "@/lib/i18n/translations";
+import { useCoachingUnread } from "@/hooks/useCoachingUnread";
 
 interface BottomNavProps {
   roles: string[];
@@ -140,37 +141,10 @@ export default function BottomNav({ roles, locale }: BottomNavProps) {
   const pathname = usePathname();
   const [moreOpen, setMoreOpen] = useState(false);
 
-  // Coaching-chat unread badge (task 122). Mirror of AppSidebar's
-  // logic: fetch on mount, poll every 30s, refresh on focus.
+  // Coaching-chat unread badge (task 122, refresh tightened in task 144).
   const showCoachingBadge =
     roles.includes("member") || roles.includes("pro");
-  const [coachingUnread, setCoachingUnread] = useState(0);
-
-  useEffect(() => {
-    if (!showCoachingBadge) return;
-    let cancelled = false;
-    async function fetchCount() {
-      try {
-        const res = await fetch("/api/coaching/unread");
-        if (!res.ok) return;
-        const data = (await res.json()) as { total?: number };
-        if (!cancelled) setCoachingUnread(data.total ?? 0);
-      } catch {
-        // Keep last value on transient failure.
-      }
-    }
-    void fetchCount();
-    const id = setInterval(fetchCount, 30_000);
-    function onFocus() {
-      void fetchCount();
-    }
-    window.addEventListener("focus", onFocus);
-    return () => {
-      cancelled = true;
-      clearInterval(id);
-      window.removeEventListener("focus", onFocus);
-    };
-  }, [showCoachingBadge]);
+  const coachingUnread = useCoachingUnread(showCoachingBadge);
 
   const isPro = roles.includes("pro");
   const isAdmin = roles.includes("admin");
