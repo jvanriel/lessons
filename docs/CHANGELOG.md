@@ -17,6 +17,15 @@ If any role inside the brackets is unknown (typo), the parser falls
 back to treating the brackets as literal text — better to over-show
 than silently hide.
 
+## 2026-05-17 — v1.1.66
+
+- **[pro] Welcome email moved to after subscription.** The full
+  "your pro account is ready, here's what to do next" email used to
+  arrive after step 1 of the registration wizard — long before the
+  pro had finished setup. Now step 1 only sends a slim "Please
+  confirm your email" message; the welcome arrives once the
+  subscription is set up.
+
 ## 2026-05-17 — v1.1.65
 
 - **Clearer "required field" hints in registration.** Every step of
