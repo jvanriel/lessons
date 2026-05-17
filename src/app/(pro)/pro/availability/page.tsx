@@ -127,6 +127,8 @@ export default async function AvailabilityPage() {
           participantCount: lessonBookings.participantCount,
           notes: lessonBookings.notes,
           paymentStatus: lessonBookings.paymentStatus,
+          priceCents: lessonBookings.priceCents,
+          currency: lessonBookings.currency,
           firstName: users.firstName,
           lastName: users.lastName,
           email: users.email,
@@ -221,6 +223,8 @@ export default async function AvailabilityPage() {
     studentPhone: b.phone ?? null,
     studentEmailVerified: b.emailVerifiedAt ?? null,
     locationCity: locCityMap.get(b.proLocationId) ?? null,
+    priceCents: b.priceCents,
+    currency: b.currency,
   }));
   // locNameMap retained for any future text-only label use; not used
   // by the new BookingCard surface.

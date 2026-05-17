@@ -28,6 +28,9 @@ interface Booking {
   locationName: string;
   locationCity: string | null;
   proLocationId: number;
+  /** Lesson price in cents at booking time (task 135). */
+  priceCents: number | null;
+  currency: string;
 }
 
 interface AvailabilitySlot {

@@ -20,6 +20,7 @@ import Link from "next/link";
 import type { Locale } from "@/lib/i18n";
 import { t } from "@/lib/i18n/translations";
 import { formatDate as formatDateLocale } from "@/lib/format-date";
+import { formatPrice } from "@/lib/pricing";
 import { getPaymentBadge } from "@/lib/payment-status";
 import { cn } from "@/lib/utils";
 
@@ -39,6 +40,11 @@ export interface BookingCardData {
   studentEmailVerified: Date | null;
   locationName: string;
   locationCity: string | null;
+  /** Lesson price in cents at booking time (task 135). null when the
+   *  pro hadn't configured pricing for this duration yet. */
+  priceCents?: number | null;
+  /** ISO currency code, defaults to "eur". */
+  currency?: string | null;
 }
 
 interface Props {
@@ -165,6 +171,13 @@ export default function BookingCard({
             "{n}",
             String(b.participantCount),
           )}
+        </p>
+      )}
+
+      {typeof b.priceCents === "number" && b.priceCents > 0 && (
+        <p className="mt-1 text-xs font-medium text-green-700">
+          {t("proBookingsView.priceLabel", locale)}{" "}
+          {formatPrice(b.priceCents / 100, locale)}
         </p>
       )}
 

@@ -44,6 +44,8 @@ export default async function ProBookingsPage() {
         locationName: locations.name,
         locationCity: locations.city,
         proLocationId: lessonBookings.proLocationId,
+        priceCents: lessonBookings.priceCents,
+        currency: lessonBookings.currency,
       })
       .from(lessonBookings)
       .innerJoin(users, eq(lessonBookings.bookedById, users.id))

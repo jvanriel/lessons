@@ -17,6 +17,14 @@ If any role inside the brackets is unknown (typo), the parser falls
 back to treating the brackets as literal text — better to over-show
 than silently hide.
 
+## 2026-05-17 — v1.1.72
+
+- **[pro] Booking cards now show the lesson price.** The booking
+  list, the calendar's expanded card, and the booking dialog opened
+  from the availability grid all display the price charged at
+  booking time — useful when a pro is glancing at upcoming lessons
+  for the week.
+
 ## 2026-05-17 — v1.1.71
 
 - **[pro] Subscription step survives Back-and-Forward.** If you

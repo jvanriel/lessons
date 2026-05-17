@@ -77,6 +77,8 @@ function bookingsOn(date: string) {
       locationName: "Test Golf Club",
       locationCity: null,
       proLocationId: 1,
+      priceCents: 6000,
+      currency: "eur",
     },
     {
       id: 2,
@@ -95,6 +97,8 @@ function bookingsOn(date: string) {
       locationName: "Test Golf Club",
       locationCity: null,
       proLocationId: 1,
+      priceCents: 6000,
+      currency: "eur",
     },
   ];
 }
@@ -353,6 +357,8 @@ describe("BookingsCalendar — grid widens for late-evening bookings", () => {
             locationName: "Test",
             locationCity: null,
             proLocationId: 1,
+            priceCents: 6000,
+            currency: "eur",
           },
         ]}
         availability={[]}

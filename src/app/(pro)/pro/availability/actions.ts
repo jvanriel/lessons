@@ -91,6 +91,9 @@ export interface SerializedBooking {
   studentPhone: string | null;
   studentEmailVerified: Date | null;
   locationCity: string | null;
+  /** Lesson price in cents at booking time (task 135). */
+  priceCents: number | null;
+  currency: string;
 }
 
 export interface SerializedProfileSettings {
