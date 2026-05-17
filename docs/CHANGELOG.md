@@ -17,6 +17,14 @@ If any role inside the brackets is unknown (typo), the parser falls
 back to treating the brackets as literal text — better to over-show
 than silently hide.
 
+## 2026-05-17 — v1.1.71
+
+- **[pro] Subscription step survives Back-and-Forward.** If you
+  navigated back in the registration stepper after entering payment
+  details, then forward again, the plan choice and Stripe form were
+  wiped — you had to redo everything. The plan + SetupIntent now
+  stay around as long as you're in the wizard.
+
 ## 2026-05-17 — v1.1.70
 
 - **[pro,member] "Back" out of the payment form.** The pro

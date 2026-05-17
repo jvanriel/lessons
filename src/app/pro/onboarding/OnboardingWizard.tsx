@@ -1124,11 +1124,32 @@ function SubscriptionPaymentForm({
   );
 }
 
-function SubscriptionStep({ onSuccess, locale }: { onSuccess: () => void; locale: Locale }) {
-  const [plan, setPlan] = useState<"monthly" | "annual">("annual");
-  const [clientSecret, setClientSecret] = useState<string | null>(null);
-  const [billingPrefill, setBillingPrefill] =
-    useState<SubscriptionBillingPrefill | null>(null);
+function SubscriptionStep({
+  onSuccess,
+  locale,
+  plan,
+  setPlan,
+  clientSecret,
+  setClientSecret,
+  billingPrefill,
+  setBillingPrefill,
+}: {
+  onSuccess: () => void;
+  locale: Locale;
+  /**
+   * Subscription form state is owned by the wizard so it survives
+   * the pro navigating Back → Forward in the stepper. Pre-fix each
+   * remount of the subscription step started fresh, so entering
+   * card details, going back to check a previous step, then coming
+   * forward again wiped the SetupIntent and the chosen plan (task 134).
+   */
+  plan: "monthly" | "annual";
+  setPlan: (p: "monthly" | "annual") => void;
+  clientSecret: string | null;
+  setClientSecret: (cs: string | null) => void;
+  billingPrefill: SubscriptionBillingPrefill | null;
+  setBillingPrefill: (b: SubscriptionBillingPrefill | null) => void;
+}) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -1325,6 +1346,16 @@ export default function OnboardingWizard({
   const [hasAccount, setHasAccount] = useState(initialHasAccount);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  // Subscription-step state lifted to the wizard so it survives the
+  // pro hitting Back → Forward in the stepper (task 134).
+  const [subscriptionPlan, setSubscriptionPlan] = useState<
+    "monthly" | "annual"
+  >("annual");
+  const [subscriptionClientSecret, setSubscriptionClientSecret] = useState<
+    string | null
+  >(null);
+  const [subscriptionBillingPrefill, setSubscriptionBillingPrefill] =
+    useState<SubscriptionBillingPrefill | null>(null);
 
   function updateData(partial: Partial<InitialData>) {
     setData((prev) => ({ ...prev, ...partial }));
@@ -1737,7 +1768,16 @@ export default function OnboardingWizard({
           {step === 4 && <InvoicingStep data={data} onChange={updateData} locale={locale} />}
           {step === 5 && <BankStep data={data} onChange={updateData} locale={locale} />}
           {step === STEP_SUBSCRIPTION && (
-            <SubscriptionStep onSuccess={() => setStep(STEP_COUNT)} locale={locale} />
+            <SubscriptionStep
+              onSuccess={() => setStep(STEP_COUNT)}
+              locale={locale}
+              plan={subscriptionPlan}
+              setPlan={setSubscriptionPlan}
+              clientSecret={subscriptionClientSecret}
+              setClientSecret={setSubscriptionClientSecret}
+              billingPrefill={subscriptionBillingPrefill}
+              setBillingPrefill={setSubscriptionBillingPrefill}
+            />
           )}
 
           {/* Navigation. Continue is hidden on the subscription step
