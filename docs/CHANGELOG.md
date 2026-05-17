@@ -17,6 +17,19 @@ If any role inside the brackets is unknown (typo), the parser falls
 back to treating the brackets as literal text — better to over-show
 than silently hide.
 
+## 2026-05-17 — v1.1.74
+
+- **[pro] Inviting a golfer is now passwordless.** When you invite a
+  golfer from /pro/students, the email contains a one-time link the
+  golfer clicks to choose their own password. You no longer type or
+  see a password — it's never on your screen, never in the email,
+  and the golfer must set their own before they can log in.
+- **[pro] Invite reason in the email.** The invite form now has a
+  "Reason" field with three quick-pick chips (Previous lesson,
+  Tournament, Personal invite) that pre-fill a localized sentence
+  with your name. Leaving the reason blank falls back to a generic
+  "you've been invited by X" line.
+
 ## 2026-05-17 — v1.1.73
 
 - **Booking confirmation emails show participants and price.** The

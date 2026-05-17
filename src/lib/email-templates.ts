@@ -44,6 +44,11 @@ const EMAIL_STRINGS: Record<
     invitePassword: string;
     inviteChangePassword: string;
     inviteCopySubject: string;
+    /** Body when the email carries a set-password link instead of a
+     *  pre-generated password (task 138). */
+    inviteSetPasswordBody: string;
+    inviteSetPasswordButton: string;
+    inviteSetPasswordExpiry: string;
     resetSubject: string;
     resetBody: string;
     resetChangePassword: string;
@@ -63,6 +68,9 @@ const EMAIL_STRINGS: Record<
     invitePassword: "Password",
     inviteChangePassword: "Please change your password after first login via Profile → Change Password.",
     inviteCopySubject: "Copy: Invitation sent to",
+    inviteSetPasswordBody: "You've been invited to join Golf Lessons. Click the button below to set your own password and log in:",
+    inviteSetPasswordButton: "Set password & log in",
+    inviteSetPasswordExpiry: "This link expires in 7 days. After that, use the \"Forgot password\" flow on the login page.",
     resetSubject: "Your password has been reset",
     resetBody: "Your password for Golf Lessons has been reset by an administrator. Here are your new credentials:",
     resetChangePassword: "Please log in and change your password via Profile → Change Password.",
@@ -81,6 +89,9 @@ const EMAIL_STRINGS: Record<
     invitePassword: "Wachtwoord",
     inviteChangePassword: "Wijzig je wachtwoord na de eerste login via Profiel → Wachtwoord wijzigen.",
     inviteCopySubject: "Kopie: Uitnodiging verstuurd naar",
+    inviteSetPasswordBody: "Je bent uitgenodigd voor Golf Lessons. Klik op de knop hieronder om zelf een wachtwoord te kiezen en in te loggen:",
+    inviteSetPasswordButton: "Wachtwoord instellen & inloggen",
+    inviteSetPasswordExpiry: "Deze link is 7 dagen geldig. Daarna gebruik je de \"Wachtwoord vergeten\"-flow op de inlogpagina.",
     resetSubject: "Je wachtwoord is gewijzigd",
     resetBody: "Je wachtwoord voor Golf Lessons is gewijzigd door een beheerder. Hier zijn je nieuwe inloggegevens:",
     resetChangePassword: "Log in en wijzig je wachtwoord via Profiel → Wachtwoord wijzigen.",
@@ -99,6 +110,9 @@ const EMAIL_STRINGS: Record<
     invitePassword: "Mot de passe",
     inviteChangePassword: "Veuillez changer votre mot de passe après la première connexion via Profil → Changer le mot de passe.",
     inviteCopySubject: "Copie : Invitation envoyée à",
+    inviteSetPasswordBody: "Vous êtes invité à rejoindre Golf Lessons. Cliquez sur le bouton ci-dessous pour choisir votre mot de passe et vous connecter :",
+    inviteSetPasswordButton: "Définir le mot de passe & se connecter",
+    inviteSetPasswordExpiry: "Ce lien expire dans 7 jours. Ensuite, utilisez le flux \"Mot de passe oublié\" sur la page de connexion.",
     resetSubject: "Votre mot de passe a été réinitialisé",
     resetBody: "Votre mot de passe pour Golf Lessons a été réinitialisé par un administrateur. Voici vos nouveaux identifiants :",
     resetChangePassword: "Connectez-vous et changez votre mot de passe via Profil → Changer le mot de passe.",
@@ -248,12 +262,17 @@ export function emailLayout(
 export function buildInviteEmail(opts: {
   firstName: string;
   loginEmail: string;
-  password: string;
+  /**
+   * Short-lived JWT reset-password URL. The user clicks it, sets their
+   * own password, and is logged in (task 138 — replaces the prior flow
+   * where the pro typed/saw the password on screen and emailed it as
+   * plaintext). The pro never learns the password.
+   */
+  setPasswordUrl: string;
   comment?: string;
   locale: Locale;
 }): string {
   const s = EMAIL_STRINGS[opts.locale] ?? EMAIL_STRINGS.en;
-  const loginUrl = `${getBaseUrl()}/login?email=${encodeURIComponent(opts.loginEmail)}`;
 
   const commentBlock = opts.comment
     ? `<div style="background:${COLORS.cream};border-left:3px solid ${COLORS.gold500};padding:12px 16px;margin:20px 0;border-radius:0 8px 8px 0;">
@@ -265,27 +284,23 @@ export function buildInviteEmail(opts: {
     <h2 style="font-family:Georgia,'Times New Roman',serif;font-size:22px;color:${COLORS.green950};margin:0 0 16px 0;font-weight:normal;">
       ${formatGreeting(s.inviteGreeting, opts.firstName, opts.locale)}
     </h2>
-    <p style="margin:0 0 20px 0;">${s.inviteBody}</p>
+    <p style="margin:0 0 20px 0;">${s.inviteSetPasswordBody}</p>
+    ${commentBlock}
     <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:${COLORS.green100};border:1px solid #b4d6c1;border-radius:8px;margin:0 0 20px 0;">
       <tr>
         <td style="padding:16px 20px;">
-          <p style="margin:0 0 8px 0;font-size:14px;">
-            <strong>${s.inviteLogin}:</strong> ${opts.loginEmail}
-          </p>
           <p style="margin:0;font-size:14px;">
-            <strong>${s.invitePassword}:</strong>
-            <code style="background:${COLORS.white};padding:2px 8px;border-radius:4px;font-family:monospace;font-size:14px;">${opts.password}</code>
+            <strong>${s.inviteLogin}:</strong> ${opts.loginEmail}
           </p>
         </td>
       </tr>
     </table>
-    <p style="margin:0 0 24px 0;">
-      <a href="${loginUrl}" style="display:inline-block;background:${COLORS.gold600};color:${COLORS.white};padding:12px 28px;border-radius:6px;text-decoration:none;font-weight:700;font-size:14px;">
-        ${s.loginButton}
+    <p style="margin:0 0 12px 0;">
+      <a href="${opts.setPasswordUrl}" style="display:inline-block;background:${COLORS.gold600};color:${COLORS.white};padding:12px 28px;border-radius:6px;text-decoration:none;font-weight:700;font-size:14px;">
+        ${s.inviteSetPasswordButton}
       </a>
     </p>
-    <p style="color:#666;font-size:13px;margin:0 0 8px 0;">${s.inviteChangePassword}</p>
-    ${commentBlock}
+    <p style="color:#666;font-size:13px;margin:0;">${s.inviteSetPasswordExpiry}</p>
   `;
 
   return emailLayout(body, undefined, opts.locale);

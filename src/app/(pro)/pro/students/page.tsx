@@ -98,6 +98,7 @@ export default async function ProStudentsPage() {
         currentBooking={currentBooking}
         currentQuickBook={currentQuickBook}
         unreadByStudentId={unreadByStudentId}
+        inviterDisplayName={profile.displayName}
         locale={locale}
       />
       <div className="mx-auto max-w-5xl px-6 pb-12">

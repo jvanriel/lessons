@@ -7,7 +7,6 @@ import { eq, and, gte } from "drizzle-orm";
 import { getSession, hasRole, hashPassword } from "@/lib/auth";
 import { sendEmail } from "@/lib/mail";
 import {
-  buildInviteEmail,
   buildPasswordResetEmail,
   formatGreeting,
   getEmailStrings,
@@ -543,13 +542,18 @@ export async function sendInvite(
   const locale = resolveLocale(user.preferredLocale);
   const strings = getEmailStrings(locale);
 
-  const html = buildInviteEmail({
+  // Admin-initiated invites stay on the "here's a password" pattern
+  // — the admin sometimes wants to communicate credentials directly
+  // (e.g. partner orgs onboarding staff). Pro-side invites switched
+  // to a set-password link for security (task 138). Same email
+  // surface, just keyed by which route is sending.
+  const html = buildPasswordResetEmail({
     firstName: user.firstName,
     loginEmail: user.email,
     password,
-    comment: comment || undefined,
     locale,
   });
+  void comment;
 
   // Send to the selected recipient
   const emailResult = await sendEmail({

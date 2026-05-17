@@ -40,6 +40,7 @@ import { loadBookingPricing } from "@/lib/booking-charge";
 import type { EmailPaymentChange } from "@/lib/email-templates";
 import {
   buildInviteEmail,
+  buildPasswordResetEmail,
   getEmailStrings,
   buildStudentBookingConfirmationEmail,
   getStudentBookingConfirmationSubject,
@@ -80,6 +81,36 @@ function generatePassword(length = 12): string {
   crypto.getRandomValues(arr);
   for (const b of arr) pw += chars[b % chars.length];
   return pw;
+}
+
+function getAuthSecret() {
+  return new TextEncoder().encode(
+    process.env.AUTH_SECRET || "dev-secret-change-me",
+  );
+}
+
+/**
+ * 7-day JWT pointing at /reset-password. The /reset-password action
+ * accepts the same shape used by the forgot-password flow ({userId,
+ * email} payload), so an invited golfer lands on a "Choose your
+ * password" page and is then logged in. Task 138.
+ */
+async function generateInviteSetPasswordUrl(
+  userId: number,
+  email: string,
+): Promise<string> {
+  const { SignJWT } = await import("jose");
+  const token = await new SignJWT({ userId, email })
+    .setProtectedHeader({ alg: "HS256" })
+    .setIssuedAt()
+    .setExpirationTime("7d")
+    .sign(getAuthSecret());
+  const baseUrl =
+    process.env.NEXT_PUBLIC_APP_URL ||
+    (process.env.VERCEL_URL
+      ? `https://${process.env.VERCEL_URL}`
+      : "http://localhost:3000");
+  return `${baseUrl}/reset-password?token=${token}`;
 }
 
 export async function getMyStudents() {
@@ -218,28 +249,29 @@ export async function getMyGuests() {
 }
 
 export async function inviteStudent(
-  _prev: { error?: string; success?: boolean; password?: string } | null,
+  _prev: { error?: string; success?: boolean } | null,
   formData: FormData
-): Promise<{ error?: string; success?: boolean; password?: string }> {
+): Promise<{ error?: string; success?: boolean }> {
   const { profile } = await requireProProfile();
   if (!profile) return { error: "No pro profile found." };
 
   const firstName = (formData.get("firstName") as string).trim();
   const lastName = (formData.get("lastName") as string).trim();
   const email = (formData.get("email") as string).trim().toLowerCase();
-  const password = (formData.get("password") as string)?.trim();
+  const reason = (formData.get("reason") as string)?.trim() || "";
   const source = (formData.get("source") as string) || "invited";
 
   if (!firstName || !lastName || !email) {
     return { error: "First name, last name and email are required." };
   }
-  if (!password) {
-    return { error: "Password is required. Use the Generate button." };
-  }
 
-  // Check if user already exists
+  // Server-generated random password. The pro never sees it, the
+  // email never carries it — the invited golfer clicks the
+  // set-password link and chooses their own (task 138). The hashed
+  // value still lives on the row so any legacy code path that
+  // expects a non-null password keeps working.
   let userId: number;
-  const tempPassword = password;
+  const tempPassword = generatePassword(16);
 
   const [existing] = await db
     .select({ id: users.id, roles: users.roles })
@@ -307,18 +339,31 @@ export async function inviteStudent(
     status: source === "pro_added" ? "active" : (tempPassword ? "pending" : "active"),
   });
 
-  // Send invite email if new user was created. Use the inviting pro's
-  // locale (from their session cookie) since the student account is fresh
-  // and has no preferredLocale yet.
-  if (tempPassword) {
+  // Send invite email if a new user was created. The pro's locale
+  // (from their session cookie) is used since the new student
+  // account has no preferredLocale yet.
+  if (!existing) {
     const locale = await getLocale();
     const strings = getEmailStrings(locale);
+    const setPasswordUrl = await generateInviteSetPasswordUrl(userId, email);
+
+    // Pro-supplied reason wins; fall back to the legacy generic line
+    // so existing copy doesn't regress for invites without a reason.
+    const comment =
+      reason ||
+      `${
+        locale === "nl"
+          ? `Je bent uitgenodigd door ${profile.displayName} op Golf Lessons.`
+          : locale === "fr"
+            ? `Vous avez été invité par ${profile.displayName} sur Golf Lessons.`
+            : `You've been invited by ${profile.displayName} on Golf Lessons.`
+      }`;
 
     const html = buildInviteEmail({
       firstName,
       loginEmail: email,
-      password: tempPassword,
-      comment: `You've been invited by ${profile.displayName} on Golf Lessons.`,
+      setPasswordUrl,
+      comment,
       locale,
     });
 
@@ -339,7 +384,7 @@ export async function inviteStudent(
   }).catch(() => {});
 
   revalidatePath("/pro/students");
-  return { success: true, password: tempPassword };
+  return { success: true };
 }
 
 export async function removeStudent(proStudentId: number) {
@@ -454,11 +499,15 @@ export async function resetStudentPassword(proStudentId: number) {
   // Send email in the student's preferred language
   const locale = resolveLocale(rel.preferredLocale);
   const strings = getEmailStrings(locale);
-  const html = buildInviteEmail({
+  // Pro-initiated reset stays on the old "here's a new password"
+  // pattern (the pro typically wants something to communicate to the
+  // student). The invite-new-user flow moved to a set-password link
+  // for security (task 138). Switching this reset path to a link
+  // would prevent the pro from telling the student in person.
+  const html = buildPasswordResetEmail({
     firstName: rel.firstName,
     loginEmail: rel.email,
     password: newPassword,
-    comment: `Your password has been reset by ${profile.displayName}.`,
     locale,
   });
 
