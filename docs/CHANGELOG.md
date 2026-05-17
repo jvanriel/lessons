@@ -17,6 +17,18 @@ If any role inside the brackets is unknown (typo), the parser falls
 back to treating the brackets as literal text — better to over-show
 than silently hide.
 
+## 2026-05-17 — v1.1.68
+
+- **[pro] Locations now own their lesson durations, prices, and group
+  size.** The pro registration wizard's "Lessen" step is gone — each
+  location's card carries its own durations, prices, extra-student
+  rate, and max group size, with a "Copy from…" dropdown to clone
+  another location's pricing in one click. The "Lessons" step becomes
+  **"Reserveringsspecificaties"** with the booking notice, booking
+  horizon, and cancellation window. The sidebar entry "Locaties" is
+  renamed to **"Locaties en lestarief"**. The duplicate pricing block
+  on `/pro/profile` has been removed.
+
 ## 2026-05-17 — v1.1.67
 
 - **[pro] Going back in the registration wizard no longer empties or

@@ -59,6 +59,10 @@ export async function POST(request: Request) {
         address: string;
         city: string;
         timezone?: string;
+        lessonDurations?: number[];
+        lessonPricing?: Record<string, number>;
+        extraStudentPricing?: Record<string, number>;
+        maxGroupSize?: number;
       }>;
       if (!locs || locs.length === 0) {
         return NextResponse.json({ error: "At least one location is required" }, { status: 400 });
@@ -128,83 +132,70 @@ export async function POST(request: Request) {
           })
           .returning({ id: locations.id });
 
+        // Per-location pricing payload (task 130). Sanitise inline:
+        // only keep priced durations, only allow non-negative extras.
+        const durations =
+          loc.lessonDurations?.filter((n) => typeof n === "number" && n > 0) ??
+          [60];
+        const validDur = new Set(durations.map(String));
+        const lessonPricing: Record<string, number> = {};
+        for (const [k, v] of Object.entries(loc.lessonPricing ?? {})) {
+          if (!validDur.has(k)) continue;
+          const cents = Math.round(Number(v));
+          if (Number.isFinite(cents) && cents > 0) lessonPricing[k] = cents;
+        }
+        const extraStudentPricing: Record<string, number> = {};
+        for (const [k, v] of Object.entries(loc.extraStudentPricing ?? {})) {
+          if (!validDur.has(k)) continue;
+          const cents = Math.round(Number(v));
+          if (Number.isFinite(cents) && cents >= 0) {
+            extraStudentPricing[k] = cents;
+          }
+        }
+        const maxGroupSize =
+          typeof loc.maxGroupSize === "number" &&
+          loc.maxGroupSize >= 1 &&
+          loc.maxGroupSize <= 20
+            ? Math.floor(loc.maxGroupSize)
+            : 4;
+
         await db.insert(proLocations).values({
           proProfileId: profile.id,
           locationId: inserted.id,
           active: true,
+          lessonDurations: durations,
+          lessonPricing,
+          extraStudentPricing,
+          maxGroupSize,
         });
       }
       break;
     }
 
-    case "lessons": {
-      const {
-        lessonDurations,
-        lessonPricing,
-        extraStudentPricing,
-        maxGroupSize,
-        cancellationHours,
-      } = data as {
-        lessonDurations: number[];
-        lessonPricing?: Record<string, number>;
-        extraStudentPricing?: Record<string, number>;
-        maxGroupSize: number;
-        cancellationHours: number;
+    case "reservationSpecs": {
+      // Replaces the old `lessons` step (task 130). Pricing moved
+      // per-location; this step now carries only booking policy.
+      const { bookingNotice, bookingHorizon, cancellationHours } = data as {
+        bookingNotice?: number;
+        bookingHorizon?: number;
+        cancellationHours?: number;
       };
-
-      // Sanitise lessonPricing: only keep entries for enabled durations
-      // with a positive cent value.
-      const cleanedPricing: Record<string, number> = {};
-      const validDurations = new Set((lessonDurations ?? []).map(String));
-      for (const [k, v] of Object.entries(lessonPricing ?? {})) {
-        if (!validDurations.has(k)) continue;
-        const cents = Math.round(Number(v));
-        if (!Number.isFinite(cents) || cents <= 0) continue;
-        cleanedPricing[k] = cents;
+      const patch: Partial<typeof proProfiles.$inferInsert> = {
+        updatedAt: new Date(),
+      };
+      if (typeof bookingNotice === "number" && bookingNotice >= 0) {
+        patch.bookingNotice = Math.floor(bookingNotice);
       }
-      if (Object.keys(cleanedPricing).length === 0) {
-        return NextResponse.json(
-          { error: "At least one lesson duration needs a price" },
-          { status: 400 }
-        );
+      if (typeof bookingHorizon === "number" && bookingHorizon >= 1) {
+        patch.bookingHorizon = Math.floor(bookingHorizon);
       }
-
-      // Sanitise extraStudentPricing: zero is valid here (= "free for
-      // each extra", which is the default when missing — see task 76).
-      const cleanedExtra: Record<string, number> = {};
-      for (const [k, v] of Object.entries(extraStudentPricing ?? {})) {
-        if (!validDurations.has(k)) continue;
-        const cents = Math.round(Number(v));
-        if (!Number.isFinite(cents) || cents < 0) continue;
-        cleanedExtra[k] = cents;
+      if (typeof cancellationHours === "number" && cancellationHours >= 0) {
+        patch.cancellationHours = Math.floor(cancellationHours);
       }
-
       await db
         .update(proProfiles)
-        .set({
-          lessonDurations: lessonDurations?.length ? lessonDurations : [60],
-          lessonPricing: cleanedPricing,
-          extraStudentPricing: cleanedExtra,
-          maxGroupSize: maxGroupSize || 4,
-          cancellationHours: cancellationHours || 24,
-          updatedAt: new Date(),
-        })
+        .set(patch)
         .where(eq(proProfiles.id, profile.id));
-
-      // Mirror durations + pricing to all of this pro's locations
-      // (task 109). Onboarding captures pricing once at the global
-      // level; the per-location editor lets the pro customise after
-      // sign-up. Without this step new pros' pro_locations rows
-      // would have empty pricing and the booking flow would refuse
-      // to price the slot.
-      await db
-        .update(proLocations)
-        .set({
-          lessonDurations: lessonDurations?.length ? lessonDurations : [60],
-          lessonPricing: cleanedPricing,
-          extraStudentPricing: cleanedExtra,
-        })
-        .where(eq(proLocations.proProfileId, profile.id));
       break;
     }
 
