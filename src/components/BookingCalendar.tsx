@@ -178,7 +178,11 @@ export function BookingCalendar({
                   ? "border border-gold-400 bg-gold-100 font-semibold text-green-900"
                   : hasAvail
                     ? "border border-green-200 bg-white text-green-800 hover:border-green-300 hover:bg-green-50"
-                    : "cursor-not-allowed text-green-300"
+                    : // task 145 — neutral grey, not light-green. The
+                      // old text-green-300 read as "positive / available"
+                      // to users, so the boxed available days didn't
+                      // visually stand out.
+                      "cursor-not-allowed text-gray-300"
               }`}
             >
               {cell.day}

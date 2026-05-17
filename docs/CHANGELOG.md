@@ -17,6 +17,13 @@ If any role inside the brackets is unknown (typo), the parser falls
 back to treating the brackets as literal text — better to over-show
 than silently hide.
 
+## 2026-05-17 — v1.1.86
+
+- **Booking calendar: unavailable dates now grey, not faded green.**
+  A user noticed all date numbers looked green even though only
+  the boxed dates were actually bookable. Unavailable days are now
+  neutral grey so the green available dates pop visually.
+
 ## 2026-05-17 — v1.1.85
 
 - **[admin,dev] Attach an image or file when creating a task.**
