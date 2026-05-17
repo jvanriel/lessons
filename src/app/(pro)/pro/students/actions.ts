@@ -54,7 +54,6 @@ import {
   todayInTZ,
 } from "@/lib/local-date";
 import { getProLocationTimezone } from "@/lib/pro";
-import { fromZonedTime } from "date-fns-tz";
 import { resolveLocale } from "@/lib/i18n";
 import { createNotification } from "@/lib/notifications";
 import {
@@ -65,16 +64,11 @@ import {
 import {
   computeAvailableSlots,
   buildIcs,
-  buildCancelIcs,
   type AvailabilityTemplate,
   type AvailabilityOverride,
   type ExistingBooking,
 } from "@/lib/lesson-slots";
-import {
-  CANCEL_STRINGS,
-  formatCancelLessonDate,
-  buildCancelEmailBody,
-} from "@/lib/booking-cancel-email";
+import { cancelBookingByPro } from "@/lib/booking-cancel";
 import { after } from "next/server";
 import crypto from "node:crypto";
 
@@ -1368,186 +1362,16 @@ export async function proCancelBooking(bookingId: number) {
   const { profile } = await requireProProfile();
   if (!profile) return { error: "No pro profile." };
 
-  const [booking] = await db
-    .select({
-      id: lessonBookings.id,
-      date: lessonBookings.date,
-      startTime: lessonBookings.startTime,
-      endTime: lessonBookings.endTime,
-      bookedById: lessonBookings.bookedById,
-      proLocationId: lessonBookings.proLocationId,
-      participantCount: lessonBookings.participantCount,
-    })
-    .from(lessonBookings)
-    .where(
-      and(
-        eq(lessonBookings.id, bookingId),
-        eq(lessonBookings.proProfileId, profile.id),
-        eq(lessonBookings.status, "confirmed")
-      )
-    )
-    .limit(1);
-
-  if (!booking) return { error: "Booking not found." };
-
-  // Decide BEFORE the row update whether the lesson is in the past,
-  // so we can short-circuit the notification+email pipeline. Resolve
-  // the lesson start in the location's TZ — same pattern as
-  // `cancelBooking` in (member)/member/bookings/actions.ts. Reading
-  // the location row also gives us name + tz for the email path.
-  const [loc] = await db
-    .select({
-      name: locations.name,
-      address: locations.address,
-      city: locations.city,
-      timezone: locations.timezone,
-    })
-    .from(proLocations)
-    .innerJoin(locations, eq(proLocations.locationId, locations.id))
-    .where(eq(proLocations.id, booking.proLocationId))
-    .limit(1);
-  if (!loc) {
-    throw new Error(
-      `proCancelBooking: location lookup missing for proLocationId=${booking.proLocationId} (booking ${booking.id})`,
-    );
-  }
-  const locationName = formatLocationFull(loc);
-  const locationTz = loc.timezone;
-  const lessonStart = fromZonedTime(
-    `${booking.date}T${booking.startTime}:00`,
-    locationTz,
-  );
-  const isPast = lessonStart.getTime() <= Date.now();
-
-  await db
-    .update(lessonBookings)
-    .set({
-      status: "cancelled",
-      cancelledAt: new Date(),
-      cancellationReason: isPast
-        ? "Cancelled by pro (admin cleanup, lesson already past)"
-        : "Cancelled by pro",
-      updatedAt: new Date(),
-    })
-    .where(eq(lessonBookings.id, bookingId));
+  const result = await cancelBookingByPro({
+    bookingId,
+    proProfileId: profile.id,
+    reason: "Cancelled by pro",
+  });
 
   revalidatePath("/pro/students");
   revalidatePath("/pro/bookings");
 
-  // Past lesson: stop here. No emails, no notification, no ICS — the
-  // student doesn't need to hear about a cancellation of a lesson
-  // they already attended (or didn't).
-  if (isPast) {
-    return { success: true, silent: true };
-  }
-
-  // Future lesson: notify + email both parties with a CANCEL ics.
-  // Mirror of the member-side cancelBooking flow, but with the
-  // "by: pro" copy variant.
-  await createNotification({
-    type: "booking_cancelled",
-    priority: "high",
-    targetUserId: booking.bookedById,
-    title: "Lesson cancelled",
-    message: `${profile.displayName} cancelled your lesson on ${booking.date} at ${booking.startTime}.`,
-    actionUrl: "/member/bookings",
-    actionLabel: "View bookings",
-  }).catch(() => {});
-
-  const [student] = await db
-    .select({
-      firstName: users.firstName,
-      lastName: users.lastName,
-      email: users.email,
-      preferredLocale: users.preferredLocale,
-    })
-    .from(users)
-    .where(eq(users.id, booking.bookedById))
-    .limit(1);
-
-  const [proRow] = await db
-    .select({
-      proFirstName: users.firstName,
-      proEmail: users.email,
-      proLocale: users.preferredLocale,
-    })
-    .from(proProfiles)
-    .innerJoin(users, eq(proProfiles.userId, users.id))
-    .where(eq(proProfiles.id, profile.id))
-    .limit(1);
-
-  const studentName = student
-    ? `${student.firstName} ${student.lastName}`
-    : "Student";
-  const studentLocale = resolveLocale(student?.preferredLocale);
-  const proLocale = resolveLocale(proRow?.proLocale);
-
-  const cancelIcs = buildCancelIcs({
-    date: booking.date,
-    startTime: booking.startTime,
-    endTime: booking.endTime,
-    summary: `Golf lesson with ${profile.displayName}`,
-    location: locationName,
-    description: `Cancelled by ${profile.displayName}`,
-    bookingId: booking.id,
-    tz: locationTz,
-  });
-  const icsAttachment = {
-    filename: "lesson-cancelled.ics",
-    contentType: "text/calendar",
-    content: cancelIcs,
-    method: "CANCEL" as const,
-  };
-
-  if (student?.email) {
-    const ss = CANCEL_STRINGS[studentLocale] ?? CANCEL_STRINGS.en;
-    sendEmail({
-      to: student.email,
-      subject: ss.studentSubject(profile.displayName, "pro"),
-      html: buildCancelEmailBody({
-        greeting: ss.greeting,
-        recipientFirstName: student.firstName,
-        bodyLine: ss.studentBody(profile.displayName, "pro"),
-        rows: [
-          [ss.date, formatCancelLessonDate(booking.date, studentLocale)],
-          [ss.time, `${booking.startTime} – ${booking.endTime}`],
-          [ss.location, locationName],
-        ],
-        helper: ss.helper,
-        locale: studentLocale,
-      }),
-      attachments: [icsAttachment],
-    }).catch(() => {});
-  }
-
-  if (proRow?.proEmail) {
-    const ps = CANCEL_STRINGS[proLocale] ?? CANCEL_STRINGS.en;
-    sendEmail({
-      to: proRow.proEmail,
-      subject: ps.proSubject(studentName, "pro"),
-      html: buildCancelEmailBody({
-        greeting: ps.greeting,
-        recipientFirstName: proRow.proFirstName,
-        bodyLine: ps.proBody(studentName, "pro"),
-        rows: [
-          [ps.date, formatCancelLessonDate(booking.date, proLocale)],
-          [ps.time, `${booking.startTime} – ${booking.endTime}`],
-          [ps.location, locationName],
-        ],
-        helper: ps.helper,
-        locale: proLocale,
-      }),
-      attachments: [icsAttachment],
-    }).catch(() => {});
-  }
-
-  // Fan out cancellation to extra participants. Skipped automatically
-  // when participantCount === 1.
-  if ((booking.participantCount ?? 1) > 1) {
-    sendParticipantCancellationNotifications(booking.id).catch(() => {});
-  }
-
-  return { success: true };
+  return result;
 }
 
 

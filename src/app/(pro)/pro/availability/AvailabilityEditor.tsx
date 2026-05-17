@@ -1738,6 +1738,13 @@ function PreviewBlockingGrid({
   const [saveStatus, setSaveStatus] = useState<"idle" | "saving" | "saved">("idle");
   const debounceRef = useRef<ReturnType<typeof setTimeout>>(undefined);
 
+  // Confirm dialog shown when a new block sweeps over existing
+  // bookings. Holds the list of bookings about to be cancelled so the
+  // pro can review before saveWeekOverrides commits (task 137).
+  const [pendingConflicts, setPendingConflicts] = useState<
+    SerializedBooking[] | null
+  >(null);
+
   // Booking dialog: tap any booking cell to open the shared
   // BookingCard (same surface as /pro/bookings). Cancel uses the same
   // confirm dialog as the bookings views.
@@ -2072,36 +2079,58 @@ function PreviewBlockingGrid({
     setEditPopover({ key: reasonKey, x: e.clientX, y: e.clientY });
   }
 
-  // ─── Auto-save overrides after 2s of inactivity ──
-  useEffect(() => {
-    if (!dirty) return;
-    clearTimeout(debounceRef.current);
-    debounceRef.current = setTimeout(() => {
-      setSaveStatus("saving");
-      setDirty(false);
+  // Build the save payload from current grid state. Pure function of
+  // the cell maps; called from both the debounce effect and the
+  // post-confirm path so the records can't drift between the two.
+  const buildOverrideRecords = useCallback(() => {
+    const datesToReplace = days.filter((d) => !d.isPast).map((d) => d.date);
+    const records: Array<{
+      date: string;
+      type: "blocked" | "available";
+      proLocationId?: number;
+      startTime?: string;
+      endTime?: string;
+      reason?: string;
+    }> = [];
 
-      const datesToReplace = days.filter((d) => !d.isPast).map((d) => d.date);
-      const records: Array<{
-        date: string;
-        type: "blocked" | "available";
-        proLocationId?: number;
-        startTime?: string;
-        endTime?: string;
-        reason?: string;
-      }> = [];
+    for (let dayIdx = 0; dayIdx < 7; dayIdx++) {
+      if (days[dayIdx].isPast) continue;
+      const date = days[dayIdx].date;
 
-      for (let dayIdx = 0; dayIdx < 7; dayIdx++) {
-        if (days[dayIdx].isPast) continue;
-        const date = days[dayIdx].date;
+      if (fullDayBlocked[dayIdx]) {
+        records.push({ date, type: "blocked", reason: reasons.get(`${dayIdx}`) });
+      } else {
+        let inBlock = false;
+        let startRow = 0;
+        for (let row = 0; row <= ROWS; row++) {
+          const active = row < ROWS && blockedCells[dayIdx][row];
+          if (active && !inBlock) {
+            inBlock = true;
+            startRow = row;
+          }
+          if (!active && inBlock) {
+            inBlock = false;
+            records.push({
+              date,
+              type: "blocked",
+              startTime: rowToTime(startRow),
+              endTime: rowToTime(row),
+              reason: reasons.get(`${dayIdx}-${startRow}`),
+            });
+          }
+        }
+      }
 
-        // ── Blocked overrides ──
-        if (fullDayBlocked[dayIdx]) {
-          records.push({ date, type: "blocked", reason: reasons.get(`${dayIdx}`) });
-        } else {
+      if (!fullDayBlocked[dayIdx]) {
+        const locIds = new Set<number>();
+        for (let row = 0; row < ROWS; row++) {
+          for (const id of extraAvailCells[dayIdx][row]) locIds.add(id);
+        }
+        for (const locId of locIds) {
           let inBlock = false;
           let startRow = 0;
           for (let row = 0; row <= ROWS; row++) {
-            const active = row < ROWS && blockedCells[dayIdx][row];
+            const active = row < ROWS && extraAvailCells[dayIdx][row].has(locId);
             if (active && !inBlock) {
               inBlock = true;
               startRow = row;
@@ -2110,57 +2139,107 @@ function PreviewBlockingGrid({
               inBlock = false;
               records.push({
                 date,
-                type: "blocked",
+                type: "available",
+                proLocationId: locId,
                 startTime: rowToTime(startRow),
                 endTime: rowToTime(row),
-                reason: reasons.get(`${dayIdx}-${startRow}`),
               });
             }
           }
         }
-
-        // ── Extra availability overrides per location ──
-        if (!fullDayBlocked[dayIdx]) {
-          const locIds = new Set<number>();
-          for (let row = 0; row < ROWS; row++) {
-            for (const id of extraAvailCells[dayIdx][row]) locIds.add(id);
-          }
-          for (const locId of locIds) {
-            let inBlock = false;
-            let startRow = 0;
-            for (let row = 0; row <= ROWS; row++) {
-              const active = row < ROWS && extraAvailCells[dayIdx][row].has(locId);
-              if (active && !inBlock) {
-                inBlock = true;
-                startRow = row;
-              }
-              if (!active && inBlock) {
-                inBlock = false;
-                records.push({
-                  date,
-                  type: "available",
-                  proLocationId: locId,
-                  startTime: rowToTime(startRow),
-                  endTime: rowToTime(row),
-                });
-              }
-            }
-          }
-        }
       }
+    }
+    return { datesToReplace, records };
+  }, [days, blockedCells, fullDayBlocked, extraAvailCells, reasons]);
 
-      (async () => {
-        const result = await saveWeekOverrides({ datesToReplace, overrides: records });
-        if (!result.error) {
-          setSaveStatus("saved");
-          setTimeout(() => setSaveStatus((s) => (s === "saved" ? "idle" : s)), 2000);
-        } else {
-          setSaveStatus("idle");
-        }
-      })();
+  // Find unique confirmed bookings that fall under a new blocked cell
+  // (or full-day block). Iterates the visible grid against bookingMap
+  // — same source the cells render from — so what the pro sees matches
+  // what we'll cancel.
+  const findConflictingBookings = useCallback((): SerializedBooking[] => {
+    const seen = new Map<number, SerializedBooking>();
+    for (let dayIdx = 0; dayIdx < 7; dayIdx++) {
+      if (days[dayIdx].isPast) continue;
+      for (let row = 0; row < ROWS; row++) {
+        const booking = bookingMap[dayIdx][row];
+        if (!booking) continue;
+        const blocked = fullDayBlocked[dayIdx] || blockedCells[dayIdx][row];
+        if (!blocked) continue;
+        if (!seen.has(booking.id)) seen.set(booking.id, booking);
+      }
+    }
+    return [...seen.values()];
+  }, [days, blockedCells, fullDayBlocked, bookingMap]);
+
+  const flushSave = useCallback(async () => {
+    setSaveStatus("saving");
+    setDirty(false);
+    const { datesToReplace, records } = buildOverrideRecords();
+    const result = await saveWeekOverrides({ datesToReplace, overrides: records });
+    if (!result.error) {
+      setSaveStatus("saved");
+      if (result.cancelledBookingIds && result.cancelledBookingIds.length > 0) {
+        // Cancelled bookings need to disappear from bookingMap — refresh
+        // the page so the server-rendered bookings prop is current.
+        router.refresh();
+      }
+      setTimeout(() => setSaveStatus((s) => (s === "saved" ? "idle" : s)), 2000);
+    } else {
+      setSaveStatus("idle");
+    }
+  }, [buildOverrideRecords, router]);
+
+  // ─── Auto-save overrides after 2s of inactivity ──
+  useEffect(() => {
+    if (!dirty) return;
+    if (pendingConflicts) return; // wait for the user's decision
+    clearTimeout(debounceRef.current);
+    debounceRef.current = setTimeout(() => {
+      const conflicts = findConflictingBookings();
+      if (conflicts.length > 0) {
+        setPendingConflicts(conflicts);
+        return;
+      }
+      flushSave();
     }, 2000);
     return () => clearTimeout(debounceRef.current);
-  }, [dirty, days, blockedCells, fullDayBlocked, extraAvailCells, reasons]);
+  }, [dirty, pendingConflicts, findConflictingBookings, flushSave]);
+
+  function confirmCancelOverlappingBookings() {
+    setPendingConflicts(null);
+    flushSave();
+  }
+
+  function undoBlocksOverBookings() {
+    // Drop just the blocks that overlap a booking, leaving any
+    // non-conflicting block painting from the same edit intact.
+    setBlockedCells((prev) => {
+      const next = prev.map((col) => [...col]);
+      for (let d = 0; d < 7; d++) {
+        for (let r = 0; r < ROWS; r++) {
+          if (next[d][r] && bookingMap[d][r]) next[d][r] = false;
+        }
+      }
+      return next;
+    });
+    setFullDayBlocked((prev) => {
+      const next = [...prev];
+      for (let d = 0; d < 7; d++) {
+        if (!next[d]) continue;
+        let hasBooking = false;
+        for (let r = 0; r < ROWS; r++) {
+          if (bookingMap[d][r]) {
+            hasBooking = true;
+            break;
+          }
+        }
+        if (hasBooking) next[d] = false;
+      }
+      return next;
+    });
+    setPendingConflicts(null);
+    setDirty(true);
+  }
 
   // ─── Helpers for cell rendering ───────────────────
   function cellLocNames(locs: Set<number>): string {
@@ -2491,10 +2570,14 @@ function PreviewBlockingGrid({
                     key={`${dayIdx}-${row}`}
                     data-cell={`${dayIdx}-${row}`}
                     onPointerDown={(e) => {
-                      // Booking cell short-circuits the paint flow:
-                      // tapping a lesson opens the BookingCard dialog
-                      // instead of toggling block / extra-availability.
-                      if (booking) {
+                      // Booking cell behaviour depends on the active
+                      // brush. With "available" brush a tap opens the
+                      // BookingCard (no reason to paint extra avail
+                      // over a booking). With "blocked" brush a tap
+                      // paints the block — saveWeekOverrides will then
+                      // auto-cancel the booking on the server side
+                      // (task 137).
+                      if (booking && brush.mode !== "blocked") {
                         e.preventDefault();
                         e.stopPropagation();
                         setExpandedBooking(booking);
@@ -2508,14 +2591,21 @@ function PreviewBlockingGrid({
                     }}
                     onContextMenu={(e) => e.preventDefault()}
                     onDoubleClick={(e) => {
-                      if (booking) {
+                      if (booking && brush.mode !== "blocked") {
                         e.preventDefault();
                         e.stopPropagation();
                         return;
                       }
                       handleDoubleClick(dayIdx, row, e);
                     }}
-                    className={cellClass + (booking ? " cursor-pointer" : "")}
+                    className={
+                      cellClass +
+                      (booking && brush.mode !== "blocked"
+                        ? " cursor-pointer"
+                        : booking && brush.mode === "blocked"
+                          ? " cursor-crosshair"
+                          : "")
+                    }
                     style={cellStyle}
                     title={title}
                   >
@@ -2669,6 +2759,66 @@ function PreviewBlockingGrid({
           }
           locale={locale}
         />
+      )}
+
+      {/* Block-over-bookings confirm — shown when the auto-save is
+          about to commit blocks that overlap existing confirmed
+          bookings. Continue cancels each booking (server-side, with
+          email + ICS). Undo drops just the conflicting blocks so the
+          pro can keep painting elsewhere. */}
+      {pendingConflicts && pendingConflicts.length > 0 && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 px-4"
+          onClick={(e) => {
+            if (e.target === e.currentTarget) undoBlocksOverBookings();
+          }}
+        >
+          <div className="mx-4 w-full max-w-md rounded-xl border border-green-200 bg-white p-6 shadow-2xl">
+            <h3 className="font-display text-lg font-semibold text-green-900">
+              {t("proAvail.blockCancels.title", locale)}
+            </h3>
+            <p className="mt-2 text-sm text-green-700">
+              {t("proAvail.blockCancels.body", locale).replace(
+                "{count}",
+                String(pendingConflicts.length),
+              )}
+            </p>
+            <ul className="mt-3 max-h-48 overflow-y-auto rounded-lg border border-green-100 bg-green-50/50 p-3">
+              {pendingConflicts.map((b) => (
+                <li key={b.id} className="py-1 text-sm text-green-900">
+                  <span className="font-medium">
+                    {b.bookerName ?? t("proAvail.booked", locale)}
+                  </span>
+                  <span className="text-green-700">
+                    {" — "}
+                    {formatDateLocale(b.date, locale, {
+                      weekday: "short",
+                      day: "numeric",
+                      month: "short",
+                    })}{" "}
+                    {b.startTime}–{b.endTime}
+                  </span>
+                </li>
+              ))}
+            </ul>
+            <div className="mt-5 flex gap-3">
+              <button
+                type="button"
+                onClick={undoBlocksOverBookings}
+                className="flex-1 rounded-md border border-green-200 px-4 py-2 text-sm font-medium text-green-700 transition-colors hover:bg-green-50"
+              >
+                {t("proAvail.blockCancels.undo", locale)}
+              </button>
+              <button
+                type="button"
+                onClick={confirmCancelOverlappingBookings}
+                className="flex-1 rounded-md bg-red-500 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-red-600"
+              >
+                {t("proAvail.blockCancels.confirm", locale)}
+              </button>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );

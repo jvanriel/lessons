@@ -17,6 +17,14 @@ If any role inside the brackets is unknown (typo), the parser falls
 back to treating the brackets as literal text — better to over-show
 than silently hide.
 
+## 2026-05-17 — v1.1.63
+
+- **[pro] Blocking a time slot now cancels overlapping bookings.** In
+  Beschikbaarheid → Rooster & Blokken, painting a block over an
+  existing booking is now allowed. Before saving, a confirm dialog
+  lists the affected lessons; on confirm the bookings are cancelled
+  and the students get an email + calendar update automatically.
+
 ## 2026-05-09 — v1.1.62
 
 - **Search field for choosing your pros.** A live search now sits
