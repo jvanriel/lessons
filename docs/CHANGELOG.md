@@ -17,6 +17,14 @@ If any role inside the brackets is unknown (typo), the parser falls
 back to treating the brackets as literal text — better to over-show
 than silently hide.
 
+## 2026-05-17 — v1.1.75
+
+- **[pro] Cancellation policy changes show up on existing bookings.**
+  Saving a new cancellation window in your profile now busts the
+  client cache for the student-facing pages — so an already-loaded
+  /member/bookings or /member/dashboard refreshes to the new value
+  on the next interaction instead of holding onto the old one.
+
 ## 2026-05-17 — v1.1.74
 
 - **[pro] Inviting a golfer is now passwordless.** When you invite a

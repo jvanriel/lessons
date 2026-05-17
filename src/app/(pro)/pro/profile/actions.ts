@@ -70,6 +70,16 @@ export async function updateProProfile(
 
   revalidatePath("/pro/profile");
   revalidatePath("/pro/availability");
+  // Booking policy fields (cancellationHours, bookingNotice,
+  // bookingHorizon) drive what the student sees on /member/bookings,
+  // /member/dashboard, and the public booking flow. Without busting
+  // those, the Router Cache keeps showing the old window to anyone
+  // who already loaded the page — Nadine flagged this for
+  // cancellationHours (task 139) but the same pattern applies to
+  // bookingNotice and bookingHorizon, so we revalidate the lot.
+  revalidatePath("/member/bookings");
+  revalidatePath("/member/dashboard");
+  revalidatePath(`/book/${profile.id}`);
   return { success: true };
 }
 
