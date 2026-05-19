@@ -52,8 +52,6 @@ import {
   getNoShowSubject,
 } from "@/lib/booking-no-show-email";
 
-const SETTLEMENT_EXPIRY_DAYS = 30;
-
 function getBaseUrl(): string {
   if (process.env.NEXT_PUBLIC_APP_URL) return process.env.NEXT_PUBLIC_APP_URL;
   if (process.env.VERCEL_URL) return `https://${process.env.VERCEL_URL}`;
@@ -182,15 +180,17 @@ export async function markBookingAsNoShow(
     } else {
       try {
         const stripe = getStripe();
-        const expiresAt =
-          Math.floor(Date.now() / 1000) +
-          SETTLEMENT_EXPIRY_DAYS * 24 * 60 * 60;
         const base = getBaseUrl();
-        const session = await stripe.checkout.sessions.create(
+        // Stripe Checkout Sessions in mode='payment' cap `expires_at`
+        // at 24 hours, which is too short for an email link. Use a
+        // Payment Link instead — durable URL that creates a Checkout
+        // Session on click and fires the same
+        // `checkout.session.completed` webhook with our metadata
+        // propagated through. `restrictions.completed_sessions.limit
+        // = 1` makes it one-shot so the student can't accidentally
+        // pay twice.
+        const link = await stripe.paymentLinks.create(
           {
-            mode: "payment",
-            customer_email: student.email,
-            expires_at: expiresAt,
             line_items: [
               {
                 quantity: 1,
@@ -215,15 +215,25 @@ export async function markBookingAsNoShow(
               },
               description: `No-show settlement booking #${booking.id}`,
             },
-            success_url: `${base}/no-show/paid?session_id={CHECKOUT_SESSION_ID}`,
-            cancel_url: `${base}/no-show/pending?booking=${booking.id}`,
+            after_completion: {
+              type: "redirect",
+              redirect: {
+                url: `${base}/no-show/paid?booking=${booking.id}`,
+              },
+            },
+            restrictions: { completed_sessions: { limit: 1 } },
           },
-          { idempotencyKey: `no-show-${booking.id}-v1` },
+          // v2 bump: switched from checkout.sessions.create to
+          // paymentLinks.create. Stripe idempotency keys are scoped
+          // per API key (not per endpoint), so we need a fresh key
+          // to avoid colliding with any earlier failed-checkout-
+          // session attempts on the same booking.
+          { idempotencyKey: `no-show-${booking.id}-v2` },
         );
-        settlementUrl = session.url ?? undefined;
-        stripeCheckoutSessionId = session.id;
+        settlementUrl = link.url ?? undefined;
+        stripeCheckoutSessionId = link.id;
         if (!settlementUrl) {
-          return { error: "Stripe did not return a Checkout URL." };
+          return { error: "Stripe did not return a payment link URL." };
         }
       } catch (err) {
         const msg =

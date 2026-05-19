@@ -82,7 +82,7 @@ export const NO_SHOW_UNPAID_STRINGS: Record<Locale, NoShowEmailStrings> = {
     amount: "Amount due",
     cta: "Pay now",
     helper:
-      "The payment link stays valid for 30 days. If this is a mistake (you did show up, or you spoke to your pro about rescheduling), reply to this email and we'll sort it out.",
+      "If this is a mistake (you did show up, or you spoke to your pro about rescheduling), reply to this email and we'll sort it out.",
   },
   nl: {
     subject: (pro) => `Gemiste les bij ${pro} — graag betalen`,
@@ -95,7 +95,7 @@ export const NO_SHOW_UNPAID_STRINGS: Record<Locale, NoShowEmailStrings> = {
     amount: "Te betalen",
     cta: "Nu betalen",
     helper:
-      "De betaallink blijft 30 dagen geldig. Klopt dit niet (je was wél aanwezig of had iets afgesproken met je pro)? Antwoord op deze e-mail en we kijken het na.",
+      "Klopt dit niet (je was wél aanwezig of had iets afgesproken met je pro)? Antwoord op deze e-mail en we kijken het na.",
   },
   fr: {
     subject: (pro) => `Cours manqué avec ${pro} — règlement à effectuer`,
@@ -108,7 +108,7 @@ export const NO_SHOW_UNPAID_STRINGS: Record<Locale, NoShowEmailStrings> = {
     amount: "Montant dû",
     cta: "Payer maintenant",
     helper:
-      "Le lien de paiement reste valable 30 jours. Si c'est une erreur (vous étiez bien présent, ou vous aviez convenu autre chose avec votre pro), répondez à cet e-mail et nous regarderons cela.",
+      "Si c'est une erreur (vous étiez bien présent, ou vous aviez convenu autre chose avec votre pro), répondez à cet e-mail et nous regarderons cela.",
   },
 };
 

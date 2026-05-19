@@ -207,14 +207,20 @@ describe("buildNoShowEmail — unpaid variant", () => {
     expect(html).not.toContain("http:///");
   });
 
-  it("renders the helper line mentioning the 30-day validity window", () => {
+  it("renders the helper line with the rescheduling-mistake fallback copy", () => {
+    // Originally pinned a 30-day validity claim, but Stripe Checkout
+    // Sessions cap expires_at at 24h. After switching to Payment
+    // Links (which are durable), the email no longer promises a
+    // specific window — it just invites the student to reply if the
+    // no-show was a misunderstanding.
     const html = buildNoShowEmail({
       ...baseOpts,
       paid: false,
       locale: "en",
       settlementUrl: SETTLEMENT_URL,
     });
-    expect(html).toContain("30 days");
+    expect(html).toContain("reply to this email");
+    expect(html).not.toContain("30 days");
   });
 
   it("omits the CTA block when settlementUrl is missing (defensive)", () => {

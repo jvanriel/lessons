@@ -17,6 +17,7 @@ import { getPaymentBadge } from "@/lib/payment-status";
 import { proCancelBooking, proMarkNoShow } from "../students/actions";
 import { CancelBookingDialog } from "../_components/CancelBookingDialog";
 import { MarkNoShowDialog } from "../_components/MarkNoShowDialog";
+import { NoShowResultDialog } from "../_components/NoShowResultDialog";
 import BookingCard from "./BookingCard";
 import { LOCATION_COLORS, buildLocationColorMap } from "@/lib/location-colors";
 
@@ -168,6 +169,10 @@ export function BookingsCalendar({
   const [cancelPending, startCancelTransition] = useTransition();
   const [noShowTargetId, setNoShowTargetId] = useState<number | null>(null);
   const [noShowPending, startNoShowTransition] = useTransition();
+  const [noShowResult, setNoShowResult] = useState<
+    | { variant: "success" | "error"; message: string; settlementUrl?: string }
+    | null
+  >(null);
 
   // Build location → colour-index map identical to AvailabilityEditor's
   // (same shared helper, same `sortOrder`-ordered list). The booking
@@ -559,16 +564,19 @@ export function BookingsCalendar({
               startNoShowTransition(async () => {
                 const result = await proMarkNoShow(id);
                 if ("error" in result) {
-                  alert(result.error);
+                  setNoShowResult({
+                    variant: "error",
+                    message: result.error,
+                  });
                 } else {
-                  if (result.settlementUrl) {
-                    alert(
-                      t(
-                        "proStudentBookings.noShowDialog.linkSent",
-                        locale,
-                      ),
-                    );
-                  }
+                  setNoShowResult({
+                    variant: "success",
+                    message: t(
+                      "proStudentBookings.noShowDialog.linkSent",
+                      locale,
+                    ),
+                    settlementUrl: result.settlementUrl,
+                  });
                   router.refresh();
                   if (expandedBookingId === id) setExpandedBookingId(null);
                 }
@@ -588,6 +596,16 @@ export function BookingsCalendar({
           />
         );
       })()}
+
+      {noShowResult && (
+        <NoShowResultDialog
+          variant={noShowResult.variant}
+          message={noShowResult.message}
+          settlementUrl={noShowResult.settlementUrl}
+          onClose={() => setNoShowResult(null)}
+          locale={locale}
+        />
+      )}
     </div>
   );
 }

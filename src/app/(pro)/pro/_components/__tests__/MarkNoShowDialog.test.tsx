@@ -53,7 +53,7 @@ function renderDialog(opts: Overrides = {}) {
 describe("MarkNoShowDialog — confirm + close", () => {
   it("calls onConfirm when the amber 'Mark as no-show' button is clicked", () => {
     const { onConfirm, onClose } = renderDialog();
-    fireEvent.click(screen.getByRole("button", { name: /mark as no-show/i }));
+    fireEvent.click(screen.getByRole("button", { name: /^no show$/i }));
     expect(onConfirm).toHaveBeenCalledTimes(1);
     expect(onClose).not.toHaveBeenCalled();
   });
