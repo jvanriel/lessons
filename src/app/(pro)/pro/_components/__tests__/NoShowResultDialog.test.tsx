@@ -18,6 +18,7 @@ import {
   fireEvent,
   render,
   screen,
+  waitFor,
 } from "@testing-library/react";
 import { NoShowResultDialog } from "@/app/(pro)/pro/_components/NoShowResultDialog";
 
@@ -156,6 +157,112 @@ describe("NoShowResultDialog — error variant", () => {
       />,
     );
     expect(screen.queryByRole("link")).toBeNull();
+  });
+});
+
+describe("NoShowResultDialog — copy-to-clipboard", () => {
+  it("calls navigator.clipboard.writeText with the settlementUrl when the copy button is clicked", async () => {
+    const writeText = vi.fn().mockResolvedValue(undefined);
+    // happy-dom doesn't ship a navigator.clipboard implementation —
+    // stub one. defineProperty so the spy is preserved across the
+    // dialog's async handler.
+    Object.defineProperty(navigator, "clipboard", {
+      configurable: true,
+      value: { writeText },
+    });
+
+    render(
+      <NoShowResultDialog
+        variant="success"
+        message="Payment link sent to the golfer."
+        settlementUrl={SETTLEMENT_URL}
+        onClose={vi.fn()}
+        locale="en"
+      />,
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: /^copy$/i }));
+    // Wait a microtask for the async handler to call writeText.
+    await new Promise((r) => setTimeout(r, 0));
+    expect(writeText).toHaveBeenCalledWith(SETTLEMENT_URL);
+  });
+
+  it("flips the button label to 'Copied!' after a successful copy", async () => {
+    const writeText = vi.fn().mockResolvedValue(undefined);
+    Object.defineProperty(navigator, "clipboard", {
+      configurable: true,
+      value: { writeText },
+    });
+
+    render(
+      <NoShowResultDialog
+        variant="success"
+        message="Payment link sent."
+        settlementUrl={SETTLEMENT_URL}
+        onClose={vi.fn()}
+        locale="en"
+      />,
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: /^copy$/i }));
+    // Wait for the async writeText to resolve and the resulting
+    // setState to commit. The flip from "Copy" → "Copied!" is the
+    // visible signal that the clipboard call succeeded.
+    await waitFor(() => {
+      expect(screen.getByRole("button", { name: /copied/i })).toBeTruthy();
+    });
+  });
+
+  it("does NOT crash when navigator.clipboard.writeText rejects (e.g. insecure context)", async () => {
+    const writeText = vi.fn().mockRejectedValue(new Error("not allowed"));
+    Object.defineProperty(navigator, "clipboard", {
+      configurable: true,
+      value: { writeText },
+    });
+
+    render(
+      <NoShowResultDialog
+        variant="success"
+        message="Payment link sent."
+        settlementUrl={SETTLEMENT_URL}
+        onClose={vi.fn()}
+        locale="en"
+      />,
+    );
+
+    expect(() => {
+      fireEvent.click(screen.getByRole("button", { name: /^copy$/i }));
+    }).not.toThrow();
+    // After the rejection, the label stays as 'Copy' (no "Copied!"
+    // confirmation). The URL is still visible as a fallback.
+    await new Promise((r) => setTimeout(r, 0));
+    expect(screen.getByRole("button", { name: /^copy$/i })).toBeTruthy();
+  });
+
+  it("renders the localized copy label in NL", () => {
+    render(
+      <NoShowResultDialog
+        variant="success"
+        message="Betaallink is naar de golfer gestuurd."
+        settlementUrl={SETTLEMENT_URL}
+        onClose={vi.fn()}
+        locale="nl"
+      />,
+    );
+    expect(screen.getByRole("button", { name: /kopieer/i })).toBeTruthy();
+  });
+
+  it("renders the localized copy label in FR", () => {
+    render(
+      <NoShowResultDialog
+        variant="success"
+        message="Lien de paiement envoyé au golfeur."
+        settlementUrl={SETTLEMENT_URL}
+        onClose={vi.fn()}
+        locale="fr"
+      />,
+    );
+    expect(screen.getByRole("button", { name: /copier/i })).toBeTruthy();
   });
 });
 
