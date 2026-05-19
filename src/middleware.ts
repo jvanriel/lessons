@@ -1,61 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { neon } from "@neondatabase/serverless";
-import {
-  verifySessionToken,
-  createSessionToken,
-  type SessionPayload,
-  type UserRole,
-} from "@/lib/auth";
-
-/**
- * Sliding-session refresh threshold. When a request lands on a
- * protected route with a JWT older than this, the middleware mints a
- * fresh 7-day token + resets the cookie. Anyone who keeps using the
- * app stays logged in indefinitely; an inactive user still falls out
- * after a full 7-day window.
- */
-const SESSION_REFRESH_AFTER_SECONDS = 24 * 60 * 60;
-const SESSION_COOKIE_MAX_AGE_SECONDS = 60 * 60 * 24 * 7;
-
-/**
- * Decode the JWT `iat` (issued-at) claim without re-verifying the
- * signature — we already verified above, so we just need to read the
- * timestamp. Returns null if the token doesn't have a parseable
- * payload, in which case we skip the refresh.
- */
-function readIat(token: string): number | null {
-  const parts = token.split(".");
-  if (parts.length < 2) return null;
-  try {
-    const json = JSON.parse(atob(parts[1])) as { iat?: number };
-    return typeof json.iat === "number" ? json.iat : null;
-  } catch {
-    return null;
-  }
-}
-
-async function maybeRefreshSession(
-  rawToken: string,
-  session: SessionPayload,
-  response: NextResponse,
-): Promise<void> {
-  const iat = readIat(rawToken);
-  if (iat === null) return;
-  const ageSeconds = Math.floor(Date.now() / 1000) - iat;
-  if (ageSeconds < SESSION_REFRESH_AFTER_SECONDS) return;
-  const fresh = await createSessionToken({
-    userId: session.userId,
-    email: session.email,
-    roles: session.roles,
-  });
-  response.cookies.set("user-session", fresh, {
-    httpOnly: true,
-    secure: process.env.NODE_ENV === "production",
-    sameSite: "lax",
-    maxAge: SESSION_COOKIE_MAX_AGE_SECONDS,
-    path: "/",
-  });
-}
+import { verifySessionToken, type UserRole } from "@/lib/auth";
+import { maybeRefreshSession } from "@/lib/session-refresh";
 
 const ROLE_ROUTES: { prefix: string; roles: UserRole[] }[] = [
   { prefix: "/member", roles: ["member", "admin", "dev"] },
