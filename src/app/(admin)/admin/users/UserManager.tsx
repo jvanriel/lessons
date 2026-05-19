@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useActionState, useTransition, useRef, useEffect } from "react";
+import { createPortal } from "react-dom";
 import { useRouter } from "next/navigation";
 import {
   createUser,
@@ -342,19 +343,47 @@ function UserRowActions({
   onEdit: () => void;
 }) {
   const [menuOpen, setMenuOpen] = useState(false);
+  const [menuPos, setMenuPos] = useState<{ top: number; right: number } | null>(null);
   const [showInvite, setShowInvite] = useState(false);
   const [showReset, setShowReset] = useState(false);
   const [, startTransition] = useTransition();
   const ref = useRef<HTMLDivElement>(null);
+  const menuRef = useRef<HTMLDivElement>(null);
+  const buttonRef = useRef<HTMLButtonElement>(null);
 
   useEffect(() => {
     if (!menuOpen) return;
     function handleClick(e: MouseEvent) {
-      if (ref.current && !ref.current.contains(e.target as Node))
-        setMenuOpen(false);
+      const target = e.target as Node;
+      if (ref.current?.contains(target)) return;
+      if (menuRef.current?.contains(target)) return;
+      setMenuOpen(false);
     }
     document.addEventListener("mousedown", handleClick);
     return () => document.removeEventListener("mousedown", handleClick);
+  }, [menuOpen]);
+
+  // The menu is portalled to <body> so it escapes the table wrapper's
+  // overflow-hidden (which otherwise clips it and lets the row text bleed
+  // through the visible portion — task 153). Recompute the screen position
+  // from the kebab button each time the menu opens, and on scroll/resize.
+  useEffect(() => {
+    if (!menuOpen) return;
+    function place() {
+      const rect = buttonRef.current?.getBoundingClientRect();
+      if (!rect) return;
+      setMenuPos({
+        top: rect.bottom + 4,
+        right: window.innerWidth - rect.right,
+      });
+    }
+    place();
+    window.addEventListener("scroll", place, true);
+    window.addEventListener("resize", place);
+    return () => {
+      window.removeEventListener("scroll", place, true);
+      window.removeEventListener("resize", place);
+    };
   }, [menuOpen]);
 
   function handleResetPassword() {
@@ -423,6 +452,7 @@ function UserRowActions({
       {/* More menu */}
       <div className="relative">
         <button
+          ref={buttonRef}
           onClick={() => setMenuOpen(!menuOpen)}
           className="rounded p-1.5 text-green-500 transition-colors hover:bg-green-100 hover:text-green-700"
           title="More actions"
@@ -431,8 +461,12 @@ function UserRowActions({
             <path strokeLinecap="round" strokeLinejoin="round" d="M12 6.75a.75.75 0 1 1 0-1.5.75.75 0 0 1 0 1.5ZM12 12.75a.75.75 0 1 1 0-1.5.75.75 0 0 1 0 1.5ZM12 18.75a.75.75 0 1 1 0-1.5.75.75 0 0 1 0 1.5Z" />
           </svg>
         </button>
-        {menuOpen && (
-          <div className="absolute right-0 top-full z-20 mt-1 w-44 rounded-lg border border-green-200 bg-white py-1 shadow-lg">
+        {menuOpen && menuPos && typeof document !== "undefined" && createPortal(
+          <div
+            ref={menuRef}
+            style={{ top: menuPos.top, right: menuPos.right }}
+            className="fixed z-50 w-44 rounded-lg border border-green-200 bg-white py-1 shadow-lg"
+          >
             {user.roles?.includes("pro_pending") && (
               <button
                 onClick={() => {
@@ -503,7 +537,8 @@ function UserRowActions({
                 Delete user
               </button>
             )}
-          </div>
+          </div>,
+          document.body,
         )}
       </div>
     </div>
