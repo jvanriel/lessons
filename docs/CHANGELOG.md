@@ -17,6 +17,14 @@ If any role inside the brackets is unknown (typo), the parser falls
 back to treating the brackets as literal text — better to over-show
 than silently hide.
 
+## 2026-05-19 — v1.1.89
+
+- **Phone-field country resets to Belgium after you clear it.**
+  Previously the country flag stuck on whatever the last typed
+  number indicated, or fell back to a generic "International"
+  globe icon once cleared. The field now snaps back to the
+  Belgian default whenever the value goes empty.
+
 ## 2026-05-19 — v1.1.88
 
 - **Pros no longer appear twice on the member dashboard.** A
