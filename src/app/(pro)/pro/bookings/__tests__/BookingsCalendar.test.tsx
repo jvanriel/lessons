@@ -77,6 +77,8 @@ function bookingsOn(date: string) {
       locationName: "Test Golf Club",
       locationCity: null,
       proLocationId: 1,
+      priceCents: 6000,
+      currency: "eur",
     },
     {
       id: 2,
@@ -95,6 +97,8 @@ function bookingsOn(date: string) {
       locationName: "Test Golf Club",
       locationCity: null,
       proLocationId: 1,
+      priceCents: 6000,
+      currency: "eur",
     },
   ];
 }
@@ -113,6 +117,7 @@ describe.each(CASES)("BookingsCalendar [$name]", (c) => {
       <BookingsCalendar
         bookings={bookingsOn(c.thursdayDate)}
         availability={[]}
+        proLocations={[]}
         locale="nl"
         timezone={c.timezone}
       />
@@ -130,18 +135,18 @@ describe.each(CASES)("BookingsCalendar [$name]", (c) => {
     const thursday = children[4];
     const friday = children[5];
 
+    // Calendar blocks now render only the student name (the time
+    // range was removed when the block became name-only). Assert two
+    // "test1 tester" blocks land in the Thursday column and zero in
+    // Monday/Friday.
     expect(
-      within(thursday as HTMLElement).queryAllByText("14:00 - 15:00").length,
-    ).toBe(1);
+      within(thursday as HTMLElement).queryAllByText("test1 tester").length,
+    ).toBe(2);
     expect(
-      within(thursday as HTMLElement).queryAllByText("15:00 - 16:00").length,
-    ).toBe(1);
-
-    expect(
-      within(friday as HTMLElement).queryAllByText(/14:00|15:00/).length,
+      within(friday as HTMLElement).queryAllByText("test1 tester").length,
     ).toBe(0);
     expect(
-      within(monday as HTMLElement).queryAllByText(/14:00|15:00/).length,
+      within(monday as HTMLElement).queryAllByText("test1 tester").length,
     ).toBe(0);
   });
 });
@@ -191,6 +196,7 @@ describe("BookingsCalendar — schedule-period validity", () => {
             validUntil: slot.validUntil,
           },
         ]}
+        proLocations={[]}
         locale="nl"
         timezone={TZ}
       />,
@@ -351,9 +357,12 @@ describe("BookingsCalendar — grid widens for late-evening bookings", () => {
             locationName: "Test",
             locationCity: null,
             proLocationId: 1,
+            priceCents: 6000,
+            currency: "eur",
           },
         ]}
         availability={[]}
+        proLocations={[]}
         locale="nl"
         timezone="Europe/Brussels"
       />,
@@ -362,7 +371,7 @@ describe("BookingsCalendar — grid widens for late-evening bookings", () => {
     // Pre-fix the time gutter only listed 07..20. With the dynamic
     // range, 22:00 should now appear as a hour label.
     expect(container.textContent).toContain("22:00");
-    // And the booking's "22:00 - 23:00" block should be present.
-    expect(container.textContent).toContain("22:00 - 23:00");
+    // And the booking's name-only block should be present.
+    expect(container.textContent).toContain("late owl");
   });
 });

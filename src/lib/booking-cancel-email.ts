@@ -19,6 +19,7 @@ export const CANCEL_STRINGS: Record<
     date: string;
     time: string;
     location: string;
+    reason: string;
     helper: string;
   }
 > = {
@@ -38,6 +39,7 @@ export const CANCEL_STRINGS: Record<
     date: "Date",
     time: "Time",
     location: "Location",
+    reason: "Reason",
     helper:
       "An updated calendar invite is attached so the event is removed from your calendar.",
   },
@@ -59,6 +61,7 @@ export const CANCEL_STRINGS: Record<
     date: "Datum",
     time: "Tijd",
     location: "Locatie",
+    reason: "Reden",
     helper:
       "Een bijgewerkte agenda-uitnodiging zit in bijlage zodat het evenement uit je agenda verdwijnt.",
   },
@@ -80,10 +83,26 @@ export const CANCEL_STRINGS: Record<
     date: "Date",
     time: "Heure",
     location: "Lieu",
+    reason: "Raison",
     helper:
       "Une invitation calendrier mise à jour est jointe pour retirer l'événement de votre agenda.",
   },
 };
+
+/**
+ * True when the caller-supplied cancellation reason is something
+ * the pro actually typed (so the student should see it on the
+ * cancellation email), as opposed to one of the legacy hard-coded
+ * defaults from before task 154. Surfacing "Reason: Cancelled by
+ * pro" would be both redundant and confusing.
+ */
+export function isUserCancellationReason(reason: string | undefined): boolean {
+  const trimmed = reason?.trim();
+  if (!trimmed) return false;
+  if (trimmed === "Cancelled by pro") return false;
+  if (trimmed === "Cancelled — pro blocked this time slot") return false;
+  return true;
+}
 
 export function formatCancelLessonDate(date: string, locale: Locale): string {
   const dateLocale =

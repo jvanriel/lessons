@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { neon } from "@neondatabase/serverless";
 import { verifySessionToken, type UserRole } from "@/lib/auth";
+import { maybeRefreshSession } from "@/lib/session-refresh";
 
 const ROLE_ROUTES: { prefix: string; roles: UserRole[] }[] = [
   { prefix: "/member", roles: ["member", "admin", "dev"] },
@@ -64,25 +65,16 @@ export async function middleware(request: NextRequest) {
     pathname === "/pro/onboarding" ||
     pathname.startsWith("/pro/onboarding/");
 
-  // ─── Closed-beta block on pro signup (production only) ─
-  // During the closed beta we only onboard hand-picked pros. Send
-  // unauthenticated signup attempts to the /for-pros waitlist dialog
-  // instead. Authenticated users (e.g. a pro resuming their own
-  // onboarding) still pass through.
-  if (
-    process.env.VERCEL_ENV === "production" &&
-    isProSignupRoute &&
-    !request.cookies.get("user-session")?.value
-  ) {
-    const target = new URL("/for-pros", request.url);
-    target.searchParams.set("waitlist", "1");
-    return NextResponse.redirect(target);
-  }
-
   // ─── Public bypass: pro self-service signup is under /pro/ but
   //     unauthenticated. /pro/register redirects into /pro/onboarding
-  //     which is the new single-flow wizard (step 0 = signup); both
-  //     need to be reachable without a session.
+  //     which is the single-flow wizard (step 0 = signup); both need
+  //     to be reachable without a session.
+  //
+  //     The closed-beta production gate that previously redirected
+  //     unauthenticated signup attempts to /for-pros?waitlist=1 was
+  //     removed on 2026-05-19 once the onboarding flow had been
+  //     exercised end-to-end. See isProSignupOpen() for the matching
+  //     feature-flag flip.
   if (isProSignupRoute) {
     return NextResponse.next();
   }
@@ -123,7 +115,15 @@ export async function middleware(request: NextRequest) {
       }
     }
 
-    return NextResponse.next();
+    // Sliding session — keep an active user logged in by minting a
+    // fresh 7-day token + resetting the cookie whenever the existing
+    // JWT is more than a day old. We do this only on protected-route
+    // visits (we already verified the session here anyway), so public
+    // browsing doesn't trigger needless cookie writes. (task added
+    // 2026-05-19 — Jan's ask)
+    const response = NextResponse.next();
+    await maybeRefreshSession(sessionToken!, session, response);
+    return response;
   }
 
   return NextResponse.next();

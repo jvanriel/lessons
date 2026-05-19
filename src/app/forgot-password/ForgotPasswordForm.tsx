@@ -4,6 +4,7 @@ import { useActionState } from "react";
 import { requestPasswordReset } from "./actions";
 import Link from "next/link";
 import type { Locale } from "@/lib/i18n";
+import LanguageSwitcher from "@/components/LanguageSwitcher";
 
 const strings: Record<string, Record<string, string>> = {
   en: {
@@ -40,7 +41,10 @@ export default function ForgotPasswordForm({ locale }: { locale: Locale }) {
   const [state, action, pending] = useActionState(requestPasswordReset, null);
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-green-950 px-6">
+    <div className="relative flex min-h-screen items-center justify-center bg-green-950 px-6">
+      <div className="absolute right-6 top-6">
+        <LanguageSwitcher locale={locale} />
+      </div>
       <div className="w-full max-w-sm">
         <h1 className="font-display text-2xl font-bold text-gold-200">
           {s.title}

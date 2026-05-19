@@ -3,11 +3,11 @@
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { BookingsCalendar } from "./BookingsCalendar";
+import BookingCard from "./BookingCard";
 import { formatDate as formatDateHelper } from "@/lib/format-date";
 import { todayInTZ } from "@/lib/local-date";
 import type { Locale } from "@/lib/i18n";
 import { t } from "@/lib/i18n/translations";
-import { getPaymentBadge } from "@/lib/payment-status";
 import { proCancelBooking } from "../students/actions";
 import { CancelBookingDialog } from "../_components/CancelBookingDialog";
 
@@ -28,6 +28,9 @@ interface Booking {
   locationName: string;
   locationCity: string | null;
   proLocationId: number;
+  /** Lesson price in cents at booking time (task 135). */
+  priceCents: number | null;
+  currency: string;
 }
 
 interface AvailabilitySlot {
@@ -112,88 +115,15 @@ function BookingsList({
           <h3 className="mb-2 text-sm font-semibold text-green-800">
             {formatDate(date)}
           </h3>
-          <div className="space-y-1.5">
+          <div className="space-y-3">
             {dateBookings.map((b) => (
-              <div
+              <BookingCard
                 key={b.id}
-                className="flex items-center justify-between rounded-lg border border-green-100 bg-white px-4 py-3"
-              >
-                <div className="flex items-center gap-4">
-                  <div className="text-sm font-medium text-green-900">
-                    {b.startTime} - {b.endTime}
-                  </div>
-                  <div>
-                    <p className="text-sm text-green-800">
-                      {b.studentFirstName} {b.studentLastName}
-                      {(() => {
-                        const pb = getPaymentBadge(b.paymentStatus);
-                        if (!pb) return null;
-                        const label = t(pb.labelKey, locale);
-                        return (
-                          <span
-                            className={`ml-2 inline-flex items-center rounded-full ${pb.bg} px-2 py-0.5 text-[10px] font-medium ${pb.fg}`}
-                            title={label}
-                          >
-                            {label}
-                          </span>
-                        );
-                      })()}
-                      {!b.studentEmailVerified && (
-                        <span className="ml-2 inline-flex items-center rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-medium text-amber-700" title={t("proBookingsView.emailUnverified", locale)}>
-                          {t("proBookingsView.emailUnverified", locale)}
-                        </span>
-                      )}
-                    </p>
-                    {/* Clickable email + phone — same pattern as the
-                        calendar's expanded detail panel (commit 7876e0d). */}
-                    <p className="mt-0.5 flex flex-wrap items-center gap-x-3 gap-y-0.5 text-xs">
-                      <a
-                        href={`mailto:${b.studentEmail}`}
-                        className="text-green-600 underline-offset-2 hover:underline"
-                      >
-                        {b.studentEmail}
-                      </a>
-                      {b.studentPhone && (
-                        <a
-                          href={`tel:${b.studentPhone.replace(/\s+/g, "")}`}
-                          className="text-green-600 underline-offset-2 hover:underline"
-                        >
-                          {b.studentPhone}
-                        </a>
-                      )}
-                    </p>
-                    <p className="text-xs text-green-500">
-                      {b.locationName}
-                      {b.locationCity ? `, ${b.locationCity}` : ""}
-                    </p>
-                  </div>
-                </div>
-                <div className="flex items-center gap-3">
-                  <div className="text-right">
-                    {b.participantCount > 1 && (
-                      <span className="text-xs text-green-500">
-                        {t("proBookingsView.participants", locale).replace(
-                          "{n}",
-                          String(b.participantCount)
-                        )}
-                      </span>
-                    )}
-                    {b.notes && (
-                      <p className="max-w-[200px] truncate text-xs text-green-400">
-                        {b.notes}
-                      </p>
-                    )}
-                  </div>
-                  <button
-                    type="button"
-                    onClick={() => setCancelTarget(b)}
-                    disabled={pending}
-                    className="text-[11px] font-medium text-red-400 hover:text-red-600 disabled:opacity-50"
-                  >
-                    {t("proStudentBookings.cancel", locale)}
-                  </button>
-                </div>
-              </div>
+                booking={b}
+                locale={locale}
+                cancelPending={pending}
+                onCancel={() => setCancelTarget(b)}
+              />
             ))}
           </div>
         </div>
@@ -218,20 +148,27 @@ function BookingsList({
 export function BookingsView({
   bookings,
   availability,
+  proLocations,
   locale,
   timezone,
 }: {
   bookings: Booking[];
   availability: AvailabilitySlot[];
+  /** Pro's locations sorted by sortOrder — same ordering the
+   *  availability editor uses, so colour assignments match. */
+  proLocations: { id: number }[];
   locale: Locale;
   timezone: string;
 }) {
+  // Default to "list" — pros open this page to scan the upcoming
+  // bookings; the calendar view is a secondary lens. Persisted choice
+  // wins when present.
   const [view, setView] = useState<"calendar" | "list">(() => {
     if (typeof window !== "undefined") {
       const stored = localStorage.getItem("bookings-view");
-      if (stored === "list") return "list";
+      if (stored === "calendar") return "calendar";
     }
-    return "calendar";
+    return "list";
   });
 
   function switchView(v: "calendar" | "list") {
@@ -241,22 +178,9 @@ export function BookingsView({
 
   return (
     <div>
-      {/* View toggle */}
+      {/* View toggle — list is the default + first tab so it reads as
+          the primary surface. Calendar is the alternate lens. */}
       <div className="mb-4 flex items-center gap-1 rounded-lg border border-green-200 bg-white p-0.5 w-fit">
-        <button
-          type="button"
-          onClick={() => switchView("calendar")}
-          className={`flex items-center gap-1.5 rounded-md px-3 py-1.5 text-xs font-medium transition-colors ${
-            view === "calendar"
-              ? "bg-green-700 text-white"
-              : "text-green-600 hover:text-green-800"
-          }`}
-        >
-          <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
-            <path strokeLinecap="round" strokeLinejoin="round" d="M6.75 3v2.25M17.25 3v2.25M3 18.75V7.5a2.25 2.25 0 0 1 2.25-2.25h13.5A2.25 2.25 0 0 1 21 7.5v11.25m-18 0A2.25 2.25 0 0 0 5.25 21h13.5A2.25 2.25 0 0 0 21 18.75m-18 0v-7.5A2.25 2.25 0 0 1 5.25 9h13.5A2.25 2.25 0 0 1 21 11.25v7.5" />
-          </svg>
-          {t("proBookingsView.calendar", locale)}
-        </button>
         <button
           type="button"
           onClick={() => switchView("list")}
@@ -271,10 +195,30 @@ export function BookingsView({
           </svg>
           {t("proBookingsView.list", locale)}
         </button>
+        <button
+          type="button"
+          onClick={() => switchView("calendar")}
+          className={`flex items-center gap-1.5 rounded-md px-3 py-1.5 text-xs font-medium transition-colors ${
+            view === "calendar"
+              ? "bg-green-700 text-white"
+              : "text-green-600 hover:text-green-800"
+          }`}
+        >
+          <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+            <path strokeLinecap="round" strokeLinejoin="round" d="M6.75 3v2.25M17.25 3v2.25M3 18.75V7.5a2.25 2.25 0 0 1 2.25-2.25h13.5A2.25 2.25 0 0 1 21 7.5v11.25m-18 0A2.25 2.25 0 0 0 5.25 21h13.5A2.25 2.25 0 0 0 21 18.75m-18 0v-7.5A2.25 2.25 0 0 1 5.25 9h13.5A2.25 2.25 0 0 1 21 11.25v7.5" />
+          </svg>
+          {t("proBookingsView.calendar", locale)}
+        </button>
       </div>
 
       {view === "calendar" ? (
-        <BookingsCalendar bookings={bookings} availability={availability} locale={locale} timezone={timezone} />
+        <BookingsCalendar
+          bookings={bookings}
+          availability={availability}
+          proLocations={proLocations}
+          locale={locale}
+          timezone={timezone}
+        />
       ) : (
         <BookingsList bookings={bookings} locale={locale} timezone={timezone} />
       )}

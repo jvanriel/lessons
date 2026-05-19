@@ -7,6 +7,7 @@
 
 import { DEFAULT_LOCALE, type Locale } from "@/lib/i18n";
 import { formatDate } from "@/lib/format-date";
+import { formatPrice } from "@/lib/pricing";
 
 function getBaseUrl(): string {
   if (process.env.NEXT_PUBLIC_APP_URL) return process.env.NEXT_PUBLIC_APP_URL;
@@ -43,6 +44,11 @@ const EMAIL_STRINGS: Record<
     invitePassword: string;
     inviteChangePassword: string;
     inviteCopySubject: string;
+    /** Body when the email carries a set-password link instead of a
+     *  pre-generated password (task 138). */
+    inviteSetPasswordBody: string;
+    inviteSetPasswordButton: string;
+    inviteSetPasswordExpiry: string;
     resetSubject: string;
     resetBody: string;
     resetChangePassword: string;
@@ -62,6 +68,9 @@ const EMAIL_STRINGS: Record<
     invitePassword: "Password",
     inviteChangePassword: "Please change your password after first login via Profile → Change Password.",
     inviteCopySubject: "Copy: Invitation sent to",
+    inviteSetPasswordBody: "You've been invited to join Golf Lessons. Click the button below to set your own password and log in:",
+    inviteSetPasswordButton: "Set password & log in",
+    inviteSetPasswordExpiry: "This link expires in 7 days. After that, use the \"Forgot password\" flow on the login page.",
     resetSubject: "Your password has been reset",
     resetBody: "Your password for Golf Lessons has been reset by an administrator. Here are your new credentials:",
     resetChangePassword: "Please log in and change your password via Profile → Change Password.",
@@ -80,6 +89,9 @@ const EMAIL_STRINGS: Record<
     invitePassword: "Wachtwoord",
     inviteChangePassword: "Wijzig je wachtwoord na de eerste login via Profiel → Wachtwoord wijzigen.",
     inviteCopySubject: "Kopie: Uitnodiging verstuurd naar",
+    inviteSetPasswordBody: "Je bent uitgenodigd voor Golf Lessons. Klik op de knop hieronder om zelf een wachtwoord te kiezen en in te loggen:",
+    inviteSetPasswordButton: "Wachtwoord instellen & inloggen",
+    inviteSetPasswordExpiry: "Deze link is 7 dagen geldig. Daarna gebruik je de \"Wachtwoord vergeten\"-flow op de inlogpagina.",
     resetSubject: "Je wachtwoord is gewijzigd",
     resetBody: "Je wachtwoord voor Golf Lessons is gewijzigd door een beheerder. Hier zijn je nieuwe inloggegevens:",
     resetChangePassword: "Log in en wijzig je wachtwoord via Profiel → Wachtwoord wijzigen.",
@@ -98,6 +110,9 @@ const EMAIL_STRINGS: Record<
     invitePassword: "Mot de passe",
     inviteChangePassword: "Veuillez changer votre mot de passe après la première connexion via Profil → Changer le mot de passe.",
     inviteCopySubject: "Copie : Invitation envoyée à",
+    inviteSetPasswordBody: "Vous êtes invité à rejoindre Golf Lessons. Cliquez sur le bouton ci-dessous pour choisir votre mot de passe et vous connecter :",
+    inviteSetPasswordButton: "Définir le mot de passe & se connecter",
+    inviteSetPasswordExpiry: "Ce lien expire dans 7 jours. Ensuite, utilisez le flux \"Mot de passe oublié\" sur la page de connexion.",
     resetSubject: "Votre mot de passe a été réinitialisé",
     resetBody: "Votre mot de passe pour Golf Lessons a été réinitialisé par un administrateur. Voici vos nouveaux identifiants :",
     resetChangePassword: "Connectez-vous et changez votre mot de passe via Profil → Changer le mot de passe.",
@@ -247,12 +262,17 @@ export function emailLayout(
 export function buildInviteEmail(opts: {
   firstName: string;
   loginEmail: string;
-  password: string;
+  /**
+   * Short-lived JWT reset-password URL. The user clicks it, sets their
+   * own password, and is logged in (task 138 — replaces the prior flow
+   * where the pro typed/saw the password on screen and emailed it as
+   * plaintext). The pro never learns the password.
+   */
+  setPasswordUrl: string;
   comment?: string;
   locale: Locale;
 }): string {
   const s = EMAIL_STRINGS[opts.locale] ?? EMAIL_STRINGS.en;
-  const loginUrl = `${getBaseUrl()}/login?email=${encodeURIComponent(opts.loginEmail)}`;
 
   const commentBlock = opts.comment
     ? `<div style="background:${COLORS.cream};border-left:3px solid ${COLORS.gold500};padding:12px 16px;margin:20px 0;border-radius:0 8px 8px 0;">
@@ -264,27 +284,23 @@ export function buildInviteEmail(opts: {
     <h2 style="font-family:Georgia,'Times New Roman',serif;font-size:22px;color:${COLORS.green950};margin:0 0 16px 0;font-weight:normal;">
       ${formatGreeting(s.inviteGreeting, opts.firstName, opts.locale)}
     </h2>
-    <p style="margin:0 0 20px 0;">${s.inviteBody}</p>
+    <p style="margin:0 0 20px 0;">${s.inviteSetPasswordBody}</p>
+    ${commentBlock}
     <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:${COLORS.green100};border:1px solid #b4d6c1;border-radius:8px;margin:0 0 20px 0;">
       <tr>
         <td style="padding:16px 20px;">
-          <p style="margin:0 0 8px 0;font-size:14px;">
-            <strong>${s.inviteLogin}:</strong> ${opts.loginEmail}
-          </p>
           <p style="margin:0;font-size:14px;">
-            <strong>${s.invitePassword}:</strong>
-            <code style="background:${COLORS.white};padding:2px 8px;border-radius:4px;font-family:monospace;font-size:14px;">${opts.password}</code>
+            <strong>${s.inviteLogin}:</strong> ${opts.loginEmail}
           </p>
         </td>
       </tr>
     </table>
-    <p style="margin:0 0 24px 0;">
-      <a href="${loginUrl}" style="display:inline-block;background:${COLORS.gold600};color:${COLORS.white};padding:12px 28px;border-radius:6px;text-decoration:none;font-weight:700;font-size:14px;">
-        ${s.loginButton}
+    <p style="margin:0 0 12px 0;">
+      <a href="${opts.setPasswordUrl}" style="display:inline-block;background:${COLORS.gold600};color:${COLORS.white};padding:12px 28px;border-radius:6px;text-decoration:none;font-weight:700;font-size:14px;">
+        ${s.inviteSetPasswordButton}
       </a>
     </p>
-    <p style="color:#666;font-size:13px;margin:0 0 8px 0;">${s.inviteChangePassword}</p>
-    ${commentBlock}
+    <p style="color:#666;font-size:13px;margin:0;">${s.inviteSetPasswordExpiry}</p>
   `;
 
   return emailLayout(body, undefined, opts.locale);
@@ -716,6 +732,80 @@ export function getPaymentFailedSubject(locale: Locale): string {
   return (PAYMENT_FAILED_STRINGS[locale] ?? PAYMENT_FAILED_STRINGS.en).subject;
 }
 
+// ─── Subscription ended / "come back" email ────────────────────────
+//
+// Fired from the Stripe webhook on `customer.subscription.deleted`
+// (task 127). Warm, low-pressure tone — Jan's call was "just unpublish
+// and invite the pro to subscribe, creates some goodwill". Existing
+// confirmed bookings stay intact; we mention that explicitly so the
+// pro knows they can still log in to honor those lessons.
+
+const SUBSCRIPTION_ENDED_STRINGS: Record<
+  Locale,
+  {
+    subject: string;
+    greeting: string;
+    body: string;
+    bookings: string;
+    cta: string;
+    help: string;
+  }
+> = {
+  en: {
+    subject: "Your Golf Lessons subscription has ended",
+    greeting: "Hi",
+    body: "Your Golf Lessons subscription has ended and your pro profile is no longer visible to new students. We hope you'll come back when the time is right — your account stays as it is, no data is removed.",
+    bookings: "Any lessons your students have already booked are still confirmed. You can log in any time to message them or honor those sessions.",
+    cta: "Re-activate my subscription",
+    help: "Questions or thoughts? Just reply to this email — we'd love to hear from you.",
+  },
+  nl: {
+    subject: "Je Golf Lessons abonnement is gestopt",
+    greeting: "Hallo",
+    body: "Je Golf Lessons abonnement is gestopt en je pro-profiel is niet meer zichtbaar voor nieuwe golfers. We hopen dat je terugkomt wanneer het je past — je account blijft staan zoals het is, er wordt niks verwijderd.",
+    bookings: "Lessen die je golfers al geboekt hebben blijven bevestigd. Je kunt altijd inloggen om met hen te chatten of die lessen alsnog te geven.",
+    cta: "Mijn abonnement heractiveren",
+    help: "Vragen of opmerkingen? Antwoord gewoon op deze e-mail — we horen graag van je.",
+  },
+  fr: {
+    subject: "Votre abonnement Golf Lessons a pris fin",
+    greeting: "Bonjour",
+    body: "Votre abonnement Golf Lessons a pris fin et votre profil pro n'est plus visible pour les nouveaux golfeurs. Nous espérons que vous reviendrez quand le moment sera venu — votre compte reste tel quel, rien n'est supprimé.",
+    bookings: "Les cours que vos golfeurs ont déjà réservés restent confirmés. Vous pouvez vous connecter à tout moment pour échanger avec eux ou assurer ces séances.",
+    cta: "Réactiver mon abonnement",
+    help: "Questions ou remarques ? Répondez simplement à cet e-mail — nous serions ravis de vous lire.",
+  },
+};
+
+export function buildSubscriptionEndedEmail(opts: {
+  firstName: string;
+  locale: Locale;
+  subscribeUrl: string;
+}): string {
+  const s =
+    SUBSCRIPTION_ENDED_STRINGS[opts.locale] ?? SUBSCRIPTION_ENDED_STRINGS.en;
+  const body = `
+    <h2 style="font-family:Georgia,'Times New Roman',serif;font-size:22px;color:${COLORS.green950};margin:0 0 16px 0;font-weight:normal;">
+      ${formatGreeting(s.greeting, opts.firstName, opts.locale)}
+    </h2>
+    <p style="margin:0 0 16px 0;">${s.body}</p>
+    <p style="margin:0 0 24px 0;color:#555;font-size:14px;">${s.bookings}</p>
+    <p style="margin:0 0 24px 0;">
+      <a href="${opts.subscribeUrl}" style="display:inline-block;background:${COLORS.gold600};color:${COLORS.white};padding:12px 28px;border-radius:6px;text-decoration:none;font-weight:700;font-size:14px;">
+        ${s.cta}
+      </a>
+    </p>
+    <p style="color:#666;font-size:13px;margin:0;">${s.help}</p>
+  `;
+  return emailLayout(body, undefined, opts.locale);
+}
+
+export function getSubscriptionEndedSubject(locale: Locale): string {
+  return (
+    SUBSCRIPTION_ENDED_STRINGS[locale] ?? SUBSCRIPTION_ENDED_STRINGS.en
+  ).subject;
+}
+
 // ─── Booking confirmation emails ───────────────────────────────────
 
 const BOOKING_STUDENT_STRINGS: Record<Locale, {
@@ -731,6 +821,7 @@ const BOOKING_STUDENT_STRINGS: Record<Locale, {
   time: string;
   duration: string;
   durationUnit: string;
+  participants: string;
   amount: string;
   amountOnSite: string;
   cta: string;
@@ -749,6 +840,7 @@ const BOOKING_STUDENT_STRINGS: Record<Locale, {
     time: "Time",
     duration: "Duration",
     durationUnit: "minutes",
+    participants: "Participants",
     amount: "Amount charged",
     amountOnSite: "Payable on site",
     cta: "View my bookings",
@@ -767,6 +859,7 @@ const BOOKING_STUDENT_STRINGS: Record<Locale, {
     time: "Tijd",
     duration: "Duur",
     durationUnit: "minuten",
+    participants: "Deelnemers",
     amount: "Bedrag",
     amountOnSite: "Te betalen ter plaatse",
     cta: "Mijn boekingen bekijken",
@@ -785,6 +878,7 @@ const BOOKING_STUDENT_STRINGS: Record<Locale, {
     time: "Heure",
     duration: "Durée",
     durationUnit: "minutes",
+    participants: "Participants",
     amount: "Montant facturé",
     amountOnSite: "À payer sur place",
     cta: "Voir mes réservations",
@@ -832,16 +926,44 @@ function detailsTable(rows: Array<DetailRow>): string {
   `;
 }
 
+/**
+ * "🚗 Waze | 📍 Google Maps" deep-link buttons rendered as a row
+ * below the booking details. Both args are nullable — the helper
+ * returns the empty string when neither URL is available, so the
+ * caller can drop the entire block by interpolating the result
+ * directly. Brand names ("Waze", "Google Maps") deliberately
+ * un-localised. Per task 116.
+ */
+function navigationButtonsHtml(
+  waze: string | null | undefined,
+  gmaps: string | null | undefined,
+): string {
+  if (!waze && !gmaps) return "";
+  const wazeBtn = waze
+    ? `<a href="${waze}" style="display:inline-block;background:#2563eb;color:#fff;padding:10px 16px;border-radius:6px;text-decoration:none;font-weight:600;font-size:13px;margin:0 8px 8px 0;">🚗 Waze</a>`
+    : "";
+  const gmapsBtn = gmaps
+    ? `<a href="${gmaps}" style="display:inline-block;background:#15803d;color:#fff;padding:10px 16px;border-radius:6px;text-decoration:none;font-weight:600;font-size:13px;margin:0 0 8px 0;">📍 Google Maps</a>`
+    : "";
+  return `<p style="margin:0 0 24px 0;">${wazeBtn}${gmapsBtn}</p>`;
+}
+
 export function buildStudentBookingConfirmationEmail(opts: {
   firstName: string;
   proName: string;
   proEmail?: string | null;
   proPhone?: string | null;
   locationName: string;
+  /** Optional Waze deep link (built by location-display.ts on the caller side). */
+  wazeUrl?: string | null;
+  /** Optional Google Maps deep link. */
+  googleMapsUrl?: string | null;
   date: string;
   startTime: string;
   endTime: string;
   duration: number;
+  /** Number of golfers in the lesson; surfaces when > 1 (task 136). */
+  participantCount?: number;
   priceCents?: number | null;
   /** If true, the pro is cash-only — show "payable on site" instead of "amount charged". */
   cashOnly?: boolean;
@@ -863,6 +985,9 @@ export function buildStudentBookingConfirmationEmail(opts: {
     [s.time, `${opts.startTime} – ${opts.endTime}`],
     [s.duration, `${opts.duration} ${s.durationUnit}`],
   );
+  if (typeof opts.participantCount === "number" && opts.participantCount > 1) {
+    rows.push([s.participants, String(opts.participantCount)]);
+  }
   if (typeof opts.priceCents === "number" && opts.priceCents > 0) {
     const amount = new Intl.NumberFormat(
       opts.locale === "en" ? "en-GB" : opts.locale === "nl" ? "nl-BE" : "fr-BE",
@@ -876,6 +1001,7 @@ export function buildStudentBookingConfirmationEmail(opts: {
     </h2>
     <p style="margin:0 0 20px 0;">${s.body}</p>
     ${detailsTable(rows)}
+    ${navigationButtonsHtml(opts.wazeUrl, opts.googleMapsUrl)}
     <p style="margin:0 0 24px 0;">
       <a href="${getBaseUrl()}/member/bookings" style="display:inline-block;background:${COLORS.gold600};color:${COLORS.white};padding:12px 28px;border-radius:6px;text-decoration:none;font-weight:700;font-size:14px;">
         ${s.cta}
@@ -917,6 +1043,13 @@ const PARTICIPANT_BOOKING_STRINGS: Record<Locale, {
   helper: (bookerName: string) => string;
   cancelSubject: (proName: string, bookerName: string) => string;
   cancelBody: (bookerName: string, proName: string) => string;
+  /**
+   * "You were removed from the lesson" — the lesson itself is still
+   * happening with the remaining participants, so the wording must
+   * not imply cancellation.
+   */
+  removedSubject: (proName: string, bookerName: string) => string;
+  removedBody: (bookerName: string, proName: string) => string;
 }> = {
   en: {
     subject: (pro, booker) => `You're joining a golf lesson with ${pro} (booked by ${booker})`,
@@ -936,6 +1069,10 @@ const PARTICIPANT_BOOKING_STRINGS: Record<Locale, {
     cancelSubject: (pro, booker) => `Cancelled: golf lesson with ${pro} (booked by ${booker})`,
     cancelBody: (booker, pro) =>
       `${booker} cancelled the golf lesson with ${pro} you were joining. The calendar invite is being removed.`,
+    removedSubject: (pro, booker) =>
+      `Removed: golf lesson with ${pro} (booked by ${booker})`,
+    removedBody: (booker, pro) =>
+      `${booker} removed you from the golf lesson with ${pro}. The calendar invite has been removed.`,
   },
   nl: {
     subject: (pro, booker) => `Je doet mee aan een golfles bij ${pro} (geboekt door ${booker})`,
@@ -955,6 +1092,10 @@ const PARTICIPANT_BOOKING_STRINGS: Record<Locale, {
     cancelSubject: (pro, booker) => `Geannuleerd: golfles bij ${pro} (geboekt door ${booker})`,
     cancelBody: (booker, pro) =>
       `${booker} heeft de golfles bij ${pro} waaraan je zou meedoen geannuleerd. De kalenderafspraak wordt verwijderd.`,
+    removedSubject: (pro, booker) =>
+      `Verwijderd: golfles bij ${pro} (geboekt door ${booker})`,
+    removedBody: (booker, pro) =>
+      `${booker} heeft jou verwijderd uit de golfles bij ${pro}. De kalenderafspraak is verwijderd.`,
   },
   fr: {
     subject: (pro, booker) => `Vous participez à un cours de golf avec ${pro} (réservé par ${booker})`,
@@ -974,6 +1115,10 @@ const PARTICIPANT_BOOKING_STRINGS: Record<Locale, {
     cancelSubject: (pro, booker) => `Annulé : cours de golf avec ${pro} (réservé par ${booker})`,
     cancelBody: (booker, pro) =>
       `${booker} a annulé le cours de golf avec ${pro} auquel vous deviez participer. L'invitation au calendrier est en cours de suppression.`,
+    removedSubject: (pro, booker) =>
+      `Retiré : cours de golf avec ${pro} (réservé par ${booker})`,
+    removedBody: (booker, pro) =>
+      `${booker} vous a retiré du cours de golf avec ${pro}. L'invitation au calendrier a été supprimée.`,
   },
 };
 
@@ -984,6 +1129,8 @@ export function buildParticipantBookingNotificationEmail(opts: {
   proEmail?: string | null;
   proPhone?: string | null;
   locationName: string;
+  wazeUrl?: string | null;
+  googleMapsUrl?: string | null;
   date: string;
   startTime: string;
   endTime: string;
@@ -1006,6 +1153,7 @@ export function buildParticipantBookingNotificationEmail(opts: {
     </h2>
     <p style="margin:0 0 20px 0;">${s.body(opts.bookerName, opts.proName)}</p>
     ${detailsTable(rows)}
+    ${navigationButtonsHtml(opts.wazeUrl, opts.googleMapsUrl)}
     <p style="color:#666;font-size:13px;margin:0;">${s.helper(opts.bookerName)}</p>
   `;
   return emailLayout(body, undefined, opts.locale);
@@ -1060,6 +1208,51 @@ export function getParticipantBookingCancelledSubject(
   );
 }
 
+/**
+ * Sent to a participant who was REMOVED from a still-active booking
+ * during an edit (booker dropped them from the participant list, but
+ * the lesson itself is still happening for the others). Distinct from
+ * the cancel template above so the wording doesn't imply the lesson
+ * was cancelled.
+ */
+export function buildParticipantBookingRemovedEmail(opts: {
+  participantFirstName: string;
+  bookerName: string;
+  proName: string;
+  locationName: string;
+  date: string;
+  startTime: string;
+  endTime: string;
+  locale: Locale;
+}): string {
+  const s = PARTICIPANT_BOOKING_STRINGS[opts.locale] ?? PARTICIPANT_BOOKING_STRINGS.en;
+  const rows: Array<DetailRow> = [
+    [s.pro, opts.proName],
+    [s.location, opts.locationName],
+    [s.date, formatLessonDate(opts.date, opts.locale)],
+    [s.time, `${opts.startTime} – ${opts.endTime}`],
+  ];
+  const body = `
+    <h2 style="font-family:Georgia,'Times New Roman',serif;font-size:22px;color:${COLORS.green950};margin:0 0 16px 0;font-weight:normal;">
+      ${formatGreeting(s.greeting, opts.participantFirstName, opts.locale)}
+    </h2>
+    <p style="margin:0 0 20px 0;">${s.removedBody(opts.bookerName, opts.proName)}</p>
+    ${detailsTable(rows)}
+  `;
+  return emailLayout(body, undefined, opts.locale);
+}
+
+export function getParticipantBookingRemovedSubject(
+  proName: string,
+  bookerName: string,
+  locale: Locale,
+): string {
+  return (PARTICIPANT_BOOKING_STRINGS[locale] ?? PARTICIPANT_BOOKING_STRINGS.en).removedSubject(
+    proName,
+    bookerName,
+  );
+}
+
 // ─── Booking-updated emails ─────────────────────────────
 //
 // Sent after `updateBooking` / `proUpdateBooking` succeeds. Mirrors
@@ -1080,12 +1273,20 @@ const BOOKING_UPDATED_STRINGS: Record<Locale, {
   duration: string;
   durationUnit: string;
   participants: string;
+  price: string;
+  /** "(was X)" prefix used to surface the pre-edit value next to the
+   *  new one on rows that actually changed. */
+  was: (oldValue: string) => string;
   cta: string;
   helperNoChange: string;
   helperCharged: (amount: string) => string;
   helperRefunded: (amount: string) => string;
   helperManualReview: string;
   helperCommissionChanged: (amount: string) => string;
+  /** Pro-side line when the booker's payment was settled automatically
+   *  (Stripe charge/refund). Tells the pro the price was adjusted
+   *  without exposing student card details. */
+  helperProAutoSettled: string;
   // Participant-side variants (booker re-invited an extra participant
   // when the lesson was rescheduled).
   participantSubject: (proName: string, bookerName: string) => string;
@@ -1105,6 +1306,8 @@ const BOOKING_UPDATED_STRINGS: Record<Locale, {
     duration: "Duration",
     durationUnit: "minutes",
     participants: "Participants",
+    price: "Price",
+    was: (old) => `(was ${old})`,
     cta: "View my bookings",
     helperNoChange:
       "No payment change — the price is the same as the original booking.",
@@ -1116,6 +1319,8 @@ const BOOKING_UPDATED_STRINGS: Record<Locale, {
       "The price changed on this booking. Our team will reconcile the payment manually and follow up.",
     helperCommissionChanged: (amount) =>
       `Updated commission: ${amount}. The change appears on your next monthly invoice.`,
+    helperProAutoSettled:
+      "The lesson price changed — we adjusted the student's payment automatically.",
     participantSubject: (pro, booker) =>
       `Updated: your golf lesson with ${pro} (booked by ${booker})`,
     participantBody: (booker, pro) =>
@@ -1136,6 +1341,8 @@ const BOOKING_UPDATED_STRINGS: Record<Locale, {
     duration: "Duur",
     durationUnit: "minuten",
     participants: "Deelnemers",
+    price: "Prijs",
+    was: (old) => `(was ${old})`,
     cta: "Mijn boekingen bekijken",
     helperNoChange:
       "Geen betalingswijziging — de prijs blijft hetzelfde als bij de oorspronkelijke boeking.",
@@ -1147,6 +1354,8 @@ const BOOKING_UPDATED_STRINGS: Record<Locale, {
       "De prijs van deze boeking is gewijzigd. Ons team verwerkt de betaling handmatig en neemt contact op.",
     helperCommissionChanged: (amount) =>
       `Bijgewerkte commissie: ${amount}. De wijziging verschijnt op je volgende maandfactuur.`,
+    helperProAutoSettled:
+      "De lesprijs is gewijzigd — we hebben de betaling van de leerling automatisch aangepast.",
     participantSubject: (pro, booker) =>
       `Bijgewerkt: je golfles bij ${pro} (geboekt door ${booker})`,
     participantBody: (booker, pro) =>
@@ -1167,6 +1376,8 @@ const BOOKING_UPDATED_STRINGS: Record<Locale, {
     duration: "Durée",
     durationUnit: "minutes",
     participants: "Participants",
+    price: "Prix",
+    was: (old) => `(auparavant ${old})`,
     cta: "Voir mes réservations",
     helperNoChange:
       "Pas de changement de paiement — le prix reste identique à la réservation initiale.",
@@ -1178,6 +1389,8 @@ const BOOKING_UPDATED_STRINGS: Record<Locale, {
       "Le prix de cette réservation a changé. Notre équipe procédera à l'ajustement manuellement et reviendra vers vous.",
     helperCommissionChanged: (amount) =>
       `Nouvelle commission : ${amount}. Le changement apparaîtra sur votre prochaine facture mensuelle.`,
+    helperProAutoSettled:
+      "Le prix du cours a changé — nous avons ajusté le paiement de l'élève automatiquement.",
     participantSubject: (pro, booker) =>
       `Mise à jour : votre cours de golf avec ${pro} (réservé par ${booker})`,
     participantBody: (booker, pro) =>
@@ -1207,11 +1420,33 @@ function formatEur(cents: number, locale: Locale): string {
   ).format(cents / 100);
 }
 
+/**
+ * The pre-task-140 default rendered "Geen betalingswijziging" on the pro
+ * email whenever `paymentChange` was undefined — but the booking-updated
+ * notify code never passed it to the pro variant, so the pro saw that
+ * line even when the student-facing price had clearly changed. Audience
+ * splits the copy: the booker sees the full payment narrative (their
+ * card was charged/refunded), while the pro sees pro-relevant facts
+ * (commission change, manual reconcile, or a neutral "price adjusted"
+ * line for auto-settled charges/refunds). Returns "" when nothing
+ * useful can be said — the caller skips the helper paragraph entirely.
+ */
 function paymentHelperFor(
   s: (typeof BOOKING_UPDATED_STRINGS)[Locale],
   change: EmailPaymentChange | undefined,
   locale: Locale,
+  audience: "booker" | "pro",
 ): string {
+  if (audience === "pro") {
+    if (!change || change.kind === "noop") return "";
+    if (change.kind === "charge" || change.kind === "refund")
+      return s.helperProAutoSettled;
+    if (change.kind === "swap_invoice_item")
+      return s.helperCommissionChanged(
+        formatEur(change.commissionCents, locale),
+      );
+    return s.helperManualReview;
+  }
   if (!change || change.kind === "noop") return s.helperNoChange;
   if (change.kind === "charge")
     return s.helperCharged(formatEur(change.amountCents, locale));
@@ -1220,6 +1455,31 @@ function paymentHelperFor(
   if (change.kind === "swap_invoice_item")
     return s.helperCommissionChanged(formatEur(change.commissionCents, locale));
   return s.helperManualReview;
+}
+
+/**
+ * Pre-edit values rendered as "(was X)" suffixes next to each new
+ * value on the rows that actually changed. Undefined → no suffix
+ * (e.g. participant emails for bookings whose only change is the
+ * extra-participant list).
+ */
+export interface PreviousBookingValues {
+  date: string;
+  startTime: string;
+  endTime: string;
+  duration: number;
+  participantCount: number;
+  /** Pre-edit `lesson_bookings.price_cents`. Null when the booking was
+   *  created before the price-column was wired up. */
+  priceCents?: number | null;
+}
+
+function wasSuffix(
+  s: (typeof BOOKING_UPDATED_STRINGS)[Locale],
+  oldValue: string | null,
+): string {
+  if (!oldValue) return "";
+  return ` <span style="color:#999;font-weight:normal;">${s.was(oldValue)}</span>`;
 }
 
 export function buildBookingUpdatedEmail(opts: {
@@ -1233,29 +1493,80 @@ export function buildBookingUpdatedEmail(opts: {
   endTime: string;
   duration: number;
   participantCount: number;
+  /** Current `lesson_bookings.price_cents`. Null → no price row. */
+  priceCents?: number | null;
+  /** ISO 4217 lowercase, e.g. "eur". Used only for the price row. */
+  currency?: string;
   locale: Locale;
   /**
-   * What the payment-delta executor did. Only the booker email needs
-   * this; pro + participant variants don't render it. Undefined →
-   * treated as a no-op (Phase 1-style "no payment change" line).
+   * Who this email is for. Splits payment-helper copy: the booker sees
+   * the full payment narrative (their card was charged/refunded), the
+   * pro sees pro-relevant facts (commission change, manual reconcile,
+   * "price adjusted"). Defaults to "booker" for legacy callers.
+   */
+  audience?: "booker" | "pro";
+  /**
+   * What the payment-delta executor did. Both booker and pro emails
+   * render an audience-appropriate helper line based on this. Undefined
+   * → "no payment change" for the booker, omitted for the pro.
    */
   paymentChange?: EmailPaymentChange;
+  /**
+   * Pre-edit values — rendered inline next to the new value on rows
+   * whose value differs ("(was Thursday 15 May)"). When undefined the
+   * email reads as the post-edit snapshot only.
+   */
+  previous?: PreviousBookingValues;
 }): string {
   const s = BOOKING_UPDATED_STRINGS[opts.locale] ?? BOOKING_UPDATED_STRINGS.en;
+  const prevDate = opts.previous && opts.previous.date !== opts.date
+    ? formatLessonDate(opts.previous.date, opts.locale)
+    : null;
+  const prevTime =
+    opts.previous &&
+    (opts.previous.startTime !== opts.startTime ||
+      opts.previous.endTime !== opts.endTime)
+      ? `${opts.previous.startTime} – ${opts.previous.endTime}`
+      : null;
+  const prevDuration =
+    opts.previous && opts.previous.duration !== opts.duration
+      ? `${opts.previous.duration} ${s.durationUnit}`
+      : null;
+  const prevPCount =
+    opts.previous && opts.previous.participantCount !== opts.participantCount
+      ? String(opts.previous.participantCount)
+      : null;
+  const prevPrice =
+    opts.previous &&
+    opts.previous.priceCents != null &&
+    opts.priceCents != null &&
+    opts.previous.priceCents !== opts.priceCents
+      ? formatEur(opts.previous.priceCents, opts.locale)
+      : null;
   const rows: Array<DetailRow> = [[s.pro, opts.proName]];
   if (opts.proEmail) rows.push([s.proEmail, opts.proEmail, `mailto:${opts.proEmail}`]);
   if (opts.proPhone)
     rows.push([s.proPhone, opts.proPhone, `tel:${opts.proPhone.replace(/\s+/g, "")}`]);
   rows.push(
     [s.location, opts.locationName],
-    [s.date, formatLessonDate(opts.date, opts.locale)],
-    [s.time, `${opts.startTime} – ${opts.endTime}`],
-    [s.duration, `${opts.duration} ${s.durationUnit}`],
+    [s.date, formatLessonDate(opts.date, opts.locale) + wasSuffix(s, prevDate)],
+    [s.time, `${opts.startTime} – ${opts.endTime}` + wasSuffix(s, prevTime)],
+    [s.duration, `${opts.duration} ${s.durationUnit}` + wasSuffix(s, prevDuration)],
   );
-  if (opts.participantCount > 1) {
-    rows.push([s.participants, String(opts.participantCount)]);
+  if (opts.participantCount > 1 || prevPCount) {
+    rows.push([
+      s.participants,
+      String(opts.participantCount) + wasSuffix(s, prevPCount),
+    ]);
   }
-  const helperLine = paymentHelperFor(s, opts.paymentChange, opts.locale);
+  if (opts.priceCents != null && opts.priceCents > 0) {
+    rows.push([
+      s.price,
+      formatEur(opts.priceCents, opts.locale) + wasSuffix(s, prevPrice),
+    ]);
+  }
+  const audience = opts.audience ?? "booker";
+  const helperLine = paymentHelperFor(s, opts.paymentChange, opts.locale, audience);
   const body = `
     <h2 style="font-family:Georgia,'Times New Roman',serif;font-size:22px;color:${COLORS.green950};margin:0 0 16px 0;font-weight:normal;">
       ${formatGreeting(s.greeting, opts.recipientFirstName, opts.locale)}
@@ -1267,7 +1578,7 @@ export function buildBookingUpdatedEmail(opts: {
         ${s.cta}
       </a>
     </p>
-    <p style="color:#666;font-size:13px;margin:0;">${helperLine}</p>
+    ${helperLine ? `<p style="color:#666;font-size:13px;margin:0;">${helperLine}</p>` : ""}
   `;
   return emailLayout(body, undefined, opts.locale);
 }
@@ -1288,17 +1599,35 @@ export function buildParticipantBookingUpdatedEmail(opts: {
   endTime: string;
   duration: number;
   locale: Locale;
+  /** Pre-edit values rendered as "(was X)" next to changed rows. */
+  previous?: Pick<
+    PreviousBookingValues,
+    "date" | "startTime" | "endTime" | "duration"
+  >;
 }): string {
   const s = BOOKING_UPDATED_STRINGS[opts.locale] ?? BOOKING_UPDATED_STRINGS.en;
+  const prevDate = opts.previous && opts.previous.date !== opts.date
+    ? formatLessonDate(opts.previous.date, opts.locale)
+    : null;
+  const prevTime =
+    opts.previous &&
+    (opts.previous.startTime !== opts.startTime ||
+      opts.previous.endTime !== opts.endTime)
+      ? `${opts.previous.startTime} – ${opts.previous.endTime}`
+      : null;
+  const prevDuration =
+    opts.previous && opts.previous.duration !== opts.duration
+      ? `${opts.previous.duration} ${s.durationUnit}`
+      : null;
   const rows: Array<DetailRow> = [[s.pro, opts.proName]];
   if (opts.proEmail) rows.push([s.proEmail, opts.proEmail, `mailto:${opts.proEmail}`]);
   if (opts.proPhone)
     rows.push([s.proPhone, opts.proPhone, `tel:${opts.proPhone.replace(/\s+/g, "")}`]);
   rows.push(
     [s.location, opts.locationName],
-    [s.date, formatLessonDate(opts.date, opts.locale)],
-    [s.time, `${opts.startTime} – ${opts.endTime}`],
-    [s.duration, `${opts.duration} ${s.durationUnit}`],
+    [s.date, formatLessonDate(opts.date, opts.locale) + wasSuffix(s, prevDate)],
+    [s.time, `${opts.startTime} – ${opts.endTime}` + wasSuffix(s, prevTime)],
+    [s.duration, `${opts.duration} ${s.durationUnit}` + wasSuffix(s, prevDuration)],
   );
   const body = `
     <h2 style="font-family:Georgia,'Times New Roman',serif;font-size:22px;color:${COLORS.green950};margin:0 0 16px 0;font-weight:normal;">
@@ -1644,6 +1973,8 @@ const CLAIM_BOOKING_STRINGS: Record<
     location: string;
     proEmail: string;
     proPhone: string;
+    participants: string;
+    price: string;
     alreadyIntro: (proName: string) => string;
     loginButton: string;
     registerHeading: string;
@@ -1666,6 +1997,8 @@ const CLAIM_BOOKING_STRINGS: Record<
     location: "Location",
     proEmail: "Pro email",
     proPhone: "Pro phone",
+    participants: "Participants",
+    price: "Price",
     alreadyIntro: (pro) =>
       `We just added a new lesson with ${pro} to your account.`,
     loginButton: "View booking",
@@ -1689,6 +2022,8 @@ const CLAIM_BOOKING_STRINGS: Record<
     location: "Locatie",
     proEmail: "E-mail pro",
     proPhone: "Telefoon pro",
+    participants: "Deelnemers",
+    price: "Prijs",
     alreadyIntro: (pro) =>
       `We hebben zojuist een nieuwe les bij ${pro} aan je account toegevoegd.`,
     loginButton: "Boeking bekijken",
@@ -1712,6 +2047,8 @@ const CLAIM_BOOKING_STRINGS: Record<
     location: "Lieu",
     proEmail: "E-mail du pro",
     proPhone: "Téléphone du pro",
+    participants: "Participants",
+    price: "Prix",
     alreadyIntro: (pro) =>
       `Nous venons d'ajouter un nouveau cours avec ${pro} à votre compte.`,
     loginButton: "Voir la réservation",
@@ -1737,6 +2074,13 @@ export function buildClaimAndVerifyBookingEmail(opts: {
   startTime: string;
   endTime: string;
   duration: number;
+  /** Number of golfers in the lesson; defaults to 1. Surfaces when
+   *  > 1 so the booker sees that extras were included (task 136). */
+  participantCount?: number;
+  /** Charged price in cents — rendered as "Price: € 80,00". Hidden
+   *  when nullish so old/legacy bookings without configured pricing
+   *  don't show "€ 0,00" (task 136). */
+  priceCents?: number | null;
   claimUrl: string;
   registerUrl: string;
   locale: Locale;
@@ -1748,6 +2092,12 @@ export function buildClaimAndVerifyBookingEmail(opts: {
     [s.duration, `${opts.duration} ${s.durationUnit}`],
     [s.location, opts.locationName],
   ];
+  if (typeof opts.participantCount === "number" && opts.participantCount > 1) {
+    rows.push([s.participants, String(opts.participantCount)]);
+  }
+  if (typeof opts.priceCents === "number" && opts.priceCents > 0) {
+    rows.push([s.price, formatPrice(opts.priceCents / 100, opts.locale)]);
+  }
   if (opts.proEmail) {
     rows.push([s.proEmail, opts.proEmail, `mailto:${opts.proEmail}`]);
   }
@@ -1798,6 +2148,9 @@ export function buildNewBookingOnAccountEmail(opts: {
   startTime: string;
   endTime: string;
   duration: number;
+  /** See buildClaimAndVerifyBookingEmail for semantics (task 136). */
+  participantCount?: number;
+  priceCents?: number | null;
   loginUrl: string;
   locale: Locale;
 }): string {
@@ -1808,6 +2161,12 @@ export function buildNewBookingOnAccountEmail(opts: {
     [s.duration, `${opts.duration} ${s.durationUnit}`],
     [s.location, opts.locationName],
   ];
+  if (typeof opts.participantCount === "number" && opts.participantCount > 1) {
+    rows.push([s.participants, String(opts.participantCount)]);
+  }
+  if (typeof opts.priceCents === "number" && opts.priceCents > 0) {
+    rows.push([s.price, formatPrice(opts.priceCents / 100, opts.locale)]);
+  }
   if (opts.proEmail) {
     rows.push([s.proEmail, opts.proEmail, `mailto:${opts.proEmail}`]);
   }

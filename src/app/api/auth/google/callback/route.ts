@@ -159,7 +159,7 @@ export async function GET(request: Request) {
 
   const roles = parseRoles(user.roles);
   if (roles.includes("pro")) {
-    return NextResponse.redirect(new URL("/pro/dashboard", request.url));
+    return NextResponse.redirect(new URL("/pro/bookings", request.url));
   } else if (roles.includes("admin") || roles.includes("dev")) {
     return NextResponse.redirect(new URL("/admin", request.url));
   } else {

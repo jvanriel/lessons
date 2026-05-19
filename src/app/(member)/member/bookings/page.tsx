@@ -17,6 +17,7 @@ import { formatDate } from "@/lib/format-date";
 import { todayInTZ } from "@/lib/local-date";
 import { t } from "@/lib/i18n/translations";
 import PageHeading from "@/components/app/PageHeading";
+import { wazeUrl, googleMapsUrl } from "@/lib/location-display";
 
 export const metadata = { title: "My Bookings — Golf Lessons" };
 
@@ -42,7 +43,10 @@ export default async function MemberBookingsPage() {
       proEmail: users.email,
       proPhone: proProfiles.contactPhone,
       locationName: locations.name,
+      locationAddress: locations.address,
       locationCity: locations.city,
+      locationLat: locations.lat,
+      locationLng: locations.lng,
       locationTimezone: locations.timezone,
       cancellationHours: proProfiles.cancellationHours,
     })
@@ -90,7 +94,7 @@ export default async function MemberBookingsPage() {
         className="mb-8"
       >
         <Link
-          href="/pros"
+          href="/member/dashboard"
           className="rounded-md bg-gold-600 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-gold-500"
         >
           {t("memberBookings.bookLesson", locale)}
@@ -144,6 +148,45 @@ export default async function MemberBookingsPage() {
                       {booking.locationName}
                       {booking.locationCity && `, ${booking.locationCity}`}
                     </div>
+                    {booking.locationAddress && (
+                      <div className="mt-0.5 text-xs text-green-500">
+                        {booking.locationAddress}
+                      </div>
+                    )}
+                    {(() => {
+                      const loc = {
+                        lat: booking.locationLat,
+                        lng: booking.locationLng,
+                        address: booking.locationAddress,
+                      };
+                      const waze = wazeUrl(loc);
+                      const gmaps = googleMapsUrl(loc);
+                      if (!waze && !gmaps) return null;
+                      return (
+                        <div className="mt-2 flex flex-wrap gap-2">
+                          {waze && (
+                            <a
+                              href={waze}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="inline-flex items-center gap-1.5 rounded-md bg-blue-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-blue-700"
+                            >
+                              🚗 Waze
+                            </a>
+                          )}
+                          {gmaps && (
+                            <a
+                              href={gmaps}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="inline-flex items-center gap-1.5 rounded-md bg-green-700 px-3 py-1.5 text-xs font-medium text-white hover:bg-green-800"
+                            >
+                              📍 Google Maps
+                            </a>
+                          )}
+                        </div>
+                      );
+                    })()}
                     {booking.participantCount > 1 && (
                       <div className="mt-0.5 text-xs text-green-500">
                         {t("memberBookings.participants", locale).replace(

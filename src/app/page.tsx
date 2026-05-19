@@ -12,7 +12,7 @@ const PAGE = "home";
 export default async function Home() {
   const session = await getSession();
   if (session) {
-    if (hasRole(session, "pro")) redirect("/pro/dashboard");
+    if (hasRole(session, "pro")) redirect("/pro/bookings");
     if (hasRole(session, "admin")) redirect("/admin/users");
     redirect("/member/dashboard");
   }
@@ -26,7 +26,13 @@ export default async function Home() {
 
       {/* Hero */}
       <section className="mx-auto max-w-6xl px-6 py-24 text-center">
-        <CmsBlock page={PAGE} block="hero.title" content={cms["hero.title"]} fallback={t("home.hero.title", locale)} as="h1" className="font-display text-5xl font-semibold tracking-tight text-green-900 sm:text-6xl" />
+        {/* Kicker + intro answer "what is this site?" before the
+            aspirational headline below — added per task 103
+            (Michel) so first-time visitors immediately understand
+            what golflessons.be is and who it's for. */}
+        <CmsBlock page={PAGE} block="hero.kicker" content={cms["hero.kicker"]} fallback={t("home.hero.kicker", locale)} as="span" className="inline-block rounded-full bg-green-100 px-4 py-1.5 text-xs font-semibold uppercase tracking-wider text-green-700" />
+        <CmsBlock page={PAGE} block="hero.intro" content={cms["hero.intro"]} fallback={t("home.hero.intro", locale)} as="p" className="mx-auto mt-6 max-w-2xl text-base leading-relaxed text-green-700" />
+        <CmsBlock page={PAGE} block="hero.title" content={cms["hero.title"]} fallback={t("home.hero.title", locale)} as="h1" className="mt-10 font-display text-5xl font-semibold tracking-tight text-green-900 sm:text-6xl" />
         <CmsBlock page={PAGE} block="hero.subtitle" content={cms["hero.subtitle"]} fallback={t("home.hero.subtitle", locale)} as="p" className="mx-auto mt-6 max-w-2xl text-lg text-green-700" />
         <div className="mt-10 flex items-center justify-center">
           <Link href="/book" className="rounded-md bg-gold-600 px-6 py-3 text-sm font-medium text-white transition-colors hover:bg-gold-500">

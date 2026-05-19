@@ -14,19 +14,19 @@ const content: Record<Locale, { title: string; lastUpdated: string; sections: Ar
       },
       {
         heading: "2. Description of service",
-        body: "Golf Lessons is a platform that connects golf students with golf professionals. We provide tools for:\n\n- Browsing and selecting golf professionals.\n- Booking golf lessons.\n- Communicating with your pro via coaching chat.\n- Managing scheduling preferences and payments.\n\nGolf Lessons acts as an intermediary and is not a party to the agreement between students and pros.",
+        body: "Golf Lessons is a platform that connects golfers with golf professionals. We provide tools for:\n\n- Browsing and selecting golf professionals.\n- Booking golf lessons.\n- Communicating with your pro via coaching chat.\n- Managing scheduling preferences and payments.\n\nGolf Lessons acts as an intermediary and is not a party to the agreement between golfers and pros.",
       },
       {
         heading: "3. Accounts",
         body: "You must provide accurate information when creating your account. You are responsible for maintaining the confidentiality of your password and for all activities under your account. You must notify us immediately of any unauthorized use.",
       },
       {
-        heading: "4. Student accounts",
-        body: "Students can create a free account to browse pros, book lessons, and communicate with their pro. Students are responsible for showing up to booked lessons and for paying any applicable lesson fees.",
+        heading: "4. Golfer accounts",
+        body: "Golfers can create a free account to browse pros, book lessons, and communicate with their pro. Golfers are responsible for showing up to booked lessons and for paying any applicable lesson fees.",
       },
       {
         heading: "5. Pro accounts",
-        body: "Golf professionals can subscribe to the platform to receive bookings, manage their schedule, and communicate with students. Pros are responsible for providing the lessons as agreed and for the accuracy of their profile information.",
+        body: "Golf professionals can subscribe to the platform to receive bookings, manage their schedule, and communicate with golfers. Pros are responsible for providing the lessons as agreed and for the accuracy of their profile information.",
       },
       {
         heading: "6. Bookings and cancellations",
@@ -38,7 +38,7 @@ const content: Record<Locale, { title: string; lastUpdated: string; sections: Ar
       },
       {
         heading: "8. Content and conduct",
-        body: "You agree not to:\n\n- Use the platform for any unlawful purpose.\n- Upload harmful, offensive, or inappropriate content.\n- Impersonate another person.\n- Interfere with the platform's operation.\n- Use the platform to directly solicit pros or students outside the platform to avoid fees.",
+        body: "You agree not to:\n\n- Use the platform for any unlawful purpose.\n- Upload harmful, offensive, or inappropriate content.\n- Impersonate another person.\n- Interfere with the platform's operation.\n- Use the platform to directly solicit pros or golfers outside the platform to avoid fees.",
       },
       {
         heading: "9. Intellectual property",
@@ -76,19 +76,19 @@ const content: Record<Locale, { title: string; lastUpdated: string; sections: Ar
       },
       {
         heading: "2. Beschrijving van de dienst",
-        body: "Golf Lessons is een platform dat golfstudenten verbindt met golfprofessionals. Wij bieden tools voor:\n\n- Het bekijken en selecteren van golfprofessionals.\n- Het boeken van golflessen.\n- Communiceren met uw pro via coaching-chat.\n- Het beheren van planningsvoorkeuren en betalingen.\n\nGolf Lessons treedt op als tussenpersoon en is geen partij bij de overeenkomst tussen studenten en pro's.",
+        body: "Golf Lessons is een platform dat golfers verbindt met golfprofessionals. Wij bieden tools voor:\n\n- Het bekijken en selecteren van golfprofessionals.\n- Het boeken van golflessen.\n- Communiceren met uw pro via coaching-chat.\n- Het beheren van planningsvoorkeuren en betalingen.\n\nGolf Lessons treedt op als tussenpersoon en is geen partij bij de overeenkomst tussen golfers en pro's.",
       },
       {
         heading: "3. Accounts",
         body: "U moet nauwkeurige informatie verstrekken bij het aanmaken van uw account. U bent verantwoordelijk voor het vertrouwelijk houden van uw wachtwoord en voor alle activiteiten onder uw account. U moet ons onmiddellijk op de hoogte stellen van ongeoorloofd gebruik.",
       },
       {
-        heading: "4. Studentenaccounts",
-        body: "Studenten kunnen een gratis account aanmaken om pro's te bekijken, lessen te boeken en te communiceren met hun pro. Studenten zijn verantwoordelijk voor het verschijnen op geboekte lessen en voor het betalen van eventuele lesgelden.",
+        heading: "4. Golfer-accounts",
+        body: "Golfers kunnen een gratis account aanmaken om pro's te bekijken, lessen te boeken en te communiceren met hun pro. Golfers zijn verantwoordelijk voor het verschijnen op geboekte lessen en voor het betalen van eventuele lesgelden.",
       },
       {
         heading: "5. Pro-accounts",
-        body: "Golfprofessionals kunnen zich abonneren op het platform om boekingen te ontvangen, hun schema te beheren en te communiceren met studenten. Pro's zijn verantwoordelijk voor het geven van de lessen zoals overeengekomen en voor de juistheid van hun profielinformatie.",
+        body: "Golfprofessionals kunnen zich abonneren op het platform om boekingen te ontvangen, hun schema te beheren en te communiceren met golfers. Pro's zijn verantwoordelijk voor het geven van de lessen zoals overeengekomen en voor de juistheid van hun profielinformatie.",
       },
       {
         heading: "6. Boekingen en annuleringen",
@@ -100,7 +100,7 @@ const content: Record<Locale, { title: string; lastUpdated: string; sections: Ar
       },
       {
         heading: "8. Inhoud en gedrag",
-        body: "U stemt ermee in om niet:\n\n- Het platform te gebruiken voor onwettige doeleinden.\n- Schadelijke, beledigende of ongepaste inhoud te uploaden.\n- Zich voor te doen als een andere persoon.\n- De werking van het platform te verstoren.\n- Het platform te gebruiken om rechtstreeks pro's of studenten buiten het platform te benaderen om kosten te vermijden.",
+        body: "U stemt ermee in om niet:\n\n- Het platform te gebruiken voor onwettige doeleinden.\n- Schadelijke, beledigende of ongepaste inhoud te uploaden.\n- Zich voor te doen als een andere persoon.\n- De werking van het platform te verstoren.\n- Het platform te gebruiken om rechtstreeks pro's of golfers buiten het platform te benaderen om kosten te vermijden.",
       },
       {
         heading: "9. Intellectueel eigendom",
@@ -138,19 +138,19 @@ const content: Record<Locale, { title: string; lastUpdated: string; sections: Ar
       },
       {
         heading: "2. Description du service",
-        body: "Golf Lessons est une plateforme qui met en relation des \u00e9l\u00e8ves de golf avec des professionnels de golf. Nous fournissons des outils pour :\n\n- Parcourir et s\u00e9lectionner des professionnels de golf.\n- R\u00e9server des cours de golf.\n- Communiquer avec votre pro via le chat de coaching.\n- G\u00e9rer les pr\u00e9f\u00e9rences de planification et les paiements.\n\nGolf Lessons agit en tant qu'interm\u00e9diaire et n'est pas partie \u00e0 l'accord entre les \u00e9l\u00e8ves et les pros.",
+        body: "Golf Lessons est une plateforme qui met en relation des golfeurs avec des professionnels de golf. Nous fournissons des outils pour :\n\n- Parcourir et s\u00e9lectionner des professionnels de golf.\n- R\u00e9server des cours de golf.\n- Communiquer avec votre pro via le chat de coaching.\n- G\u00e9rer les pr\u00e9f\u00e9rences de planification et les paiements.\n\nGolf Lessons agit en tant qu'interm\u00e9diaire et n'est pas partie \u00e0 l'accord entre les golfeurs et les pros.",
       },
       {
         heading: "3. Comptes",
         body: "Vous devez fournir des informations exactes lors de la cr\u00e9ation de votre compte. Vous \u00eates responsable du maintien de la confidentialit\u00e9 de votre mot de passe et de toutes les activit\u00e9s sous votre compte. Vous devez nous notifier imm\u00e9diatement de toute utilisation non autoris\u00e9e.",
       },
       {
-        heading: "4. Comptes \u00e9tudiants",
-        body: "Les \u00e9tudiants peuvent cr\u00e9er un compte gratuit pour parcourir les pros, r\u00e9server des cours et communiquer avec leur pro. Les \u00e9tudiants sont responsables de se pr\u00e9senter aux cours r\u00e9serv\u00e9s et de payer les frais de cours applicables.",
+        heading: "4. Comptes golfeurs",
+        body: "Les golfeurs peuvent cr\u00e9er un compte gratuit pour parcourir les pros, r\u00e9server des cours et communiquer avec leur pro. Les golfeurs sont responsables de se pr\u00e9senter aux cours r\u00e9serv\u00e9s et de payer les frais de cours applicables.",
       },
       {
         heading: "5. Comptes pro",
-        body: "Les professionnels de golf peuvent s'abonner \u00e0 la plateforme pour recevoir des r\u00e9servations, g\u00e9rer leur emploi du temps et communiquer avec les \u00e9tudiants. Les pros sont responsables de fournir les cours convenus et de l'exactitude de leurs informations de profil.",
+        body: "Les professionnels de golf peuvent s'abonner \u00e0 la plateforme pour recevoir des r\u00e9servations, g\u00e9rer leur emploi du temps et communiquer avec les golfeurs. Les pros sont responsables de fournir les cours convenus et de l'exactitude de leurs informations de profil.",
       },
       {
         heading: "6. R\u00e9servations et annulations",
@@ -162,7 +162,7 @@ const content: Record<Locale, { title: string; lastUpdated: string; sections: Ar
       },
       {
         heading: "8. Contenu et conduite",
-        body: "Vous acceptez de ne pas :\n\n- Utiliser la plateforme \u00e0 des fins ill\u00e9gales.\n- T\u00e9l\u00e9charger du contenu nuisible, offensant ou inappropri\u00e9.\n- Usurper l'identit\u00e9 d'une autre personne.\n- Interf\u00e9rer avec le fonctionnement de la plateforme.\n- Utiliser la plateforme pour solliciter directement des pros ou des \u00e9tudiants en dehors de la plateforme afin d'\u00e9viter les frais.",
+        body: "Vous acceptez de ne pas :\n\n- Utiliser la plateforme \u00e0 des fins ill\u00e9gales.\n- T\u00e9l\u00e9charger du contenu nuisible, offensant ou inappropri\u00e9.\n- Usurper l'identit\u00e9 d'une autre personne.\n- Interf\u00e9rer avec le fonctionnement de la plateforme.\n- Utiliser la plateforme pour solliciter directement des pros ou des golfeurs en dehors de la plateforme afin d'\u00e9viter les frais.",
       },
       {
         heading: "9. Propri\u00e9t\u00e9 intellectuelle",

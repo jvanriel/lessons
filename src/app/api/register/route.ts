@@ -4,6 +4,7 @@ import { db } from "@/lib/db";
 import { users, userEmails } from "@/lib/db/schema";
 import { eq, and, isNull } from "drizzle-orm";
 import { hashPassword, setSessionCookie } from "@/lib/auth";
+import { activatePendingProStudentRelationships } from "@/lib/pro-students";
 import { createNotification } from "@/lib/notifications";
 import { sendEmail } from "@/lib/mail";
 import { emailLayout, formatGreeting, getEmailStrings } from "@/lib/email-templates";
@@ -99,6 +100,12 @@ export async function POST(request: Request) {
     userId = inserted[0].id;
     await db.insert(userEmails).values({ userId, email, label: "primary", isPrimary: true }).onConflictDoNothing();
   }
+
+  // task 152 — flip any pending pro_students rows attached to this
+  // user (left by a prior pro-invite) to active. Common case: the
+  // pro invited an email, the user's now claiming the stub row by
+  // setting a password.
+  await activatePendingProStudentRelationships(userId);
 
   createNotification({
     type: "user_registered",

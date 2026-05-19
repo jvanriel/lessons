@@ -37,8 +37,8 @@
  */
 
 import { db } from "@/lib/db";
-import { lessonBookings, proProfiles, users } from "@/lib/db/schema";
-import { eq } from "drizzle-orm";
+import { lessonBookings, proLocations, proProfiles, users } from "@/lib/db/schema";
+import { and, eq } from "drizzle-orm";
 import { getStripe, calculatePlatformFee } from "@/lib/stripe";
 import { computeBookingPriceCents } from "@/lib/pricing";
 import * as Sentry from "@sentry/nextjs";
@@ -138,23 +138,37 @@ export function decideBookingPricing(
 }
 
 /**
- * Convenience: load the pro's pricing row and run `decideBookingPricing`
- * on it. Server-action helper so call sites stay terse.
+ * Convenience: load pricing for a specific pro+location and run
+ * `decideBookingPricing` on it. Server-action helper so call sites
+ * stay terse.
+ *
+ * Pricing source: `pro_locations` carries per-location lessonPricing /
+ * extraStudentPricing as of task 109. `pro_profiles` provides the
+ * non-pricing context (`allowBookingWithoutPayment`,
+ * `subscriptionStatus`) that's the same across all the pro's
+ * locations. We join the two so the caller passes both ids.
  */
 export async function loadBookingPricing(
   proProfileId: number,
+  proLocationId: number,
   duration: number,
   participantCount: number,
 ): Promise<BookingPricingResult> {
   const [row] = await db
     .select({
-      lessonPricing: proProfiles.lessonPricing,
-      extraStudentPricing: proProfiles.extraStudentPricing,
+      lessonPricing: proLocations.lessonPricing,
+      extraStudentPricing: proLocations.extraStudentPricing,
       allowBookingWithoutPayment: proProfiles.allowBookingWithoutPayment,
       subscriptionStatus: proProfiles.subscriptionStatus,
     })
-    .from(proProfiles)
-    .where(eq(proProfiles.id, proProfileId))
+    .from(proLocations)
+    .innerJoin(proProfiles, eq(proProfiles.id, proLocations.proProfileId))
+    .where(
+      and(
+        eq(proLocations.id, proLocationId),
+        eq(proProfiles.id, proProfileId),
+      ),
+    )
     .limit(1);
   return decideBookingPricing(
     row

@@ -15,11 +15,13 @@ import { todayInTZ } from "@/lib/local-date";
 import { t } from "@/lib/i18n/translations";
 import { redirect } from "next/navigation";
 import Link from "next/link";
+import { wazeUrl, googleMapsUrl } from "@/lib/location-display";
 import { QRLoginButton } from "./QRLoginDialog";
 import { HelpButton } from "./HelpDialog";
 import { BookingRefreshListener } from "@/components/BookingRefreshListener";
 import { CancelBookingButton } from "./CancelBookingDialog";
 import { QuickBook } from "./QuickRebook";
+import ChatProButton from "./ChatProButton";
 import {
   getQuickBookData,
   type QuickBookData,
@@ -53,6 +55,9 @@ export default async function MemberDashboard() {
       proName: proProfiles.displayName,
       proId: proProfiles.id,
       locationName: locations.name,
+      locationAddress: locations.address,
+      locationLat: locations.lat,
+      locationLng: locations.lng,
       locationTimezone: locations.timezone,
       cancellationHours: proProfiles.cancellationHours,
     })
@@ -93,7 +98,11 @@ export default async function MemberDashboard() {
     }
   }
 
-  // Get my pros (via proStudents relationships) with booking preferences
+  // Get my pros (via proStudents relationships) with booking preferences.
+  // `published` is queried so the dashboard can hide booking entry
+  // points for pros who haven't finished their profile yet — clicking
+  // /member/book/[proId] 404s on those (task 150). Chat stays available
+  // either way.
   const myPros = await db
     .select({
       proStudentId: proStudents.id,
@@ -102,6 +111,7 @@ export default async function MemberDashboard() {
       photoUrl: proProfiles.photoUrl,
       specialties: proProfiles.specialties,
       bookingEnabled: proProfiles.bookingEnabled,
+      published: proProfiles.published,
       allowBookingWithoutPayment: proProfiles.allowBookingWithoutPayment,
       hasPreferences: proStudents.preferredLocationId,
     })
@@ -116,11 +126,13 @@ export default async function MemberDashboard() {
       )
     );
 
-  // Fetch quick book data for pros with saved preferences
+  // Fetch quick book data for pros with saved preferences. Require
+  // `published` too — an unpublished pro with preferences shouldn't
+  // surface a QuickBook strip that 404s when clicked.
   const quickBookMap: Record<number, QuickBookData> = {};
   await Promise.all(
     myPros
-      .filter((p) => p.hasPreferences !== null && p.bookingEnabled)
+      .filter((p) => p.hasPreferences !== null && p.bookingEnabled && p.published)
       .map(async (p) => {
         const data = await getQuickBookData(p.proProfileId, p.proStudentId);
         if (data.hasPreferences) {
@@ -206,16 +218,15 @@ export default async function MemberDashboard() {
                   </div>
                 </Link>
                 <div className="mt-3 flex gap-2">
-                  <Link
-                    href={`/member/coaching/${pro.proStudentId}`}
-                    className="flex flex-1 items-center justify-center gap-1.5 rounded-md border border-green-200 px-3 py-1.5 text-xs font-medium text-green-700 transition-colors hover:bg-green-50"
-                  >
-                    <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                      <path strokeLinecap="round" strokeLinejoin="round" d="M8.625 12a.375.375 0 1 1-.75 0 .375.375 0 0 1 .75 0Zm0 0H8.25m4.125 0a.375.375 0 1 1-.75 0 .375.375 0 0 1 .75 0Zm0 0H12m4.125 0a.375.375 0 1 1-.75 0 .375.375 0 0 1 .75 0Zm0 0h-.375M21 12c0 4.556-4.03 8.25-9 8.25a9.764 9.764 0 0 1-2.555-.337A5.972 5.972 0 0 1 5.41 20.97a5.969 5.969 0 0 1-.474-.065 4.48 4.48 0 0 0 .978-2.025c.09-.457-.133-.901-.467-1.226C3.93 16.178 3 14.189 3 12c0-4.556 4.03-8.25 9-8.25s9 3.694 9 8.25Z" />
-                    </svg>
-                    {t("memberDash.chat", locale)}
-                  </Link>
-                  {pro.bookingEnabled && !quickBookMap[pro.proStudentId] && (
+                  <ChatProButton
+                    proStudentId={pro.proStudentId}
+                    label={t("memberDash.chat", locale)}
+                  />
+                  {/* Booking entry is gated on the pro being fully
+                      published — pre-task-150 an invited student saw a
+                      "Boek les" CTA that 404'd because /member/book/[proId]
+                      filters on proProfiles.published=true. */}
+                  {pro.bookingEnabled && pro.published && !quickBookMap[pro.proStudentId] && (
                     <Link
                       href={`/member/book/${pro.proProfileId}`}
                       className="flex flex-1 items-center justify-center rounded-md bg-gold-600 px-3 py-1.5 text-xs font-medium text-white transition-colors hover:bg-gold-500"
@@ -224,7 +235,11 @@ export default async function MemberDashboard() {
                     </Link>
                   )}
                 </div>
-                {quickBookMap[pro.proStudentId] ? (
+                {!pro.published ? (
+                  <p className="mt-3 text-[11px] leading-snug text-green-500/80">
+                    {t("memberDash.proNotReady", locale)}
+                  </p>
+                ) : quickBookMap[pro.proStudentId] ? (
                   <QuickBook
                     data={quickBookMap[pro.proStudentId]}
                     proId={pro.proProfileId}
@@ -264,7 +279,15 @@ export default async function MemberDashboard() {
 
         {upcomingBookings.length === 0 ? (
           <p className="mt-2 text-sm text-green-600">
-            {t("member.noLessons", locale)}
+            {/* Copy depends on whether the golfer is already
+                connected to a pro (task 11). With pros: nudge to
+                book; without: nudge to browse. */}
+            {t(
+              myPros.length > 0
+                ? "member.noLessonsHasPro"
+                : "member.noLessons",
+              locale,
+            )}
           </p>
         ) : (
           <div className="mt-4 space-y-3">
@@ -287,6 +310,40 @@ export default async function MemberDashboard() {
                     {t("memberDash.with", locale)} {booking.proName}{" "}
                     {t("memberDash.at", locale)} {booking.locationName}
                   </div>
+                  {(() => {
+                    const loc = {
+                      lat: booking.locationLat,
+                      lng: booking.locationLng,
+                      address: booking.locationAddress,
+                    };
+                    const waze = wazeUrl(loc);
+                    const gmaps = googleMapsUrl(loc);
+                    if (!waze && !gmaps) return null;
+                    return (
+                      <div className="mt-1.5 flex flex-wrap gap-1.5">
+                        {waze && (
+                          <a
+                            href={waze}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="inline-flex items-center gap-1 rounded bg-blue-600 px-2 py-0.5 text-[10px] font-medium text-white hover:bg-blue-700"
+                          >
+                            🚗 Waze
+                          </a>
+                        )}
+                        {gmaps && (
+                          <a
+                            href={gmaps}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="inline-flex items-center gap-1 rounded bg-green-700 px-2 py-0.5 text-[10px] font-medium text-white hover:bg-green-800"
+                          >
+                            📍 Maps
+                          </a>
+                        )}
+                      </div>
+                    );
+                  })()}
                 </div>
                 <CancelBookingButton
                   locale={locale}

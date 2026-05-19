@@ -1,6 +1,15 @@
 "use client";
 
 import { useState, useEffect, useRef, useCallback } from "react";
+import {
+  isGoogleShortcutName,
+  parseGoogleShortcutUrl,
+} from "@/lib/google-shortcut";
+import {
+  computeReadReceipt,
+  readReceiptColorClass,
+  readReceiptGlyph,
+} from "@/lib/read-receipt";
 
 // ─── Types ─────────────────────────────────────────────
 
@@ -54,8 +63,40 @@ interface CommentsProps {
   userId: number;
   mentionUsers?: MentionUser[];
   onUpload?: (file: File) => Promise<Attachment | null>;
+  /**
+   * Optional Drive integration (task 16): when supplied, the input
+   * row renders a "Create Google Doc/Sheet/Slides" menu next to the
+   * paperclip. Caller is responsible for creating the file in Drive
+   * (via /api/admin/tasks/google-create or similar) and returning
+   * the attachment metadata; Comments inserts it as a regular
+   * comment attachment.
+   */
+  onCreateGoogleDoc?: (
+    type: "document" | "spreadsheet" | "presentation",
+    title: string,
+  ) => Promise<Attachment>;
+  /**
+   * Optional companion to `onCreateGoogleDoc` (task 124): attach an
+   * existing Drive file to a comment by pasting its URL. The caller
+   * resolves the URL → metadata via Drive (anyone-with-link or
+   * service-account-readable files) and returns the attachment.
+   */
+  onAttachGoogleLink?: (url: string) => Promise<Attachment>;
   fillHeight?: boolean;
   emptyText?: string;
+  /**
+   * If set, render WhatsApp-style read-receipt ticks next to the
+   * timestamp on the viewer's own messages: ✓ (sent) when the
+   * other side has not loaded the chat since this message was
+   * created, ✓✓ (read) when they have. Pass an ISO string from
+   * the server (the page that renders this should fetch the
+   * partner's last_seen_at and forward it).
+   *
+   * Currently used only by `CoachingChat`. Other surfaces (task
+   * comments, etc.) should leave this undefined — they don't
+   * carry per-conversation read state.
+   */
+  readReceiptOtherSeenAt?: string | null;
 }
 
 const QUICK_REACTIONS = ["👍", "❤️", "😂", "🎯", "✅"];
@@ -82,8 +123,11 @@ export default function Comments({
   userId,
   mentionUsers = [],
   onUpload,
+  onCreateGoogleDoc,
+  onAttachGoogleLink,
   fillHeight = false,
   emptyText = "No comments yet. Start the conversation.",
+  readReceiptOtherSeenAt,
 }: CommentsProps) {
   const [comments, setComments] = useState<Comment[]>([]);
   const [loading, setLoading] = useState(true);
@@ -94,6 +138,22 @@ export default function Comments({
   const [mentionFilter, setMentionFilter] = useState("");
   const [mentionCursorPos, setMentionCursorPos] = useState(0);
   const [uploading, setUploading] = useState(false);
+  const [uploadError, setUploadError] = useState<string | null>(null);
+  // Drive-integration menu state (task 16). Anchored to the
+  // paperclip-row buttons; one shared "creating" flag because the
+  // three options share the same code path.
+  const [driveMenuOpen, setDriveMenuOpen] = useState(false);
+  const [creatingGoogleDoc, setCreatingGoogleDoc] = useState(false);
+  // Styled prompt dialog (task 124) — replaces the browser's native
+  // `prompt()` for collecting the title or URL. Same shape as the
+  // app's other modals (e.g. CancelBookingDialog).
+  type DrivePromptState =
+    | null
+    | { mode: "create"; type: "document" | "spreadsheet" | "presentation" }
+    | { mode: "attach" };
+  const [drivePrompt, setDrivePrompt] = useState<DrivePromptState>(null);
+  const [drivePromptValue, setDrivePromptValue] = useState("");
+  const drivePromptInputRef = useRef<HTMLInputElement>(null);
   const [dragOver, setDragOver] = useState(false);
   const [lightboxUrl, setLightboxUrl] = useState<string | null>(null);
   const [videoUrl, setVideoUrl] = useState<string | null>(null);
@@ -173,6 +233,17 @@ export default function Comments({
     }
   }, [comments]);
 
+  // Focus + select the Drive prompt input whenever it opens.
+  useEffect(() => {
+    if (drivePrompt) {
+      const id = setTimeout(() => {
+        drivePromptInputRef.current?.focus();
+        drivePromptInputRef.current?.select();
+      }, 0);
+      return () => clearTimeout(id);
+    }
+  }, [drivePrompt]);
+
   function handleScroll() {
     if (!scrollRef.current) return;
     const { scrollTop, scrollHeight, clientHeight } = scrollRef.current;
@@ -216,11 +287,55 @@ export default function Comments({
   async function handleFileUpload(file: File) {
     if (!onUpload || uploading) return;
     setUploading(true);
+    setUploadError(null);
     shouldAutoScroll.current = true;
 
     try {
+      // Google native files (Docs/Sheets/Slides) selected from a
+      // Drive-synced folder come through as small JSON shortcuts.
+      // Parse the embedded URL and reroute through the Drive attach
+      // flow so the cloud file is what gets linked. Falls through to
+      // a normal upload if parsing fails for any reason.
+      if (onAttachGoogleLink && isGoogleShortcutName(file.name)) {
+        try {
+          const text = await file.text();
+          const driveUrl = parseGoogleShortcutUrl(text);
+          if (driveUrl) {
+            const attachment = await onAttachGoogleLink(driveUrl);
+            const res = await fetch("/api/comments", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({
+                contextType,
+                contextId,
+                content: "",
+                attachments: [attachment],
+              }),
+            });
+            if (res.ok) {
+              const newComment: Comment = await res.json();
+              setComments((prev) => [...prev, newComment]);
+            } else {
+              const body = (await res.json().catch(() => ({}))) as {
+                error?: string;
+              };
+              setUploadError(body.error ?? "Failed to attach Google file.");
+            }
+            return;
+          }
+        } catch {
+          // Shortcut didn't parse — fall through to normal upload so
+          // the user sees the upload-side error (likely "type not
+          // allowed") rather than a silent skip.
+        }
+      }
+
       const attachment = await onUpload(file);
-      if (!attachment) return;
+      if (!attachment) {
+        // The caller signalled "nothing to attach" without throwing —
+        // treat as a silent skip (e.g. user cancelled mid-upload).
+        return;
+      }
 
       // Create a comment with the attachment
       const caption = isImageType(attachment.contentType)
@@ -243,11 +358,106 @@ export default function Comments({
       if (res.ok) {
         const newComment: Comment = await res.json();
         setComments((prev) => [...prev, newComment]);
+      } else {
+        const body = (await res.json().catch(() => ({}))) as {
+          error?: string;
+        };
+        setUploadError(body.error ?? "Upload failed.");
       }
-    } catch {
-      // Handle silently
+    } catch (err) {
+      // Surface the message instead of swallowing it (task 16) —
+      // users were getting no feedback on too-large / wrong-type
+      // uploads.
+      const msg =
+        err instanceof Error && err.message
+          ? err.message
+          : "Upload failed.";
+      setUploadError(msg);
     } finally {
       setUploading(false);
+    }
+  }
+
+  /**
+   * Open the styled "Create new Google file" prompt. The actual
+   * Drive create + comment post happens in `submitDrivePrompt`
+   * once the user confirms.
+   */
+  function openCreateDrivePrompt(
+    type: "document" | "spreadsheet" | "presentation",
+  ) {
+    if (!onCreateGoogleDoc || creatingGoogleDoc) return;
+    const defaultTitle =
+      type === "document"
+        ? "Untitled document"
+        : type === "spreadsheet"
+          ? "Untitled spreadsheet"
+          : "Untitled presentation";
+    setDriveMenuOpen(false);
+    setDrivePromptValue(defaultTitle);
+    setDrivePrompt({ mode: "create", type });
+  }
+
+  /** Open the styled "Attach existing Drive URL" prompt. */
+  function openAttachDrivePrompt() {
+    if (!onAttachGoogleLink || creatingGoogleDoc) return;
+    setDriveMenuOpen(false);
+    setDrivePromptValue("");
+    setDrivePrompt({ mode: "attach" });
+  }
+
+  /**
+   * Run the Drive create-or-attach flow with the value currently in
+   * the dialog input. Posts the resulting attachment as a comment
+   * with no caption — the file card already shows the title.
+   */
+  async function submitDrivePrompt() {
+    if (!drivePrompt || creatingGoogleDoc) return;
+    const value = drivePromptValue.trim();
+    if (!value) return;
+    const mode = drivePrompt;
+    setDrivePrompt(null);
+    setCreatingGoogleDoc(true);
+    setUploadError(null);
+    shouldAutoScroll.current = true;
+    try {
+      let attachment: Attachment | undefined;
+      if (mode.mode === "create") {
+        if (!onCreateGoogleDoc) return;
+        attachment = await onCreateGoogleDoc(mode.type, value);
+      } else {
+        if (!onAttachGoogleLink) return;
+        attachment = await onAttachGoogleLink(value);
+      }
+      const res = await fetch("/api/comments", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          contextType,
+          contextId,
+          content: "",
+          attachments: [attachment],
+        }),
+      });
+      if (res.ok) {
+        const newComment: Comment = await res.json();
+        setComments((prev) => [...prev, newComment]);
+      } else {
+        const body = (await res.json().catch(() => ({}))) as {
+          error?: string;
+        };
+        setUploadError(body.error ?? "Failed to attach Google file.");
+      }
+    } catch (err) {
+      const msg =
+        err instanceof Error && err.message
+          ? err.message
+          : mode.mode === "create"
+            ? "Failed to create Google file."
+            : "Failed to attach Google file.";
+      setUploadError(msg);
+    } finally {
+      setCreatingGoogleDoc(false);
     }
   }
 
@@ -484,6 +694,69 @@ export default function Comments({
         </div>
       )}
 
+      {/* Drive prompt dialog (task 124) — replaces window.prompt
+          for the title (create) and URL (attach) flows. */}
+      {drivePrompt && (
+        <div
+          className="fixed inset-0 z-[100] flex items-center justify-center bg-black/50 p-4"
+          onClick={(e) => {
+            if (e.target === e.currentTarget) setDrivePrompt(null);
+          }}
+        >
+          <div className="mx-4 w-full max-w-sm rounded-xl border border-green-200 bg-white p-6 shadow-2xl">
+            <h3 className="font-display text-lg font-semibold text-green-900">
+              {drivePrompt.mode === "create"
+                ? drivePrompt.type === "document"
+                  ? "New Google Doc"
+                  : drivePrompt.type === "spreadsheet"
+                    ? "New Google Sheet"
+                    : "New Google Slides"
+                : "Attach Google file"}
+            </h3>
+            <p className="mt-2 text-sm text-green-600">
+              {drivePrompt.mode === "create"
+                ? "Choose a title."
+                : "Paste a Google Drive / Docs / Sheets / Slides URL."}
+            </p>
+            <input
+              ref={drivePromptInputRef}
+              type={drivePrompt.mode === "create" ? "text" : "url"}
+              value={drivePromptValue}
+              onChange={(e) => setDrivePromptValue(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") {
+                  e.preventDefault();
+                  void submitDrivePrompt();
+                } else if (e.key === "Escape") {
+                  setDrivePrompt(null);
+                }
+              }}
+              placeholder={
+                drivePrompt.mode === "create"
+                  ? "Untitled"
+                  : "https://docs.google.com/document/d/…"
+              }
+              className="mt-4 w-full rounded-md border border-green-200 bg-white px-3 py-2 text-sm text-green-800 placeholder:text-green-300 focus:border-green-400 focus:outline-none"
+            />
+            <div className="mt-5 flex gap-3">
+              <button
+                onClick={() => setDrivePrompt(null)}
+                className="flex-1 rounded-md border border-green-200 px-4 py-2 text-sm font-medium text-green-700 transition-colors hover:bg-green-50"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={submitDrivePrompt}
+                disabled={!drivePromptValue.trim()}
+                className="flex-1 rounded-md bg-gold-600 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-gold-500 disabled:opacity-50"
+              >
+                {drivePrompt.mode === "create" ? "Create" : "Attach"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Video overlay */}
       {videoUrl && (
         <div
@@ -649,29 +922,47 @@ export default function Comments({
                                     isOwn ? "bg-green-600/40" : "bg-green-100"
                                   }`}>
                                     <svg className={`h-4 w-4 ${isOwn ? "text-white" : "text-green-600"}`} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                                      <path strokeLinecap="round" strokeLinejoin="round" d="M19.5 14.25v-2.625a3.375 3.375 0 0 0-3.375-3.375h-1.5A1.125 1.125 0 0 1 13.5 7.125v-1.5a3.375 3.375 0 0 0-3.375-3.375H8.25m2.25 0H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 0 0-9-9Z" />
+                                      {att.contentType === "application/vnd.google-apps.spreadsheet" ? (
+                                        <path strokeLinecap="round" strokeLinejoin="round" d="M3.75 6A2.25 2.25 0 0 1 6 3.75h2.25A2.25 2.25 0 0 1 10.5 6v2.25a2.25 2.25 0 0 1-2.25 2.25H6a2.25 2.25 0 0 1-2.25-2.25V6ZM3.75 15.75A2.25 2.25 0 0 1 6 13.5h2.25a2.25 2.25 0 0 1 2.25 2.25V18a2.25 2.25 0 0 1-2.25 2.25H6A2.25 2.25 0 0 1 3.75 18v-2.25ZM13.5 6a2.25 2.25 0 0 1 2.25-2.25H18A2.25 2.25 0 0 1 20.25 6v2.25A2.25 2.25 0 0 1 18 10.5h-2.25a2.25 2.25 0 0 1-2.25-2.25V6ZM13.5 15.75a2.25 2.25 0 0 1 2.25-2.25H18a2.25 2.25 0 0 1 2.25 2.25V18A2.25 2.25 0 0 1 18 20.25h-2.25A2.25 2.25 0 0 1 13.5 18v-2.25Z" />
+                                      ) : att.contentType === "application/vnd.google-apps.presentation" ? (
+                                        <path strokeLinecap="round" strokeLinejoin="round" d="M3.75 3v11.25A2.25 2.25 0 0 0 6 16.5h2.25M3.75 3h-1.5m1.5 0h16.5m0 0h1.5m-1.5 0v11.25A2.25 2.25 0 0 1 18 16.5h-2.25m-7.5 0h7.5m-7.5 0-1 3m8.5-3 1 3m0 0 .5 1.5m-.5-1.5h-9.5m0 0-.5 1.5M9 11.25v1.5M12 9v3.75m3-6v6" />
+                                      ) : att.contentType === "application/vnd.google-apps.document" ? (
+                                        <path strokeLinecap="round" strokeLinejoin="round" d="M19.5 14.25v-2.625a3.375 3.375 0 0 0-3.375-3.375h-1.5A1.125 1.125 0 0 1 13.5 7.125v-1.5a3.375 3.375 0 0 0-3.375-3.375H8.25m0 12.75h7.5m-7.5 3H12M10.5 2.25H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 0 0-9-9Z" />
+                                      ) : (
+                                        <path strokeLinecap="round" strokeLinejoin="round" d="M19.5 14.25v-2.625a3.375 3.375 0 0 0-3.375-3.375h-1.5A1.125 1.125 0 0 1 13.5 7.125v-1.5a3.375 3.375 0 0 0-3.375-3.375H8.25m2.25 0H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 0 0-9-9Z" />
+                                      )}
                                     </svg>
                                   </div>
                                   <div className="min-w-0 flex-1">
                                     <p className={`truncate text-xs font-medium ${isOwn ? "text-white" : "text-green-800"}`}>
                                       {att.name}
                                     </p>
-                                    <p className={`text-[10px] ${isOwn ? "text-green-200" : "text-green-400"}`}>
-                                      {formatFileSize(att.size)}
-                                    </p>
+                                    {att.size > 0 && (
+                                      <p className={`text-[10px] ${isOwn ? "text-green-200" : "text-green-400"}`}>
+                                        {formatFileSize(att.size)}
+                                      </p>
+                                    )}
                                   </div>
-                                  <svg className={`h-4 w-4 shrink-0 ${isOwn ? "text-green-200" : "text-green-400"}`} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                                    <path strokeLinecap="round" strokeLinejoin="round" d="M3 16.5v2.25A2.25 2.25 0 0 0 5.25 21h13.5A2.25 2.25 0 0 0 21 18.75V16.5M16.5 12 12 16.5m0 0L7.5 12m4.5 4.5V3" />
-                                  </svg>
+                                  {att.contentType?.startsWith("application/vnd.google-apps.") ? (
+                                    <svg className={`h-4 w-4 shrink-0 ${isOwn ? "text-green-200" : "text-green-400"}`} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                                      <path strokeLinecap="round" strokeLinejoin="round" d="M16.862 4.487l1.687-1.688a1.875 1.875 0 1 1 2.652 2.652L10.582 16.07a4.5 4.5 0 0 1-1.897 1.13L6 18l.8-2.685a4.5 4.5 0 0 1 1.13-1.897l8.932-8.931Zm0 0L19.5 7.125" />
+                                    </svg>
+                                  ) : (
+                                    <svg className={`h-4 w-4 shrink-0 ${isOwn ? "text-green-200" : "text-green-400"}`} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                                      <path strokeLinecap="round" strokeLinejoin="round" d="M3 16.5v2.25A2.25 2.25 0 0 0 5.25 21h13.5A2.25 2.25 0 0 0 21 18.75V16.5M16.5 12 12 16.5m0 0L7.5 12m4.5 4.5V3" />
+                                    </svg>
+                                  )}
                                 </a>
                               );
                             })}
                           </div>
                         )}
 
-                        <p className="whitespace-pre-wrap text-sm leading-relaxed">
-                          {renderContentWithMentions(comment.content)}
-                        </p>
+                        {comment.content && (
+                          <p className="whitespace-pre-wrap text-sm leading-relaxed">
+                            {renderContentWithMentions(comment.content)}
+                          </p>
+                        )}
 
                         {/* Chevron menu — top right inside bubble */}
                         <div className="absolute right-1 top-1">
@@ -732,31 +1023,45 @@ export default function Comments({
                                   </svg>
                                   Reply
                                 </button>
-                                {comment.attachments && comment.attachments.length > 0 && (
-                                  <a
-                                    href={comment.attachments[0].url}
-                                    download={comment.attachments[0].name}
-                                    target="_blank"
-                                    rel="noopener noreferrer"
-                                    onClick={() => setMenuOpenId(null)}
-                                    className="flex w-full items-center gap-2 px-3 py-1.5 text-xs text-green-700 hover:bg-green-50"
-                                  >
-                                    <svg
-                                      className="h-3.5 w-3.5"
-                                      fill="none"
-                                      viewBox="0 0 24 24"
-                                      stroke="currentColor"
-                                      strokeWidth={2}
+                                {comment.attachments && comment.attachments.length > 0 && (() => {
+                                  const att = comment.attachments[0];
+                                  const isGoogle = att.contentType?.startsWith(
+                                    "application/vnd.google-apps.",
+                                  );
+                                  return (
+                                    <a
+                                      href={att.url}
+                                      {...(isGoogle ? {} : { download: att.name })}
+                                      target="_blank"
+                                      rel="noopener noreferrer"
+                                      onClick={() => setMenuOpenId(null)}
+                                      className="flex w-full items-center gap-2 px-3 py-1.5 text-xs text-green-700 hover:bg-green-50"
                                     >
-                                      <path
-                                        strokeLinecap="round"
-                                        strokeLinejoin="round"
-                                        d="M3 16.5v2.25A2.25 2.25 0 0 0 5.25 21h13.5A2.25 2.25 0 0 0 21 18.75V16.5M16.5 12 12 16.5m0 0L7.5 12m4.5 4.5V3"
-                                      />
-                                    </svg>
-                                    Download
-                                  </a>
-                                )}
+                                      <svg
+                                        className="h-3.5 w-3.5"
+                                        fill="none"
+                                        viewBox="0 0 24 24"
+                                        stroke="currentColor"
+                                        strokeWidth={2}
+                                      >
+                                        {isGoogle ? (
+                                          <path
+                                            strokeLinecap="round"
+                                            strokeLinejoin="round"
+                                            d="M16.862 4.487l1.687-1.688a1.875 1.875 0 1 1 2.652 2.652L10.582 16.07a4.5 4.5 0 0 1-1.897 1.13L6 18l.8-2.685a4.5 4.5 0 0 1 1.13-1.897l8.932-8.931Zm0 0L19.5 7.125"
+                                          />
+                                        ) : (
+                                          <path
+                                            strokeLinecap="round"
+                                            strokeLinejoin="round"
+                                            d="M3 16.5v2.25A2.25 2.25 0 0 0 5.25 21h13.5A2.25 2.25 0 0 0 21 18.75V16.5M16.5 12 12 16.5m0 0L7.5 12m4.5 4.5V3"
+                                          />
+                                        )}
+                                      </svg>
+                                      {isGoogle ? "Open" : "Download"}
+                                    </a>
+                                  );
+                                })()}
                                 {isOwn && (
                                   <button
                                     onClick={() => {
@@ -838,7 +1143,7 @@ export default function Comments({
                   )}
                   </div>
 
-                  {/* Edited indicator + timestamp */}
+                  {/* Edited indicator + timestamp + read receipt */}
                   <div
                     className={`mt-0.5 flex items-center gap-1.5 px-1 ${isOwn ? "justify-end" : "justify-start"}`}
                   >
@@ -850,6 +1155,29 @@ export default function Comments({
                     <span className="text-[10px] text-green-400">
                       {formatTime(comment.createdAt)}
                     </span>
+                    {/* WhatsApp-style ✓ / ✓✓ on own, non-deleted
+                        messages. Only renders when the parent has
+                        opted into read receipts via the
+                        readReceiptOtherSeenAt prop. */}
+                    {isOwn &&
+                      !isDeleted &&
+                      readReceiptOtherSeenAt !== undefined &&
+                      (() => {
+                        const state = computeReadReceipt(
+                          readReceiptOtherSeenAt,
+                          comment.createdAt,
+                        );
+                        const label = state === "read" ? "Read" : "Sent";
+                        return (
+                          <span
+                            className={`text-[11px] ${readReceiptColorClass(state)}`}
+                            aria-label={label}
+                            title={label}
+                          >
+                            {readReceiptGlyph(state)}
+                          </span>
+                        );
+                      })()}
                   </div>
 
                   {/* Reactions */}
@@ -943,13 +1271,50 @@ export default function Comments({
         </div>
       )}
 
+      {/* Drive create progress (task 16) */}
+      {creatingGoogleDoc && (
+        <div className="flex items-center gap-2 border-t border-green-100 bg-gold-50 px-4 py-2">
+          <div className="h-4 w-4 animate-spin rounded-full border-2 border-gold-400 border-t-transparent" />
+          <span className="text-xs text-gold-700">Working on Google file...</span>
+        </div>
+      )}
+
+      {/* Upload error — surfaces server-side validation (file too
+          large, type not allowed) and transport failures. Pre-fix
+          the catch-block was a silent `Handle silently` (task 16). */}
+      {uploadError && (
+        <div className="flex items-start gap-2 border-t border-red-100 bg-red-50 px-4 py-2">
+          <span className="flex-1 text-xs text-red-700">{uploadError}</span>
+          <button
+            type="button"
+            onClick={() => setUploadError(null)}
+            className="text-red-400 hover:text-red-600"
+            aria-label="Dismiss"
+          >
+            <svg
+              className="h-3.5 w-3.5"
+              fill="none"
+              viewBox="0 0 24 24"
+              stroke="currentColor"
+              strokeWidth={2}
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                d="M6 18L18 6M6 6l12 12"
+              />
+            </svg>
+          </button>
+        </div>
+      )}
+
       {/* Hidden file input */}
       {onUpload && (
         <input
           ref={fileInputRef}
           type="file"
           className="hidden"
-          accept="image/jpeg,image/png,image/gif,image/webp,video/mp4,video/quicktime,video/webm,application/pdf,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document,application/vnd.ms-excel,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+          accept="image/jpeg,image/png,image/gif,image/webp,image/heic,image/heif,video/mp4,video/quicktime,video/webm,application/pdf,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document,application/vnd.ms-excel,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/vnd.ms-powerpoint,application/vnd.openxmlformats-officedocument.presentationml.presentation,text/csv,text/plain,text/markdown,.gdoc,.gsheet,.gslides,.gdraw,.gform"
           onChange={(e) => {
             const file = e.target.files?.[0];
             if (file) handleFileUpload(file);
@@ -1015,6 +1380,73 @@ export default function Comments({
               <path strokeLinecap="round" strokeLinejoin="round" d="m18.375 12.739-7.693 7.693a4.5 4.5 0 0 1-6.364-6.364l10.94-10.94A3 3 0 1 1 19.5 7.372L8.552 18.32m.009-.01-.01.01m5.699-9.941-7.81 7.81a1.5 1.5 0 0 0 2.112 2.13" />
             </svg>
           </button>
+        )}
+        {/* Drive-integration menu (task 16) — sits next to the
+            paperclip when the parent supplies onCreateGoogleDoc.
+            Three-option popover for Doc / Sheet / Slides; uses a
+            window.prompt() to capture the title (low-overhead UI;
+            replace with a styled dialog if it gets popular). */}
+        {(onCreateGoogleDoc || onAttachGoogleLink) && (
+          <div className="relative">
+            <button
+              type="button"
+              onClick={() => setDriveMenuOpen((v) => !v)}
+              disabled={creatingGoogleDoc}
+              className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-green-400 transition-colors hover:bg-green-50 hover:text-green-600 disabled:opacity-40"
+              title="Create or attach a Google file"
+            >
+              <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M19.5 14.25v-2.625a3.375 3.375 0 0 0-3.375-3.375h-1.5A1.125 1.125 0 0 1 13.5 7.125v-1.5a3.375 3.375 0 0 0-3.375-3.375H8.25M12 9v6m3-3H9m1.5-7.5h-5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 0 0-9-9Z" />
+              </svg>
+            </button>
+            {driveMenuOpen && (
+              <>
+                <div
+                  className="fixed inset-0 z-10"
+                  onClick={() => setDriveMenuOpen(false)}
+                />
+                <div className="absolute bottom-10 left-0 z-20 min-w-[180px] rounded-md border border-green-200 bg-white py-1 shadow-lg">
+                  {onCreateGoogleDoc && (
+                    <>
+                      <button
+                        type="button"
+                        onClick={() => openCreateDrivePrompt("document")}
+                        className="block w-full px-3 py-1.5 text-left text-xs text-green-800 hover:bg-green-50"
+                      >
+                        📄 New Google Doc
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => openCreateDrivePrompt("spreadsheet")}
+                        className="block w-full px-3 py-1.5 text-left text-xs text-green-800 hover:bg-green-50"
+                      >
+                        📊 New Google Sheet
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => openCreateDrivePrompt("presentation")}
+                        className="block w-full px-3 py-1.5 text-left text-xs text-green-800 hover:bg-green-50"
+                      >
+                        🎬 New Google Slides
+                      </button>
+                    </>
+                  )}
+                  {onCreateGoogleDoc && onAttachGoogleLink && (
+                    <div className="my-1 border-t border-green-100" />
+                  )}
+                  {onAttachGoogleLink && (
+                    <button
+                      type="button"
+                      onClick={openAttachDrivePrompt}
+                      className="block w-full px-3 py-1.5 text-left text-xs text-green-800 hover:bg-green-50"
+                    >
+                      🔗 Attach existing file…
+                    </button>
+                  )}
+                </div>
+              </>
+            )}
+          </div>
         )}
         <textarea
           ref={inputRef}

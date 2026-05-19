@@ -4,6 +4,7 @@ import * as Sentry from "@sentry/nextjs";
 import { db } from "@/lib/db";
 import { users, lessonBookings } from "@/lib/db/schema";
 import { eq } from "drizzle-orm";
+import { isClaimBookingUserError } from "@/lib/claim-booking-errors";
 
 function getSecret() {
   return new TextEncoder().encode(
@@ -80,7 +81,12 @@ export async function GET(request: NextRequest) {
     // Fallback: no booking found — send to home page
     return NextResponse.redirect(new URL("/?verified=1", request.url));
   } catch (err) {
-    Sentry.captureException(err, { tags: { area: "claim-booking" } });
+    // Don't alert on user-input failures. The predicate covers
+    // jose's JOSEError subclasses + our two well-known guard
+    // messages; everything else still escalates to Sentry.
+    if (!isClaimBookingUserError(err)) {
+      Sentry.captureException(err, { tags: { area: "claim-booking" } });
+    }
     return NextResponse.redirect(new URL("/login?claim=error", request.url));
   }
 }

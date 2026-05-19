@@ -18,7 +18,7 @@ import { LOCALES, LOCALE_SHORT, type Locale } from "@/lib/i18n";
 
 const CMS_PAGES: { slug: string; label: string; route: string }[] = [
   { slug: "home", label: "Home", route: "/" },
-  { slug: "for-students", label: "For Students", route: "/for-students" },
+  { slug: "for-students", label: "For Golfers", route: "/for-students" },
   { slug: "for-pros", label: "For Pros", route: "/for-pros" },
 ];
 

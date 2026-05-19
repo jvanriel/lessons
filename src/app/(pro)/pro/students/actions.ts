@@ -18,7 +18,10 @@ import { eq, ne, and, asc, desc, gte, lte } from "drizzle-orm";
 import { requireProProfile } from "@/lib/pro";
 import { hashPassword } from "@/lib/auth";
 import { sendEmail } from "@/lib/mail";
-import { sendParticipantCancellationNotifications } from "@/lib/booking-participants";
+import {
+  sendParticipantCancellationNotifications,
+  getEmailableParticipants,
+} from "@/lib/booking-participants";
 import {
   parseEditBookingChanges,
   validateEditAllowed,
@@ -37,6 +40,7 @@ import { loadBookingPricing } from "@/lib/booking-charge";
 import type { EmailPaymentChange } from "@/lib/email-templates";
 import {
   buildInviteEmail,
+  buildPasswordResetEmail,
   getEmailStrings,
   buildStudentBookingConfirmationEmail,
   getStudentBookingConfirmationSubject,
@@ -51,22 +55,23 @@ import {
   todayInTZ,
 } from "@/lib/local-date";
 import { getProLocationTimezone } from "@/lib/pro";
-import { fromZonedTime } from "date-fns-tz";
 import { resolveLocale } from "@/lib/i18n";
 import { createNotification } from "@/lib/notifications";
 import {
+  formatLocationFull,
+  wazeUrl,
+  googleMapsUrl,
+} from "@/lib/location-display";
+import {
   computeAvailableSlots,
   buildIcs,
-  buildCancelIcs,
   type AvailabilityTemplate,
   type AvailabilityOverride,
   type ExistingBooking,
 } from "@/lib/lesson-slots";
-import {
-  CANCEL_STRINGS,
-  formatCancelLessonDate,
-  buildCancelEmailBody,
-} from "@/lib/booking-cancel-email";
+import { cancelBookingByPro } from "@/lib/booking-cancel";
+import { markBookingAsNoShow } from "@/lib/booking-no-show";
+import { findStudentOverlap } from "@/lib/booking-overlap";
 import { after } from "next/server";
 import crypto from "node:crypto";
 
@@ -78,6 +83,36 @@ function generatePassword(length = 12): string {
   crypto.getRandomValues(arr);
   for (const b of arr) pw += chars[b % chars.length];
   return pw;
+}
+
+function getAuthSecret() {
+  return new TextEncoder().encode(
+    process.env.AUTH_SECRET || "dev-secret-change-me",
+  );
+}
+
+/**
+ * 7-day JWT pointing at /reset-password. The /reset-password action
+ * accepts the same shape used by the forgot-password flow ({userId,
+ * email} payload), so an invited golfer lands on a "Choose your
+ * password" page and is then logged in. Task 138.
+ */
+async function generateInviteSetPasswordUrl(
+  userId: number,
+  email: string,
+): Promise<string> {
+  const { SignJWT } = await import("jose");
+  const token = await new SignJWT({ userId, email })
+    .setProtectedHeader({ alg: "HS256" })
+    .setIssuedAt()
+    .setExpirationTime("7d")
+    .sign(getAuthSecret());
+  const baseUrl =
+    process.env.NEXT_PUBLIC_APP_URL ||
+    (process.env.VERCEL_URL
+      ? `https://${process.env.VERCEL_URL}`
+      : "http://localhost:3000");
+  return `${baseUrl}/reset-password?token=${token}`;
 }
 
 export async function getMyStudents() {
@@ -216,28 +251,29 @@ export async function getMyGuests() {
 }
 
 export async function inviteStudent(
-  _prev: { error?: string; success?: boolean; password?: string } | null,
+  _prev: { error?: string; success?: boolean } | null,
   formData: FormData
-): Promise<{ error?: string; success?: boolean; password?: string }> {
+): Promise<{ error?: string; success?: boolean }> {
   const { profile } = await requireProProfile();
   if (!profile) return { error: "No pro profile found." };
 
   const firstName = (formData.get("firstName") as string).trim();
   const lastName = (formData.get("lastName") as string).trim();
   const email = (formData.get("email") as string).trim().toLowerCase();
-  const password = (formData.get("password") as string)?.trim();
+  const reason = (formData.get("reason") as string)?.trim() || "";
   const source = (formData.get("source") as string) || "invited";
 
   if (!firstName || !lastName || !email) {
     return { error: "First name, last name and email are required." };
   }
-  if (!password) {
-    return { error: "Password is required. Use the Generate button." };
-  }
 
-  // Check if user already exists
+  // Server-generated random password. The pro never sees it, the
+  // email never carries it — the invited golfer clicks the
+  // set-password link and chooses their own (task 138). The hashed
+  // value still lives on the row so any legacy code path that
+  // expects a non-null password keeps working.
   let userId: number;
-  const tempPassword = password;
+  const tempPassword = generatePassword(16);
 
   const [existing] = await db
     .select({ id: users.id, roles: users.roles })
@@ -296,27 +332,46 @@ export async function inviteStudent(
       .onConflictDoNothing();
   }
 
-  // Create pro-student relationship
-  // "pro_added" is always active immediately; "invited" is pending until first login
-  await db.insert(proStudents).values({
-    proProfileId: profile.id,
-    userId,
-    source,
-    status: source === "pro_added" ? "active" : (tempPassword ? "pending" : "active"),
-  });
+  // Create pro-student relationship.
+  // "pro_added" is always active immediately; "invited" is pending until first login.
+  // onConflictDoNothing guards the (pro_profile_id, user_id) WHERE status='active'
+  // partial unique index added in task 147 — a concurrent invite race won't
+  // produce a duplicate active row.
+  await db
+    .insert(proStudents)
+    .values({
+      proProfileId: profile.id,
+      userId,
+      source,
+      status: source === "pro_added" ? "active" : (tempPassword ? "pending" : "active"),
+    })
+    .onConflictDoNothing();
 
-  // Send invite email if new user was created. Use the inviting pro's
-  // locale (from their session cookie) since the student account is fresh
-  // and has no preferredLocale yet.
-  if (tempPassword) {
+  // Send invite email if a new user was created. The pro's locale
+  // (from their session cookie) is used since the new student
+  // account has no preferredLocale yet.
+  if (!existing) {
     const locale = await getLocale();
     const strings = getEmailStrings(locale);
+    const setPasswordUrl = await generateInviteSetPasswordUrl(userId, email);
+
+    // Pro-supplied reason wins; fall back to the legacy generic line
+    // so existing copy doesn't regress for invites without a reason.
+    const comment =
+      reason ||
+      `${
+        locale === "nl"
+          ? `Je bent uitgenodigd door ${profile.displayName} op Golf Lessons.`
+          : locale === "fr"
+            ? `Vous avez été invité par ${profile.displayName} sur Golf Lessons.`
+            : `You've been invited by ${profile.displayName} on Golf Lessons.`
+      }`;
 
     const html = buildInviteEmail({
       firstName,
       loginEmail: email,
-      password: tempPassword,
-      comment: `You've been invited by ${profile.displayName} on Golf Lessons.`,
+      setPasswordUrl,
+      comment,
       locale,
     });
 
@@ -337,7 +392,7 @@ export async function inviteStudent(
   }).catch(() => {});
 
   revalidatePath("/pro/students");
-  return { success: true, password: tempPassword };
+  return { success: true };
 }
 
 export async function removeStudent(proStudentId: number) {
@@ -452,11 +507,15 @@ export async function resetStudentPassword(proStudentId: number) {
   // Send email in the student's preferred language
   const locale = resolveLocale(rel.preferredLocale);
   const strings = getEmailStrings(locale);
-  const html = buildInviteEmail({
+  // Pro-initiated reset stays on the old "here's a new password"
+  // pattern (the pro typically wants something to communicate to the
+  // student). The invite-new-user flow moved to a set-password link
+  // for security (task 138). Switching this reset path to a link
+  // would prevent the pro from telling the student in person.
+  const html = buildPasswordResetEmail({
     firstName: rel.firstName,
     loginEmail: rel.email,
     password: newPassword,
-    comment: `Your password has been reset by ${profile.displayName}.`,
     locale,
   });
 
@@ -1051,6 +1110,25 @@ export async function proQuickBookForStudent(data: {
     return { error: "This time slot is no longer available." };
   }
 
+  // Cross-pro double-booking guard. (task 143) Pro is creating on
+  // behalf of the student — if the student already has a confirmed
+  // booking that overlaps (with this pro or any other), refuse so
+  // the student isn't stranded between two parallel lessons.
+  const proBookingOverlap = await findStudentOverlap({
+    userId: rel.userId,
+    date: data.date,
+    startTime: data.startTime,
+    endTime: data.endTime,
+  });
+  if (proBookingOverlap) {
+    const proLocale = await getLocale();
+    return {
+      error: t("bookErr.studentOverlapForPro", proLocale)
+        .replace("{start}", proBookingOverlap.startTime)
+        .replace("{end}", proBookingOverlap.endTime),
+    };
+  }
+
   // Create booking (booked by the student, initiated by pro). Atomic
   // insert + participant — the pro/student relationship already
   // exists (this is a pro-initiated booking against an existing
@@ -1151,24 +1229,36 @@ export async function proQuickBookForStudent(data: {
   // notification mail so it lives in their inbox alongside the in-app
   // toast — useful as a record of what they just booked on behalf of
   // the student.
+  // Pricing now lives on pro_locations (task 109). Pull the location's
+  // own lessonPricing for the email's price line, plus the pro's
+  // contact + locale fields from pro_profiles via the same join.
   const [proRow] = await db
     .select({
       contactPhone: proProfiles.contactPhone,
-      lessonPricing: proProfiles.lessonPricing,
+      lessonPricing: proLocations.lessonPricing,
       allowBookingWithoutPayment: proProfiles.allowBookingWithoutPayment,
       proFirstName: users.firstName,
       proEmail: users.email,
       proLocale: users.preferredLocale,
     })
-    .from(proProfiles)
+    .from(proLocations)
+    .innerJoin(proProfiles, eq(proProfiles.id, proLocations.proProfileId))
     .innerJoin(users, eq(proProfiles.userId, users.id))
-    .where(eq(proProfiles.id, profile.id))
+    .where(
+      and(
+        eq(proLocations.id, data.proLocationId),
+        eq(proProfiles.id, profile.id),
+      ),
+    )
     .limit(1);
 
   const [loc] = await db
     .select({
       name: locations.name,
+      address: locations.address,
       city: locations.city,
+      lat: locations.lat,
+      lng: locations.lng,
       timezone: locations.timezone,
     })
     .from(proLocations)
@@ -1180,7 +1270,7 @@ export async function proQuickBookForStudent(data: {
       `proCreateBooking: location lookup missing for proLocationId=${data.proLocationId} (booking ${booking.id})`,
     );
   }
-  const locationName = loc.city ? `${loc.name}, ${loc.city}` : loc.name;
+  const locationName = formatLocationFull(loc);
   const locationTz = loc.timezone;
 
   const [studentRow] = await db
@@ -1231,6 +1321,8 @@ export async function proQuickBookForStudent(data: {
             proEmail: proRow.proEmail,
             proPhone: proRow.contactPhone,
             locationName,
+            wazeUrl: wazeUrl(loc),
+            googleMapsUrl: googleMapsUrl(loc),
             date: data.date,
             startTime: data.startTime,
             endTime: data.endTime,
@@ -1346,185 +1438,43 @@ export async function proCancelBooking(bookingId: number) {
   const { profile } = await requireProProfile();
   if (!profile) return { error: "No pro profile." };
 
-  const [booking] = await db
-    .select({
-      id: lessonBookings.id,
-      date: lessonBookings.date,
-      startTime: lessonBookings.startTime,
-      endTime: lessonBookings.endTime,
-      bookedById: lessonBookings.bookedById,
-      proLocationId: lessonBookings.proLocationId,
-      participantCount: lessonBookings.participantCount,
-    })
-    .from(lessonBookings)
-    .where(
-      and(
-        eq(lessonBookings.id, bookingId),
-        eq(lessonBookings.proProfileId, profile.id),
-        eq(lessonBookings.status, "confirmed")
-      )
-    )
-    .limit(1);
-
-  if (!booking) return { error: "Booking not found." };
-
-  // Decide BEFORE the row update whether the lesson is in the past,
-  // so we can short-circuit the notification+email pipeline. Resolve
-  // the lesson start in the location's TZ — same pattern as
-  // `cancelBooking` in (member)/member/bookings/actions.ts. Reading
-  // the location row also gives us name + tz for the email path.
-  const [loc] = await db
-    .select({
-      name: locations.name,
-      city: locations.city,
-      timezone: locations.timezone,
-    })
-    .from(proLocations)
-    .innerJoin(locations, eq(proLocations.locationId, locations.id))
-    .where(eq(proLocations.id, booking.proLocationId))
-    .limit(1);
-  if (!loc) {
-    throw new Error(
-      `proCancelBooking: location lookup missing for proLocationId=${booking.proLocationId} (booking ${booking.id})`,
-    );
-  }
-  const locationName = loc.city ? `${loc.name}, ${loc.city}` : loc.name;
-  const locationTz = loc.timezone;
-  const lessonStart = fromZonedTime(
-    `${booking.date}T${booking.startTime}:00`,
-    locationTz,
-  );
-  const isPast = lessonStart.getTime() <= Date.now();
-
-  await db
-    .update(lessonBookings)
-    .set({
-      status: "cancelled",
-      cancelledAt: new Date(),
-      cancellationReason: isPast
-        ? "Cancelled by pro (admin cleanup, lesson already past)"
-        : "Cancelled by pro",
-      updatedAt: new Date(),
-    })
-    .where(eq(lessonBookings.id, bookingId));
+  const result = await cancelBookingByPro({
+    bookingId,
+    proProfileId: profile.id,
+    reason: "Cancelled by pro",
+  });
 
   revalidatePath("/pro/students");
   revalidatePath("/pro/bookings");
 
-  // Past lesson: stop here. No emails, no notification, no ICS — the
-  // student doesn't need to hear about a cancellation of a lesson
-  // they already attended (or didn't).
-  if (isPast) {
-    return { success: true, silent: true };
-  }
+  return result;
+}
 
-  // Future lesson: notify + email both parties with a CANCEL ics.
-  // Mirror of the member-side cancelBooking flow, but with the
-  // "by: pro" copy variant.
-  await createNotification({
-    type: "booking_cancelled",
-    priority: "high",
-    targetUserId: booking.bookedById,
-    title: "Lesson cancelled",
-    message: `${profile.displayName} cancelled your lesson on ${booking.date} at ${booking.startTime}.`,
-    actionUrl: "/member/bookings",
-    actionLabel: "View bookings",
-  }).catch(() => {});
+/**
+ * Pro-side "mark as no-show" wrapper (task 155). Auth gate + cache
+ * revalidate around `markBookingAsNoShow` so the pro doesn't have to
+ * thread proProfileId through every UI call site.
+ *
+ * Returns `{ success: true, settlementUrl? }` on success or
+ * `{ error }` on user-actionable failure. The optional
+ * `settlementUrl` is present when the booking was unpaid and a
+ * Stripe Checkout session was created — the UI can surface it as
+ * "we sent a payment link" inline confirmation.
+ */
+export async function proMarkNoShow(bookingId: number) {
+  const { profile } = await requireProProfile();
+  if (!profile) return { error: "No pro profile." };
 
-  const [student] = await db
-    .select({
-      firstName: users.firstName,
-      lastName: users.lastName,
-      email: users.email,
-      preferredLocale: users.preferredLocale,
-    })
-    .from(users)
-    .where(eq(users.id, booking.bookedById))
-    .limit(1);
-
-  const [proRow] = await db
-    .select({
-      proFirstName: users.firstName,
-      proEmail: users.email,
-      proLocale: users.preferredLocale,
-    })
-    .from(proProfiles)
-    .innerJoin(users, eq(proProfiles.userId, users.id))
-    .where(eq(proProfiles.id, profile.id))
-    .limit(1);
-
-  const studentName = student
-    ? `${student.firstName} ${student.lastName}`
-    : "Student";
-  const studentLocale = resolveLocale(student?.preferredLocale);
-  const proLocale = resolveLocale(proRow?.proLocale);
-
-  const cancelIcs = buildCancelIcs({
-    date: booking.date,
-    startTime: booking.startTime,
-    endTime: booking.endTime,
-    summary: `Golf lesson with ${profile.displayName}`,
-    location: locationName,
-    description: `Cancelled by ${profile.displayName}`,
-    bookingId: booking.id,
-    tz: locationTz,
+  const result = await markBookingAsNoShow({
+    bookingId,
+    proProfileId: profile.id,
   });
-  const icsAttachment = {
-    filename: "lesson-cancelled.ics",
-    contentType: "text/calendar",
-    content: cancelIcs,
-    method: "CANCEL" as const,
-  };
 
-  if (student?.email) {
-    const ss = CANCEL_STRINGS[studentLocale] ?? CANCEL_STRINGS.en;
-    sendEmail({
-      to: student.email,
-      subject: ss.studentSubject(profile.displayName, "pro"),
-      html: buildCancelEmailBody({
-        greeting: ss.greeting,
-        recipientFirstName: student.firstName,
-        bodyLine: ss.studentBody(profile.displayName, "pro"),
-        rows: [
-          [ss.date, formatCancelLessonDate(booking.date, studentLocale)],
-          [ss.time, `${booking.startTime} – ${booking.endTime}`],
-          [ss.location, locationName],
-        ],
-        helper: ss.helper,
-        locale: studentLocale,
-      }),
-      attachments: [icsAttachment],
-    }).catch(() => {});
-  }
+  revalidatePath("/pro/students");
+  revalidatePath("/pro/bookings");
+  revalidatePath("/pro/earnings");
 
-  if (proRow?.proEmail) {
-    const ps = CANCEL_STRINGS[proLocale] ?? CANCEL_STRINGS.en;
-    sendEmail({
-      to: proRow.proEmail,
-      subject: ps.proSubject(studentName, "pro"),
-      html: buildCancelEmailBody({
-        greeting: ps.greeting,
-        recipientFirstName: proRow.proFirstName,
-        bodyLine: ps.proBody(studentName, "pro"),
-        rows: [
-          [ps.date, formatCancelLessonDate(booking.date, proLocale)],
-          [ps.time, `${booking.startTime} – ${booking.endTime}`],
-          [ps.location, locationName],
-        ],
-        helper: ps.helper,
-        locale: proLocale,
-      }),
-      attachments: [icsAttachment],
-    }).catch(() => {});
-  }
-
-  // Fan out cancellation to extra participants. Skipped automatically
-  // when participantCount === 1.
-  if ((booking.participantCount ?? 1) > 1) {
-    sendParticipantCancellationNotifications(booking.id).catch(() => {});
-  }
-
-  return { success: true };
+  return result;
 }
 
 
@@ -1548,12 +1498,17 @@ export async function proUpdateBooking(formData: FormData) {
   if (!bookingId) return { error: "Invalid booking ID" };
 
   const changes = parseEditBookingChanges(formData);
-  const participantError = validateEditParticipants(changes.extraParticipants);
+  const localeForParticipantCheck = await getLocale();
+  const participantError = validateEditParticipants(
+    changes.extraParticipants,
+    localeForParticipantCheck,
+  );
   if (participantError) return { error: participantError };
 
   const [booking] = await db
     .select({
       id: lessonBookings.id,
+      bookedById: lessonBookings.bookedById,
       proProfileId: lessonBookings.proProfileId,
       proLocationId: lessonBookings.proLocationId,
       date: lessonBookings.date,
@@ -1653,7 +1608,51 @@ export async function proUpdateBooking(formData: FormData) {
       booking.id,
     );
     if (taken) return { error: t("bookErr.slotUnavailable", localeForSlot) };
+    // Cross-pro double-booking guard for the student. (task 143)
+    const studentOverlap = await findStudentOverlap({
+      userId: booking.bookedById,
+      date: changes.date,
+      startTime: changes.startTime,
+      endTime: changes.endTime,
+      excludeBookingId: booking.id,
+    });
+    if (studentOverlap) {
+      return {
+        error: t("bookErr.studentOverlapForPro", localeForSlot)
+          .replace("{start}", studentOverlap.startTime)
+          .replace("{end}", studentOverlap.endTime),
+      };
+    }
   }
+
+  // Pre-edit snapshot for the booking-updated emails. Mirror of the
+  // member side — both sides need this so the recipients see what
+  // actually changed.
+  const previous = {
+    date: booking.date,
+    startTime: booking.startTime,
+    endTime: booking.endTime,
+    duration:
+      Number(booking.endTime.split(":")[0]) * 60 +
+      Number(booking.endTime.split(":")[1]) -
+      (Number(booking.startTime.split(":")[0]) * 60 +
+        Number(booking.startTime.split(":")[1])),
+    participantCount: booking.participantCount,
+    priceCents: booking.priceCents,
+  };
+  // Booker email — needed by getEmailableParticipants to exclude the
+  // booker from the participant fanout. Pro session is the pro, not
+  // the booker, so look it up from the booking row.
+  const [bookerUser] = await db
+    .select({ email: users.email })
+    .from(users)
+    .where(eq(users.id, booking.bookedById))
+    .limit(1);
+  const bookerEmail = bookerUser?.email ?? "";
+  const previousParticipants = await getEmailableParticipants(
+    booking.id,
+    bookerEmail,
+  );
 
   try {
     await applyBookingEdit(booking.id, changes, bookerParticipant.id);
@@ -1670,6 +1669,7 @@ export async function proUpdateBooking(formData: FormData) {
   // walkthrough. Failures Sentry-tagged "edit-payment".
   const pricing = await loadBookingPricing(
     booking.proProfileId,
+    booking.proLocationId,
     changes.duration,
     changes.participantCount,
   );
@@ -1702,7 +1702,12 @@ export async function proUpdateBooking(formData: FormData) {
   }
 
   after(async () => {
-    await sendBookingUpdatedNotifications(booking.id, paymentChange);
+    await sendBookingUpdatedNotifications(
+      booking.id,
+      paymentChange,
+      previous,
+      previousParticipants,
+    );
   });
 
   revalidatePath("/pro/bookings");

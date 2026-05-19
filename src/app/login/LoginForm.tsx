@@ -8,6 +8,7 @@ import { Suspense } from "react";
 import { t } from "@/lib/i18n/translations";
 import type { Locale } from "@/lib/i18n";
 import PasswordInput from "@/components/PasswordInput";
+import LanguageSwitcher from "@/components/LanguageSwitcher";
 
 function PasskeyButton({
   locale,
@@ -266,7 +267,13 @@ function LoginFormInner({ locale }: { locale: Locale }) {
   }
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-green-950 px-6">
+    <div className="relative flex min-h-screen items-center justify-center bg-green-950 px-6">
+      {/* Per task 103 (Michel) — pre-login language picker so the
+          login UI shows up in the user's preferred language without
+          having to log in first. */}
+      <div className="absolute right-6 top-6">
+        <LanguageSwitcher locale={locale} />
+      </div>
       <div className="w-full max-w-sm">
         <h1 className="font-display text-2xl font-bold text-gold-200">
           {t("auth.signIn", locale)}

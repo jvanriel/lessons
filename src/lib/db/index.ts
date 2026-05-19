@@ -1,5 +1,6 @@
 import { Pool, neonConfig } from "@neondatabase/serverless";
 import { drizzle } from "drizzle-orm/neon-serverless";
+import * as Sentry from "@sentry/nextjs";
 import ws from "ws";
 import * as schema from "./schema";
 
@@ -44,6 +45,18 @@ if (typeof WebSocket === "undefined") {
 // which is the desired behaviour (avoids re-establishing the WS on
 // every request).
 const pool = new Pool({ connectionString: databaseUrl, max: 5 });
+
+// Without this listener, an idle WebSocket dropped by Neon (timeout,
+// restart, blip) makes the underlying pg client emit 'error' with
+// nobody listening — Node then treats it as an uncaughtException and
+// kills the function instance. First seen as SENTRY-ORANGE-ZEBRA-1T
+// on /api/notifications (a polling endpoint, so the most exposed).
+// Capture for visibility but swallow so it stays a transient pool
+// blip rather than a process crash.
+pool.on("error", (err: Error) => {
+  Sentry.captureException(err, { tags: { area: "db-pool" } });
+});
+
 export const db = drizzle(pool, { schema });
 
 /**

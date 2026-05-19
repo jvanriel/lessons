@@ -86,7 +86,7 @@ export default function ManualRefundForm({ booking }: { booking: Booking }) {
           <dd className="text-green-900">{booking.proDisplayName}</dd>
         </div>
         <div>
-          <dt className="text-xs uppercase text-green-500">Student</dt>
+          <dt className="text-xs uppercase text-green-500">Golfer</dt>
           <dd className="text-green-900">
             {booking.studentFirstName} {booking.studentLastName}
             <br />

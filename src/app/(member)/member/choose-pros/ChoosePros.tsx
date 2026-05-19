@@ -14,6 +14,7 @@ interface Pro {
   specialties: string | null;
   bio: string | null;
   cities: (string | null)[];
+  courses: string[];
 }
 
 interface UpcomingBooking {
@@ -44,63 +45,90 @@ export default function ChoosePros({
     return initial;
   });
   const [isPending, startTransition] = useTransition();
-  const [confirmOpen, setConfirmOpen] = useState(false);
+  const [pendingDeactivateId, setPendingDeactivateId] = useState<number | null>(
+    null
+  );
   const [error, setError] = useState<string | null>(null);
+  // "saved" briefly flashes after a successful auto-save so the user
+  // sees confirmation; transitions back to "idle" via setTimeout.
+  const [saveState, setSaveState] = useState<"idle" | "saved">("idle");
+  const [query, setQuery] = useState("");
   const backdropRef = useRef<HTMLDivElement>(null);
+
+  const filteredPros = useMemo(() => {
+    const q = query.trim().toLowerCase();
+    if (!q) return pros;
+    return pros.filter((p) => {
+      const haystack = [
+        p.displayName,
+        p.specialties ?? "",
+        p.bio ?? "",
+        p.cities.filter(Boolean).join(" "),
+        p.courses.join(" "),
+      ]
+        .join(" ")
+        .toLowerCase();
+      return haystack.includes(q);
+    });
+  }, [pros, query]);
 
   const prosById = useMemo(
     () => new Map(pros.map((p) => [p.id, p])),
     [pros]
   );
 
-  // Pros that are currently active but will be deactivated by submission.
-  const deselected = useMemo(
-    () => existingProIds.filter((id) => !selected.has(id)),
-    [existingProIds, selected]
-  );
-
-  // Subset of the above that have lessons booked in the future.
-  const deselectedWithBookings = useMemo(
-    () =>
-      deselected
-        .map((id) => ({
-          pro: prosById.get(id),
-          bookings: upcomingBookingsByPro[id] ?? [],
-        }))
-        .filter((x) => x.pro && x.bookings.length > 0),
-    [deselected, prosById, upcomingBookingsByPro]
-  );
-
-  function toggle(id: number) {
-    setSelected((prev) => {
-      const next = new Set(prev);
-      if (next.has(id)) {
-        next.delete(id);
-      } else {
-        next.add(id);
-      }
-      return next;
-    });
-  }
-
-  function handleSaveClick() {
+  function persist(next: Set<number>) {
     setError(null);
-    if (deselectedWithBookings.length > 0) {
-      setConfirmOpen(true);
-      return;
-    }
-    save();
-  }
-
-  function save() {
-    setConfirmOpen(false);
     startTransition(async () => {
-      const result = await selectPros(Array.from(selected));
+      const result = await selectPros(Array.from(next));
       if (result && "error" in result && result.error) {
         setError(result.error);
+        return;
       }
+      setSaveState("saved");
+      setTimeout(() => setSaveState("idle"), 1500);
     });
   }
+
+  function toggle(id: number) {
+    const isCurrentlySelected = selected.has(id);
+    // Deselecting an existing relationship that has upcoming lessons —
+    // surface the confirmation dialog before changing state, so the
+    // student is warned the bookings will be cancelled.
+    if (
+      isCurrentlySelected &&
+      existingProIds.includes(id) &&
+      (upcomingBookingsByPro[id] ?? []).length > 0
+    ) {
+      setPendingDeactivateId(id);
+      return;
+    }
+    const next = new Set(selected);
+    if (next.has(id)) next.delete(id);
+    else next.add(id);
+    setSelected(next);
+    persist(next);
+  }
+
+  function confirmDeactivate() {
+    if (pendingDeactivateId == null) return;
+    const next = new Set(selected);
+    next.delete(pendingDeactivateId);
+    setSelected(next);
+    setPendingDeactivateId(null);
+    persist(next);
+  }
+
+  function cancelDeactivate() {
+    setPendingDeactivateId(null);
+  }
+
+  const pendingDeactivatePro =
+    pendingDeactivateId != null ? prosById.get(pendingDeactivateId) : null;
+  const pendingDeactivateBookings =
+    pendingDeactivateId != null
+      ? upcomingBookingsByPro[pendingDeactivateId] ?? []
+      : [];
 
   return (
     <div className="mx-auto max-w-4xl px-6 py-12">
@@ -125,8 +153,25 @@ export default function ChoosePros({
         </div>
       ) : (
         <>
-          <div className="mt-8 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-            {pros.map((pro) => {
+          <div className="relative mt-6">
+            <svg className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-green-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="m21 21-5.197-5.197m0 0A7.5 7.5 0 1 0 5.196 5.196a7.5 7.5 0 0 0 10.607 10.607Z" />
+            </svg>
+            <input
+              type="search"
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+              placeholder={t("choosePros.searchPlaceholder", locale)}
+              className="w-full rounded-md border border-green-200 bg-white py-2 pl-9 pr-3 text-sm text-green-800 placeholder:text-green-300 focus:border-green-400 focus:outline-none"
+            />
+          </div>
+          {filteredPros.length === 0 ? (
+            <div className="mt-6 rounded-xl border border-green-200 bg-white p-8 text-center">
+              <p className="text-green-600">{t("choosePros.noMatches", locale)}</p>
+            </div>
+          ) : (
+          <div className="mt-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+            {filteredPros.map((pro) => {
               const isSelected = selected.has(pro.id);
               const isExisting = existingProIds.includes(pro.id);
               return (
@@ -134,7 +179,7 @@ export default function ChoosePros({
                   key={pro.id}
                   type="button"
                   onClick={() => toggle(pro.id)}
-                  className={`relative rounded-xl border p-5 text-left transition-all ${
+                  className={`relative w-full min-w-0 rounded-xl border p-5 text-left transition-all ${
                     isSelected
                       ? "border-gold-500 bg-gold-50 shadow-md ring-1 ring-gold-400"
                       : "border-green-200 bg-white hover:border-green-300 hover:shadow-sm"
@@ -191,6 +236,7 @@ export default function ChoosePros({
               );
             })}
           </div>
+          )}
 
           {error && (
             <div className="mt-6 rounded-md border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
@@ -203,33 +249,32 @@ export default function ChoosePros({
               href="/member/dashboard"
               className="text-sm text-green-500 hover:text-green-600"
             >
-              {t("choosePros.skipForNow", locale)}
+              ← {t("choosePros.backToDashboard", locale)}
             </Link>
-            <button
-              type="button"
-              onClick={handleSaveClick}
-              disabled={isPending}
-              className="rounded-md bg-gold-600 px-6 py-2.5 text-sm font-medium text-white transition-colors hover:bg-gold-500 disabled:opacity-50 disabled:cursor-not-allowed"
+            <span
+              className={`text-xs transition-opacity ${
+                isPending || saveState === "saved"
+                  ? "opacity-100"
+                  : "opacity-0"
+              } ${isPending ? "text-green-500" : "text-green-600"}`}
+              aria-live="polite"
             >
               {isPending
                 ? t("choosePros.saving", locale)
-                : selected.size > 0
-                  ? t("choosePros.continueWithCount", locale).replace(
-                      "{n}",
-                      String(selected.size)
-                    )
-                  : t("choosePros.continue", locale)}
-            </button>
+                : saveState === "saved"
+                  ? t("choosePros.saved", locale)
+                  : ""}
+            </span>
           </div>
         </>
       )}
 
-      {confirmOpen && (
+      {pendingDeactivatePro && (
         <div
           ref={backdropRef}
           className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 px-4"
           onClick={(e) => {
-            if (e.target === backdropRef.current) setConfirmOpen(false);
+            if (e.target === backdropRef.current) cancelDeactivate();
           }}
         >
           <div className="w-full max-w-md rounded-xl border border-green-200 bg-white p-6 shadow-2xl">
@@ -240,42 +285,35 @@ export default function ChoosePros({
               {t("choosePros.deactivate.body", locale)}
             </p>
 
-            <ul className="mt-4 space-y-3 max-h-64 overflow-y-auto">
-              {deselectedWithBookings.map(({ pro, bookings }) => (
-                <li
-                  key={pro!.id}
-                  className="rounded-lg border border-green-200 bg-green-50/40 p-3"
-                >
-                  <p className="text-sm font-medium text-green-900">
-                    {pro!.displayName}
-                  </p>
-                  <ul className="mt-1 space-y-0.5 text-xs text-green-700">
-                    {bookings.map((b) => (
-                      <li key={b.id}>
-                        {formatDate(b.date, locale, {
-                          weekday: "short",
-                          day: "numeric",
-                          month: "long",
-                        })}{" "}
-                        · {b.startTime}–{b.endTime}
-                      </li>
-                    ))}
-                  </ul>
-                </li>
-              ))}
-            </ul>
+            <div className="mt-4 rounded-lg border border-green-200 bg-green-50/40 p-3">
+              <p className="text-sm font-medium text-green-900">
+                {pendingDeactivatePro.displayName}
+              </p>
+              <ul className="mt-1 space-y-0.5 text-xs text-green-700">
+                {pendingDeactivateBookings.map((b) => (
+                  <li key={b.id}>
+                    {formatDate(b.date, locale, {
+                      weekday: "short",
+                      day: "numeric",
+                      month: "long",
+                    })}{" "}
+                    · {b.startTime}–{b.endTime}
+                  </li>
+                ))}
+              </ul>
+            </div>
 
             <div className="mt-5 flex gap-3">
               <button
                 type="button"
-                onClick={() => setConfirmOpen(false)}
+                onClick={cancelDeactivate}
                 className="flex-1 rounded-md border border-green-200 px-4 py-2 text-sm font-medium text-green-700 transition-colors hover:bg-green-50"
               >
                 {t("choosePros.deactivate.cancel", locale)}
               </button>
               <button
                 type="button"
-                onClick={save}
+                onClick={confirmDeactivate}
                 disabled={isPending}
                 className="flex-1 rounded-md bg-red-600 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-red-500 disabled:opacity-50"
               >

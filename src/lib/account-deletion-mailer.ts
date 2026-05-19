@@ -14,6 +14,17 @@ import { emailLayout } from "@/lib/email-templates";
 import { resolveLocale, type Locale } from "@/lib/i18n";
 
 /**
+ * Resolve the absolute base URL for in-email CTAs. Email clients
+ * render links statically (no `<base>` inheritance, no browser
+ * context), so every href must include scheme + host or it breaks.
+ */
+function getBaseUrl(): string {
+  if (process.env.NEXT_PUBLIC_APP_URL) return process.env.NEXT_PUBLIC_APP_URL;
+  if (process.env.VERCEL_URL) return `https://${process.env.VERCEL_URL}`;
+  return "http://localhost:3000";
+}
+
+/**
  * Cancellation emails sent when an account is soft-deleted by an admin
  * and the platform auto-cancels the user's still-confirmed future
  * bookings. Sent to the *counterpart* — the pro when a student account
@@ -103,7 +114,15 @@ function formatLessonDate(date: string, locale: Locale): string {
   }).format(new Date(date + "T00:00:00"));
 }
 
-function buildEmailBody(opts: {
+/**
+ * Render the HTML body for an account-deletion notification email.
+ * Exported for unit tests — the `notifyCounterpartOfAccountDeletion`
+ * helper composes its callers' arguments and passes them straight
+ * through, so testing this gives us coverage of the CTA-URL
+ * rendering (regression for task 62 round 2: a relative `/pros` href
+ * rendered as `http:///pros` in mail clients).
+ */
+export function buildEmailBody(opts: {
   greeting: string;
   recipientFirstName: string;
   bodyLine: string;
@@ -282,6 +301,12 @@ export async function notifyCounterpartOfAccountDeletion(
         actionUrl: "/pros",
         actionLabel: "Find another pro",
       });
+      // Email CTA needs an ABSOLUTE URL — a bare "/pros" rendered
+      // outside the browser context, so the email client (Gmail web,
+      // Outlook, Apple Mail) prepends nothing and the link comes out
+      // as `http:///pros` which every browser rejects (task 62 round 2,
+      // Nadine 2026-05-13).
+      const findProUrl = `${getBaseUrl()}/pros`;
       await sendEmail({
         to: student.email,
         subject: s.studentSubject(proName),
@@ -295,7 +320,7 @@ export async function notifyCounterpartOfAccountDeletion(
             [s.location, locationName],
           ],
           helper: s.studentFooter,
-          cta: { url: "/pros", label: s.findAnotherPro },
+          cta: { url: findProUrl, label: s.findAnotherPro },
           locale,
         }),
         attachments: [icsAttachment],

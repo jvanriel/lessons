@@ -8,6 +8,40 @@ import {
   requireStripePrice,
   TRIAL_PERIOD_DAYS,
 } from "@/lib/stripe";
+import { sendEmail } from "@/lib/mail";
+import {
+  buildWelcomeEmail,
+  getWelcomeSubject,
+} from "@/lib/email-templates";
+import { resolveLocale } from "@/lib/i18n";
+import { SignJWT } from "jose";
+
+function getAuthSecret() {
+  return new TextEncoder().encode(
+    process.env.AUTH_SECRET || "dev-secret-change-me",
+  );
+}
+
+async function generateVerifyUrl(
+  userId: number,
+  email: string,
+): Promise<string> {
+  const token = await new SignJWT({
+    userId,
+    email,
+    purpose: "email-verify",
+  })
+    .setProtectedHeader({ alg: "HS256" })
+    .setIssuedAt()
+    .setExpirationTime("24h")
+    .sign(getAuthSecret());
+  const baseUrl =
+    process.env.NEXT_PUBLIC_APP_URL ||
+    (process.env.VERCEL_URL
+      ? `https://${process.env.VERCEL_URL}`
+      : "http://localhost:3000");
+  return `${baseUrl}/api/auth/verify-email?token=${token}`;
+}
 
 export async function POST(request: Request) {
   const session = await getSession();
@@ -121,6 +155,29 @@ export async function POST(request: Request) {
       updatedAt: new Date(),
     })
     .where(eq(proProfiles.id, profile.id));
+
+  // Full "Welcome — your pro account is ready" mail. Sent only on
+  // first activation (previous subscriptionStatus was null) so a
+  // re-subscribing pro doesn't get a fresh welcome message. The slim
+  // verify-email mail at /api/pro/personal still gates email
+  // confirmation; if the user hasn't verified yet, include a verify
+  // CTA in the welcome mail too.
+  if (profile.subscriptionStatus == null) {
+    const locale = resolveLocale(user.preferredLocale);
+    const verifyUrl = user.emailVerifiedAt
+      ? undefined
+      : await generateVerifyUrl(user.id, user.email);
+    sendEmail({
+      to: user.email,
+      subject: getWelcomeSubject("pro", locale),
+      html: buildWelcomeEmail({
+        firstName: user.firstName,
+        accountType: "pro",
+        locale,
+        verifyUrl,
+      }),
+    }).catch(() => {});
+  }
 
   return NextResponse.json({
     subscriptionId: sub.id,

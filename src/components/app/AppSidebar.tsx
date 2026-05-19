@@ -6,6 +6,7 @@ import { usePathname } from "next/navigation";
 import type { Locale } from "@/lib/i18n";
 import { t } from "@/lib/i18n/translations";
 import { dashboardHrefFor } from "./dashboard-href";
+import { useCoachingUnread } from "@/hooks/useCoachingUnread";
 
 interface AppSidebarProps {
   roles: string[];
@@ -87,7 +88,7 @@ const sections: NavSection[] = [
       },
       {
         href: "/pro/students",
-        label: "Students",
+        label: "Golfers",
         labelKey: "appNav.students",
         icon: (
           <Icon d="M15 19.128a9.38 9.38 0 0 0 2.625.372 9.337 9.337 0 0 0 4.121-.952 4.125 4.125 0 0 0-7.533-2.493M15 19.128v-.003c0-1.113-.285-2.16-.786-3.07M15 19.128v.106A12.318 12.318 0 0 1 8.624 21c-2.331 0-4.512-.645-6.374-1.766l-.001-.109a6.375 6.375 0 0 1 11.964-3.07M12 6.375a3.375 3.375 0 1 1-6.75 0 3.375 3.375 0 0 1 6.75 0Zm8.25 2.25a2.625 2.625 0 1 1-5.25 0 2.625 2.625 0 0 1 5.25 0Z" />
@@ -176,6 +177,14 @@ const sections: NavSection[] = [
         labelKey: "appNav.chat",
         icon: (
           <Icon d="M8.625 12a.375.375 0 1 1-.75 0 .375.375 0 0 1 .75 0Zm0 0H8.25m4.125 0a.375.375 0 1 1-.75 0 .375.375 0 0 1 .75 0Zm0 0H12m4.125 0a.375.375 0 1 1-.75 0 .375.375 0 0 1 .75 0Zm0 0h-.375M21 12c0 4.556-4.03 8.25-9 8.25a9.764 9.764 0 0 1-2.555-.337A5.972 5.972 0 0 1 5.41 20.97a5.969 5.969 0 0 1-.474-.065 4.48 4.48 0 0 0 .978-2.025c.09-.457-.133-.901-.467-1.226C3.93 16.178 3 14.189 3 12c0-4.556 4.03-8.25 9-8.25s9 3.694 9 8.25Z" />
+        ),
+      },
+      {
+        href: "/member/choose-pros",
+        label: "Manage Pros",
+        labelKey: "appNav.managePros",
+        icon: (
+          <Icon d="M18 18.72a9.094 9.094 0 0 0 3.741-.479 3 3 0 0 0-4.682-2.72m.94 3.198.001.031c0 .225-.012.447-.037.666A11.944 11.944 0 0 1 12 21c-2.17 0-4.207-.576-5.963-1.584A6.062 6.062 0 0 1 6 18.719m12 0a5.971 5.971 0 0 0-.941-3.197m0 0A5.995 5.995 0 0 0 12 12.75a5.995 5.995 0 0 0-5.058 2.772m0 0a3 3 0 0 0-4.681 2.72 8.986 8.986 0 0 0 3.74.477m.94-3.197a5.971 5.971 0 0 0-.94 3.197M15 6.75a3 3 0 1 1-6 0 3 3 0 0 1 6 0Zm6 3a2.25 2.25 0 1 1-4.5 0 2.25 2.25 0 0 1 4.5 0Zm-13.5 0a2.25 2.25 0 1 1-4.5 0 2.25 2.25 0 0 1 4.5 0Z" />
         ),
       },
       {
@@ -346,6 +355,13 @@ const sections: NavSection[] = [
 ];
 
 
+// Items whose row should display the coaching-unread badge. Both
+// the pro entry ("/pro/students") and the golfer entry
+// ("/member/coaching") count — for users with both roles, the
+// /api/coaching/unread response merges the two and we get a single
+// total.
+const COACHING_BADGE_LABEL_KEYS = new Set(["appNav.students", "appNav.chat"]);
+
 export default function AppSidebar({
   roles,
   collapsed,
@@ -353,6 +369,14 @@ export default function AppSidebar({
   locale,
 }: AppSidebarProps) {
   const pathname = usePathname();
+
+  // Coaching-chat unread badge (task 122, refresh tightened in task 144).
+  // Skipped entirely when the viewer has neither a member nor a pro
+  // role — there's nothing to badge for admin/dev-only users.
+  const showCoachingBadge =
+    roles.includes("member") || roles.includes("pro");
+  const coachingUnread = useCoachingUnread(showCoachingBadge).total;
+
   const visibleSections = sections.filter((s) => {
     // `role` is optional: a section without one (e.g. utility entries
     // like About) is visible to every authenticated user.
@@ -451,6 +475,10 @@ export default function AppSidebar({
                       pathname === resolvedHref ||
                       pathname.startsWith(resolvedHref + "/");
                     const itemLabel = item.labelKey ? t(item.labelKey, locale) : item.label;
+                    const showBadge =
+                      coachingUnread > 0 &&
+                      item.labelKey !== undefined &&
+                      COACHING_BADGE_LABEL_KEYS.has(item.labelKey);
                     return (
                       <li key={item.href}>
                         <Link
@@ -462,12 +490,26 @@ export default function AppSidebar({
                               : "text-green-100/60 hover:bg-green-800 hover:text-green-100"
                           }`}
                         >
-                          {item.icon}
+                          <span className="relative">
+                            {item.icon}
+                            {/* Tiny red dot when collapsed —
+                                still flags new messages without
+                                stealing icon-row real estate. */}
+                            {showBadge && collapsed && (
+                              <span className="absolute -right-0.5 -top-0.5 h-2 w-2 rounded-full bg-red-500 ring-1 ring-green-950" />
+                            )}
+                          </span>
                           {!collapsed && <span>{itemLabel}</span>}
+                          {!collapsed && showBadge && (
+                            <span className="ml-auto inline-flex min-w-[20px] items-center justify-center rounded-full bg-red-500 px-1.5 text-[10px] font-semibold text-white">
+                              {coachingUnread > 99 ? "99+" : coachingUnread}
+                            </span>
+                          )}
                           {/* Tooltip when collapsed */}
                           {collapsed && (
                             <span className="pointer-events-none absolute left-full ml-2 whitespace-nowrap rounded-md bg-green-800 px-2 py-1 text-xs text-green-100 opacity-0 shadow-lg transition-opacity group-hover:opacity-100">
                               {itemLabel}
+                              {showBadge && ` (${coachingUnread})`}
                             </span>
                           )}
                         </Link>

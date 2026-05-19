@@ -6,7 +6,6 @@ import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { t } from "@/lib/i18n/translations";
 import type { Locale } from "@/lib/i18n";
-import { formatPriceInput, parsePriceInput } from "@/lib/pricing";
 
 interface ProfileData {
   id: number;
@@ -15,12 +14,6 @@ interface ProfileData {
   specialties: string | null;
   contactPhone: string | null;
   photoUrl: string | null;
-  lessonDurations: number[];
-  /** Per-duration price for the first student in EUR (decimal). */
-  lessonPricing: Record<string, number>;
-  /** Per-duration price for each additional student in EUR (decimal). */
-  extraStudentPricing: Record<string, number>;
-  maxGroupSize: number;
   bookingEnabled: boolean;
   bookingNotice: number;
   bookingHorizon: number;
@@ -113,41 +106,8 @@ export default function ProProfileEditor({
     }
   }
 
-  // Booking settings
-  const [lessonDurations, setLessonDurations] = useState<number[]>(profile.lessonDurations);
-  // EUR (decimal) per duration. The editor keeps the pretty-printed
-  // string per row in parallel so we don't lose what the user typed
-  // (e.g. "60,5" mid-edit) to round-tripping through Number.
-  const [lessonPricing, setLessonPricing] = useState<Record<string, number>>(
-    profile.lessonPricing
-  );
-  const [lessonPriceInputs, setLessonPriceInputs] = useState<Record<string, string>>(
-    () =>
-      Object.fromEntries(
-        Object.entries(profile.lessonPricing).map(([k, v]) => [
-          k,
-          formatPriceInput(v, locale),
-        ]),
-      ),
-  );
-  // Per-duration price for each *additional* student in the same lesson
-  // (group-discount mechanism — task 76). Mirrors lessonPricing's pair of
-  // value-state + display-string-state so partial input ("12,5") doesn't
-  // get clobbered by Number round-tripping.
-  const [extraStudentPricing, setExtraStudentPricing] = useState<
-    Record<string, number>
-  >(profile.extraStudentPricing);
-  const [extraStudentPriceInputs, setExtraStudentPriceInputs] = useState<
-    Record<string, string>
-  >(() =>
-    Object.fromEntries(
-      Object.entries(profile.extraStudentPricing).map(([k, v]) => [
-        k,
-        formatPriceInput(v, locale),
-      ]),
-    ),
-  );
-  const [maxGroupSize, setMaxGroupSize] = useState(profile.maxGroupSize);
+  // Booking settings (task 130: durations + pricing + maxGroupSize
+  // moved per-location; this editor no longer touches them).
   const [bookingEnabled, setBookingEnabled] = useState(profile.bookingEnabled);
   const [bookingNotice, setBookingNotice] = useState(profile.bookingNotice);
   const [bookingHorizon, setBookingHorizon] = useState(profile.bookingHorizon);
@@ -164,29 +124,6 @@ export default function ProProfileEditor({
       formData.set("specialties", specialties);
       formData.set("bio", bio);
       formData.set("contactPhone", contactPhone);
-      formData.set("maxGroupSize", String(maxGroupSize));
-      formData.set("lessonDurations", JSON.stringify(lessonDurations));
-      // Convert EUR → cents and only send entries for enabled durations.
-      const pricingCents: Record<string, number> = {};
-      for (const d of lessonDurations) {
-        const eur = lessonPricing[String(d)];
-        if (typeof eur === "number" && eur > 0) {
-          pricingCents[String(d)] = Math.round(eur * 100);
-        }
-      }
-      formData.set("lessonPricing", JSON.stringify(pricingCents));
-      // Same conversion + filter for extra-student pricing. Allow zero
-      // (a "free for extra students" tier is intentional copy of the
-      // base pricing model except >0; for extras, 0 means free) — but
-      // skip negative values just in case.
-      const extraCents: Record<string, number> = {};
-      for (const d of lessonDurations) {
-        const eur = extraStudentPricing[String(d)];
-        if (typeof eur === "number" && eur >= 0) {
-          extraCents[String(d)] = Math.round(eur * 100);
-        }
-      }
-      formData.set("extraStudentPricing", JSON.stringify(extraCents));
       formData.set("bookingEnabled", String(bookingEnabled));
       formData.set("bookingNotice", String(bookingNotice));
       formData.set("bookingHorizon", String(bookingHorizon));
@@ -351,173 +288,6 @@ export default function ProProfileEditor({
             />
             <p className="mt-1 text-xs text-green-500">
               {t("proProfile.contactPhoneHelp", locale)}
-            </p>
-          </div>
-        </div>
-
-        {/* ── Lesson Settings ── */}
-        <div className="space-y-4 border-t border-green-100 pt-6">
-          <h2 className="font-display text-lg font-semibold text-green-950">
-            {t("proProfile.section.lessons", locale)}
-          </h2>
-
-          <div>
-            <label className="block text-sm font-medium text-green-800">
-              {t("proProfile.lessonDurations", locale)}
-            </label>
-            <div className="mt-2 flex flex-wrap gap-3">
-              {[30, 60, 90, 120].map((d) => (
-                <label
-                  key={d}
-                  className="flex items-center gap-1.5 text-sm text-green-950"
-                >
-                  <input
-                    type="checkbox"
-                    checked={lessonDurations.includes(d)}
-                    onChange={(e) => {
-                      if (e.target.checked) {
-                        setLessonDurations(
-                          [...lessonDurations, d].sort((a, b) => a - b)
-                        );
-                        // No price pre-fill: any value we'd inject reads
-                        // like a recommendation. The pro types their own.
-                      } else {
-                        const next = lessonDurations.filter((v) => v !== d);
-                        if (next.length > 0) setLessonDurations(next);
-                      }
-                    }}
-                    className="h-4 w-4 rounded border-green-300 accent-[#c4a035]"
-                  />
-                  {d} min
-                </label>
-              ))}
-            </div>
-            <p className="mt-1 text-xs text-green-500">
-              {t("proProfile.lessonDurationsHelp", locale)}
-            </p>
-          </div>
-
-          {/* Per-duration lesson prices — real amounts charged at booking */}
-          <div className="rounded-lg border border-gold-200 bg-gold-50/40 p-4">
-            <h3 className="text-sm font-semibold text-green-900">
-              {t("proOnb.lessons.chargingHeading", locale)}{" "}
-              <span className="text-red-500">*</span>
-            </h3>
-            <p className="mt-1 text-xs text-green-600">
-              {t("proOnb.lessons.chargingHint", locale)}
-            </p>
-            <div className="mt-3 grid gap-3 sm:grid-cols-2">
-              {lessonDurations.map((d) => (
-                <div key={d}>
-                  <label className="block text-xs font-medium text-green-700">
-                    {t("proOnb.lessons.pricePerDuration", locale).replace(
-                      "{n}",
-                      String(d)
-                    )}
-                  </label>
-                  <div className="relative mt-1">
-                    <span className="pointer-events-none absolute inset-y-0 left-3 flex items-center text-sm text-green-500">
-                      €
-                    </span>
-                    <input
-                      type="text"
-                      inputMode="decimal"
-                      value={lessonPriceInputs[String(d)] ?? ""}
-                      onChange={(e) => {
-                        const raw = e.target.value;
-                        setLessonPriceInputs((prev) => ({
-                          ...prev,
-                          [String(d)]: raw,
-                        }));
-                        const parsed = parsePriceInput(raw);
-                        setLessonPricing((prev) => {
-                          const next = { ...prev };
-                          if (parsed === null) delete next[String(d)];
-                          else next[String(d)] = parsed;
-                          return next;
-                        });
-                      }}
-                      onBlur={() => {
-                        // Tidy the display on blur — "60,5" becomes
-                        // "60,50", "60" stays "60", trailing junk gets
-                        // normalised.
-                        const v = lessonPricing[String(d)];
-                        if (typeof v === "number") {
-                          setLessonPriceInputs((prev) => ({
-                            ...prev,
-                            [String(d)]: formatPriceInput(v, locale),
-                          }));
-                        }
-                      }}
-                      placeholder="0"
-                      className={inputClass + " pl-7"}
-                    />
-                  </div>
-                  {/* Per-extra-student rate (task 76). Default 0 = base
-                      rate covers the whole group. */}
-                  <label className="mt-2 block text-xs font-medium text-green-700">
-                    {t("proProfile.extraStudentPrice", locale).replace(
-                      "{n}",
-                      String(d)
-                    )}
-                  </label>
-                  <div className="relative mt-1">
-                    <span className="pointer-events-none absolute inset-y-0 left-3 flex items-center text-sm text-green-500">
-                      €
-                    </span>
-                    <input
-                      type="text"
-                      inputMode="decimal"
-                      value={extraStudentPriceInputs[String(d)] ?? ""}
-                      onChange={(e) => {
-                        const raw = e.target.value;
-                        setExtraStudentPriceInputs((prev) => ({
-                          ...prev,
-                          [String(d)]: raw,
-                        }));
-                        const parsed = parsePriceInput(raw);
-                        setExtraStudentPricing((prev) => {
-                          const next = { ...prev };
-                          if (parsed === null) delete next[String(d)];
-                          else next[String(d)] = parsed;
-                          return next;
-                        });
-                      }}
-                      onBlur={() => {
-                        const v = extraStudentPricing[String(d)];
-                        if (typeof v === "number") {
-                          setExtraStudentPriceInputs((prev) => ({
-                            ...prev,
-                            [String(d)]: formatPriceInput(v, locale),
-                          }));
-                        }
-                      }}
-                      placeholder="0"
-                      className={inputClass + " pl-7"}
-                    />
-                  </div>
-                </div>
-              ))}
-            </div>
-            <p className="mt-3 text-xs text-green-600">
-              {t("proProfile.extraStudentPriceHint", locale)}
-            </p>
-          </div>
-
-          <div>
-            <label className="block text-sm font-medium text-green-800">
-              {t("proProfile.maxGroupSize", locale)}
-            </label>
-            <input
-              type="number"
-              value={maxGroupSize}
-              onChange={(e) => setMaxGroupSize(Number(e.target.value))}
-              className={inputClass + " max-w-[120px]"}
-              min={1}
-              max={10}
-            />
-            <p className="mt-1 text-xs text-green-500">
-              {t("proProfile.maxGroupSizeHelp", locale)}
             </p>
           </div>
         </div>

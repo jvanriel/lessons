@@ -45,7 +45,7 @@ export default async function AdminDashboard() {
         </div>
         <div className="rounded-xl border border-green-200 bg-white p-5">
           <p className="text-2xl font-bold text-green-900">{memberCount}</p>
-          <p className="text-sm text-green-500">Students</p>
+          <p className="text-sm text-green-500">Golfers</p>
         </div>
         <div className="rounded-xl border border-green-200 bg-white p-5">
           <p className="text-2xl font-bold text-green-900">{proCount}</p>

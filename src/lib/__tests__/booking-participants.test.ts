@@ -48,15 +48,22 @@ describe("parseExtraParticipants", () => {
     expect(out[1].email).toBeNull();
   });
 
-  it("drops fully-empty rows so a 'set count to 3 then changed mind' submit doesn't add ghosts", () => {
+  it("keeps fully-empty rows so validateExtraParticipants can reject them (task 101 retest)", () => {
+    // Pre-task-101-retest this dropped empty rows silently — but
+    // that let "I picked 2 then didn't fill the extra" submissions
+    // slip past validation and create a booking with
+    // participantCount=2 + only the booker inserted. Now we keep
+    // the row so the validator returns an error.
     const f = fd({
       "participants[0].firstName": "Alice",
       "participants[0].lastName": "A",
       // index 1 left entirely blank
     });
     const out = parseExtraParticipants(f, 3);
-    expect(out).toHaveLength(1);
+    expect(out).toHaveLength(2);
     expect(out[0].firstName).toBe("Alice");
+    expect(out[1].firstName).toBe("");
+    expect(out[1].lastName).toBe("");
   });
 
   it("clamps participantCount=0 (and negative) to no extras", () => {

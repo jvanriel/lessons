@@ -1,7 +1,12 @@
 import { getSession, hasRole } from "@/lib/auth";
 import { redirect } from "next/navigation";
 import { db } from "@/lib/db";
-import { users, proProfiles, proLocations } from "@/lib/db/schema";
+import {
+  users,
+  proProfiles,
+  proLocations,
+  locations,
+} from "@/lib/db/schema";
 import { eq } from "drizzle-orm";
 import OnboardingWizard from "./OnboardingWizard";
 import { getLocale } from "@/lib/locale";
@@ -16,10 +21,8 @@ const EMPTY_DATA = {
   displayName: "",
   bio: "",
   specialties: "",
-  lessonDurations: [60],
-  lessonPricing: {} as Record<string, number>,
-  extraStudentPricing: {} as Record<string, number>,
-  maxGroupSize: 4,
+  bookingNotice: 24,
+  bookingHorizon: 60,
   cancellationHours: 24,
   bankAccountHolder: "",
   bankIban: "",
@@ -91,16 +94,25 @@ export default async function OnboardingPage() {
   const hasProfile = !!profile.bio || !!profile.specialties;
 
   const existingLocations = await db
-    .select({ id: proLocations.id })
+    .select({
+      name: locations.name,
+      address: locations.address,
+      city: locations.city,
+      timezone: locations.timezone,
+      lessonDurations: proLocations.lessonDurations,
+      lessonPricing: proLocations.lessonPricing,
+      extraStudentPricing: proLocations.extraStudentPricing,
+      maxGroupSize: proLocations.maxGroupSize,
+    })
     .from(proLocations)
-    .where(eq(proLocations.proProfileId, profile.id))
-    .limit(1);
+    .innerJoin(locations, eq(proLocations.locationId, locations.id))
+    .where(eq(proLocations.proProfileId, profile.id));
   const hasLocations = existingLocations.length > 0;
 
-  const pricing = (profile.lessonPricing as Record<string, number>) ?? {};
-  const hasLessons = Object.values(pricing).some(
-    (v) => typeof v === "number" && v > 0,
-  );
+  // Pricing now lives per-location (task 130). Step 3 = Reservation
+  // specs (booking notice/horizon/cancellation), which always have
+  // defaults — so once locations are set, that step is reachable.
+  const hasReservationSpecs = hasLocations;
   const hasBank = !!profile.bankIban;
   const hasInvoicing =
     !!profile.invoiceAddressLine1 &&
@@ -108,21 +120,40 @@ export default async function OnboardingPage() {
     !!profile.invoiceCity &&
     !!profile.invoiceCountry;
 
-  // Step indexes: 0=Personal, 1=Profile, 2=Locations, 3=Lessons,
-  // 4=Invoicing, 5=Bank, 6=Subscription.
+  // Step indexes: 0=Personal, 1=Profile, 2=Locations+tariffs,
+  // 3=Reservation specs, 4=Invoicing, 5=Bank, 6=Subscription.
   let initialStep = 0;
   if (hasPersonal) initialStep = 1;
   if (hasPersonal && hasProfile) initialStep = 2;
   if (hasPersonal && hasProfile && hasLocations) initialStep = 3;
-  if (hasPersonal && hasProfile && hasLocations && hasLessons) initialStep = 4;
-  if (hasPersonal && hasProfile && hasLocations && hasLessons && hasInvoicing) initialStep = 5;
-  if (hasPersonal && hasProfile && hasLocations && hasLessons && hasInvoicing && hasBank) initialStep = 6;
+  if (hasPersonal && hasProfile && hasLocations && hasReservationSpecs) initialStep = 4;
+  if (hasPersonal && hasProfile && hasLocations && hasReservationSpecs && hasInvoicing) initialStep = 5;
+  if (hasPersonal && hasProfile && hasLocations && hasReservationSpecs && hasInvoicing && hasBank) initialStep = 6;
 
   return (
     <OnboardingWizard
       initialStep={initialStep}
       hasAccount
       locale={locale}
+      initialLocations={existingLocations.map((l) => ({
+        name: l.name,
+        address: l.address ?? "",
+        city: l.city ?? "",
+        timezone: l.timezone,
+        lessonDurations: (l.lessonDurations as number[]) ?? [60],
+        // Stored in cents; expose as decimal EUR to the editor.
+        lessonPricing: Object.fromEntries(
+          Object.entries(
+            (l.lessonPricing as Record<string, number>) ?? {},
+          ).map(([k, cents]) => [k, cents / 100]),
+        ),
+        extraStudentPricing: Object.fromEntries(
+          Object.entries(
+            (l.extraStudentPricing as Record<string, number>) ?? {},
+          ).map(([k, cents]) => [k, cents / 100]),
+        ),
+        maxGroupSize: l.maxGroupSize,
+      }))}
       initialData={{
         firstName: user?.firstName ?? "",
         lastName: user?.lastName ?? "",
@@ -131,19 +162,8 @@ export default async function OnboardingPage() {
         displayName: profile.displayName,
         bio: profile.bio ?? "",
         specialties: profile.specialties ?? "",
-        lessonDurations: (profile.lessonDurations as number[]) ?? [60],
-        // Stored in cents; expose as decimal EUR to the editor.
-        lessonPricing: Object.fromEntries(
-          Object.entries(
-            (profile.lessonPricing as Record<string, number>) ?? {}
-          ).map(([k, cents]) => [k, cents / 100])
-        ),
-        extraStudentPricing: Object.fromEntries(
-          Object.entries(
-            (profile.extraStudentPricing as Record<string, number>) ?? {}
-          ).map(([k, cents]) => [k, cents / 100])
-        ),
-        maxGroupSize: profile.maxGroupSize,
+        bookingNotice: profile.bookingNotice,
+        bookingHorizon: profile.bookingHorizon,
         cancellationHours: profile.cancellationHours,
         bankAccountHolder: profile.bankAccountHolder ?? "",
         bankIban: profile.bankIban ?? "",

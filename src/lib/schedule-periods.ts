@@ -25,6 +25,10 @@ export interface SchedulePeriodSlot {
 export interface SchedulePeriodInput {
   validFrom: string | null;
   validUntil: string | null;
+  /** Optional per-period grid render window (task 119). Display-only,
+   *  validator passes them through without inspection. */
+  displayStartTime?: string;
+  displayEndTime?: string;
   slots: SchedulePeriodSlot[];
 }
 

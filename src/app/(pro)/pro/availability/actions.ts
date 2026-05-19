@@ -1,7 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { eq, and } from "drizzle-orm";
+import { eq, and, inArray } from "drizzle-orm";
 import { db } from "@/lib/db";
 import {
   proProfiles,
@@ -9,9 +9,11 @@ import {
   proAvailability,
   proAvailabilityOverrides,
   proSchedulePeriods,
+  lessonBookings,
 } from "@/lib/db/schema";
 import { getSession, hasRole } from "@/lib/auth";
 import { validateSchedulePeriods } from "@/lib/schedule-periods";
+import { cancelBookingByPro } from "@/lib/booking-cancel";
 
 async function requireProWithProfile() {
   const session = await getSession();
@@ -45,6 +47,11 @@ export interface SerializedSchedulePeriod {
   id: number;
   validFrom: string | null;
   validUntil: string | null;
+  /** Per-period grid render window (task 119). Display-only — does
+   *  NOT affect availability calculations. Defaults to 09:00 / 22:00
+   *  for newly-created periods. */
+  displayStartTime: string;
+  displayEndTime: string;
 }
 
 export interface SerializedOverride {
@@ -73,6 +80,20 @@ export interface SerializedBooking {
   participantCount: number;
   locationName: string | null;
   bookerName: string | null;
+  // Extra fields the shared BookingCard dialog renders. Populated by
+  // the availability page so the same surface used on /pro/bookings
+  // can be opened from a booking cell on /pro/availability.
+  notes: string | null;
+  paymentStatus: string;
+  studentFirstName: string | null;
+  studentLastName: string | null;
+  studentEmail: string;
+  studentPhone: string | null;
+  studentEmailVerified: Date | null;
+  locationCity: string | null;
+  /** Lesson price in cents at booking time (task 135). */
+  priceCents: number | null;
+  currency: string;
 }
 
 export interface SerializedProfileSettings {
@@ -112,6 +133,10 @@ export async function saveSchedulePeriods(input: {
   periods: Array<{
     validFrom: string | null;
     validUntil: string | null;
+    /** Per-period grid render window (task 119). Optional in the
+     *  payload — defaults to 09:00 / 22:00 when missing. */
+    displayStartTime?: string;
+    displayEndTime?: string;
     slots: Array<{
       proLocationId: number;
       dayOfWeek: number;
@@ -160,6 +185,8 @@ export async function saveSchedulePeriods(input: {
         proProfileId: profile.id,
         validFrom: p.validFrom,
         validUntil: p.validUntil,
+        displayStartTime: p.displayStartTime ?? "09:00",
+        displayEndTime: p.displayEndTime ?? "22:00",
       })),
     );
   }
@@ -252,7 +279,12 @@ export async function saveWeekOverrides(data: {
     endTime?: string;
     reason?: string;
   }>;
-}): Promise<{ error?: string }> {
+  // Optional reason the pro typed in the "Cancel these bookings?" dialog
+  // — applied to every booking the block sweep cancels in this save
+  // (task 154). Falls back to any per-block `reason` set via the
+  // double-click popover, then to a generic default.
+  cancellationReason?: string;
+}): Promise<{ error?: string; cancelledBookingIds?: number[] }> {
   const { profile } = await requireProWithProfile();
 
   // Delete all existing overrides for the given dates
@@ -282,7 +314,96 @@ export async function saveWeekOverrides(data: {
     );
   }
 
+  // Cancel any confirmed bookings whose time range falls under a new
+  // blocked override (task 137). Full-day blocks (no times) cover the
+  // whole date. Partial blocks cancel anything that *overlaps* — even a
+  // single 30-min cell on top of a 60-min lesson invalidates it. The
+  // existing cancel helper handles notification, student+pro email
+  // with CANCEL ics, and group-lesson participant fan-out.
+  const cancelledBookingIds: number[] = [];
+  const blockedDates = new Set(
+    data.overrides
+      .filter((o) => o.type === "blocked" && !o.startTime && !o.endTime)
+      .map((o) => o.date),
+  );
+  const partialBlocks = data.overrides.filter(
+    (o) => o.type === "blocked" && o.startTime && o.endTime,
+  );
+  const blockedDatesAll = new Set<string>([
+    ...blockedDates,
+    ...partialBlocks.map((o) => o.date),
+  ]);
+
+  if (blockedDatesAll.size > 0) {
+    const candidates = await db
+      .select({
+        id: lessonBookings.id,
+        date: lessonBookings.date,
+        startTime: lessonBookings.startTime,
+        endTime: lessonBookings.endTime,
+      })
+      .from(lessonBookings)
+      .where(
+        and(
+          eq(lessonBookings.proProfileId, profile.id),
+          eq(lessonBookings.status, "confirmed"),
+          inArray(lessonBookings.date, [...blockedDatesAll]),
+        ),
+      );
+
+    const partialByDate = new Map<
+      string,
+      Array<{ s: string; e: string; reason?: string }>
+    >();
+    for (const o of partialBlocks) {
+      const arr = partialByDate.get(o.date) ?? [];
+      arr.push({ s: o.startTime!, e: o.endTime!, reason: o.reason });
+      partialByDate.set(o.date, arr);
+    }
+    const fullDayReasonByDate = new Map<string, string | undefined>();
+    for (const o of data.overrides) {
+      if (o.type === "blocked" && !o.startTime && !o.endTime) {
+        fullDayReasonByDate.set(o.date, o.reason);
+      }
+    }
+    const dialogReason = data.cancellationReason?.trim();
+
+    for (const b of candidates) {
+      const fullDay = blockedDates.has(b.date);
+      let overlaps = fullDay;
+      let overlappingBlockReason: string | undefined =
+        fullDay ? fullDayReasonByDate.get(b.date) : undefined;
+      if (!overlaps) {
+        const ranges = partialByDate.get(b.date) ?? [];
+        for (const r of ranges) {
+          if (r.s < b.endTime && r.e > b.startTime) {
+            overlaps = true;
+            overlappingBlockReason = r.reason;
+            break;
+          }
+        }
+      }
+      if (!overlaps) continue;
+      // Reason priority: explicit dialog input > per-block reason set via
+      // the double-click popover > generic fallback (task 154).
+      const reason =
+        dialogReason ||
+        overlappingBlockReason?.trim() ||
+        "Cancelled — pro blocked this time slot";
+      const result = await cancelBookingByPro({
+        bookingId: b.id,
+        proProfileId: profile.id,
+        reason,
+      });
+      if ("success" in result) cancelledBookingIds.push(b.id);
+    }
+  }
+
   revalidatePath("/pro/availability");
   revalidatePath("/pro/bookings");
-  return {};
+  if (cancelledBookingIds.length > 0) {
+    revalidatePath("/pro/students");
+    revalidatePath("/member/bookings");
+  }
+  return { cancelledBookingIds };
 }

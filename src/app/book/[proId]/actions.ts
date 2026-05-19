@@ -41,11 +41,13 @@ import {
   getProBookingNotificationSubject,
 } from "@/lib/email-templates";
 import { resolveLocale, type Locale } from "@/lib/i18n";
+import { formatLocationFull } from "@/lib/location-display";
 import { t } from "@/lib/i18n/translations";
 import { getLocale } from "@/lib/locale";
 import { addDaysToDateString, todayInTZ } from "@/lib/local-date";
 import { getProLocationTimezone } from "@/lib/pro";
 import { updateBookingPreferences } from "@/lib/booking-preferences";
+import { findStudentOverlap } from "@/lib/booking-overlap";
 import {
   limitByKey,
   publicBookingLimiter,
@@ -81,9 +83,6 @@ export async function getAllBookablePros() {
       photoUrl: proProfiles.photoUrl,
       bio: proProfiles.bio,
       specialties: proProfiles.specialties,
-      lessonDurations: proProfiles.lessonDurations,
-      lessonPricing: proProfiles.lessonPricing,
-      extraStudentPricing: proProfiles.extraStudentPricing,
       maxGroupSize: proProfiles.maxGroupSize,
       bookingHorizon: proProfiles.bookingHorizon,
       bookingNotice: proProfiles.bookingNotice,
@@ -101,7 +100,9 @@ export async function getAllBookablePros() {
 
   if (pros.length === 0) return [];
 
-  // Fetch every active location for these pros in one go.
+  // Fetch every active location for these pros in one go. Pricing is
+  // per-location since task 109, so it ships down with each location
+  // row.
   const proIds = pros.map((p) => p.id);
   const locs = await db
     .select({
@@ -112,6 +113,10 @@ export async function getAllBookablePros() {
       address: locations.address,
       timezone: locations.timezone,
       lessonDuration: proLocations.lessonDuration,
+      lessonDurations: proLocations.lessonDurations,
+      lessonPricing: proLocations.lessonPricing,
+      extraStudentPricing: proLocations.extraStudentPricing,
+      maxGroupSize: proLocations.maxGroupSize,
       sortOrder: proLocations.sortOrder,
     })
     .from(proLocations)
@@ -155,9 +160,6 @@ export async function getPublicPro(proIdStr: string) {
       photoUrl: proProfiles.photoUrl,
       bio: proProfiles.bio,
       specialties: proProfiles.specialties,
-      lessonDurations: proProfiles.lessonDurations,
-      lessonPricing: proProfiles.lessonPricing,
-      extraStudentPricing: proProfiles.extraStudentPricing,
       maxGroupSize: proProfiles.maxGroupSize,
       bookingEnabled: proProfiles.bookingEnabled,
       bookingHorizon: proProfiles.bookingHorizon,
@@ -186,6 +188,12 @@ export async function getPublicLocations(proProfileId: number) {
       address: locations.address,
       timezone: locations.timezone,
       lessonDuration: proLocations.lessonDuration,
+      // Per-location pricing (task 109). The booking wizard reads
+      // these once a location is picked.
+      lessonDurations: proLocations.lessonDurations,
+      lessonPricing: proLocations.lessonPricing,
+      extraStudentPricing: proLocations.extraStudentPricing,
+      maxGroupSize: proLocations.maxGroupSize,
     })
     .from(proLocations)
     .innerJoin(locations, eq(proLocations.locationId, locations.id))
@@ -493,7 +501,7 @@ export async function createPublicBooking(formData: FormData) {
     return { error: t("publicBook.err.nameRequired", uiLocale) };
   }
 
-  const participantValidationError = validateExtraParticipants(extraParticipants);
+  const participantValidationError = validateExtraParticipants(extraParticipants, uiLocale);
   if (participantValidationError) {
     return { error: participantValidationError };
   }
@@ -526,12 +534,22 @@ export async function createPublicBooking(formData: FormData) {
     return { error: t("publicBook.err.slotUnavailable", uiLocale) };
   }
 
-  // Price snapshot — informational only on this flow (no charge). We still
-  // record it so later "retroactively pay for this lesson" flows have an
-  // authoritative number. Group-rate aware (task 76).
+  // Price snapshot — informational only on this flow (no charge). We
+  // still record it so later "retroactively pay for this lesson"
+  // flows have an authoritative number. Pricing is per-location since
+  // task 109; pull this booking's pro_location row for the snapshot.
+  const [locationPricing] = await db
+    .select({
+      lessonPricing: proLocations.lessonPricing,
+      extraStudentPricing: proLocations.extraStudentPricing,
+      maxGroupSize: proLocations.maxGroupSize,
+    })
+    .from(proLocations)
+    .where(eq(proLocations.id, proLocationId))
+    .limit(1);
   const priceCents = computeBookingPriceCents({
-    lessonPricing: pro.lessonPricing as Record<string, number> | null,
-    extraStudentPricing: pro.extraStudentPricing as
+    lessonPricing: locationPricing?.lessonPricing as Record<string, number> | null,
+    extraStudentPricing: locationPricing?.extraStudentPricing as
       | Record<string, number>
       | null,
     duration,
@@ -589,6 +607,26 @@ export async function createPublicBooking(formData: FormData) {
     userId = existing[0].id;
     branch = "verified";
     recipientLocale = resolveLocale(existing[0].preferredLocale);
+  }
+
+  // Cross-pro double-booking guard. (task 143) Skip for brand-new
+  // users — they can't have prior bookings. For "unverified" and
+  // "verified" branches the user pre-existed, so check their
+  // calendar across all pros.
+  if (branch !== "new") {
+    const overlap = await findStudentOverlap({
+      userId,
+      date,
+      startTime,
+      endTime,
+    });
+    if (overlap) {
+      return {
+        error: t("bookErr.studentOverlapSelf", uiLocale)
+          .replace("{start}", overlap.startTime)
+          .replace("{end}", overlap.endTime),
+      };
+    }
   }
 
   // ─── Insert the booking ──────────────────────────────
@@ -688,7 +726,10 @@ export async function createPublicBooking(formData: FormData) {
   const [loc] = await db
     .select({
       name: locations.name,
+      address: locations.address,
       city: locations.city,
+      lat: locations.lat,
+      lng: locations.lng,
       timezone: locations.timezone,
     })
     .from(proLocations)
@@ -700,7 +741,7 @@ export async function createPublicBooking(formData: FormData) {
       `createPublicBooking: location lookup missing for proLocationId=${proLocationId} (booking ${booking.id})`,
     );
   }
-  const locationName = loc.city ? `${loc.name}, ${loc.city}` : loc.name;
+  const locationName = formatLocationFull(loc);
   const locationTz = loc.timezone;
 
   // Single .ics shared between the student and pro emails — both
@@ -780,6 +821,8 @@ export async function createPublicBooking(formData: FormData) {
             startTime,
             endTime,
             duration,
+            participantCount,
+            priceCents,
             claimUrl,
             registerUrl,
             locale: recipientLocale,
@@ -803,6 +846,8 @@ export async function createPublicBooking(formData: FormData) {
             startTime,
             endTime,
             duration,
+            participantCount,
+            priceCents,
             loginUrl: `${getBaseUrl()}/login?email=${encodeURIComponent(email)}`,
             locale: recipientLocale,
           }),
@@ -989,6 +1034,8 @@ async function _sendClaimEmail(manageToken: string) {
       date: lessonBookings.date,
       startTime: lessonBookings.startTime,
       endTime: lessonBookings.endTime,
+      participantCount: lessonBookings.participantCount,
+      priceCents: lessonBookings.priceCents,
     })
     .from(lessonBookings)
     .where(eq(lessonBookings.manageToken, manageToken))
@@ -1074,6 +1121,8 @@ async function _sendClaimEmail(manageToken: string) {
       startTime: booking.startTime,
       endTime: booking.endTime,
       duration,
+      participantCount: booking.participantCount,
+      priceCents: booking.priceCents,
       claimUrl,
       registerUrl,
       locale: recipientLocale,

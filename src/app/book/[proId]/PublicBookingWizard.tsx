@@ -5,7 +5,11 @@ import Script from "next/script";
 import { Button } from "@/components/ui/button";
 import type { Locale } from "@/lib/i18n";
 import { t } from "@/lib/i18n/translations";
-import { formatPrice, computeBookingPriceCents } from "@/lib/pricing";
+import {
+  formatPrice,
+  computeBookingPriceBreakdown,
+} from "@/lib/pricing";
+import { PriceBreakdown } from "@/components/booking/PriceBreakdown";
 import { formatDate as formatDateLocale } from "@/lib/format-date";
 import PhoneField, { isValidPhoneNumber } from "@/components/PhoneField";
 import { BookingCalendar } from "@/components/BookingCalendar";
@@ -36,6 +40,16 @@ interface Location {
   city: string | null;
   address: string | null;
   lessonDuration: number | null;
+  /**
+   * Per-location lesson durations + pricing (task 109). Each
+   * location is its own offering — different clubs can have
+   * different durations and prices for the same pro.
+   */
+  lessonDurations: number[];
+  lessonPricing: Record<string, number>;
+  extraStudentPricing?: Record<string, number> | null;
+  /** Max participants in a lesson at this location (task 130). */
+  maxGroupSize: number;
 }
 
 interface Pro {
@@ -44,15 +58,6 @@ interface Pro {
   photoUrl: string | null;
   specialties?: string | null;
   bio?: string | null;
-  lessonDurations: number[];
-  lessonPricing: Record<string, number>;
-  /**
-   * Per-duration extra-participant rate. Total price for a booking
-   * with N participants is `lessonPricing[d] + extraStudentPricing[d]
-   * * (N - 1)`. Without this, the summary line shows the base price
-   * regardless of participant count (task 100).
-   */
-  extraStudentPricing?: Record<string, number> | null;
   maxGroupSize: number;
   locations: Location[];
   /**
@@ -92,8 +97,16 @@ export default function PublicBookingWizard({
     if (pro && pro.locations.length === 1) return pro.locations[0].id;
     return null;
   });
+  // Active location's offering (durations + pricing). Pricing is
+  // per-location since task 109. Picked once locationId is set.
+  const activeLocation = useMemo(
+    () => pro?.locations.find((l) => l.id === locationId) ?? null,
+    [pro, locationId],
+  );
   const [duration, setDuration] = useState<number | null>(() => {
-    if (pro && pro.lessonDurations.length === 1) return pro.lessonDurations[0];
+    if (pro && pro.locations.length === 1 && pro.locations[0].lessonDurations.length === 1) {
+      return pro.locations[0].lessonDurations[0];
+    }
     return null;
   });
   const [date, setDate] = useState<string | null>(null);
@@ -125,6 +138,16 @@ export default function PublicBookingWizard({
   const [extraParticipants, setExtraParticipants] = useState<
     Array<{ firstName: string; lastName: string; email: string }>
   >([]);
+  // Clamp participantCount when the active location's max changes
+  // (e.g. user picked location A with max=4, set count to 3, then
+  // switched to location B with max=2). Without this the dropdown
+  // would render with a value not in its options.
+  useEffect(() => {
+    if (!activeLocation) return;
+    if (participantCount > activeLocation.maxGroupSize) {
+      setParticipantCount(activeLocation.maxGroupSize);
+    }
+  }, [activeLocation, participantCount]);
   useEffect(() => {
     setExtraParticipants((prev) => {
       const target = Math.max(0, participantCount - 1);
@@ -177,11 +200,14 @@ export default function PublicBookingWizard({
   // → pre-select).
   function handlePickPro(next: Pro) {
     setPro(next);
-    setLocationId(
-      next.locations.length === 1 ? next.locations[0].id : null
-    );
+    const onlyLoc = next.locations.length === 1 ? next.locations[0] : null;
+    setLocationId(onlyLoc ? onlyLoc.id : null);
+    // Auto-pick a duration only when there's a single location AND its
+    // single offering covers exactly one duration (task 109).
     setDuration(
-      next.lessonDurations.length === 1 ? next.lessonDurations[0] : null
+      onlyLoc && onlyLoc.lessonDurations.length === 1
+        ? onlyLoc.lessonDurations[0]
+        : null,
     );
     setDate(null);
     setSlot(null);
@@ -226,18 +252,20 @@ export default function PublicBookingWizard({
       .finally(() => setLoadingSlots(false));
   }, [pro, locationId, duration, date]);
 
-  const priceCents = useMemo(() => {
-    if (!pro || !duration) return null;
-    // Group-rate aware: base + extra * (N - 1). Pre-fix this only
-    // returned the base price, so the summary line and the resulting
-    // booking row understated the total for groups (task 100).
-    return computeBookingPriceCents({
-      lessonPricing: pro.lessonPricing,
-      extraStudentPricing: pro.extraStudentPricing,
+  const priceBreakdown = useMemo(() => {
+    if (!activeLocation || !duration) return null;
+    // Group-rate aware: base + extra * (N - 1). Pre-fix the public
+    // wizard only displayed the base price for groups (task 100).
+    // Returning a breakdown — not just the total — lets the summary
+    // show the math behind multi-participant totals (task 100 follow-up).
+    return computeBookingPriceBreakdown({
+      lessonPricing: activeLocation.lessonPricing,
+      extraStudentPricing: activeLocation.extraStudentPricing,
       duration,
       participantCount,
     });
-  }, [pro, duration, participantCount]);
+  }, [activeLocation, duration, participantCount]);
+  const priceCents = priceBreakdown?.totalCents ?? null;
 
   const trimmedFirst = firstName.trim();
   const trimmedLast = lastName.trim();
@@ -663,20 +691,21 @@ export default function PublicBookingWizard({
         </div>
       )}
 
-      {/* Step 2: Duration */}
-      {locationId && pro.lessonDurations.length > 0 && (
+      {/* Step 2: Duration — sourced from the active location's
+          offering since task 109 made pricing per-location. */}
+      {locationId && activeLocation && activeLocation.lessonDurations.length > 0 && (
         <div className="mt-6">
           <label className="block text-sm font-medium text-green-800">
             {t(
-              pro.lessonDurations.length > 1
+              activeLocation.lessonDurations.length > 1
                 ? "publicBook.durationPick"
                 : "publicBook.duration",
               locale,
             )}
           </label>
           <div className="mt-2 flex flex-wrap gap-2">
-            {pro.lessonDurations.map((d) => {
-              const p = pro.lessonPricing[String(d)];
+            {activeLocation.lessonDurations.map((d) => {
+              const p = activeLocation.lessonPricing[String(d)];
               return (
                 <button
                   key={d}
@@ -877,7 +906,7 @@ export default function PublicBookingWizard({
             </p>
           </div>
 
-          {pro && pro.maxGroupSize > 1 && (
+          {activeLocation && activeLocation.maxGroupSize > 1 && (
             <div className="mt-3">
               <label className="mb-1 block text-xs font-medium text-green-700">
                 {t("book.participants", locale)}
@@ -887,7 +916,7 @@ export default function PublicBookingWizard({
                 onChange={(e) => setParticipantCount(Number(e.target.value))}
                 className="w-full rounded-md border border-green-200 bg-white px-3 py-2 text-sm text-green-900 focus:border-green-400 focus:outline-none focus:ring-1 focus:ring-green-400"
               >
-                {Array.from({ length: pro.maxGroupSize }, (_, i) => i + 1).map(
+                {Array.from({ length: activeLocation.maxGroupSize }, (_, i) => i + 1).map(
                   (n) => (
                     <option key={n} value={n}>
                       {n}{" "}
@@ -997,13 +1026,17 @@ export default function PublicBookingWizard({
             }}
           />
 
-          {priceCents !== null && (
-            <p className="mt-4 text-sm text-green-700">
-              {t("publicBook.priceNote", locale).replace(
-                "{price}",
-                formatPrice(priceCents / 100, locale)
-              )}
-            </p>
+          {priceBreakdown !== null && (
+            <>
+              <PriceBreakdown
+                breakdown={priceBreakdown}
+                duration={duration!}
+                locale={locale}
+              />
+              <p className="mt-2 text-[11px] text-green-600">
+                {t("publicBook.priceNoteSuffix", locale)}
+              </p>
+            </>
           )}
 
           {error && (

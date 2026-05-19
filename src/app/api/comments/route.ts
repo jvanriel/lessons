@@ -54,9 +54,15 @@ export async function POST(request: NextRequest) {
   const body = await request.json();
   const { contextType, contextId, content, type, replyToId, attachments } = body;
 
-  if (!contextType || !contextId || !content?.trim()) {
+  const trimmedContent = typeof content === "string" ? content.trim() : "";
+  const hasAttachment = Array.isArray(attachments) && attachments.length > 0;
+
+  if (!contextType || !contextId || (!trimmedContent && !hasAttachment)) {
     return NextResponse.json(
-      { error: "contextType, contextId, and content are required" },
+      {
+        error:
+          "contextType, contextId, and either content or an attachment are required",
+      },
       { status: 400 }
     );
   }
@@ -65,7 +71,7 @@ export async function POST(request: NextRequest) {
     contextType,
     parseInt(contextId),
     session.userId,
-    content.trim(),
+    trimmedContent,
     type || "comment",
     {
       replyToId: replyToId ? parseInt(replyToId) : undefined,

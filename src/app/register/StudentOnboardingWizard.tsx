@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback, useMemo } from "react";
 import { Button } from "@/components/ui/button";
 import {
   Elements,
@@ -54,6 +54,7 @@ interface ProfileData {
   phone: string;
   preferredLocale: string;
   handicap: string;
+  clubMemberNumber: string;
   golfGoals: string[];
   golfGoalsOther: string;
 }
@@ -248,7 +249,7 @@ function AccountStep({
             className={inputClass}
           />
           {firstNameMissing && (
-            <p className={errClass}>{t("authErr.allFieldsRequired", locale)}</p>
+            <p className={errClass}>{t("authErr.fieldRequired", locale)}</p>
           )}
         </div>
         <div>
@@ -263,7 +264,7 @@ function AccountStep({
             className={inputClass}
           />
           {lastNameMissing && (
-            <p className={errClass}>{t("authErr.allFieldsRequired", locale)}</p>
+            <p className={errClass}>{t("authErr.fieldRequired", locale)}</p>
           )}
         </div>
       </div>
@@ -280,7 +281,7 @@ function AccountStep({
           className={inputClass + (emailLocked ? " opacity-60" : "")}
         />
         {emailMissing && (
-          <p className={errClass}>{t("authErr.allFieldsRequired", locale)}</p>
+          <p className={errClass}>{t("authErr.fieldRequired", locale)}</p>
         )}
         {emailInvalid && (
           <p className={errClass}>{t("authErr.invalidEmail", locale)}</p>
@@ -379,7 +380,7 @@ function AccountStep({
               <p className={errClass}>
                 {pwTooShort
                   ? t("authErr.passwordTooShort", locale)
-                  : t("authErr.allFieldsRequired", locale)}
+                  : t("authErr.fieldRequired", locale)}
               </p>
             )}
           </div>
@@ -518,6 +519,21 @@ function GolfProfileStep({
       </div>
       <div>
         <label className="block text-sm font-medium text-green-800">
+          {t("onboarding.clubMemberNumber", locale)}{" "}
+          <span className="font-normal text-green-500">({t("onboarding.handicapOptional", locale)})</span>
+        </label>
+        <input
+          type="text"
+          value={data.clubMemberNumber}
+          onChange={(e) => onChange({ clubMemberNumber: e.target.value })}
+          placeholder={t("onboarding.clubMemberNumberPlaceholder", locale)}
+          maxLength={64}
+          className={inputClass + " max-w-[260px]"}
+        />
+        <p className="mt-1 text-xs text-green-500">{t("onboarding.clubMemberNumberHint", locale)}</p>
+      </div>
+      <div>
+        <label className="block text-sm font-medium text-green-800">
           {t("onboarding.goals", locale)}
         </label>
         <div className="mt-2 flex flex-wrap gap-2">
@@ -564,6 +580,23 @@ function GolfProfileStep({
 // ─── Step 3: Choose Pros ───────────────────────────────
 
 function ChooseProsStep({ pros, selected, onToggle, locale }: { pros: Pro[]; selected: Set<number>; onToggle: (id: number) => void; locale: Locale }) {
+  const [query, setQuery] = useState("");
+  const filtered = useMemo(() => {
+    const q = query.trim().toLowerCase();
+    if (!q) return pros;
+    return pros.filter((p) => {
+      const haystack = [
+        p.displayName,
+        p.specialties ?? "",
+        p.cities.filter(Boolean).join(" "),
+        p.locations.map((l) => `${l.name} ${l.city ?? ""}`).join(" "),
+      ]
+        .join(" ")
+        .toLowerCase();
+      return haystack.includes(q);
+    });
+  }, [pros, query]);
+
   if (pros.length === 0) {
     return (
       <div className="rounded-xl border border-green-200 bg-white p-8 text-center">
@@ -574,26 +607,44 @@ function ChooseProsStep({ pros, selected, onToggle, locale }: { pros: Pro[]; sel
   return (
     <div className="space-y-4">
       <p className="text-sm text-green-600">{t("onboarding.chooseProsDesc", locale)}</p>
-      <div className="grid gap-4 sm:grid-cols-2">
-        {pros.map((pro) => {
-          const isSelected = selected.has(pro.id);
-          return (
-            <button key={pro.id} type="button" onClick={() => onToggle(pro.id)} className={`relative rounded-xl border p-5 text-left transition-all ${isSelected ? "border-gold-500 bg-gold-50 shadow-md ring-1 ring-gold-400" : "border-green-200 bg-white hover:border-green-300 hover:shadow-sm"}`}>
-              <div className="flex items-center gap-3">
-                {pro.photoUrl ? <img src={pro.photoUrl} alt={pro.displayName} className="h-14 w-14 rounded-full object-cover" /> : <div className="flex h-14 w-14 items-center justify-center rounded-full bg-green-100 text-lg font-medium text-green-600">{pro.displayName.charAt(0)}</div>}
-                <div className="min-w-0 flex-1">
-                  <p className="truncate font-medium text-green-900">{pro.displayName}</p>
-                  {pro.specialties && <p className="mt-0.5 truncate text-xs text-gold-600">{pro.specialties}</p>}
-                  {pro.cities.length > 0 && <p className="mt-0.5 truncate text-xs text-green-500">{pro.cities.join(", ")}</p>}
-                </div>
-              </div>
-              <div className={`absolute left-3 top-3 flex h-5 w-5 items-center justify-center rounded-full border ${isSelected ? "border-gold-500 bg-gold-500 text-white" : "border-green-300 bg-white"}`}>
-                {isSelected && <svg className="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}><path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" /></svg>}
-              </div>
-            </button>
-          );
-        })}
+      <div className="relative">
+        <svg className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-green-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+          <path strokeLinecap="round" strokeLinejoin="round" d="m21 21-5.197-5.197m0 0A7.5 7.5 0 1 0 5.196 5.196a7.5 7.5 0 0 0 10.607 10.607Z" />
+        </svg>
+        <input
+          type="search"
+          value={query}
+          onChange={(e) => setQuery(e.target.value)}
+          placeholder={t("choosePros.searchPlaceholder", locale)}
+          className="w-full rounded-md border border-green-200 bg-white py-2 pl-9 pr-3 text-sm text-green-800 placeholder:text-green-300 focus:border-green-400 focus:outline-none"
+        />
       </div>
+      {filtered.length === 0 ? (
+        <div className="rounded-xl border border-green-200 bg-white p-8 text-center">
+          <p className="text-green-600">{t("choosePros.noMatches", locale)}</p>
+        </div>
+      ) : (
+        <div className="grid gap-4 sm:grid-cols-2">
+          {filtered.map((pro) => {
+            const isSelected = selected.has(pro.id);
+            return (
+              <button key={pro.id} type="button" onClick={() => onToggle(pro.id)} className={`relative w-full min-w-0 rounded-xl border p-5 text-left transition-all ${isSelected ? "border-gold-500 bg-gold-50 shadow-md ring-1 ring-gold-400" : "border-green-200 bg-white hover:border-green-300 hover:shadow-sm"}`}>
+                <div className="flex items-center gap-3">
+                  {pro.photoUrl ? <img src={pro.photoUrl} alt={pro.displayName} className="h-14 w-14 rounded-full object-cover" /> : <div className="flex h-14 w-14 items-center justify-center rounded-full bg-green-100 text-lg font-medium text-green-600">{pro.displayName.charAt(0)}</div>}
+                  <div className="min-w-0 flex-1">
+                    <p className="truncate font-medium text-green-900">{pro.displayName}</p>
+                    {pro.specialties && <p className="mt-0.5 truncate text-xs text-gold-600">{pro.specialties}</p>}
+                    {pro.cities.length > 0 && <p className="mt-0.5 truncate text-xs text-green-500">{pro.cities.join(", ")}</p>}
+                  </div>
+                </div>
+                <div className={`absolute left-3 top-3 flex h-5 w-5 items-center justify-center rounded-full border ${isSelected ? "border-gold-500 bg-gold-500 text-white" : "border-green-300 bg-white"}`}>
+                  {isSelected && <svg className="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}><path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" /></svg>}
+                </div>
+              </button>
+            );
+          })}
+        </div>
+      )}
     </div>
   );
 }
@@ -689,6 +740,14 @@ function PaymentStep({
             wanted platform-fee transparency. So before the card
             form we spell out both: card is charged only for lessons
             the student books, and platform fees are on the pro. */}
+        {/* task 55 v3 — the terms paragraph used to live BELOW the
+            Stripe block. Nadine flagged that as confusing: Stripe's
+            own mandate text mentioned "hun voorwaarden" without a
+            clickable link, then a separate "Gebruiksvoorwaarden" link
+            appeared after the submit button — two disconnected
+            references. Move the link into the scope-info box right
+            above the Stripe widget and reword it to explicitly bridge
+            to Stripe's "their terms" phrase. */}
         <div className="rounded-lg border border-green-100 bg-green-50/50 p-4">
           <p className="font-medium text-green-900 text-sm">
             {t("onboarding.paymentScopeHeading", locale)}
@@ -697,22 +756,32 @@ function PaymentStep({
             <li>{t("onboarding.paymentScopeBullet1", locale)}</li>
             <li>{t("onboarding.paymentScopeBullet2", locale)}</li>
           </ul>
+          <p className="mt-3 text-sm text-green-700">
+            {t("onboarding.paymentTermsPrefix", locale)}{" "}
+            <a
+              href="/terms"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="underline font-medium hover:text-green-900"
+            >
+              {t("onboarding.paymentTermsLink", locale)}
+            </a>
+            {t("onboarding.paymentTermsSuffix", locale)}
+          </p>
         </div>
+        {/* Drop the SetupIntent so the "Enable quick-book" intro
+            re-renders. Used to recover from a weird Stripe Link state
+            without losing the student's wizard progress (task 132). */}
+        <button
+          type="button"
+          onClick={() => setClientSecret(null)}
+          className="text-xs font-medium text-green-700 underline hover:text-green-900"
+        >
+          {t("onboarding.paymentBack", locale)}
+        </button>
         <Elements stripe={getStripe()} options={{ clientSecret, ...stripeElementsOptions }}>
           <PaymentForm onSuccess={onSuccess} locale={locale} billing={billing} />
         </Elements>
-        <p className="text-xs text-green-500">
-          {t("onboarding.paymentTermsPrefix", locale)}{" "}
-          <a
-            href="/terms"
-            target="_blank"
-            rel="noopener noreferrer"
-            className="underline hover:text-green-700"
-          >
-            {t("onboarding.paymentTermsLink", locale)}
-          </a>
-          {t("onboarding.paymentTermsSuffix", locale)}
-        </p>
         <button type="button" onClick={onSkip} className="mt-2 w-full text-center text-sm text-green-500 hover:text-green-700">{t("onboarding.skipPayment", locale)}</button>
       </div>
     );
@@ -773,6 +842,7 @@ export default function StudentOnboardingWizard({
       phone: "",
       preferredLocale: locale,
       handicap: "",
+      clubMemberNumber: "",
       golfGoals: [],
       golfGoalsOther: "",
     }
@@ -928,7 +998,7 @@ export default function StudentOnboardingWizard({
     let result;
     switch (step) {
       case 2:
-        result = await saveStep("golf-profile", { handicap: data.handicap || null, golfGoals: data.golfGoals, golfGoalsOther: data.golfGoalsOther || null });
+        result = await saveStep("golf-profile", { handicap: data.handicap || null, clubMemberNumber: data.clubMemberNumber.trim() || null, golfGoals: data.golfGoals, golfGoalsOther: data.golfGoalsOther || null });
         if (!result) break;
         // Skip step 3 (Choose Pros) entirely when the student arrived
         // from a booking with a pre-selected pro — the pro_students row
@@ -1064,7 +1134,14 @@ export default function StudentOnboardingWizard({
           <div className="mt-6 flex justify-center"><ProgressBar current={progressCurrent} total={progressSteps} /></div>
         )}
         <div className="mt-8 rounded-xl border border-green-200 bg-white p-6 shadow-sm sm:p-8">
-          <h2 className="mb-6 text-lg font-semibold text-green-900">{stepTitle}</h2>
+          <h2 className="text-lg font-semibold text-green-900">{stepTitle}</h2>
+          {step === 1 ? (
+            <p className="mb-6 mt-1 text-xs text-green-600">
+              {t("auth.requiredLegend", loc)}
+            </p>
+          ) : (
+            <div className="mb-6" />
+          )}
           {error && <div className="mb-4 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">{error}</div>}
 
           {step === 0 && <LanguageStep selected={data.preferredLocale} onChange={(v) => updateData({ preferredLocale: v })} />}

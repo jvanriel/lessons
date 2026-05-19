@@ -66,8 +66,9 @@ export async function POST(request: Request) {
     }
 
     case "golf-profile": {
-      const { handicap, golfGoals, golfGoalsOther } = data as {
+      const { handicap, clubMemberNumber, golfGoals, golfGoalsOther } = data as {
         handicap: string | null;
+        clubMemberNumber?: string | null;
         golfGoals: string[];
         golfGoalsOther: string | null;
       };
@@ -82,6 +83,8 @@ export async function POST(request: Request) {
         }
         parsedHandicap = String(h);
       }
+      const cleanMemberNumber =
+        clubMemberNumber?.trim().slice(0, 64) || null;
       const validGoals = (golfGoals || []).filter((g) =>
         VALID_GOALS.includes(g)
       );
@@ -89,6 +92,7 @@ export async function POST(request: Request) {
         .update(users)
         .set({
           handicap: parsedHandicap,
+          clubMemberNumber: cleanMemberNumber,
           golfGoals: validGoals.length > 0 ? validGoals : null,
           golfGoalsOther: golfGoalsOther?.trim() || null,
         })
@@ -119,26 +123,41 @@ export async function POST(request: Request) {
         );
       const validIds = new Set(validPros.map((p) => p.id));
 
-      // Check existing relationships
+      // Check existing relationships across ALL statuses. Pre-fix the
+      // query filtered on status='active', so an existing 'pending'
+      // (from a pro-side invite) or 'inactive' (from a prior deactivate)
+      // row was treated as missing — the subsequent INSERT then created
+      // a duplicate active row, surfacing as the doubled pro card on
+      // the member dashboard. (task 147)
       const existing = await db
         .select({
           id: proStudents.id,
           proProfileId: proStudents.proProfileId,
+          status: proStudents.status,
         })
         .from(proStudents)
-        .where(
-          and(
-            eq(proStudents.userId, session.userId),
-            eq(proStudents.status, "active")
-          )
-        );
+        .where(eq(proStudents.userId, session.userId));
       const existingMap = new Map(
-        existing.map((r) => [r.proProfileId, r.id])
+        existing.map((r) => [r.proProfileId, r])
       );
 
-      // Insert new relationships
+      // Reactivate non-active existing rows; insert brand-new ones.
+      const toReactivate = proProfileIds
+        .filter(
+          (id) =>
+            validIds.has(id) &&
+            existingMap.get(id) &&
+            existingMap.get(id)!.status !== "active",
+        )
+        .map((id) => existingMap.get(id)!.id);
+      if (toReactivate.length > 0) {
+        await db
+          .update(proStudents)
+          .set({ status: "active" })
+          .where(inArray(proStudents.id, toReactivate));
+      }
       const newIds = proProfileIds.filter(
-        (id) => validIds.has(id) && !existingMap.has(id)
+        (id) => validIds.has(id) && !existingMap.has(id),
       );
       if (newIds.length > 0) {
         await db.insert(proStudents).values(
@@ -147,8 +166,8 @@ export async function POST(request: Request) {
             userId: session.userId,
             source: "self" as const,
             status: "active" as const,
-          }))
-        );
+          })),
+        ).onConflictDoNothing();
       }
 
       // Fetch all proStudents with pro data for the scheduling step

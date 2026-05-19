@@ -17,7 +17,13 @@ import {
   buildParticipantBookingCancelledEmail,
   getParticipantBookingCancelledSubject,
 } from "@/lib/email-templates";
-import { resolveLocale } from "@/lib/i18n";
+import { resolveLocale, type Locale } from "@/lib/i18n";
+import { t } from "@/lib/i18n/translations";
+import {
+  formatLocationFull,
+  wazeUrl,
+  googleMapsUrl,
+} from "@/lib/location-display";
 import * as Sentry from "@sentry/nextjs";
 
 /**
@@ -47,6 +53,14 @@ export function parseExtraParticipants(
   formData: FormData,
   participantCount: number,
 ): ExtraParticipant[] {
+  // task 101 retest — return one row per requested extra, including
+  // empty ones. Pre-fix this skipped rows where firstName, lastName
+  // AND email were all empty, which let an "I picked 2 but didn't
+  // fill in the extra" submission slip past validateExtraParticipants
+  // (which then saw an empty array and returned no error). The
+  // booking would persist with participantCount=2 but only the
+  // booker inserted. Keeping the empty row makes the next-step
+  // validator catch it.
   const out: ExtraParticipant[] = [];
   const extras = Math.max(0, participantCount - 1);
   for (let i = 0; i < extras; i++) {
@@ -54,7 +68,6 @@ export function parseExtraParticipants(
     const lastName = ((formData.get(`participants[${i}].lastName`) as string) ?? "").trim();
     const email = ((formData.get(`participants[${i}].email`) as string) ?? "").trim().toLowerCase();
     const phone = ((formData.get(`participants[${i}].phone`) as string) ?? "").trim();
-    if (!firstName && !lastName && !email) continue;
     out.push({
       firstName,
       lastName,
@@ -67,17 +80,18 @@ export function parseExtraParticipants(
 
 /**
  * Validate that the per-participant fields are filled when the slot
- * exists. Returns null on success or a user-facing error string on
- * failure. Keep validation minimal — the Resource server-side enforces
- * the contract; this just produces a friendly message before the
- * insert tries.
+ * exists. Returns null on success or a locale-translated error string
+ * on failure. Keep validation minimal — the Resource server-side
+ * enforces the contract; this just produces a friendly message before
+ * the insert tries.
  */
 export function validateExtraParticipants(
   participants: ExtraParticipant[],
+  locale: Locale = "en",
 ): string | null {
   for (const p of participants) {
     if (!p.firstName || !p.lastName) {
-      return "Each additional participant needs a first and last name.";
+      return t("bookErr.extraParticipantNamesRequired", locale);
     }
   }
   return null;
@@ -107,7 +121,10 @@ async function loadBookingForFanout(bookingId: number) {
       // locale (participants may not have an account on file).
       bookerLocale: users.preferredLocale,
       locationName: locations.name,
+      locationAddress: locations.address,
       locationCity: locations.city,
+      locationLat: locations.lat,
+      locationLng: locations.lng,
       locationTimezone: locations.timezone,
       bookerFirstName: users.firstName,
       bookerLastName: users.lastName,
@@ -209,9 +226,16 @@ export async function sendParticipantBookingNotifications(
     const bookerName =
       `${data.bookerFirstName ?? ""} ${data.bookerLastName ?? ""}`.trim() ||
       data.bookerEmail;
-    const locationLabel = data.locationCity
-      ? `${data.locationName}, ${data.locationCity}`
-      : data.locationName;
+    const locationLabel = formatLocationFull({
+      name: data.locationName,
+      address: data.locationAddress,
+      city: data.locationCity,
+    });
+    const navLoc = {
+      lat: data.locationLat,
+      lng: data.locationLng,
+      address: data.locationAddress,
+    };
     const duration = durationMinutes(data.startTime, data.endTime);
 
     const ics = buildIcs({
@@ -252,6 +276,8 @@ export async function sendParticipantBookingNotifications(
             proEmail: data.proPublicEmail,
             proPhone: data.proContactPhone,
             locationName: locationLabel,
+            wazeUrl: wazeUrl(navLoc),
+            googleMapsUrl: googleMapsUrl(navLoc),
             date: data.date,
             startTime: data.startTime,
             endTime: data.endTime,
@@ -292,9 +318,11 @@ export async function sendParticipantCancellationNotifications(
     const bookerName =
       `${data.bookerFirstName ?? ""} ${data.bookerLastName ?? ""}`.trim() ||
       data.bookerEmail;
-    const locationLabel = data.locationCity
-      ? `${data.locationName}, ${data.locationCity}`
-      : data.locationName;
+    const locationLabel = formatLocationFull({
+      name: data.locationName,
+      address: data.locationAddress,
+      city: data.locationCity,
+    });
 
     const cancelIcs = buildCancelIcs({
       date: data.date,

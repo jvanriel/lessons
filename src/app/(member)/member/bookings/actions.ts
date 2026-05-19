@@ -16,7 +16,10 @@ import { checkCancellationAllowed, buildCancelIcs } from "@/lib/lesson-slots";
 import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import { sendEmail } from "@/lib/mail";
-import { sendParticipantCancellationNotifications } from "@/lib/booking-participants";
+import {
+  sendParticipantCancellationNotifications,
+  getEmailableParticipants,
+} from "@/lib/booking-participants";
 import {
   parseEditBookingChanges,
   validateEditAllowed,
@@ -34,6 +37,7 @@ import {
 import { loadBookingPricing } from "@/lib/booking-charge";
 import type { EmailPaymentChange } from "@/lib/email-templates";
 import { getAvailableSlots } from "@/app/(member)/member/book/actions";
+import { findStudentOverlap } from "@/lib/booking-overlap";
 import { lessonParticipants } from "@/lib/db/schema";
 import { isSlotConflictError } from "@/lib/db";
 import { after } from "next/server";
@@ -354,7 +358,11 @@ export async function updateBooking(formData: FormData) {
   if (!bookingId) return { error: "Invalid booking ID" };
 
   const changes = parseEditBookingChanges(formData);
-  const participantError = validateEditParticipants(changes.extraParticipants);
+  const localeForParticipantCheck = await getLocale();
+  const participantError = validateEditParticipants(
+    changes.extraParticipants,
+    localeForParticipantCheck,
+  );
   if (participantError) return { error: participantError };
 
   // Load the booking + the booker's own lesson_participants row so we
@@ -478,7 +486,50 @@ export async function updateBooking(formData: FormData) {
     if (taken) {
       return { error: t("bookErr.slotUnavailable", locale) };
     }
+    // Cross-pro double-booking guard. (task 143) Edit path excludes
+    // the booking being edited from the check.
+    const overlap = await findStudentOverlap({
+      userId: session.userId,
+      date: changes.date,
+      startTime: changes.startTime,
+      endTime: changes.endTime,
+      excludeBookingId: booking.id,
+    });
+    if (overlap) {
+      return {
+        error: t("bookErr.studentOverlapSelf", locale)
+          .replace("{start}", overlap.startTime)
+          .replace("{end}", overlap.endTime),
+      };
+    }
   }
+
+  // Snapshot the pre-edit values BEFORE applyBookingEdit overwrites
+  // them. Used by the booking-updated emails so the recipient (booker,
+  // pro, extra participant) sees "(was OLD)" next to each changed
+  // field. Booking row's `endTime - startTime` is the original
+  // duration; participantCount is also captured.
+  const previous = {
+    date: booking.date,
+    startTime: booking.startTime,
+    endTime: booking.endTime,
+    duration:
+      Number(booking.endTime.split(":")[0]) * 60 +
+      Number(booking.endTime.split(":")[1]) -
+      (Number(booking.startTime.split(":")[0]) * 60 +
+        Number(booking.startTime.split(":")[1])),
+    participantCount: booking.participantCount,
+    priceCents: booking.priceCents,
+  };
+  // Capture the participant list BEFORE applyBookingEdit deletes +
+  // reinserts. Anyone removed from the booking won't appear in the
+  // post-edit fanout but still needs a "you were removed" email +
+  // ICS CANCEL — `sendBookingUpdatedNotifications` diffs this against
+  // the live list and emails the dropouts.
+  const previousParticipants = await getEmailableParticipants(
+    booking.id,
+    session.email,
+  );
 
   try {
     await applyBookingEdit(booking.id, changes, bookerParticipant.id);
@@ -499,6 +550,7 @@ export async function updateBooking(formData: FormData) {
   // the pre-edit price (admin reconciles).
   const pricing = await loadBookingPricing(
     booking.proProfileId,
+    booking.proLocationId,
     changes.duration,
     changes.participantCount,
   );
@@ -535,7 +587,12 @@ export async function updateBooking(formData: FormData) {
   // Notification fanout runs post-response so the UI returns
   // immediately. Vercel keeps the function alive via `after()`.
   after(async () => {
-    await sendBookingUpdatedNotifications(booking.id, paymentChange);
+    await sendBookingUpdatedNotifications(
+      booking.id,
+      paymentChange,
+      previous,
+      previousParticipants,
+    );
   });
 
   revalidatePath("/member/bookings");

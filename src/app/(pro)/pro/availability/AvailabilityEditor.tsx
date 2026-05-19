@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useCallback, useRef, useMemo, useEffect, type ReactNode } from "react";
+import { useState, useCallback, useRef, useMemo, useEffect, useTransition, type ReactNode } from "react";
 import type {
   SerializedAvailability,
   SerializedOverride,
@@ -14,6 +14,12 @@ import { t } from "@/lib/i18n/translations";
 import type { Locale } from "@/lib/i18n";
 import { formatDate as formatDateLocale } from "@/lib/format-date";
 import { addDaysToDateString } from "@/lib/local-date";
+import { LOCATION_COLORS, buildLocationColorMap } from "@/lib/location-colors";
+import { beginCellPointer } from "@/lib/availability-grid-pointer";
+import BookingCard from "../bookings/BookingCard";
+import { CancelBookingDialog } from "../_components/CancelBookingDialog";
+import { proCancelBooking } from "../students/actions";
+import { useRouter } from "next/navigation";
 
 // ─── Constants ───────────────────────────────────────
 
@@ -26,9 +32,14 @@ const DAY_KEYS = [
   "book.day.sat",
   "book.day.sun",
 ] as const;
-const GRID_START_HOUR = 7;
-const GRID_END_HOUR = 22;
-const ROWS = (GRID_END_HOUR - GRID_START_HOUR) * 2; // 30 half-hour rows
+// Storage range is the full 24h day so the per-period display window
+// (task 119) can be set to any start/end without clamping at the
+// edges. Pre-fix the storage was 07:00–22:00 (30 half-hour rows), so
+// a pro who set displayEndTime="23:00" still saw the grid stop at
+// 22:00 because Math.min(ROWS, …) capped the row index.
+const GRID_START_HOUR = 0;
+const GRID_END_HOUR = 24;
+const ROWS = (GRID_END_HOUR - GRID_START_HOUR) * 2; // 48 half-hour rows
 const CELL_H_DESKTOP = 22;
 const CELL_H_TOUCH = 52;
 
@@ -52,15 +63,6 @@ function useCellHeight() {
   return cellH;
 }
 
-// Distinct colors for up to 6 locations
-const LOCATION_COLORS = [
-  { bg: "bg-green-500/80", bgHex: "#22c55e", text: "text-green-700", light: "bg-green-100", border: "border-green-500" },
-  { bg: "bg-blue-500/80", bgHex: "#3b82f6", text: "text-blue-700", light: "bg-blue-100", border: "border-blue-500" },
-  { bg: "bg-amber-500/80", bgHex: "#f59e0b", text: "text-amber-700", light: "bg-amber-100", border: "border-amber-500" },
-  { bg: "bg-purple-500/80", bgHex: "#a855f7", text: "text-purple-700", light: "bg-purple-100", border: "border-purple-500" },
-  { bg: "bg-rose-500/80", bgHex: "#f43f5e", text: "text-rose-700", light: "bg-rose-100", border: "border-rose-500" },
-  { bg: "bg-cyan-500/80", bgHex: "#06b6d4", text: "text-cyan-700", light: "bg-cyan-100", border: "border-cyan-500" },
-];
 
 function rowToTime(row: number): string {
   const totalMinutes = (GRID_START_HOUR * 60) + (row * 30);
@@ -87,6 +89,13 @@ interface Period {
   id: string;
   validFrom: string | null;
   validUntil: string | null;
+  /** Per-period grid render window (task 119). "HH:MM" strings;
+   *  WeeklyTemplateGrid renders only the rows in
+   *  [displayStartTime, displayEndTime). Doesn't affect saved
+   *  availability rows — values outside the window are preserved
+   *  on save. */
+  displayStartTime: string;
+  displayEndTime: string;
   grid: LocationGrid;
 }
 
@@ -98,6 +107,55 @@ function emptyGrid(): LocationGrid {
 
 function cloneGrid(g: LocationGrid): LocationGrid {
   return g.map((col) => col.map((cell) => new Set(cell)));
+}
+
+/**
+ * Deep equality on two LocationGrids — same set of location ids in
+ * every cell. Used by the auto-merge-on-remove logic so adjacent
+ * periods that came from the same Altijd-split (and weren't edited
+ * apart since) collapse back into one when the user removes the
+ * bounded period that originally split them. (task 77 item D)
+ */
+/**
+ * True when every cell of the grid is empty — used to flag a period
+ * that's been left without availability (typically the gap-placeholder
+ * inserted after removing a bounded period whose flanks couldn't be
+ * merged). (task 77 retest)
+ */
+function isGridEmpty(g: LocationGrid): boolean {
+  for (let day = 0; day < 7; day++) {
+    for (let row = 0; row < ROWS; row++) {
+      if (g[day][row].size > 0) return false;
+    }
+  }
+  return true;
+}
+
+function gridsEqual(a: LocationGrid, b: LocationGrid): boolean {
+  for (let day = 0; day < 7; day++) {
+    for (let row = 0; row < ROWS; row++) {
+      const sa = a[day][row];
+      const sb = b[day][row];
+      if (sa.size !== sb.size) return false;
+      for (const id of sa) if (!sb.has(id)) return false;
+    }
+  }
+  return true;
+}
+
+/**
+ * True iff two periods can be merged into one without loss: same
+ * display window AND identical location grids. Date adjacency is
+ * NOT required — the caller invokes this after removing the period
+ * that sat between `a` and `b`, so the gap between them is about
+ * to be filled by the merge itself. (task 77 item D)
+ */
+function periodsCanMerge(a: Period, b: Period): boolean {
+  return (
+    a.displayStartTime === b.displayStartTime &&
+    a.displayEndTime === b.displayEndTime &&
+    gridsEqual(a.grid, b.grid)
+  );
 }
 
 function availabilityToLocationGrid(slots: SerializedAvailability[]): LocationGrid {
@@ -143,6 +201,8 @@ function buildPeriods(
       id: `p${d.id}`,
       validFrom: d.validFrom,
       validUntil: d.validUntil,
+      displayStartTime: d.displayStartTime ?? "09:00",
+      displayEndTime: d.displayEndTime ?? "22:00",
       grid: availabilityToLocationGrid(matched),
     };
   });
@@ -151,6 +211,8 @@ function buildPeriods(
       id: "p-default",
       validFrom: null,
       validUntil: null,
+      displayStartTime: "09:00",
+      displayEndTime: "22:00",
       grid: emptyGrid(),
     });
   }
@@ -291,75 +353,9 @@ function LandscapeRotatePrompt({ locale }: { locale: Locale }) {
 
 // ─── Touch paint helpers ─────────────────────────────
 
-const LONG_PRESS_MS = 350;
-const LONG_PRESS_MOVE_TOLERANCE = 10;
-
-/**
- * Gates a cell paint operation by pointer type:
- *
- *   - Mouse / pen → `fire` runs immediately AND `startDrag` is invoked,
- *     so a desktop click toggles the cell and a held-down drag paints
- *     the cells the cursor crosses.
- *   - Touch → `fire` only runs after the finger stays put for ~350ms
- *     (long-press, with a haptic buzz on supported devices). A short
- *     tap does nothing — leaves the page free to scroll. `startDrag`
- *     is NOT called on touch: drag-paint is desktop-only by design
- *     (task 75). Mobile users toggle one cell per long-press.
- */
-function beginCellPointer(
-  e: React.PointerEvent,
-  fire: () => void,
-  startDrag: () => void,
-) {
-  if (e.pointerType !== "touch") {
-    e.preventDefault();
-    fire();
-    startDrag();
-    return;
-  }
-  // Touch: wait for a long-press before doing anything. Meanwhile the
-  // browser is free to scroll if the user slides their finger.
-  const startX = e.clientX;
-  const startY = e.clientY;
-  let done = false;
-  const cleanup = () => {
-    done = true;
-    window.removeEventListener("pointermove", onMove, true);
-    window.removeEventListener("pointerup", onEnd, true);
-    window.removeEventListener("pointercancel", onEnd, true);
-  };
-  const onMove = (ev: PointerEvent) => {
-    if (done) return;
-    if (
-      Math.abs(ev.clientX - startX) > LONG_PRESS_MOVE_TOLERANCE ||
-      Math.abs(ev.clientY - startY) > LONG_PRESS_MOVE_TOLERANCE
-    ) {
-      clearTimeout(timer);
-      cleanup();
-    }
-  };
-  const onEnd = () => {
-    clearTimeout(timer);
-    cleanup();
-  };
-  const timer = window.setTimeout(() => {
-    if (done) return;
-    fire();
-    // Intentionally NOT calling startDrag on touch — drag-paint is
-    // desktop-only. Long-press toggles a single cell and stops.
-    if ("vibrate" in navigator) {
-      try {
-        navigator.vibrate(15);
-      } catch {
-        /* user-agent gesture rules — ignore */
-      }
-    }
-    cleanup();
-  }, LONG_PRESS_MS);
-  window.addEventListener("pointermove", onMove, true);
-  window.addEventListener("pointerup", onEnd, true);
-  window.addEventListener("pointercancel", onEnd, true);
-}
+// beginCellPointer + LONG_PRESS_MS moved to
+// @/lib/availability-grid-pointer so the touch / mouse branch can be
+// unit-tested without spinning up this 2700-line editor.
 
 /**
  * Given a clientX/Y, find the [data-cell] element under the cursor and
@@ -399,12 +395,12 @@ export default function AvailabilityEditor({
 }: Props) {
   const CELL_H = useCellHeight();
 
-  // Build location -> color index map
-  const locationColorMap = useMemo(() => {
-    const map = new Map<number, number>();
-    locations.forEach((loc, i) => map.set(loc.id, i % LOCATION_COLORS.length));
-    return map;
-  }, [locations]);
+  // Build location -> color index map (shared helper so the bookings
+  // calendar uses the identical mapping).
+  const locationColorMap = useMemo(
+    () => buildLocationColorMap(locations),
+    [locations],
+  );
 
   // Active brush for painting
   const [activeLocationId, setActiveLocationId] = useState<number>(locations[0]?.id || 0);
@@ -552,6 +548,8 @@ function SchedulePeriodsSection({
     grid: LocationGrid;
     defaultFrom: string;
     defaultUntil: string;
+    displayStartTime: string;
+    displayEndTime: string;
   } | null>(null);
   const [pendingRemoveId, setPendingRemoveId] = useState<string | null>(null);
   // When the user removes the chronologically last period, the dialog
@@ -583,6 +581,8 @@ function SchedulePeriodsSection({
       periods: periods.map((p) => ({
         validFrom: p.validFrom,
         validUntil: p.validUntil,
+        displayStartTime: p.displayStartTime,
+        displayEndTime: p.displayEndTime,
         slots: locations.flatMap((loc) =>
           gridToSlotsForLocation(p.grid, loc.id).map((s) => ({
             proLocationId: loc.id,
@@ -624,12 +624,19 @@ function SchedulePeriodsSection({
     return () => clearTimeout(debounceRef.current);
   }, [periods, locations]);
 
-  function addPeriod(validFrom: string, validUntil: string) {
+  function addPeriod(
+    validFrom: string,
+    validUntil: string,
+    displayStartTime: string,
+    displayEndTime: string,
+  ) {
     const id = `p${Date.now()}`;
     const inserted: Period = {
       id,
       validFrom,
       validUntil,
+      displayStartTime,
+      displayEndTime,
       grid: emptyGrid(),
     };
     onPeriodsChange(insertWithSplit(periods, inserted).sort(sortPeriods));
@@ -650,16 +657,25 @@ function SchedulePeriodsSection({
       grid: cloneGrid(activePeriod.grid),
       defaultFrom: fromAnchor,
       defaultUntil,
+      displayStartTime: activePeriod.displayStartTime,
+      displayEndTime: activePeriod.displayEndTime,
     });
   }
 
-  function commitDuplicate(validFrom: string, validUntil: string) {
+  function commitDuplicate(
+    validFrom: string,
+    validUntil: string,
+    displayStartTime: string,
+    displayEndTime: string,
+  ) {
     if (!pendingDuplicate) return;
     const id = `p${Date.now()}`;
     const inserted: Period = {
       id,
       validFrom,
       validUntil,
+      displayStartTime,
+      displayEndTime,
       grid: pendingDuplicate.grid,
     };
     onPeriodsChange(insertWithSplit(periods, inserted).sort(sortPeriods));
@@ -688,8 +704,61 @@ function SchedulePeriodsSection({
     const idx = periods.findIndex((p) => p.id === id);
     if (idx < 0) return;
     const wasLast = idx === periods.length - 1 && periods.length > 1;
+    // Snapshot the flanking periods + the removed period BEFORE the
+    // filter — used by the auto-merge step + gap-placeholder below.
+    const removed = periods[idx];
+    const prev = idx > 0 ? periods[idx - 1] : null;
+    const after = idx < periods.length - 1 ? periods[idx + 1] : null;
 
     let next = periods.filter((p) => p.id !== id);
+    // Auto-merge the flanking pair if they match (same grid + display
+    // window). Common case: Nadine adds a bounded period inside
+    // Altijd → insertWithSplit clones Altijd into before/after with
+    // the same grid → removing the bounded period leaves two
+    // identical pieces sandwiching a now-empty range. Without this,
+    // the editor would leave (null, X-1) + (Y+1, null) as two stuck
+    // tabs even though the user just wants their Altijd back.
+    let merged = false;
+    if (prev && after && periodsCanMerge(prev, after)) {
+      const mergedPeriod: Period = {
+        ...prev,
+        validUntil: after.validUntil,
+        grid: cloneGrid(prev.grid),
+      };
+      next = next
+        .filter((p) => p.id !== prev.id && p.id !== after.id)
+        .concat(mergedPeriod)
+        .sort(sortPeriods);
+      merged = true;
+    }
+
+    // Gap placeholder: when neighbors couldn't be merged AND the
+    // removed period was bounded (had both a start and end date),
+    // re-insert an EMPTY period at the same date range so the pro
+    // visibly sees the now-uncovered window and knows to fill in
+    // availability for it. Without this, the date range becomes
+    // silent dead space — students see "no slots" but the pro
+    // doesn't notice (task 77 retest, Nadine 2026-05-18).
+    if (
+      !merged &&
+      removed &&
+      removed.validFrom &&
+      removed.validUntil &&
+      prev &&
+      after
+    ) {
+      next = [
+        ...next,
+        {
+          id: `p${Date.now()}`,
+          validFrom: removed.validFrom,
+          validUntil: removed.validUntil,
+          displayStartTime: removed.displayStartTime,
+          displayEndTime: removed.displayEndTime,
+          grid: emptyGrid(),
+        },
+      ].sort(sortPeriods);
+    }
     // If the user removed the chronologically last period and ticked
     // the "extend previous" toggle, clear the new-last's validUntil
     // so the timeline keeps an open end (no closing date).
@@ -703,7 +772,14 @@ function SchedulePeriodsSection({
     // grid has somewhere to render. If the user removes the last
     // period, recreate an empty unbounded one.
     if (next.length === 0) {
-      next.push({ id: `p${Date.now()}`, validFrom: null, validUntil: null, grid: emptyGrid() });
+      next.push({
+        id: `p${Date.now()}`,
+        validFrom: null,
+        validUntil: null,
+        displayStartTime: "09:00",
+        displayEndTime: "22:00",
+        grid: emptyGrid(),
+      });
     }
     onPeriodsChange(next);
     if (activePeriodId === id) {
@@ -715,11 +791,21 @@ function SchedulePeriodsSection({
     id: string,
     validFrom: string | null,
     validUntil: string | null,
+    displayStartTime?: string,
+    displayEndTime?: string,
   ) {
     onPeriodsChange(
       periods
         .map((p) =>
-          p.id === id ? { ...p, validFrom, validUntil } : p,
+          p.id === id
+            ? {
+                ...p,
+                validFrom,
+                validUntil,
+                displayStartTime: displayStartTime ?? p.displayStartTime,
+                displayEndTime: displayEndTime ?? p.displayEndTime,
+              }
+            : p,
         )
         .sort(sortPeriods),
     );
@@ -732,21 +818,41 @@ function SchedulePeriodsSection({
         <span className="text-sm font-medium text-green-800">
           {t("proAvail.schedulePeriods", locale)}:
         </span>
-        {periods.map((p) => (
-          <button
-            key={p.id}
-            type="button"
-            onClick={() => onActivePeriodChange(p.id)}
-            className={`rounded-full px-3 py-1 text-xs font-medium transition-colors ${
-              p.id === activePeriodId
-                ? "bg-green-700 text-white"
-                : "border border-green-200 bg-white text-green-700 hover:border-green-400"
-            }`}
-            title={periodLabel(p, locale)}
-          >
-            {periodLabel(p, locale)}
-          </button>
-        ))}
+        {periods.map((p) => {
+          // Bounded periods with no slots get an amber border + ring so
+          // the pro spots them at a glance — typically gap placeholders
+          // left after removing a non-mergeable middle period. The
+          // unbounded Altijd-tab is always considered "fine" even when
+          // empty (it's the default starting state).
+          const isEmpty =
+            (p.validFrom !== null || p.validUntil !== null) &&
+            isGridEmpty(p.grid);
+          const isActive = p.id === activePeriodId;
+          return (
+            <button
+              key={p.id}
+              type="button"
+              onClick={() => onActivePeriodChange(p.id)}
+              className={`rounded-full px-3 py-1 text-xs font-medium transition-colors ${
+                isActive
+                  ? isEmpty
+                    ? "bg-amber-600 text-white"
+                    : "bg-green-700 text-white"
+                  : isEmpty
+                    ? "border border-amber-300 bg-amber-50 text-amber-700 hover:border-amber-500"
+                    : "border border-green-200 bg-white text-green-700 hover:border-green-400"
+              }`}
+              title={periodLabel(p, locale)}
+            >
+              {periodLabel(p, locale)}
+              {isEmpty && (
+                <span className="ml-1 opacity-80">
+                  · {t("proAvail.emptyBadge", locale)}
+                </span>
+              )}
+            </button>
+          );
+        })}
         <button
           type="button"
           onClick={() => setShowAdd(true)}
@@ -784,6 +890,18 @@ function SchedulePeriodsSection({
                 ) && (
                   <p className="mt-1 text-[11px] italic text-green-500">
                     {t("proAvail.alwaysResetHint", locale)}
+                  </p>
+                )}
+              {/* Empty-period banner: bounded period with no slots —
+                  typically a gap placeholder left by removing a
+                  middle period whose flanks didn't match (task 77
+                  retest). Surfaces the unfilled range so the pro
+                  knows to paint availability in. */}
+              {(activePeriod.validFrom !== null ||
+                activePeriod.validUntil !== null) &&
+                isGridEmpty(activePeriod.grid) && (
+                  <p className="mt-1 rounded-md bg-amber-50 px-2 py-1 text-[11px] text-amber-800">
+                    {t("proAvail.emptyPeriodHint", locale)}
                   </p>
                 )}
             </div>
@@ -826,6 +944,8 @@ function SchedulePeriodsSection({
             onActiveLocationChange={onActiveLocationChange}
             grid={activePeriod.grid}
             onGridChange={onGridChange}
+            displayStartTime={activePeriod.displayStartTime}
+            displayEndTime={activePeriod.displayEndTime}
             locale={locale}
           />
         </div>
@@ -866,6 +986,8 @@ function SchedulePeriodsSection({
             mode="edit"
             initialFrom={p.validFrom}
             initialUntil={p.validUntil}
+            initialDisplayStartTime={p.displayStartTime}
+            initialDisplayEndTime={p.displayEndTime}
             allowOpenStart={idx === 0}
             allowOpenEnd={idx === periods.length - 1}
             locale={locale}
@@ -876,8 +998,14 @@ function SchedulePeriodsSection({
                 from: x.validFrom!,
                 until: x.validUntil!,
               }))}
-            onSubmit={(from, until) =>
-              updatePeriodDates(p.id, from || null, until || null)
+            onSubmit={(from, until, dStart, dEnd) =>
+              updatePeriodDates(
+                p.id,
+                from || null,
+                until || null,
+                dStart,
+                dEnd,
+              )
             }
             onClose={() => setEditingDatesFor(null)}
           />
@@ -888,6 +1016,8 @@ function SchedulePeriodsSection({
           mode="add"
           initialFrom={pendingDuplicate.defaultFrom}
           initialUntil={pendingDuplicate.defaultUntil}
+          initialDisplayStartTime={pendingDuplicate.displayStartTime}
+          initialDisplayEndTime={pendingDuplicate.displayEndTime}
           locale={locale}
           existingBoundedRanges={periods
             .filter((p) => p.validFrom && p.validUntil)
@@ -1048,6 +1178,8 @@ function insertWithSplit(existing: Period[], inserted: Period): Period[] {
       id: `p${Date.now()}b`,
       validFrom: beforeFrom,
       validUntil: beforeUntil,
+      displayStartTime: containing.displayStartTime,
+      displayEndTime: containing.displayEndTime,
       grid: cloneGrid(containing.grid),
     });
   }
@@ -1057,6 +1189,8 @@ function insertWithSplit(existing: Period[], inserted: Period): Period[] {
       id: `p${Date.now()}a`,
       validFrom: afterFrom,
       validUntil: afterUntil,
+      displayStartTime: containing.displayStartTime,
+      displayEndTime: containing.displayEndTime,
       grid: cloneGrid(containing.grid),
     });
   }
@@ -1082,6 +1216,8 @@ function PeriodDatesDialog({
   mode,
   initialFrom,
   initialUntil,
+  initialDisplayStartTime,
+  initialDisplayEndTime,
   existingBoundedRanges,
   locale,
   onSubmit,
@@ -1092,11 +1228,20 @@ function PeriodDatesDialog({
   mode: "add" | "edit";
   initialFrom?: string | null;
   initialUntil?: string | null;
+  /** Optional initial display window (task 119). Defaults to
+   *  09:00 / 22:00 when not supplied. */
+  initialDisplayStartTime?: string;
+  initialDisplayEndTime?: string;
   existingBoundedRanges: Array<{ id: string; from: string; until: string }>;
   locale: Locale;
   // Sends `""` (empty) for boundary fields the user wants to clear.
   // Callers convert that to `null` before persisting.
-  onSubmit: (from: string, until: string) => void;
+  onSubmit: (
+    from: string,
+    until: string,
+    displayStartTime: string,
+    displayEndTime: string,
+  ) => void;
   onClose: () => void;
   // Task 78 — only the chronologically first period may have null
   // `validFrom` and only the last may have null `validUntil`. The
@@ -1111,6 +1256,12 @@ function PeriodDatesDialog({
   );
   const [openEnd, setOpenEnd] = useState(
     allowOpenEnd && initialUntil === null,
+  );
+  const [displayStart, setDisplayStart] = useState(
+    initialDisplayStartTime ?? "09:00",
+  );
+  const [displayEnd, setDisplayEnd] = useState(
+    initialDisplayEndTime ?? "22:00",
   );
   const [submitError, setSubmitError] = useState<string | null>(null);
 
@@ -1130,6 +1281,9 @@ function PeriodDatesDialog({
         }
       }
     }
+    if (displayStart && displayEnd && displayStart >= displayEnd) {
+      return t("proAvail.displayRangeInvalid", locale);
+    }
     return null;
   })();
 
@@ -1148,7 +1302,7 @@ function PeriodDatesDialog({
       setSubmitError(inlineError);
       return;
     }
-    onSubmit(fromValue, untilValue);
+    onSubmit(fromValue, untilValue, displayStart, displayEnd);
   }
 
   const error = inlineError ?? submitError;
@@ -1209,6 +1363,34 @@ function PeriodDatesDialog({
               </span>
             )}
           </label>
+          {/* Display window (task 119) — narrows the visible row range
+              of the editor + preview grids without affecting saved
+              availability. Defaults 09:00 – 22:00. */}
+          <div className="mt-2 rounded-md border border-green-100 bg-green-50/40 p-2">
+            <p className="mb-1 text-[11px] font-medium text-green-700">
+              {t("proAvail.displayRangeLabel", locale)}
+            </p>
+            <p className="mb-2 text-[10px] text-green-600">
+              {t("proAvail.displayRangeHelp", locale)}
+            </p>
+            <div className="flex items-center gap-2">
+              <input
+                type="time"
+                value={displayStart}
+                onChange={(e) => setDisplayStart(e.target.value)}
+                step={1800}
+                className="flex-1 rounded-md border border-green-200 bg-white px-2 py-1 text-xs text-green-900 focus:border-green-400 focus:outline-none focus:ring-1 focus:ring-green-400"
+              />
+              <span className="text-xs text-green-500">–</span>
+              <input
+                type="time"
+                value={displayEnd}
+                onChange={(e) => setDisplayEnd(e.target.value)}
+                step={1800}
+                className="flex-1 rounded-md border border-green-200 bg-white px-2 py-1 text-xs text-green-900 focus:border-green-400 focus:outline-none focus:ring-1 focus:ring-green-400"
+              />
+            </div>
+          </div>
           {error && <p className="text-xs text-red-600">{error}</p>}
         </div>
         <div className="mt-5 flex gap-3">
@@ -1242,6 +1424,8 @@ function WeeklyTemplateGrid({
   onActiveLocationChange,
   grid,
   onGridChange,
+  displayStartTime,
+  displayEndTime,
   locale,
 }: {
   locations: SerializedProLocationWithName[];
@@ -1250,8 +1434,21 @@ function WeeklyTemplateGrid({
   onActiveLocationChange: (id: number) => void;
   grid: LocationGrid;
   onGridChange: (grid: LocationGrid) => void;
+  /** Per-period grid render window (task 119). Only rows in
+   *  [displayStartTime, displayEndTime) are rendered; underlying
+   *  grid storage stays full-day. */
+  displayStartTime: string;
+  displayEndTime: string;
   locale: Locale;
 }) {
+  // Visible row window for the editor. Clamp to the storage bounds
+  // and floor/ceil so the inputs translate cleanly to row indices
+  // (each row = 30 min).
+  const visibleStart = Math.max(0, Math.min(ROWS, timeToRow(displayStartTime)));
+  const visibleEnd = Math.max(
+    visibleStart,
+    Math.min(ROWS, timeToRow(displayEndTime)),
+  );
   const CELL_H = useCellHeight();
   // Auto-save now lives on the parent (`SchedulePeriodsSection`) so the
   // grid component stays a controlled view: edits go up via
@@ -1424,8 +1621,12 @@ function WeeklyTemplateGrid({
             </div>
           ))}
 
-          {/* Grid rows */}
-          {Array.from({ length: ROWS }, (_, row) => {
+          {/* Grid rows — windowed by the period's display range
+              (task 119). Rows outside [visibleStart, visibleEnd)
+              still exist in storage and are saved verbatim, just
+              not rendered. */}
+          {Array.from({ length: visibleEnd - visibleStart }, (_, vi) => {
+            const row = visibleStart + vi;
             const isHourBoundary = row % 2 === 0;
             return [
               <div
@@ -1453,9 +1654,14 @@ function WeeklyTemplateGrid({
                   const colorIdx = locationColorMap.get(locId) ?? 0;
                   cellStyle.backgroundColor = LOCATION_COLORS[colorIdx].bgHex;
                   cellStyle.opacity = 0.75;
-                  // Rounding for contiguous blocks
-                  const aboveSame = row > 0 && grid[day][row - 1].has(locId);
-                  const belowSame = row < ROWS - 1 && grid[day][row + 1].has(locId);
+                  // Rounding for contiguous blocks. Use the visible
+                  // window bounds (not full ROWS) so a block that
+                  // continues past the rendered edge still rounds at
+                  // the visible top / bottom (task 119).
+                  const aboveSame =
+                    row > visibleStart && grid[day][row - 1].has(locId);
+                  const belowSame =
+                    row < visibleEnd - 1 && grid[day][row + 1].has(locId);
                   if (!aboveSame) cellClass += " rounded-t";
                   if (!belowSame) cellClass += " rounded-b";
                 } else {
@@ -1595,10 +1801,44 @@ function PreviewBlockingGrid({
   locale: Locale;
 }) {
   const CELL_H = useCellHeight();
+  const router = useRouter();
   const [weekOffset, setWeekOffset] = useState(0);
   const [dirty, setDirty] = useState(false);
   const [saveStatus, setSaveStatus] = useState<"idle" | "saving" | "saved">("idle");
   const debounceRef = useRef<ReturnType<typeof setTimeout>>(undefined);
+
+  // Confirm dialog shown when a new block sweeps over existing
+  // bookings. Holds the list of bookings about to be cancelled so the
+  // pro can review before saveWeekOverrides commits (task 137).
+  const [pendingConflicts, setPendingConflicts] = useState<
+    SerializedBooking[] | null
+  >(null);
+  // Reason the pro types in the conflict dialog — flows to every
+  // cancellation email sent in this save (task 154).
+  const [cancellationReason, setCancellationReason] = useState("");
+
+  // Booking dialog: tap any booking cell to open the shared
+  // BookingCard (same surface as /pro/bookings). Cancel uses the same
+  // confirm dialog as the bookings views.
+  const [expandedBooking, setExpandedBooking] =
+    useState<SerializedBooking | null>(null);
+  const [cancelTargetBooking, setCancelTargetBooking] =
+    useState<SerializedBooking | null>(null);
+  const [cancelPending, startCancelTransition] = useTransition();
+  function handleCancelBooking() {
+    if (!cancelTargetBooking) return;
+    const id = cancelTargetBooking.id;
+    startCancelTransition(async () => {
+      const result = await proCancelBooking(id);
+      if ("error" in result) {
+        alert(result.error);
+      } else {
+        router.refresh();
+      }
+      setCancelTargetBooking(null);
+      setExpandedBooking(null);
+    });
+  }
 
   const today = useMemo(() => {
     const d = new Date();
@@ -1631,6 +1871,40 @@ function PreviewBlockingGrid({
     ws.setDate(ws.getDate() - currentDow + weekOffset * 7);
     return ws;
   }, [weekOffset, today]);
+
+  // Display window for the preview grid (task 119) — union across
+  // every period whose date range overlaps the visible week, so a
+  // winter (09:00-18:00) + summer (07:00-22:00) split shows the
+  // right rows on each week. Falls back to 09:00–22:00 when no
+  // periods match (defensive — should never render with empty
+  // periods).
+  const { previewVisibleStart, previewVisibleEnd } = useMemo(() => {
+    const dates = days.map((d) => d.date);
+    const visible = periods.filter((p) =>
+      dates.some(
+        (d) =>
+          (p.validFrom === null || p.validFrom <= d) &&
+          (p.validUntil === null || p.validUntil >= d),
+      ),
+    );
+    const source = visible.length > 0 ? visible : periods;
+    let start = ROWS;
+    let end = 0;
+    for (const p of source) {
+      const s = timeToRow(p.displayStartTime ?? "09:00");
+      const e = timeToRow(p.displayEndTime ?? "22:00");
+      if (s < start) start = s;
+      if (e > end) end = e;
+    }
+    if (start >= end) {
+      start = timeToRow("09:00");
+      end = timeToRow("22:00");
+    }
+    return {
+      previewVisibleStart: Math.max(0, Math.min(ROWS, start)),
+      previewVisibleEnd: Math.max(0, Math.min(ROWS, end)),
+    };
+  }, [days, periods]);
 
   // ─── Brush: blocked or extra availability per location ─
   type PreviewBrush = { mode: "blocked" } | { mode: "available"; locationId: number };
@@ -1670,8 +1944,8 @@ function PreviewBlockingGrid({
       );
     });
 
-    const bMap: (string | null)[][] = Array.from({ length: 7 }, () =>
-      Array<string | null>(ROWS).fill(null),
+    const bMap: (SerializedBooking | null)[][] = Array.from({ length: 7 }, () =>
+      Array<SerializedBooking | null>(ROWS).fill(null),
     );
     for (const b of bookings) {
       if (b.status?.startsWith("cancelled")) continue;
@@ -1679,12 +1953,11 @@ function PreviewBlockingGrid({
       if (dayIdx < 0) continue;
       const startRow = timeToRow(b.startTime);
       const endRow = timeToRow(b.endTime);
-      const label = b.bookerName || t("proAvail.booked", locale);
-      for (let r = startRow; r < endRow; r++) bMap[dayIdx][r] = label;
+      for (let r = startRow; r < endRow; r++) bMap[dayIdx][r] = b;
     }
 
     return { templateAvailMap: aMap, bookingMap: bMap };
-  }, [days, periods, bookings, locale]);
+  }, [days, periods, bookings]);
 
   // ─── Paint handlers ───────────────────────────────
 
@@ -1878,36 +2151,58 @@ function PreviewBlockingGrid({
     setEditPopover({ key: reasonKey, x: e.clientX, y: e.clientY });
   }
 
-  // ─── Auto-save overrides after 2s of inactivity ──
-  useEffect(() => {
-    if (!dirty) return;
-    clearTimeout(debounceRef.current);
-    debounceRef.current = setTimeout(() => {
-      setSaveStatus("saving");
-      setDirty(false);
+  // Build the save payload from current grid state. Pure function of
+  // the cell maps; called from both the debounce effect and the
+  // post-confirm path so the records can't drift between the two.
+  const buildOverrideRecords = useCallback(() => {
+    const datesToReplace = days.filter((d) => !d.isPast).map((d) => d.date);
+    const records: Array<{
+      date: string;
+      type: "blocked" | "available";
+      proLocationId?: number;
+      startTime?: string;
+      endTime?: string;
+      reason?: string;
+    }> = [];
 
-      const datesToReplace = days.filter((d) => !d.isPast).map((d) => d.date);
-      const records: Array<{
-        date: string;
-        type: "blocked" | "available";
-        proLocationId?: number;
-        startTime?: string;
-        endTime?: string;
-        reason?: string;
-      }> = [];
+    for (let dayIdx = 0; dayIdx < 7; dayIdx++) {
+      if (days[dayIdx].isPast) continue;
+      const date = days[dayIdx].date;
 
-      for (let dayIdx = 0; dayIdx < 7; dayIdx++) {
-        if (days[dayIdx].isPast) continue;
-        const date = days[dayIdx].date;
+      if (fullDayBlocked[dayIdx]) {
+        records.push({ date, type: "blocked", reason: reasons.get(`${dayIdx}`) });
+      } else {
+        let inBlock = false;
+        let startRow = 0;
+        for (let row = 0; row <= ROWS; row++) {
+          const active = row < ROWS && blockedCells[dayIdx][row];
+          if (active && !inBlock) {
+            inBlock = true;
+            startRow = row;
+          }
+          if (!active && inBlock) {
+            inBlock = false;
+            records.push({
+              date,
+              type: "blocked",
+              startTime: rowToTime(startRow),
+              endTime: rowToTime(row),
+              reason: reasons.get(`${dayIdx}-${startRow}`),
+            });
+          }
+        }
+      }
 
-        // ── Blocked overrides ──
-        if (fullDayBlocked[dayIdx]) {
-          records.push({ date, type: "blocked", reason: reasons.get(`${dayIdx}`) });
-        } else {
+      if (!fullDayBlocked[dayIdx]) {
+        const locIds = new Set<number>();
+        for (let row = 0; row < ROWS; row++) {
+          for (const id of extraAvailCells[dayIdx][row]) locIds.add(id);
+        }
+        for (const locId of locIds) {
           let inBlock = false;
           let startRow = 0;
           for (let row = 0; row <= ROWS; row++) {
-            const active = row < ROWS && blockedCells[dayIdx][row];
+            const active = row < ROWS && extraAvailCells[dayIdx][row].has(locId);
             if (active && !inBlock) {
               inBlock = true;
               startRow = row;
@@ -1916,57 +2211,117 @@ function PreviewBlockingGrid({
               inBlock = false;
               records.push({
                 date,
-                type: "blocked",
+                type: "available",
+                proLocationId: locId,
                 startTime: rowToTime(startRow),
                 endTime: rowToTime(row),
-                reason: reasons.get(`${dayIdx}-${startRow}`),
               });
             }
           }
         }
-
-        // ── Extra availability overrides per location ──
-        if (!fullDayBlocked[dayIdx]) {
-          const locIds = new Set<number>();
-          for (let row = 0; row < ROWS; row++) {
-            for (const id of extraAvailCells[dayIdx][row]) locIds.add(id);
-          }
-          for (const locId of locIds) {
-            let inBlock = false;
-            let startRow = 0;
-            for (let row = 0; row <= ROWS; row++) {
-              const active = row < ROWS && extraAvailCells[dayIdx][row].has(locId);
-              if (active && !inBlock) {
-                inBlock = true;
-                startRow = row;
-              }
-              if (!active && inBlock) {
-                inBlock = false;
-                records.push({
-                  date,
-                  type: "available",
-                  proLocationId: locId,
-                  startTime: rowToTime(startRow),
-                  endTime: rowToTime(row),
-                });
-              }
-            }
-          }
-        }
       }
+    }
+    return { datesToReplace, records };
+  }, [days, blockedCells, fullDayBlocked, extraAvailCells, reasons]);
 
-      (async () => {
-        const result = await saveWeekOverrides({ datesToReplace, overrides: records });
-        if (!result.error) {
-          setSaveStatus("saved");
-          setTimeout(() => setSaveStatus((s) => (s === "saved" ? "idle" : s)), 2000);
-        } else {
-          setSaveStatus("idle");
+  // Find unique confirmed bookings that fall under a new blocked cell
+  // (or full-day block). Iterates the visible grid against bookingMap
+  // — same source the cells render from — so what the pro sees matches
+  // what we'll cancel.
+  const findConflictingBookings = useCallback((): SerializedBooking[] => {
+    const seen = new Map<number, SerializedBooking>();
+    for (let dayIdx = 0; dayIdx < 7; dayIdx++) {
+      if (days[dayIdx].isPast) continue;
+      for (let row = 0; row < ROWS; row++) {
+        const booking = bookingMap[dayIdx][row];
+        if (!booking) continue;
+        const blocked = fullDayBlocked[dayIdx] || blockedCells[dayIdx][row];
+        if (!blocked) continue;
+        if (!seen.has(booking.id)) seen.set(booking.id, booking);
+      }
+    }
+    return [...seen.values()];
+  }, [days, blockedCells, fullDayBlocked, bookingMap]);
+
+  const flushSave = useCallback(
+    async (reason?: string) => {
+      setSaveStatus("saving");
+      setDirty(false);
+      const { datesToReplace, records } = buildOverrideRecords();
+      const result = await saveWeekOverrides({
+        datesToReplace,
+        overrides: records,
+        cancellationReason: reason,
+      });
+      if (!result.error) {
+        setSaveStatus("saved");
+        if (result.cancelledBookingIds && result.cancelledBookingIds.length > 0) {
+          // Cancelled bookings need to disappear from bookingMap — refresh
+          // the page so the server-rendered bookings prop is current.
+          router.refresh();
         }
-      })();
+        setTimeout(() => setSaveStatus((s) => (s === "saved" ? "idle" : s)), 2000);
+      } else {
+        setSaveStatus("idle");
+      }
+    },
+    [buildOverrideRecords, router],
+  );
+
+  // ─── Auto-save overrides after 2s of inactivity ──
+  useEffect(() => {
+    if (!dirty) return;
+    if (pendingConflicts) return; // wait for the user's decision
+    clearTimeout(debounceRef.current);
+    debounceRef.current = setTimeout(() => {
+      const conflicts = findConflictingBookings();
+      if (conflicts.length > 0) {
+        setPendingConflicts(conflicts);
+        return;
+      }
+      flushSave();
     }, 2000);
     return () => clearTimeout(debounceRef.current);
-  }, [dirty, days, blockedCells, fullDayBlocked, extraAvailCells, reasons]);
+  }, [dirty, pendingConflicts, findConflictingBookings, flushSave]);
+
+  function confirmCancelOverlappingBookings() {
+    const reason = cancellationReason.trim();
+    setPendingConflicts(null);
+    setCancellationReason("");
+    flushSave(reason || undefined);
+  }
+
+  function undoBlocksOverBookings() {
+    setCancellationReason("");
+    // Drop just the blocks that overlap a booking, leaving any
+    // non-conflicting block painting from the same edit intact.
+    setBlockedCells((prev) => {
+      const next = prev.map((col) => [...col]);
+      for (let d = 0; d < 7; d++) {
+        for (let r = 0; r < ROWS; r++) {
+          if (next[d][r] && bookingMap[d][r]) next[d][r] = false;
+        }
+      }
+      return next;
+    });
+    setFullDayBlocked((prev) => {
+      const next = [...prev];
+      for (let d = 0; d < 7; d++) {
+        if (!next[d]) continue;
+        let hasBooking = false;
+        for (let r = 0; r < ROWS; r++) {
+          if (bookingMap[d][r]) {
+            hasBooking = true;
+            break;
+          }
+        }
+        if (hasBooking) next[d] = false;
+      }
+      return next;
+    });
+    setPendingConflicts(null);
+    setDirty(true);
+  }
 
   // ─── Helpers for cell rendering ───────────────────
   function cellLocNames(locs: Set<number>): string {
@@ -2139,8 +2494,13 @@ function PreviewBlockingGrid({
             </div>
           ))}
 
-          {/* ── Data rows ── */}
-          {Array.from({ length: ROWS }, (_, row) => {
+          {/* ── Data rows ── (task 119) Windowed to the union of
+              every period's display range that overlaps the visible
+              week. */}
+          {Array.from(
+            { length: previewVisibleEnd - previewVisibleStart },
+            (_, vi) => {
+            const row = previewVisibleStart + vi;
             const isHourBoundary = row % 2 === 0;
             return [
               <div
@@ -2201,8 +2561,16 @@ function PreviewBlockingGrid({
                 let overlayClass = "";
                 if (!day.isPast && isBlocked) {
                   overlayBg = "rgba(239, 68, 68, 0.6)";
-                  const aboveBlocked = row > 0 && (isFullDay || blockedCells[dayIdx][row - 1]);
-                  const belowBlocked = row < ROWS - 1 && (isFullDay || blockedCells[dayIdx][row + 1]);
+                  // Same windowed-bounds trick as WeeklyTemplateGrid
+                  // (task 119) — round at the visible edge so blocks
+                  // that continue outside the rendered window don't
+                  // bleed past the grid border.
+                  const aboveBlocked =
+                    row > previewVisibleStart &&
+                    (isFullDay || blockedCells[dayIdx][row - 1]);
+                  const belowBlocked =
+                    row < previewVisibleEnd - 1 &&
+                    (isFullDay || blockedCells[dayIdx][row + 1]);
                   if (!aboveBlocked) overlayClass += " rounded-t";
                   if (!belowBlocked) overlayClass += " rounded-b";
                 } else if (!day.isPast && hasExtra) {
@@ -2216,14 +2584,22 @@ function PreviewBlockingGrid({
                     );
                     overlayBg = `repeating-linear-gradient(135deg, ${colors[0]}99 0px, ${colors[0]}99 3px, ${colors[1] || colors[0]}99 3px, ${colors[1] || colors[0]}99 6px)`;
                   }
-                  const aboveExtra = row > 0 && extraAvailCells[dayIdx][row - 1].size > 0;
-                  const belowExtra = row < ROWS - 1 && extraAvailCells[dayIdx][row + 1].size > 0;
+                  const aboveExtra =
+                    row > previewVisibleStart &&
+                    extraAvailCells[dayIdx][row - 1].size > 0;
+                  const belowExtra =
+                    row < previewVisibleEnd - 1 &&
+                    extraAvailCells[dayIdx][row + 1].size > 0;
                   if (!aboveExtra) overlayClass += " rounded-t";
                   if (!belowExtra) overlayClass += " rounded-b";
                 } else if (!day.isPast && booking) {
                   overlayBg = "rgba(20, 184, 166, 0.6)";
-                  const aboveBooked = row > 0 && !!bookingMap[dayIdx][row - 1];
-                  const belowBooked = row < ROWS - 1 && !!bookingMap[dayIdx][row + 1];
+                  const aboveBooked =
+                    row > previewVisibleStart &&
+                    !!bookingMap[dayIdx][row - 1];
+                  const belowBooked =
+                    row < previewVisibleEnd - 1 &&
+                    !!bookingMap[dayIdx][row + 1];
                   if (!aboveBooked) overlayClass += " rounded-t";
                   if (!belowBooked) overlayClass += " rounded-b";
                 }
@@ -2240,23 +2616,78 @@ function PreviewBlockingGrid({
                 } else if (hasExtra) {
                   title += ` - ${t("proAvail.extraPrefix", locale)}: ${cellLocNames(extraLocs)}`;
                 } else if (booking) {
-                  title += ` - ${booking}`;
+                  title += ` - ${booking.bookerName ?? t("proAvail.booked", locale)}`;
+                }
+
+                // First *visible* row of a booking block — render the
+                // student name on top of the overlay so the pro can
+                // scan the grid and see which lesson sits at which
+                // slot. Only the first row gets the label so it
+                // isn't repeated on every 30-min cell of a longer
+                // booking. The label span extends downward to cover
+                // the visible portion of the booking and flex-centres
+                // its text vertically — same visual centring the
+                // bookings calendar uses. Bookings that bleed past
+                // the display window get their label clamped to what
+                // is actually rendered (task 119).
+                const isBookingFirstRow =
+                  !!booking &&
+                  (row === previewVisibleStart ||
+                    bookingMap[dayIdx][row - 1]?.id !== booking.id);
+                let bookingRowSpan = 0;
+                if (isBookingFirstRow && booking) {
+                  bookingRowSpan = 1;
+                  let r = row + 1;
+                  while (
+                    r < previewVisibleEnd &&
+                    bookingMap[dayIdx][r]?.id === booking.id
+                  ) {
+                    bookingRowSpan++;
+                    r++;
+                  }
                 }
 
                 return (
                   <div
                     key={`${dayIdx}-${row}`}
                     data-cell={`${dayIdx}-${row}`}
-                    onPointerDown={(e) =>
+                    onPointerDown={(e) => {
+                      // Booking cell behaviour depends on the active
+                      // brush. With "available" brush a tap opens the
+                      // BookingCard (no reason to paint extra avail
+                      // over a booking). With "blocked" brush a tap
+                      // paints the block — saveWeekOverrides will then
+                      // auto-cancel the booking on the server side
+                      // (task 137).
+                      if (booking && brush.mode !== "blocked") {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        setExpandedBooking(booking);
+                        return;
+                      }
                       beginCellPointer(
                         e,
                         () => handlePointerDown(dayIdx, row, e),
                         () => startOverrideDrag(),
-                      )
-                    }
+                      );
+                    }}
                     onContextMenu={(e) => e.preventDefault()}
-                    onDoubleClick={(e) => handleDoubleClick(dayIdx, row, e)}
-                    className={cellClass}
+                    onDoubleClick={(e) => {
+                      if (booking && brush.mode !== "blocked") {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        return;
+                      }
+                      handleDoubleClick(dayIdx, row, e);
+                    }}
+                    className={
+                      cellClass +
+                      (booking && brush.mode !== "blocked"
+                        ? " cursor-pointer"
+                        : booking && brush.mode === "blocked"
+                          ? " cursor-crosshair"
+                          : "")
+                    }
                     style={cellStyle}
                     title={title}
                   >
@@ -2270,11 +2701,23 @@ function PreviewBlockingGrid({
                         }
                       />
                     )}
+                    {isBookingFirstRow && booking && (
+                      <span
+                        className="pointer-events-none absolute inset-x-0.5 top-0 z-10 flex items-center justify-center px-1"
+                        style={{ height: bookingRowSpan * CELL_H }}
+                      >
+                        <span className="truncate text-[10px] font-semibold leading-tight text-white">
+                          {booking.bookerName ??
+                            t("proAvail.booked", locale)}
+                        </span>
+                      </span>
+                    )}
                   </div>
                 );
               }),
             ];
-          }).flat()}
+          },
+          ).flat()}
         </div>
       </div>
 
@@ -2349,6 +2792,125 @@ function PreviewBlockingGrid({
             </div>
           </div>
         </>
+      )}
+
+      {/* Booking dialog — same shared BookingCard the /pro/bookings
+          calendar uses. Tap any booking cell on the preview grid to
+          open it; backdrop click + the card's Close button dismiss. */}
+      {expandedBooking && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 px-4"
+          onClick={(e) => {
+            if (e.target === e.currentTarget) setExpandedBooking(null);
+          }}
+        >
+          <div className="w-full max-w-md">
+            <BookingCard
+              booking={{
+                ...expandedBooking,
+                locationName: expandedBooking.locationName ?? "",
+              }}
+              locale={locale}
+              cancelPending={cancelPending}
+              onCancel={() => setCancelTargetBooking(expandedBooking)}
+              showDate
+              onClose={() => setExpandedBooking(null)}
+            />
+          </div>
+        </div>
+      )}
+
+      {/* Cancel-confirm dialog — same component the bookings views
+          mount. proCancelBooking handles the server side; on success
+          we close both dialogs and refresh so the cell drops. */}
+      {cancelTargetBooking && (
+        <CancelBookingDialog
+          date={cancelTargetBooking.date}
+          startTime={cancelTargetBooking.startTime}
+          endTime={cancelTargetBooking.endTime}
+          studentName={cancelTargetBooking.bookerName ?? undefined}
+          onConfirm={handleCancelBooking}
+          onClose={() => setCancelTargetBooking(null)}
+          pending={cancelPending}
+          formatDate={(d) =>
+            formatDateLocale(d, locale, {
+              weekday: "short",
+              month: "short",
+              day: "numeric",
+            })
+          }
+          locale={locale}
+        />
+      )}
+
+      {/* Block-over-bookings confirm — shown when the auto-save is
+          about to commit blocks that overlap existing confirmed
+          bookings. Continue cancels each booking (server-side, with
+          email + ICS). Undo drops just the conflicting blocks so the
+          pro can keep painting elsewhere. */}
+      {pendingConflicts && pendingConflicts.length > 0 && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 px-4"
+          onClick={(e) => {
+            if (e.target === e.currentTarget) undoBlocksOverBookings();
+          }}
+        >
+          <div className="mx-4 w-full max-w-md rounded-xl border border-green-200 bg-white p-6 shadow-2xl">
+            <h3 className="font-display text-lg font-semibold text-green-900">
+              {t("proAvail.blockCancels.title", locale)}
+            </h3>
+            <p className="mt-2 text-sm text-green-700">
+              {t("proAvail.blockCancels.body", locale).replace(
+                "{count}",
+                String(pendingConflicts.length),
+              )}
+            </p>
+            <ul className="mt-3 max-h-48 overflow-y-auto rounded-lg border border-green-100 bg-green-50/50 p-3">
+              {pendingConflicts.map((b) => (
+                <li key={b.id} className="py-1 text-sm text-green-900">
+                  <span className="font-medium">
+                    {b.bookerName ?? t("proAvail.booked", locale)}
+                  </span>
+                  <span className="text-green-700">
+                    {" — "}
+                    {formatDateLocale(b.date, locale, {
+                      weekday: "short",
+                      day: "numeric",
+                      month: "short",
+                    })}{" "}
+                    {b.startTime}–{b.endTime}
+                  </span>
+                </li>
+              ))}
+            </ul>
+            <label className="mt-4 block text-xs font-medium text-green-700">
+              {t("proAvail.blockCancels.reasonLabel", locale)}
+              <textarea
+                value={cancellationReason}
+                onChange={(e) => setCancellationReason(e.target.value)}
+                placeholder={t("proAvail.blockCancels.reasonPlaceholder", locale)}
+                rows={2}
+                className="mt-1 block w-full rounded-md border border-green-200 bg-white px-3 py-2 text-sm text-green-900 focus:border-green-400 focus:outline-none focus:ring-1 focus:ring-green-400"
+              />
+            </label>
+            <div className="mt-5 flex gap-3">
+              <button
+                type="button"
+                onClick={undoBlocksOverBookings}
+                className="flex-1 rounded-md border border-green-200 px-4 py-2 text-sm font-medium text-green-700 transition-colors hover:bg-green-50"
+              >
+                {t("proAvail.blockCancels.undo", locale)}
+              </button>
+              <button
+                type="button"
+                onClick={confirmCancelOverlappingBookings}
+                className="flex-1 rounded-md bg-red-500 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-red-600"
+              >
+                {t("proAvail.blockCancels.confirm", locale)}
+              </button>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );

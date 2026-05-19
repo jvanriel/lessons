@@ -122,7 +122,7 @@ async function handleRedeem(
 
   const roles = Array.isArray(payload.roles) ? (payload.roles as string[]) : [];
   let target = "/member/dashboard";
-  if (roles.includes("pro")) target = "/pro/dashboard";
+  if (roles.includes("pro")) target = "/pro/bookings";
   else if (roles.includes("admin") || roles.includes("dev")) target = "/admin";
 
   return NextResponse.redirect(new URL(target, request.url));

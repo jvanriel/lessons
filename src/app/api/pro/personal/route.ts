@@ -8,11 +8,9 @@ import { resolveLocale, type Locale } from "@/lib/i18n";
 import { limitByIp, registerLimiter } from "@/lib/rate-limit";
 import { SignJWT } from "jose";
 import {
-  buildWelcomeEmail,
   emailLayout,
   formatGreeting,
   getEmailStrings,
-  getWelcomeSubject,
 } from "@/lib/email-templates";
 import { ensureProProfile, normalizeRoles } from "@/lib/pro";
 import { looksLikeE164, normalizePhone } from "@/lib/phone";
@@ -279,20 +277,18 @@ export async function POST(req: NextRequest) {
     .onConflictDoNothing();
   await ensureProProfile({ userId, firstName, lastName, email });
 
-  // Single welcome email with the verify CTA embedded as step 1.
-  // Replaces the previous two-mail flow (separate "verify your email"
-  // + "welcome") which arrived back-to-back at step 0 of the wizard.
-  const verifyUrl = await generateVerifyUrl(userId, email);
-  sendEmail({
-    to: email,
-    subject: getWelcomeSubject("pro", preferredLocale as Locale),
-    html: buildWelcomeEmail({
-      firstName,
-      accountType: "pro",
-      locale: preferredLocale as Locale,
-      verifyUrl,
-    }),
-  }).catch(() => {});
+  // Slim "Please verify your email" mail only. The full welcome email
+  // ("your pro account is set up, here's what to do next") used to fire
+  // here, but step 0 is only the first of seven wizard steps — sending
+  // a celebratory welcome before the pro has even picked locations,
+  // lessons, or paid the subscription is misleading. The welcome email
+  // now lands when the subscription is created (task 127).
+  await sendStandaloneVerifyEmail(
+    userId,
+    email,
+    firstName,
+    preferredLocale as Locale,
+  );
 
   await setSessionCookie({
     userId,

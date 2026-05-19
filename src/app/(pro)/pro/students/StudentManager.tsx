@@ -62,12 +62,27 @@ export default function StudentManager({
   currentStudentId,
   currentBooking,
   currentQuickBook,
+  unreadByStudentId,
+  inviterDisplayName,
   locale,
 }: {
   students: Student[];
   currentStudentId: number | null;
   currentBooking: { date: string; startTime: string; endTime: string } | null;
   currentQuickBook: ProQuickBookData | null;
+  /**
+   * Coaching-chat unread count keyed by `proStudents.id`. Rendered
+   * as a red badge next to the golfer's name on the list (task 122).
+   * Server-rendered to avoid a client round-trip; the AppSidebar
+   * separately polls for total live updates.
+   */
+  unreadByStudentId?: Record<number, number>;
+  /**
+   * Display name of the inviting pro. Used to fill the `{pro}`
+   * placeholder in the suggested-reason chips on the invite form
+   * (task 138).
+   */
+  inviterDisplayName: string;
   locale: Locale;
 }) {
   const router = useRouter();
@@ -100,7 +115,10 @@ export default function StudentManager({
     null
   );
   const [filter, setFilter] = useState<"all" | "active" | "pending" | "inactive">("all");
-  const [generatedPassword, setGeneratedPassword] = useState("");
+  // Reason text shown to the invitee, wired through to buildInviteEmail's
+  // comment block. Empty by default — the action falls back to a generic
+  // "you've been invited by X" line in that case (task 138).
+  const [inviteReason, setInviteReason] = useState("");
   const [search, setSearch] = useState("");
   const [selectedStudentId, setSelectedStudentId] = useState<number | null>(null);
   const [editingStudent, setEditingStudent] = useState<Student | null>(null);
@@ -163,7 +181,7 @@ export default function StudentManager({
             type="button"
             onClick={() => {
               setInviteMode("invited");
-              setGeneratedPassword("");
+              setInviteReason("");
               setShowInviteForm(true);
             }}
             className="flex-1 rounded-md bg-gold-600 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-gold-500 sm:flex-none"
@@ -175,7 +193,7 @@ export default function StudentManager({
             type="button"
             onClick={() => {
               setInviteMode("pro_added");
-              setGeneratedPassword("");
+              setInviteReason("");
               setShowInviteForm(true);
             }}
             className="flex-1 rounded-md border border-green-300 bg-white px-4 py-2 text-sm font-medium text-green-700 transition-colors hover:bg-green-50 sm:flex-none"
@@ -248,35 +266,46 @@ export default function StudentManager({
                 className="mt-1 block w-full rounded-lg border border-green-200 px-3 py-2 text-sm focus:border-gold-500 focus:outline-none focus:ring-1 focus:ring-gold-500"
               />
             </div>
-            <div>
-              <label className="text-sm font-medium text-green-700">
-                {t("proStudents.password", locale)}
-              </label>
-              <div className="mt-1 flex gap-2">
-                <input
-                  name="password"
-                  type="text"
-                  required
-                  value={generatedPassword}
-                  onChange={(e) => setGeneratedPassword(e.target.value)}
-                  className="block w-full rounded-lg border border-green-200 px-3 py-2 text-sm font-mono focus:border-gold-500 focus:outline-none focus:ring-1 focus:ring-gold-500"
+            {inviteMode === "invited" && (
+              <div>
+                <label className="text-sm font-medium text-green-700">
+                  {t("proStudents.inviteReasonLabel", locale)}
+                </label>
+                <p className="mt-0.5 text-xs text-green-500">
+                  {t("proStudents.inviteReasonHelp", locale)}
+                </p>
+                <div className="mt-2 flex flex-wrap gap-1.5">
+                  {(
+                    ["previousLesson", "tournament", "manualAdd"] as const
+                  ).map((key) => (
+                    <button
+                      key={key}
+                      type="button"
+                      onClick={() =>
+                        setInviteReason(
+                          t(`proStudents.inviteReasonSuggest.${key}`, locale)
+                            .replace("{pro}", inviterDisplayName),
+                        )
+                      }
+                      className="rounded-full border border-green-200 bg-white px-3 py-1 text-[11px] font-medium text-green-700 hover:bg-green-50"
+                    >
+                      {t(`proStudents.inviteReasonChip.${key}`, locale)}
+                    </button>
+                  ))}
+                </div>
+                <textarea
+                  name="reason"
+                  value={inviteReason}
+                  onChange={(e) => setInviteReason(e.target.value)}
+                  rows={2}
+                  placeholder={t(
+                    "proStudents.inviteReasonPlaceholder",
+                    locale,
+                  )}
+                  className="mt-2 block w-full rounded-lg border border-green-200 px-3 py-2 text-sm focus:border-gold-500 focus:outline-none focus:ring-1 focus:ring-gold-500"
                 />
-                <button
-                  type="button"
-                  onClick={() => {
-                    const chars = "ABCDEFGHJKLMNPQRSTUVWXYZabcdefghjkmnpqrstuvwxyz23456789!@#$%";
-                    let pw = "";
-                    const arr = new Uint8Array(12);
-                    crypto.getRandomValues(arr);
-                    for (const b of arr) pw += chars[b % chars.length];
-                    setGeneratedPassword(pw);
-                  }}
-                  className="shrink-0 rounded-lg border border-green-200 px-3 py-2 text-xs font-medium text-green-700 transition-colors hover:bg-green-50"
-                >
-                  {t("proStudents.generate", locale)}
-                </button>
               </div>
-            </div>
+            )}
 
             {inviteState?.error && (
               <p className="text-sm text-red-600">{inviteState.error}</p>
@@ -286,12 +315,6 @@ export default function StudentManager({
                 {inviteMode === "invited"
                   ? t("proStudents.successInvited", locale)
                   : t("proStudents.successAdded", locale)}
-                {inviteState.password && (
-                  <span className="block mt-1 text-xs text-green-500">
-                    {t("proStudents.tempPassword", locale)}{" "}
-                    <code className="bg-green-50 px-1 py-0.5 rounded">{inviteState.password}</code>
-                  </span>
-                )}
               </p>
             )}
 
@@ -487,8 +510,15 @@ export default function StudentManager({
                       {student.lastName.charAt(0)}
                     </div>
                     <div className="min-w-0 flex-1">
-                      <p className="text-sm font-medium text-green-900">
-                        {student.firstName} {student.lastName}
+                      <p className="flex items-center gap-2 text-sm font-medium text-green-900">
+                        <span className={(unreadByStudentId?.[student.id] ?? 0) > 0 ? "font-bold" : undefined}>
+                          {student.firstName} {student.lastName}
+                        </span>
+                        {(unreadByStudentId?.[student.id] ?? 0) > 0 && (
+                          <span className="inline-flex min-w-[20px] items-center justify-center rounded-full bg-red-500 px-1.5 py-0.5 text-[10px] font-semibold text-white">
+                            {unreadByStudentId![student.id]! > 99 ? "99+" : unreadByStudentId![student.id]}
+                          </span>
+                        )}
                       </p>
                       <div className="mt-0.5 flex flex-wrap items-center gap-x-3 text-xs">
                         <a

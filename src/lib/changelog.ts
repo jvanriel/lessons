@@ -21,17 +21,29 @@
 
 import type { UserRole } from "@/lib/auth";
 
+/**
+ * Authoring vocabulary for the `[role]` tag inside CHANGELOG bullets.
+ * Matches `UserRole` plus `"golfer"`, which is an authoring alias for
+ * `"member"` — the user-facing copy renamed "student/member" to
+ * "golfer" (task 103) but the auth role string in the database is
+ * still `member`. Keeping `"golfer"` as a tag preserves the friendly
+ * label in the rendered badge, while `isItemVisibleTo` maps it back
+ * to `member` for the visibility check.
+ */
+export type ChangelogTag = UserRole | "golfer";
+
 export interface ChangelogItem {
   /** Bullet text with the role tag stripped. */
   text: string;
   /**
-   * Roles allowed to see this item. `null` means "everyone" (the
-   * untagged default). An empty array would mean "no one" but the
-   * parser never produces that — at least one valid role is required
-   * inside the brackets, otherwise the brackets are treated as plain
-   * text and `roles` falls back to `null`.
+   * Audience tags allowed to see this item. `null` means "untagged"
+   * — by policy (task 117) those are internal changes only visible
+   * to admin/dev. An empty array would mean "no one" but the parser
+   * never produces that — at least one valid tag is required inside
+   * the brackets, otherwise the brackets are treated as plain text
+   * and `roles` falls back to `null`.
    */
-  roles: UserRole[] | null;
+  roles: ChangelogTag[] | null;
 }
 
 export interface ChangelogEntry {
@@ -54,7 +66,8 @@ export interface ChangelogEntry {
   items: ChangelogItem[];
 }
 
-const VALID_ROLES: ReadonlySet<UserRole> = new Set([
+const VALID_TAGS: ReadonlySet<ChangelogTag> = new Set([
+  "golfer",
   "member",
   "pro",
   "admin",
@@ -62,7 +75,7 @@ const VALID_ROLES: ReadonlySet<UserRole> = new Set([
 ]);
 
 /**
- * Split a `[role,role2] body text` prefix off a bullet. Returns the
+ * Split a `[tag,tag2] body text` prefix off a bullet. Returns the
  * original text + `roles=null` when the bullet has no valid prefix
  * (so plain `[note]` or `[TODO]` text passes through unchanged).
  */
@@ -73,30 +86,50 @@ export function parseItemRoles(raw: string): ChangelogItem {
     .split(",")
     .map((r) => r.trim().toLowerCase())
     .filter(Boolean);
-  const roles = candidates.filter((r): r is UserRole =>
-    VALID_ROLES.has(r as UserRole),
+  const tags = candidates.filter((r): r is ChangelogTag =>
+    VALID_TAGS.has(r as ChangelogTag),
   );
   // If any candidate failed to validate, treat the whole prefix as
   // plain text — better to over-show a typo'd entry than to silently
   // drop it for everyone.
-  if (roles.length === 0 || roles.length !== candidates.length) {
+  if (tags.length === 0 || tags.length !== candidates.length) {
     return { text: raw, roles: null };
   }
-  return { text: m[2], roles };
+  return { text: m[2], roles: tags };
 }
 
 /**
- * True if a user with `userRoles` should see `item`. Untagged items
- * (`item.roles === null`) are visible to everyone, including signed-
- * out visitors. Tagged items require the viewer to have at least one
- * of the listed roles.
+ * True if a viewer with `userRoles` should see `item`.
+ *
+ * Policy (task 117):
+ *   - Untagged items are *internal* — staff-only (admin / dev). The
+ *     long tail of internal fixes (Sentry crashes, infra, schema,
+ *     tooling) used to leak through to the public About page; now
+ *     they don't.
+ *   - Anonymous viewers see items tagged for the `member` audience
+ *     (i.e. `[golfer]` in markdown) so prospective golfers landing
+ *     on /about for SEO get a useful list.
+ *   - Otherwise: the viewer's roles must intersect the item's tags,
+ *     with `golfer` mapping to `member` for the check.
+ *
+ * Staff (admin / dev) always see everything regardless of tag.
  */
 export function isItemVisibleTo(
   item: ChangelogItem,
   userRoles: readonly UserRole[],
 ): boolean {
-  if (item.roles === null) return true;
-  return item.roles.some((r) => userRoles.includes(r));
+  const isStaff =
+    userRoles.includes("admin") || userRoles.includes("dev");
+  if (item.roles === null) return isStaff;
+  if (isStaff) return true;
+
+  // Authoring alias: `[golfer]` targets the `member` audience.
+  const audience = item.roles.map((r) =>
+    r === "golfer" ? "member" : r,
+  ) as UserRole[];
+
+  if (userRoles.length === 0) return audience.includes("member");
+  return audience.some((r) => userRoles.includes(r));
 }
 
 /**

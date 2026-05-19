@@ -40,10 +40,16 @@ import {
 } from "@/lib/email-templates";
 import { resolveLocale, type Locale } from "@/lib/i18n";
 import { t } from "@/lib/i18n/translations";
+import {
+  formatLocationFull,
+  wazeUrl,
+  googleMapsUrl,
+} from "@/lib/location-display";
 import { getLocale } from "@/lib/locale";
 import { addDaysToDateString, todayInTZ } from "@/lib/local-date";
 import { computeSuggestedDate } from "@/lib/booking-suggestion";
 import { getProLocationTimezone } from "@/lib/pro";
+import { findStudentOverlap } from "@/lib/booking-overlap";
 import { updateBookingPreferences } from "@/lib/booking-preferences";
 import {
   parseExtraParticipants,
@@ -70,6 +76,23 @@ async function getUiLocale(): Promise<Locale> {
 function requireMember() {
   return getSession().then((session) => {
     if (!session || !hasRole(session, "member")) {
+      redirect("/login");
+    }
+    return session;
+  });
+}
+
+/**
+ * Lighter guard for the read-only "what's available" lookups
+ * (getAvailableDates / getAvailableSlots / getDateBlockReason).
+ * Pros need to call these from the booking-edit page too; the data
+ * being returned ("which dates does this pro have open?") is the
+ * same info exposed in the public booking flow, so requiring a
+ * specific role is overkill — just need any signed-in viewer.
+ */
+function requireSignedIn() {
+  return getSession().then((session) => {
+    if (!session) {
       redirect("/login");
     }
     return session;
@@ -128,9 +151,16 @@ export async function getProLocations(proProfileId: number) {
 export async function getAvailableDates(
   proProfileId: number,
   locationId: number,
-  duration: number
+  duration: number,
+  /**
+   * Optional booking id to exclude from the conflict check — same
+   * semantics as `getAvailableSlots`. Used by the booking-edit
+   * calendar so the booking being edited doesn't make the dates
+   * around it look fully booked.
+   */
+  excludeBookingId?: number,
 ) {
-  await requireMember();
+  await requireSignedIn();
 
   // Get the pro's booking horizon
   const [pro] = await db
@@ -199,7 +229,10 @@ export async function getAvailableDates(
         eq(lessonBookings.proLocationId, locationId),
         eq(lessonBookings.status, "confirmed"),
         gte(lessonBookings.date, todayStr),
-        lte(lessonBookings.date, horizonStr)
+        lte(lessonBookings.date, horizonStr),
+        ...(excludeBookingId
+          ? [ne(lessonBookings.id, excludeBookingId)]
+          : []),
       )
     );
 
@@ -250,7 +283,7 @@ export async function getAvailableSlots(
    */
   excludeBookingId?: number,
 ) {
-  await requireMember();
+  await requireSignedIn();
 
   const [pro] = await db
     .select({ bookingNotice: proProfiles.bookingNotice })
@@ -342,7 +375,7 @@ export async function getDateBlockReason(
   locationId: number,
   date: string,
 ): Promise<string | null> {
-  await requireMember();
+  await requireSignedIn();
   const overrides = await db
     .select({
       type: proAvailabilityOverrides.type,
@@ -456,7 +489,7 @@ export async function createBooking(formData: FormData) {
 
   const locale = await getUiLocale();
 
-  const participantValidationError = validateExtraParticipants(extraParticipants);
+  const participantValidationError = validateExtraParticipants(extraParticipants, locale);
   if (participantValidationError) {
     return { error: participantValidationError };
   }
@@ -475,11 +508,31 @@ export async function createBooking(formData: FormData) {
     return { error: t("bookErr.slotUnavailable", locale) };
   }
 
+  // Cross-pro double-booking guard. (task 143)
+  const overlap = await findStudentOverlap({
+    userId: session.userId,
+    date,
+    startTime,
+    endTime,
+  });
+  if (overlap) {
+    return {
+      error: t("bookErr.studentOverlapSelf", locale)
+        .replace("{start}", overlap.startTime)
+        .replace("{end}", overlap.endTime),
+    };
+  }
+
   // Pricing + payment-status resolution — shared with `quickCreateBooking`
   // via `loadBookingPricing` so both paths apply the same rules
   // (group-rate, cash-only routing, comp accounts, online-pro-needs-price
   // bailout). See `src/lib/booking-charge.ts`.
-  const pricing = await loadBookingPricing(proProfileId, duration, participantCount);
+  const pricing = await loadBookingPricing(
+    proProfileId,
+    proLocationId,
+    duration,
+    participantCount,
+  );
   if (!pricing.ok) {
     return { error: t(`bookErr.${pricing.errorKey}`, locale) };
   }
@@ -624,7 +677,10 @@ export async function createBooking(formData: FormData) {
   const [loc] = await db
     .select({
       name: locations.name,
+      address: locations.address,
       city: locations.city,
+      lat: locations.lat,
+      lng: locations.lng,
       timezone: locations.timezone,
     })
     .from(proLocations)
@@ -636,7 +692,7 @@ export async function createBooking(formData: FormData) {
       `createBooking: location lookup missing for proLocationId=${proLocationId} (booking ${booking.id})`,
     );
   }
-  const locationName = loc.city ? `${loc.name}, ${loc.city}` : loc.name;
+  const locationName = formatLocationFull(loc);
   const locationTz = loc.timezone;
 
   if (pro) {
@@ -706,10 +762,13 @@ export async function createBooking(formData: FormData) {
             proEmail: pro.proEmail,
             proPhone: pro.contactPhone,
             locationName,
+            wazeUrl: wazeUrl(loc),
+            googleMapsUrl: googleMapsUrl(loc),
             date,
             startTime,
             endTime,
             duration,
+            participantCount,
             priceCents,
             cashOnly,
             locale: studentLocale,
@@ -1094,6 +1153,21 @@ export async function quickCreateBooking(data: {
     return { error: t("bookErr.slotUnavailable", locale) };
   }
 
+  // Cross-pro double-booking guard. (task 143)
+  const overlap = await findStudentOverlap({
+    userId: session.userId,
+    date: data.date,
+    startTime: data.startTime,
+    endTime: data.endTime,
+  });
+  if (overlap) {
+    return {
+      error: t("bookErr.studentOverlapSelf", locale)
+        .replace("{start}", overlap.startTime)
+        .replace("{end}", overlap.endTime),
+    };
+  }
+
   // Pricing + payment-status resolution — shared with `createBooking`
   // via `loadBookingPricing` so Quick Book applies the same rules
   // (group-rate, cash-only routing, comp accounts, online-pro-needs-price
@@ -1101,7 +1175,12 @@ export async function quickCreateBooking(data: {
   // no PaymentIntent / hardcoded "manual" pro-email — so an online-pay
   // pro received "Cash on the day" while we never charged the student
   // (gaps.md §0 High: Quick Book pricing bypass).
-  const pricing = await loadBookingPricing(data.proProfileId, data.duration, 1);
+  const pricing = await loadBookingPricing(
+    data.proProfileId,
+    data.proLocationId,
+    data.duration,
+    1,
+  );
   if (!pricing.ok) {
     return { error: t(`bookErr.${pricing.errorKey}`, locale) };
   }
@@ -1199,7 +1278,10 @@ export async function quickCreateBooking(data: {
   const [loc] = await db
     .select({
       name: locations.name,
+      address: locations.address,
       city: locations.city,
+      lat: locations.lat,
+      lng: locations.lng,
       timezone: locations.timezone,
     })
     .from(proLocations)
@@ -1211,7 +1293,7 @@ export async function quickCreateBooking(data: {
       `quickCreateBooking: location lookup missing for proLocationId=${data.proLocationId} (booking ${booking.id})`,
     );
   }
-  const locationName = loc.city ? `${loc.name}, ${loc.city}` : loc.name;
+  const locationName = formatLocationFull(loc);
   const locationTz = loc.timezone;
 
   if (pro) {
@@ -1549,5 +1631,86 @@ export async function updatePreferredInterval(
     );
 
   return { success: true };
+}
+
+/**
+ * Pill-driven jump for the booking-edit calendar. Saves the new
+ * preferred interval, then computes where QuickBook would point the
+ * student to under that interval (preferredDayOfWeek + tz anchor),
+ * and returns a slot at preferredTime (or first available) on that
+ * date. The form folds the result into its own selectedSlot state so
+ * the date pills + slot list visibly move — matching the QuickBook
+ * dashboard semantic where the pill is a navigational shortcut.
+ */
+export async function suggestSlotForInterval(
+  proStudentId: number,
+  interval: "weekly" | "biweekly" | "monthly" | null,
+  proProfileId: number,
+  proLocationId: number,
+  duration: number,
+  excludeBookingId?: number,
+): Promise<{
+  suggestedDate: string;
+  suggestedSlot: { startTime: string; endTime: string } | null;
+} | null> {
+  const session = await requireMember();
+
+  await db
+    .update(proStudents)
+    .set({ preferredInterval: interval })
+    .where(
+      and(
+        eq(proStudents.id, proStudentId),
+        eq(proStudents.userId, session.userId),
+      ),
+    );
+
+  const [rel] = await db
+    .select({
+      preferredDayOfWeek: proStudents.preferredDayOfWeek,
+      preferredTime: proStudents.preferredTime,
+    })
+    .from(proStudents)
+    .where(
+      and(
+        eq(proStudents.id, proStudentId),
+        eq(proStudents.userId, session.userId),
+      ),
+    )
+    .limit(1);
+
+  if (!rel || rel.preferredDayOfWeek === null) return null;
+
+  const tz = await getProLocationTimezone(proLocationId);
+  const suggestedDate = computeSuggestedDate(
+    interval,
+    rel.preferredDayOfWeek,
+    null,
+    tz,
+  );
+
+  const slots = await getAvailableSlots(
+    proProfileId,
+    proLocationId,
+    suggestedDate,
+    duration,
+    excludeBookingId,
+  );
+
+  if (slots.length === 0) {
+    return { suggestedDate, suggestedSlot: null };
+  }
+
+  const preferred = rel.preferredTime
+    ? slots.find((s) => s.startTime === rel.preferredTime) ?? slots[0]
+    : slots[0];
+
+  return {
+    suggestedDate,
+    suggestedSlot: {
+      startTime: preferred.startTime,
+      endTime: preferred.endTime,
+    },
+  };
 }
 

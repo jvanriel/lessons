@@ -17,6 +17,472 @@ If any role inside the brackets is unknown (typo), the parser falls
 back to treating the brackets as literal text — better to over-show
 than silently hide.
 
+## 2026-05-19 — v1.1.102
+
+- **You stay logged in for as long as you keep using the app.**
+  The login session was a fixed 7-day cookie — after that you got
+  bounced back to the login screen even if you'd been booking
+  lessons all week. The middleware now extends the session
+  whenever you visit any logged-in page and your token is more
+  than a day old: a fresh 7-day window starts. If you genuinely
+  stop using the app for 7 days the session still expires, like
+  before.
+
+## 2026-05-19 — v1.1.101
+
+- **[admin,dev] Picking a Google Doc/Sheet/Slides from the file
+  picker now actually attaches it.** Google Drive for Desktop
+  represents native Google files as 1-KB JSON shortcuts on the
+  local disk, and the file picker was hiding them by default
+  (their extensions weren't in the allow-list). The task attachment
+  flow now (1) shows `.gdoc/.gsheet/.gslides/.gdraw/.gform` files
+  in the picker and (2) when one is chosen, reads the embedded
+  Drive URL out of the shortcut and routes it through the Drive
+  attach API instead of uploading the 1-KB stub to Blob. Works
+  from both the New Task dialog and from the Comments tab of an
+  already-open task.
+
+## 2026-05-19 — v1.1.100
+
+- **"Find another pro" button in account-deletion emails works
+  again.** When a pro account was removed, the cancellation email
+  to the affected students contained a button whose href was just
+  `/pros` — a relative URL with no scheme/host. Email clients
+  render that as `http:///pros` and browsers refuse to open it.
+  The link is now built with the absolute app URL, so it routes
+  cleanly to the live `/pros` listing.
+
+## 2026-05-19 — v1.1.99
+
+- **[pro] Removing a period inside another schedule no longer
+  leaves an invisible gap.** When you removed a bounded period
+  whose neighbouring periods have different schedules, the date
+  range went silently uncovered — students saw "no slots" but the
+  pro had no signal. Now the editor keeps a visible empty
+  placeholder tab for that range, marked in amber with a "leeg"
+  badge, and the editor itself shows an amber hint above the grid
+  ("Deze periode heeft nog geen beschikbaarheid — kleur cellen in
+  het rooster hieronder in"). The auto-merge behaviour (when both
+  neighbours match) is unchanged.
+
+## 2026-05-19 — v1.1.98
+
+- **Edit-booking dialog explains why the participant picker is
+  missing.** When a pro has configured a location for solo lessons
+  only (max participants = 1), the "Aantal deelnemers" dropdown
+  used to silently disappear on the edit form, making it look like
+  a missing feature. Now you see a short hint there: "Deze pro
+  biedt op deze locatie enkel privélessen aan." (EN/NL/FR). The
+  underlying behaviour (no extra-participant slot for max=1
+  locations) is unchanged — this just makes the limitation visible.
+
+## 2026-05-19 — v1.1.97
+
+- **[pro] Cancelling your subscription now hides your profile right
+  away.** Previously, a pro who cancelled mid-trial stayed visible
+  on the public Pros list and could keep taking new bookings until
+  the trial actually expired. Now the moment the cancellation
+  reaches Stripe your profile flips to unpublished — no new bookings
+  come in, but every lesson your students already booked stays
+  confirmed so you can still teach them out. When the period
+  finishes you get a warm "your subscription has ended, come back
+  when you're ready" email with a link to re-subscribe. Your
+  account, students and chat history all stay intact.
+
+## 2026-05-19 — v1.1.96
+
+- **[pro] Location addresses now get real coordinates again.** The
+  post-save verification card was relying on Nominatim, which
+  silently rate-limited Vercel's shared egress IPs — every newly
+  saved location ended up with NULL coords, so Waze and Google
+  Maps fell back to fuzzy text matching and could send students to
+  the wrong street. Switched the geocoder to Google's Geocoding
+  API (with Nominatim kept as a fallback so the system still works
+  before the key is provisioned). Once GOOGLE_MAPS_API_KEY is set
+  in Vercel, the verification card embeds a Google Map preview
+  too, and the address field becomes a Google Places autocomplete
+  — pros pick a real Belgian address instead of typing freeform.
+
+## 2026-05-19 — v1.1.95
+
+- **Chat unread badges work again.** A subtle SQL bug in the
+  per-conversation unread query was making the red dot next to
+  "Chat", "Golfspelers" and the individual pro/golfer cards
+  silently return 0 — every coaching conversation looked read
+  even when the other side had just typed a fresh message. The
+  query now uses an explicit table alias so Postgres correlates
+  the subquery to the right row. Per-card badges on the golfer's
+  dashboard and on /coaching also refresh live (10s + on focus +
+  on send/receive) instead of only at page load (task 144 round 2).
+
+## 2026-05-19 — v1.1.94
+
+- **Marketing copy now uses "golfers" everywhere.** The home hero
+  no longer leans on "Belgische thuisbasis" / "Made in Belgium" —
+  it just says the platform is built for golfers and the pros who
+  teach them. The for-pros feature cards, terms of use and privacy
+  policy were also rephrased so "leerlingen / élèves / students"
+  becomes "golfers / golfeurs / golfers", matching the rest of the
+  product. The Dutch privacy text now spells out "AVG" as
+  "Algemene Verordening Gegevensbescherming (AVG)" so first-time
+  readers know what it refers to.
+
+## 2026-05-19 — v1.1.93
+
+- **[pro] Pros can give a reason when a block cancels existing
+  bookings.** The "Cancel these bookings?" dialog now has a Reason
+  field. Whatever the pro types lands in the cancellation email each
+  affected student receives, so they understand why the lesson was
+  cancelled (illness, terrain closed, ...).
+
+## 2026-05-19 — v1.1.92
+
+- **Invited golfers flip to "Actief" the moment they claim their
+  account.** When a pro invited a golfer, the pending pro_students
+  row stayed at "Uitgenodigd" forever even after the golfer set
+  their password — and the choose-pros step could create a second
+  active row, so the pro saw the same person twice in their list.
+  Both the invite-email reset-password flow and the new-account
+  register/login paths now flip pending → active on first login,
+  with a safety dedup against any legacy duplicate active sibling.
+
+## 2026-05-19 — v1.1.91
+
+- **[pro] Cancellations show as a credit-note line in earnings.**
+  The "Recente betalingen" table on /pro/earnings used to render a
+  cancelled lesson as a regular payment row, so it looked like the
+  pro had collected money for a lesson that was actually cancelled.
+  Cancellations now appear as a second row — same student, signed-
+  negative amount, "Kredietnota" status — sorted chronologically
+  with the original payment so the audit trail is preserved.
+
+## 2026-05-19 — v1.1.90
+
+- **No more 404 when an invited golfer tries to book with a half-
+  set-up pro.** A pro can invite golfers before their profile is
+  published. The golfer would see the pro card on their dashboard
+  with a "Book a lesson" button — clicking it 404'd because the
+  booking page filters on published pros. The dashboard now hides
+  the booking buttons when the pro isn't published and shows a
+  friendly "this pro is still setting up — chat already works"
+  message. Chat link stays active either way.
+
+## 2026-05-19 — v1.1.89
+
+- **Phone-field country resets to Belgium after you clear it.**
+  Previously the country flag stuck on whatever the last typed
+  number indicated, or fell back to a generic "International"
+  globe icon once cleared. The field now snaps back to the
+  Belgian default whenever the value goes empty.
+
+## 2026-05-19 — v1.1.88
+
+- **Pros no longer appear twice on the member dashboard.** A
+  duplicate `pro_students` row was created when the onboarding
+  flow only deduped against active rows (so a "pending" or
+  "inactive" row got duplicated) or when two inserts raced past
+  the check-then-insert. The table now has a partial unique index
+  that makes duplicates impossible at the DB level, and the
+  onboarding flow reactivates inactive/pending rows instead of
+  inserting a new one.
+
+## 2026-05-17 — v1.1.87
+
+- **[pro] Cancelled bookings no longer block new ones on the
+  calendar.** A cancelled lesson used to render as a full block on
+  the week calendar with strikethrough + faded colour — if you
+  booked a replacement in the same slot, the two cards overlapped.
+  Cancellations now show as a thin red bar at the left edge of the
+  slot's column so a new booking renders fully visible while the
+  cancellation is still flagged. Full details stay in the list view.
+
+## 2026-05-17 — v1.1.86
+
+- **Booking calendar: unavailable dates now grey, not faded green.**
+  A user noticed all date numbers looked green even though only
+  the boxed dates were actually bookable. Unavailable days are now
+  neutral grey so the green available dates pop visually.
+
+## 2026-05-17 — v1.1.85
+
+- **[admin,dev] Attach an image or file when creating a task.**
+  The "New task" dialog now has an attachment widget alongside
+  Title / Initial comment. Pick an image, PDF, or Office doc and
+  it lands as the task's first attachment when the task is
+  created — no more two-step "create then open then attach" dance.
+
+## 2026-05-17 — v1.1.84
+
+- **Booking-edit duration dropdown shows the right options again.**
+  After the per-location pricing/duration migration earlier this
+  month, the edit form was still reading the duration list from
+  the pro's old profile-level field — most pros only saw 60 min
+  and couldn't extend a booking. The form now reads durations +
+  max group size from the specific location the booking is at,
+  matching what's offered at booking time.
+
+## 2026-05-17 — v1.1.83
+
+- **Extra participants now actually required.** Adding extra
+  participants to a booking but leaving their first/last name blank
+  used to silently submit — the server dropped the empty rows so
+  validation never fired. The booking would persist with the
+  higher participant count but only the booker recorded. The form
+  now refuses with "Elke extra deelnemer heeft een voornaam en
+  achternaam nodig" (also EN/FR).
+
+## 2026-05-17 — v1.1.82
+
+- **Logo no longer 404s for members.** Members clicking the
+  brand/logo used to land on `/member/book` (a route that was
+  removed when the booking flow started requiring a chosen pro).
+  They now land on their dashboard instead.
+
+## 2026-05-17 — v1.1.81
+
+- **[pro] Closed periods merge back into "Altijd" when removed.**
+  Adding a bounded period inside your "Altijd" schedule splits it
+  into before / closed / after segments. Previously, removing the
+  closed period(s) left the two flanking segments stuck even though
+  you just wanted your single Altijd back. The editor now auto-
+  merges flanking segments back into one when their grids and
+  display windows still match — no auto-merge if you've edited them
+  apart in the meantime.
+
+## 2026-05-17 — v1.1.80
+
+- **Clearer terms link on the registration payment step.** The
+  Stripe card form mentions "their terms" but doesn't always render
+  a clickable link. We now put our Terms-of-Use link directly above
+  the Stripe block (where Stripe's text appears) with wording that
+  explicitly bridges the two: "the 'their terms' Stripe mentions
+  below are our [Terms of Use]". The duplicate link that used to
+  appear below the submit button is removed, so there's one clear
+  place to read the conditions.
+
+## 2026-05-17 — v1.1.79
+
+- **Chat notifications update faster.** The unread-chat badge in
+  the sidebar and bottom nav now refreshes every 10 seconds (was
+  30) and updates immediately when you open or send inside a
+  conversation. While you're inside a chat your "last read" stays
+  fresh, so a message that arrives while you're reading won't keep
+  ringing the badge on your other tabs once you've seen it.
+
+## 2026-05-17 — v1.1.78
+
+- **No more double-booking yourself across pros.** If you already
+  have a confirmed lesson at a given time, you can no longer book a
+  second lesson with another pro that overlaps. The booking and
+  edit forms (member, public, and pro-on-behalf-of-student) now
+  refuse the conflict with a clear "you already have a lesson from
+  X to Y" message. Back-to-back lessons (10:00–11:00 then 11:00–
+  12:00) still work.
+
+## 2026-05-17 — v1.1.77
+
+- **[pro] Address confirmation when saving a location.** Saving a
+  teaching location now shows you the address we found on the map
+  (with a small map preview) so you can confirm we have the right
+  place. If we can't find your address, you get a warning — without
+  it, the Waze/Google Maps buttons in student emails could quietly
+  send people to the wrong spot.
+
+## 2026-05-17 — v1.1.76
+
+- **[pro] Pro email on edited bookings now shows the new price.**
+  Previously the pro received "no payment change" on every edit, even
+  when the lesson price actually changed. The pro now sees the new
+  lesson price (with the old price next to it when it changed) and a
+  payment line tailored to the pro (commission update or manual-review
+  note) instead of student-card language.
+
+## 2026-05-17 — v1.1.75
+
+- **[pro] Cancellation policy changes show up on existing bookings.**
+  Saving a new cancellation window in your profile now busts the
+  client cache for the student-facing pages — so an already-loaded
+  /member/bookings or /member/dashboard refreshes to the new value
+  on the next interaction instead of holding onto the old one.
+
+## 2026-05-17 — v1.1.74
+
+- **[pro] Inviting a golfer is now passwordless.** When you invite a
+  golfer from /pro/students, the email contains a one-time link the
+  golfer clicks to choose their own password. You no longer type or
+  see a password — it's never on your screen, never in the email,
+  and the golfer must set their own before they can log in.
+- **[pro] Invite reason in the email.** The invite form now has a
+  "Reason" field with three quick-pick chips (Previous lesson,
+  Tournament, Personal invite) that pre-fill a localized sentence
+  with your name. Leaving the reason blank falls back to a generic
+  "you've been invited by X" line.
+
+## 2026-05-17 — v1.1.73
+
+- **Booking confirmation emails show participants and price.** The
+  email a student gets after booking — both the public "confirm &
+  claim" version and the signed-in confirmation — now includes the
+  number of participants when more than one was booked, and the
+  total price charged.
+
+## 2026-05-17 — v1.1.72
+
+- **[pro] Booking cards now show the lesson price.** The booking
+  list, the calendar's expanded card, and the booking dialog opened
+  from the availability grid all display the price charged at
+  booking time — useful when a pro is glancing at upcoming lessons
+  for the week.
+
+## 2026-05-17 — v1.1.71
+
+- **[pro] Subscription step survives Back-and-Forward.** If you
+  navigated back in the registration stepper after entering payment
+  details, then forward again, the plan choice and Stripe form were
+  wiped — you had to redo everything. The plan + SetupIntent now
+  stay around as long as you're in the wizard.
+
+## 2026-05-17 — v1.1.70
+
+- **[pro,member] "Back" out of the payment form.** The pro
+  subscription step and the student payment step both now have a
+  link above the Stripe form that drops the SetupIntent and returns
+  you to the previous screen — so you can switch monthly/annual or
+  recover from a confused Stripe Link state without having to use
+  wizard Back + Next.
+- **[pro] Terms link above the trial-start button.** A small "by
+  starting your trial you accept our Terms & Conditions" line is
+  now visible right under the Stripe form on the subscription step,
+  matching the pattern the student payment step already has.
+
+## 2026-05-17 — v1.1.69
+
+- **[pro] Stricter IBAN check during registration and billing.**
+  Incomplete IBANs (e.g. "BE12 1234") used to slip past the form
+  silently after the first eight characters were typed. The
+  validator now enforces the correct country-specific length and
+  the ISO mod-97 checksum, so typos and partial entries are caught
+  immediately.
+
+## 2026-05-17 — v1.1.68
+
+- **[pro] Locations now own their lesson durations, prices, and group
+  size.** The pro registration wizard's "Lessen" step is gone — each
+  location's card carries its own durations, prices, extra-student
+  rate, and max group size, with a "Copy from…" dropdown to clone
+  another location's pricing in one click. The "Lessons" step becomes
+  **"Reserveringsspecificaties"** with the booking notice, booking
+  horizon, and cancellation window. The sidebar entry "Locaties" is
+  renamed to **"Locaties en lestarief"**. The duplicate pricing block
+  on `/pro/profile` has been removed.
+
+## 2026-05-17 — v1.1.67
+
+- **[pro] Going back in the registration wizard no longer empties or
+  duplicates locations.** Coming back to the Locations step now
+  shows the locations you already entered (previously the form was
+  blank). Hitting Next again replaces them instead of appending —
+  fixing the "I went back and now I have duplicate locations on my
+  account" issue.
+
+## 2026-05-17 — v1.1.66
+
+- **[pro] Welcome email moved to after subscription.** The full
+  "your pro account is ready, here's what to do next" email used to
+  arrive after step 1 of the registration wizard — long before the
+  pro had finished setup. Now step 1 only sends a slim "Please
+  confirm your email" message; the welcome arrives once the
+  subscription is set up.
+
+## 2026-05-17 — v1.1.65
+
+- **Clearer "required field" hints in registration.** Every step of
+  the pro registration wizard (and the student account step) now
+  shows a "* Verplicht in te vullen velden" legend below the
+  heading. Per-field error messages also say "Dit veld is verplicht"
+  instead of the misleading "Alle velden zijn verplicht".
+
+## 2026-05-17 — v1.1.64
+
+- **Price breakdown on group bookings.** When you book a lesson with
+  extra participants and the pro has set an extra-student rate, the
+  summary now shows the math — base lesson, extras × rate, and total
+  — so you can verify the total before confirming.
+
+## 2026-05-17 — v1.1.63
+
+- **[pro] Blocking a time slot now cancels overlapping bookings.** In
+  Beschikbaarheid → Rooster & Blokken, painting a block over an
+  existing booking is now allowed. Before saving, a confirm dialog
+  lists the affected lessons; on confirm the bookings are cancelled
+  and the students get an email + calendar update automatically.
+
+## 2026-05-09 — v1.1.62
+
+- **Search field for choosing your pros.** A live search now sits
+  above the pro cards on both registration and the Manage Pros page
+  — matches any text on the card (name, specialty, course or city).
+
+## 2026-05-09 — v1.1.61
+
+- **[admin,pro] Native Google Docs/Sheets/Slides on tasks.** Create a
+  Google Doc, Sheet, or Slides directly from a task's Comments tab —
+  the file lands in a per-task Drive folder and is attached as a
+  comment.
+
+## 2026-05-08 — v1.1.60
+
+- **Editing a booking now uses the QuickBook surface.** Date pill row,
+  slot list, weekly/biweekly/monthly pills and a "More options" link,
+  same as on the member dashboard. Tapping a pill jumps the calendar
+  to the next suggested date based on your preferences.
+- **Edit form shows the booking's current date/time at the top.** Pro
+  and location alongside it so you can see what you're changing from
+  at a glance.
+- **Booking-update emails show what changed.** Each field that
+  actually moved renders inline as "NEW (was OLD)" — date, time,
+  duration, participant count.
+- **Dropped participants get a removal email.** When a booker removes
+  someone from an existing booking, that person receives a "Removed"
+  email and a calendar invite that cancels the entry from their
+  calendar.
+- [pro] **Pro bookings page redesign.** New mobile-first card with
+  outlined Edit + Cancel buttons, shared between the list view and
+  the calendar's expanded detail panel. Calendar blocks show just
+  the student name; tapping opens the card in a centered dialog.
+  Cards are colour-coded by location, matching the palette on the
+  availability page so the same club gets the same colour in both
+  grids. The dialog has explicit Close + Edit + Cancel buttons
+  (Close on the right, booking actions on the left) with icons —
+  the dismissive action can't be confused with cancelling the
+  lesson.
+- [pro] **Bookings is the default landing page.** Bottom nav order
+  is now Reserveringen → Golfers → Beschikbaarheid; Dashboard moved
+  to the top of the "More" sheet.
+- [pro] **Bookings on the availability page are clickable.** The
+  preview grid now shows the student's name on each booking and
+  opens the same booking card on tap.
+
+## 2026-05-06 — v1.1.58
+
+- [pro] **Per-location lesson pricing (task 109).** Each location
+  now carries its own lesson durations and prices. A pro who
+  teaches at multiple clubs can set a different price at each one
+  — the booking wizard charges the active location's price, and
+  the booking row records that exact amount.
+  - New "Lessons & pricing" section on each location card under
+    /pro/locations: pick durations, set price + per-extra-student
+    surcharge per duration. Translated NL / FR / EN.
+  - Booking calendar (member + public) now sources durations and
+    prices from the location the student picks rather than from
+    the pro's global defaults.
+  - The pricing fields on /pro/profile become a per-pro default
+    used only when adding new locations; a small notice points
+    pros to /pro/locations for the actual prices.
+  - Existing locations were backfilled from each pro's global
+    defaults during the migration, so behaviour for current pros
+    is unchanged until they customise per-location.
+
 ## 2026-05-06 — v1.1.57
 
 - [pro] **Pro billing/payment copy refinements (task 13).** Two
@@ -51,7 +517,7 @@ than silently hide.
 
 ## 2026-05-06 — v1.1.55
 
-- **Booking calendar shows when the pro's calendar is open through.**
+- [golfer] **Booking calendar shows when the pro's calendar is open through.**
   A small caption now sits below the booking calendar — "Bookings
   open through {date}" — so students don't have to guess why
   forward months stop showing slots. Applies to both the public
@@ -60,7 +526,7 @@ than silently hide.
 
 ## 2026-05-06 — v1.1.54
 
-- **Extending a booking's duration now works.** Previously, trying
+- [golfer] **Extending a booking's duration now works.** Previously, trying
   to extend a 60-minute lesson to 90 minutes at the same start time
   failed with "this slot is not available" — the system was
   treating the existing 60-minute booking as a blocker against its
@@ -120,7 +586,7 @@ than silently hide.
 
 ## 2026-05-06 — v1.1.49
 
-- **Extra-participant emails are now in each participant's own
+- [golfer] **Extra-participant emails are now in each participant's own
   language.** When a Dutch booker added a French friend as an extra
   participant, the friend used to receive the confirmation, update,
   and cancellation emails in Dutch. They now arrive in French if the
@@ -207,7 +673,7 @@ than silently hide.
 
 ## 2026-05-04 — v1.1.39
 
-- **Clearer "extra participant email" hint on the booking form.**
+- [golfer] **Clearer "extra participant email" hint on the booking form.**
   The hint used to say "email is optional but recommended" without
   explaining why. It now leads with the reason — confirmation
   details and a calendar invite are sent by email — so it's obvious
@@ -284,7 +750,7 @@ than silently hide.
 
 ## 2026-05-04 — v1.1.31
 
-- **Clearer "add payment method" message on the dashboard.** When a
+- [golfer] **Clearer "add payment method" message on the dashboard.** When a
   pro requires online payment and you haven't added a payment method
   yet, the Quick Book widget now names that pro explicitly — e.g.
   *"Olivier requires online payment for bookings. Add a payment
@@ -305,7 +771,7 @@ than silently hide.
 
 ## 2026-05-04 — v1.1.29
 
-- **Public booking now shows the correct group price.** When you
+- [golfer] **Public booking now shows the correct group price.** When you
   add an extra participant to a public booking, the summary line
   now includes the extra-participant rate set by the pro instead
   of just the base price. (The booking row itself was already
@@ -313,7 +779,7 @@ than silently hide.
 
 ## 2026-05-04 — v1.1.28
 
-- **Editing a booking now respects the pro's availability.** When you
+- [golfer] **Editing a booking now respects the pro's availability.** When you
   reschedule, you can only pick from time slots the pro has actually
   made available — previously the form let you type any time, which
   meant a student could land a lesson on a slot the pro never
@@ -327,7 +793,7 @@ than silently hide.
 
 ## 2026-05-04 — v1.1.27
 
-- **Generated passwords are no longer emailed by default.** When you
+- [golfer] **Generated passwords are no longer emailed by default.** When you
   use the "Generate password" button during signup, a checkbox now
   appears asking whether to also include the password in the
   confirmation email. It's off by default — putting a password in
@@ -336,7 +802,7 @@ than silently hide.
 
 ## 2026-05-03 — v1.1.26
 
-- **QR login now works on Android, not just iPhone.** Previously the
+- [golfer] **QR login now works on Android, not just iPhone.** Previously the
   QR code on the dashboard encoded a long signed token directly in
   the URL — fine for the iPhone camera, but most Android cameras
   couldn't resolve the dense QR. The QR now encodes a short opaque
@@ -345,7 +811,7 @@ than silently hide.
 
 ## 2026-05-02 — v1.1.25
 
-- **Edit booking: remove a specific participant.** Previously
+- [golfer] **Edit booking: remove a specific participant.** Previously
   lowering the participant count always dropped the *last* person in
   the list — if you wanted to remove someone in the middle you had
   to edit names around. Each additional-participant row now has its
@@ -360,7 +826,7 @@ than silently hide.
 
 ## 2026-05-02 — v1.1.24
 
-- **Edit a booking and the payment is now adjusted automatically.**
+- [golfer] **Edit a booking and the payment is now adjusted automatically.**
   When you change a booking's duration or the number of participants
   in a way that changes the price, the system handles the difference:
   - Online payments: the price increase is charged to your saved
@@ -386,7 +852,7 @@ than silently hide.
 
 ## 2026-05-02 — v1.1.22
 
-- **You can now edit an existing booking.** From the bookings list
+- [golfer] **You can now edit an existing booking.** From the bookings list
   (member side at /member/bookings, pro side via the booking detail
   on /pro/bookings) an "Edit" link opens a form where you can change
   the date, start time, duration, or participant list. The change
@@ -405,7 +871,7 @@ than silently hide.
 
 ## 2026-05-02 — v1.1.21
 
-- **Extra participants on a group lesson now get their own emails +
+- [golfer] **Extra participants on a group lesson now get their own emails +
   calendar invites.** When you book a lesson for more than one
   person (member booking or public booking), the form now asks for
   each additional participant's first name, last name, and (optional)

@@ -29,7 +29,7 @@ const STEP_KEYS = [
   "proOnb.step.personal",
   "proOnb.step.profile",
   "proOnb.step.locations",
-  "proOnb.step.lessons",
+  "proOnb.step.reservationSpecs",
   "proOnb.step.invoicing",
   "proOnb.step.bank",
   "proOnb.step.subscription",
@@ -48,12 +48,14 @@ interface InitialData {
   displayName: string;
   bio: string;
   specialties: string;
-  lessonDurations: number[];
-  /** Per-duration lesson price in EUR (user-facing, NOT cents). */
-  lessonPricing: Record<string, number>;
-  /** Per-duration extra-student rate in EUR. Default 0 = base covers group. */
-  extraStudentPricing: Record<string, number>;
-  maxGroupSize: number;
+  /**
+   * Reservation specs (task 130) — were previously mixed with lesson
+   * pricing in the "Lessons" step. The pricing moved per-location; the
+   * remaining policy fields stayed here and got renamed to "Reservation
+   * specs" in the UI.
+   */
+  bookingNotice: number;
+  bookingHorizon: number;
   cancellationHours: number;
   bankAccountHolder: string;
   bankIban: string;
@@ -214,7 +216,7 @@ function PersonalStep({
           required
         />
         {emailMissing && (
-          <p className={err}>{t("authErr.allFieldsRequired", locale)}</p>
+          <p className={err}>{t("authErr.fieldRequired", locale)}</p>
         )}
         {emailInvalid && (
           <p className={err}>{t("authErr.invalidEmail", locale)}</p>
@@ -342,6 +344,16 @@ interface Location {
    * Defaults to the browser TZ when the form first renders, but the
    * pro can override via the `<TimezonePicker />`. */
   timezone: string;
+  /**
+   * Per-location lesson offering (task 130 — durations + prices +
+   * max group size moved out of the global Lessons step into each
+   * location). Pricing is held as EUR decimal in client state and
+   * converted to cents on submit, matching the existing pattern.
+   */
+  lessonDurations: number[];
+  lessonPricing: Record<string, number>;
+  extraStudentPricing: Record<string, number>;
+  maxGroupSize: number;
 }
 
 function LocationsStep({
@@ -353,20 +365,32 @@ function LocationsStep({
   onChange: (locs: Location[]) => void;
   locale: Locale;
 }) {
+  const durationOptions = [30, 45, 60, 90, 120];
+
   function addLocation() {
-    // New rows inherit the previous row's TZ when present (most pros
-    // who add multiple locations are in the same country); fall back
-    // to the browser TZ via the picker's auto-detect when the list
-    // starts empty.
-    const inheritTz =
-      locations[locations.length - 1]?.timezone ?? "";
-    onChange([
-      ...locations,
-      { name: "", address: "", city: "", timezone: inheritTz },
-    ]);
+    // Inherit the previous row's TZ + pricing for the new one — the
+    // common case is "I teach the same lessons at multiple venues".
+    // The pro can still override per-location, or pick a different
+    // existing location via the "Copy from" dropdown.
+    const prev = locations[locations.length - 1];
+    const blank: Location = {
+      name: "",
+      address: "",
+      city: "",
+      timezone: prev?.timezone ?? "",
+      lessonDurations: prev ? [...prev.lessonDurations] : [60],
+      lessonPricing: prev ? { ...prev.lessonPricing } : {},
+      extraStudentPricing: prev ? { ...prev.extraStudentPricing } : {},
+      maxGroupSize: prev?.maxGroupSize ?? 4,
+    };
+    onChange([...locations, blank]);
   }
 
-  function updateLocation(i: number, field: keyof Location, value: string) {
+  function updateLocation<K extends keyof Location>(
+    i: number,
+    field: K,
+    value: Location[K],
+  ) {
     const updated = [...locations];
     updated[i] = { ...updated[i], [field]: value };
     onChange(updated);
@@ -375,6 +399,50 @@ function LocationsStep({
   function removeLocation(i: number) {
     if (locations.length <= 1) return;
     onChange(locations.filter((_, idx) => idx !== i));
+  }
+
+  function toggleDuration(i: number, d: number) {
+    const loc = locations[i];
+    const has = loc.lessonDurations.includes(d);
+    if (has && loc.lessonDurations.length === 1) return;
+    const next = has
+      ? loc.lessonDurations.filter((x) => x !== d)
+      : [...loc.lessonDurations, d].sort((a, b) => a - b);
+    updateLocation(i, "lessonDurations", next);
+  }
+
+  function setPrice(i: number, d: number, raw: string) {
+    const n = parsePriceInput(raw);
+    if (n === null) return;
+    updateLocation(i, "lessonPricing", {
+      ...locations[i].lessonPricing,
+      [String(d)]: n,
+    });
+  }
+
+  function setExtraPrice(i: number, d: number, raw: string) {
+    const n = parsePriceInput(raw);
+    if (n === null) return;
+    updateLocation(i, "extraStudentPricing", {
+      ...locations[i].extraStudentPricing,
+      [String(d)]: n,
+    });
+  }
+
+  function copyFrom(i: number, sourceIdx: number) {
+    if (sourceIdx < 0 || sourceIdx >= locations.length || sourceIdx === i) {
+      return;
+    }
+    const src = locations[sourceIdx];
+    const updated = [...locations];
+    updated[i] = {
+      ...updated[i],
+      lessonDurations: [...src.lessonDurations],
+      lessonPricing: { ...src.lessonPricing },
+      extraStudentPricing: { ...src.extraStudentPricing },
+      maxGroupSize: src.maxGroupSize,
+    };
+    onChange(updated);
   }
 
   return (
@@ -447,18 +515,147 @@ function LocationsStep({
               locale={locale}
               value={loc.timezone || undefined}
               onChange={(tz) => updateLocation(i, "timezone", tz)}
-              // The onboarding API hardcodes `country: "Belgium"` for
-              // each new location, so the picker's natural inference
-              // is Brussels. The pro can override via "change" — most
-              // never need to.
               inferred={defaultTimezoneForCountry("Belgium")}
               inferredFromLabel="Belgium"
-              // No `name` so the picker doesn't try to submit via
-              // form-action — this wizard POSTs JSON, the timezone
-              // travels through React state.
               name=""
               required={false}
             />
+          </div>
+
+          {/* Pricing block — moved from the old Lessons step (task 130).
+              Each location carries its own durations, prices, extra-
+              student rate, and max group size. */}
+          <div className="rounded-lg border border-gold-100 bg-white p-3 space-y-3">
+            <div className="flex items-center justify-between">
+              <span className="text-xs font-semibold uppercase tracking-wide text-green-700">
+                {t("proOnb.loc.pricingHeading", locale)}
+              </span>
+              {locations.length > 1 && (
+                <label className="flex items-center gap-1 text-[11px] text-green-600">
+                  <span>{t("proOnb.loc.copyFrom", locale)}</span>
+                  <select
+                    value=""
+                    onChange={(e) => {
+                      const idx = parseInt(e.target.value, 10);
+                      if (Number.isFinite(idx)) copyFrom(i, idx);
+                      e.target.value = "";
+                    }}
+                    className="rounded border border-green-200 bg-white px-1.5 py-0.5 text-[11px] text-green-800"
+                  >
+                    <option value="">
+                      {t("proOnb.loc.copyFromPlaceholder", locale)}
+                    </option>
+                    {locations.map((other, idx) =>
+                      idx === i ? null : (
+                        <option key={idx} value={idx}>
+                          {other.name?.trim() ||
+                            t("proOnb.loc.label", locale).replace(
+                              "{n}",
+                              String(idx + 1),
+                            )}
+                        </option>
+                      ),
+                    )}
+                  </select>
+                </label>
+              )}
+            </div>
+            <div>
+              <label className="block text-xs font-medium text-green-700">
+                {t("proOnb.lessons.durations", locale)}
+              </label>
+              <div className="mt-1 flex flex-wrap gap-2">
+                {durationOptions.map((d) => (
+                  <button
+                    key={d}
+                    type="button"
+                    onClick={() => toggleDuration(i, d)}
+                    className={`rounded-lg border px-3 py-1.5 text-xs font-medium transition-colors ${
+                      loc.lessonDurations.includes(d)
+                        ? "border-green-700 bg-green-700 text-white"
+                        : "border-green-200 bg-white text-green-700 hover:border-green-400"
+                    }`}
+                  >
+                    {d} min
+                  </button>
+                ))}
+              </div>
+            </div>
+            <div className="grid gap-3 sm:grid-cols-2">
+              {loc.lessonDurations.map((d) => (
+                <div key={d} className="rounded border border-green-100 p-2">
+                  <label className="block text-[11px] font-medium text-green-700">
+                    {t("proOnb.lessons.pricePerDuration", locale).replace(
+                      "{n}",
+                      String(d),
+                    )}
+                  </label>
+                  <div className="relative mt-1">
+                    <span className="pointer-events-none absolute inset-y-0 left-3 flex items-center text-xs text-green-500">
+                      €
+                    </span>
+                    <input
+                      type="text"
+                      inputMode="decimal"
+                      value={
+                        loc.lessonPricing[String(d)] !== undefined
+                          ? formatPriceInput(loc.lessonPricing[String(d)], locale)
+                          : ""
+                      }
+                      onChange={(e) => setPrice(i, d, e.target.value)}
+                      placeholder="0"
+                      className={inputClass + " pl-7"}
+                    />
+                  </div>
+                  <label className="mt-2 block text-[11px] font-medium text-green-700">
+                    {t("proProfile.extraStudentPrice", locale).replace(
+                      "{n}",
+                      String(d),
+                    )}
+                  </label>
+                  <div className="relative mt-1">
+                    <span className="pointer-events-none absolute inset-y-0 left-3 flex items-center text-xs text-green-500">
+                      €
+                    </span>
+                    <input
+                      type="text"
+                      inputMode="decimal"
+                      value={
+                        loc.extraStudentPricing[String(d)] !== undefined
+                          ? formatPriceInput(
+                              loc.extraStudentPricing[String(d)],
+                              locale,
+                            )
+                          : ""
+                      }
+                      onChange={(e) => setExtraPrice(i, d, e.target.value)}
+                      placeholder="0"
+                      className={inputClass + " pl-7"}
+                    />
+                  </div>
+                </div>
+              ))}
+            </div>
+            <div>
+              <label className="block text-xs font-medium text-green-700">
+                {t("proOnb.lessons.maxGroup", locale)}
+              </label>
+              <input
+                type="number"
+                min={1}
+                max={20}
+                value={loc.maxGroupSize}
+                onChange={(e) => {
+                  const n = parseInt(e.target.value, 10);
+                  updateLocation(
+                    i,
+                    "maxGroupSize",
+                    Number.isFinite(n) && n >= 1 ? n : 1,
+                  );
+                }}
+                className={inputClass + " max-w-[140px]"}
+              />
+            </div>
           </div>
         </div>
       ))}
@@ -475,7 +672,7 @@ function LocationsStep({
 
 // ─── Step 3: Lessons ────────────────────────────────────
 
-function LessonsStep({
+function ReservationSpecsStep({
   data,
   onChange,
   locale,
@@ -484,150 +681,54 @@ function LessonsStep({
   onChange: (d: Partial<InitialData>) => void;
   locale: Locale;
 }) {
-  const durations = [30, 45, 60, 90, 120];
-
-  function toggleDuration(d: number) {
-    const current = data.lessonDurations;
-    if (current.includes(d)) {
-      if (current.length > 1) {
-        onChange({ lessonDurations: current.filter((x) => x !== d) });
-      }
-    } else {
-      // No price pre-fill: any number we'd inject feels like a
-      // recommendation. The pro must enter their own.
-      onChange({
-        lessonDurations: [...current, d].sort((a, b) => a - b),
-      });
-    }
-  }
-
-  function updatePriceForDuration(d: number, value: string) {
-    const n = parsePriceInput(value);
-    if (n === null) return;
-    onChange({
-      lessonPricing: { ...data.lessonPricing, [String(d)]: n },
-    });
-  }
-
-  function updateExtraPriceForDuration(d: number, value: string) {
-    const n = parsePriceInput(value);
-    if (n === null) return;
-    onChange({
-      extraStudentPricing: { ...data.extraStudentPricing, [String(d)]: n },
-    });
-  }
-
   return (
     <div className="space-y-5">
-      <div>
-        <label className="block text-sm font-medium text-green-800">
-          {t("proOnb.lessons.durations", locale)}
-        </label>
-        <div className="mt-2 flex flex-wrap gap-2">
-          {durations.map((d) => (
-            <button
-              key={d}
-              type="button"
-              onClick={() => toggleDuration(d)}
-              className={`rounded-lg border px-4 py-2 text-sm font-medium transition-colors ${
-                data.lessonDurations.includes(d)
-                  ? "border-green-700 bg-green-700 text-white"
-                  : "border-green-200 bg-white text-green-700 hover:border-green-400"
-              }`}
-            >
-              {d} min
-            </button>
-          ))}
-        </div>
-      </div>
-
-      {/* Per-duration lesson prices — REAL prices that get charged */}
-      <div className="rounded-lg border border-gold-200 bg-gold-50/40 p-4">
-        <h3 className="text-sm font-semibold text-green-900">
-          {t("proOnb.lessons.chargingHeading", locale)}{" "}
-          <span className="text-red-500">*</span>
-        </h3>
-        <p className="mt-1 text-xs text-green-600">
-          {t("proOnb.lessons.chargingHint", locale)}
-        </p>
-        <div className="mt-3 grid gap-3 sm:grid-cols-2">
-          {data.lessonDurations.map((d) => (
-            <div key={d}>
-              <label className="block text-xs font-medium text-green-700">
-                {t("proOnb.lessons.pricePerDuration", locale).replace(
-                  "{n}",
-                  String(d)
-                )}
-              </label>
-              <div className="relative mt-1">
-                <span className="pointer-events-none absolute inset-y-0 left-3 flex items-center text-sm text-green-500">
-                  €
-                </span>
-                <input
-                  type="text"
-                  inputMode="decimal"
-                  value={
-                    data.lessonPricing[String(d)] !== undefined
-                      ? formatPriceInput(data.lessonPricing[String(d)], locale)
-                      : ""
-                  }
-                  onChange={(e) => updatePriceForDuration(d, e.target.value)}
-                  placeholder="0"
-                  className={inputClass + " pl-7"}
-                />
-              </div>
-              {/* Per-extra-student rate (task 76). Default 0 = base rate
-                  covers the whole group. */}
-              <label className="mt-2 block text-xs font-medium text-green-700">
-                {t("proProfile.extraStudentPrice", locale).replace(
-                  "{n}",
-                  String(d)
-                )}
-              </label>
-              <div className="relative mt-1">
-                <span className="pointer-events-none absolute inset-y-0 left-3 flex items-center text-sm text-green-500">
-                  €
-                </span>
-                <input
-                  type="text"
-                  inputMode="decimal"
-                  value={
-                    data.extraStudentPricing[String(d)] !== undefined
-                      ? formatPriceInput(
-                          data.extraStudentPricing[String(d)],
-                          locale,
-                        )
-                      : ""
-                  }
-                  onChange={(e) =>
-                    updateExtraPriceForDuration(d, e.target.value)
-                  }
-                  placeholder="0"
-                  className={inputClass + " pl-7"}
-                />
-              </div>
-            </div>
-          ))}
-        </div>
-        <p className="mt-3 text-xs text-green-600">
-          {t("proProfile.extraStudentPriceHint", locale)}
-        </p>
-      </div>
+      <p className="text-sm text-green-600">
+        {t("proOnb.resv.intro", locale)}
+      </p>
 
       <div>
         <label className="block text-sm font-medium text-green-800">
-          {t("proOnb.lessons.maxGroup", locale)}
+          {t("proOnb.resv.bookingNotice", locale)}
         </label>
         <input
           type="number"
-          value={data.maxGroupSize}
-          onChange={(e) =>
-            onChange({ maxGroupSize: parseInt(e.target.value) || 1 })
-          }
-          min="1"
-          max="20"
+          value={data.bookingNotice}
+          onChange={(e) => {
+            const n = parseInt(e.target.value, 10);
+            onChange({
+              bookingNotice: Number.isFinite(n) && n >= 0 ? n : 24,
+            });
+          }}
+          min="0"
+          max="720"
           className={inputClass + " max-w-[200px]"}
         />
+        <p className="mt-1 text-xs text-green-500">
+          {t("proOnb.resv.bookingNoticeHint", locale)}
+        </p>
+      </div>
+
+      <div>
+        <label className="block text-sm font-medium text-green-800">
+          {t("proOnb.resv.bookingHorizon", locale)}
+        </label>
+        <input
+          type="number"
+          value={data.bookingHorizon}
+          onChange={(e) => {
+            const n = parseInt(e.target.value, 10);
+            onChange({
+              bookingHorizon: Number.isFinite(n) && n >= 1 ? n : 60,
+            });
+          }}
+          min="1"
+          max="365"
+          className={inputClass + " max-w-[200px]"}
+        />
+        <p className="mt-1 text-xs text-green-500">
+          {t("proOnb.resv.bookingHorizonHint", locale)}
+        </p>
       </div>
 
       <div>
@@ -1023,11 +1124,32 @@ function SubscriptionPaymentForm({
   );
 }
 
-function SubscriptionStep({ onSuccess, locale }: { onSuccess: () => void; locale: Locale }) {
-  const [plan, setPlan] = useState<"monthly" | "annual">("annual");
-  const [clientSecret, setClientSecret] = useState<string | null>(null);
-  const [billingPrefill, setBillingPrefill] =
-    useState<SubscriptionBillingPrefill | null>(null);
+function SubscriptionStep({
+  onSuccess,
+  locale,
+  plan,
+  setPlan,
+  clientSecret,
+  setClientSecret,
+  billingPrefill,
+  setBillingPrefill,
+}: {
+  onSuccess: () => void;
+  locale: Locale;
+  /**
+   * Subscription form state is owned by the wizard so it survives
+   * the pro navigating Back → Forward in the stepper. Pre-fix each
+   * remount of the subscription step started fresh, so entering
+   * card details, going back to check a previous step, then coming
+   * forward again wiped the SetupIntent and the chosen plan (task 134).
+   */
+  plan: "monthly" | "annual";
+  setPlan: (p: "monthly" | "annual") => void;
+  clientSecret: string | null;
+  setClientSecret: (cs: string | null) => void;
+  billingPrefill: SubscriptionBillingPrefill | null;
+  setBillingPrefill: (b: SubscriptionBillingPrefill | null) => void;
+}) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -1075,6 +1197,20 @@ function SubscriptionStep({ onSuccess, locale }: { onSuccess: () => void; locale
           <p className="mt-1 text-xs text-green-500">
             {t("proOnb.sub.firstChargeOn", locale).replace("{date}", firstChargeDate)}
           </p>
+          <button
+            type="button"
+            onClick={() => {
+              // Drop the SetupIntent so the plan picker re-renders.
+              // Without this the pro can't switch monthly/annual or
+              // recover from a weird Stripe Link state without
+              // hitting wizard-Back-then-Next (task 132).
+              setClientSecret(null);
+              setBillingPrefill(null);
+            }}
+            className="mt-3 text-xs font-medium text-green-700 underline hover:text-green-900"
+          >
+            {t("proOnb.sub.changePlan", locale)}
+          </button>
         </div>
         <Elements
           stripe={getStripe()}
@@ -1087,6 +1223,18 @@ function SubscriptionStep({ onSuccess, locale }: { onSuccess: () => void; locale
             billingPrefill={billingPrefill}
           />
         </Elements>
+        <p className="text-xs text-green-500">
+          {t("proOnb.sub.termsPrefix", locale)}{" "}
+          <a
+            href="/terms"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="underline hover:text-green-700"
+          >
+            {t("proOnb.sub.termsLink", locale)}
+          </a>
+          {t("proOnb.sub.termsSuffix", locale)}
+        </p>
       </div>
     );
   }
@@ -1158,11 +1306,18 @@ function SubscriptionStep({ onSuccess, locale }: { onSuccess: () => void; locale
 export default function OnboardingWizard({
   initialStep,
   initialData,
+  initialLocations,
   hasAccount: initialHasAccount,
   locale,
 }: {
   initialStep: number;
   initialData: InitialData;
+  /** Existing locations seeded from the DB. Empty on first visit; the
+   *  one-blank-row placeholder lets the TimezonePicker auto-fill the
+   *  browser TZ on mount. Pre-fix we always rendered the placeholder,
+   *  so a pro who saved locations and navigated back saw the form
+   *  blank — and Next re-inserted duplicates server-side (task 129). */
+  initialLocations?: Location[];
   /** True when a pro session already exists on mount. Flips to true
    *  after a successful create in step 0. */
   hasAccount: boolean;
@@ -1170,17 +1325,37 @@ export default function OnboardingWizard({
 }) {
   const [step, setStep] = useState(initialStep);
   const [data, setData] = useState<InitialData>(initialData);
-  const [locations, setLocations] = useState<Location[]>([
-    // First row's TZ left empty so the picker auto-fills from the
-    // browser TZ on mount (most pros never have to interact with the
-    // picker in the common-case "I'm at home" flow).
-    { name: "", address: "", city: "", timezone: "" },
-  ]);
+  const [locations, setLocations] = useState<Location[]>(
+    initialLocations && initialLocations.length > 0
+      ? initialLocations
+      : [
+          {
+            name: "",
+            address: "",
+            city: "",
+            timezone: "",
+            lessonDurations: [60],
+            lessonPricing: {},
+            extraStudentPricing: {},
+            maxGroupSize: 4,
+          },
+        ],
+  );
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
   const [hasAccount, setHasAccount] = useState(initialHasAccount);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  // Subscription-step state lifted to the wizard so it survives the
+  // pro hitting Back → Forward in the stepper (task 134).
+  const [subscriptionPlan, setSubscriptionPlan] = useState<
+    "monthly" | "annual"
+  >("annual");
+  const [subscriptionClientSecret, setSubscriptionClientSecret] = useState<
+    string | null
+  >(null);
+  const [subscriptionBillingPrefill, setSubscriptionBillingPrefill] =
+    useState<SubscriptionBillingPrefill | null>(null);
 
   function updateData(partial: Partial<InitialData>) {
     setData((prev) => ({ ...prev, ...partial }));
@@ -1310,38 +1485,57 @@ export default function OnboardingWizard({
           specialties: data.specialties,
         });
         break;
-      case 2: // Locations
-        success = await saveStep("locations", { locations });
-        break;
-      case 3: {
-        // Validate: at least one selected duration must have a price > 0
-        const anyPricedDuration = data.lessonDurations.some(
-          (d) => (data.lessonPricing[String(d)] ?? 0) > 0
-        );
-        if (!anyPricedDuration) {
+      case 2: {
+        // Locations + per-location pricing (task 130). At least one
+        // location must have at least one priced duration.
+        let anyPriced = false;
+        for (const loc of locations) {
+          for (const d of loc.lessonDurations) {
+            if ((loc.lessonPricing[String(d)] ?? 0) > 0) {
+              anyPriced = true;
+              break;
+            }
+          }
+          if (anyPriced) break;
+        }
+        if (!anyPriced) {
           setError(t("proOnb.lessons.chargingHint", locale));
           return;
         }
-        // Convert EUR → cents for storage
-        const lessonPricingCents: Record<string, number> = {};
-        for (const d of data.lessonDurations) {
-          const eur = data.lessonPricing[String(d)];
-          if (typeof eur === "number" && eur > 0) {
-            lessonPricingCents[String(d)] = Math.round(eur * 100);
+        const payload = locations.map((loc) => {
+          const pricingCents: Record<string, number> = {};
+          const extraCents: Record<string, number> = {};
+          for (const d of loc.lessonDurations) {
+            const p = loc.lessonPricing[String(d)];
+            if (typeof p === "number" && p > 0) {
+              pricingCents[String(d)] = Math.round(p * 100);
+            }
+            const e = loc.extraStudentPricing[String(d)];
+            if (typeof e === "number" && e >= 0) {
+              extraCents[String(d)] = Math.round(e * 100);
+            }
           }
-        }
-        const extraStudentPricingCents: Record<string, number> = {};
-        for (const d of data.lessonDurations) {
-          const eur = data.extraStudentPricing[String(d)];
-          if (typeof eur === "number" && eur >= 0) {
-            extraStudentPricingCents[String(d)] = Math.round(eur * 100);
-          }
-        }
-        success = await saveStep("lessons", {
-          lessonDurations: data.lessonDurations,
-          lessonPricing: lessonPricingCents,
-          extraStudentPricing: extraStudentPricingCents,
-          maxGroupSize: data.maxGroupSize,
+          return {
+            name: loc.name,
+            address: loc.address,
+            city: loc.city,
+            timezone: loc.timezone,
+            lessonDurations: loc.lessonDurations,
+            lessonPricing: pricingCents,
+            extraStudentPricing: extraCents,
+            maxGroupSize: loc.maxGroupSize,
+          };
+        });
+        success = await saveStep("locations", { locations: payload });
+        break;
+      }
+      case 3: {
+        // Reservation specs (task 130) — the policy fields that used
+        // to live alongside lesson pricing. Pricing is now per-location
+        // and saved with the Locations step.
+        success = await saveStep("reservationSpecs", {
+          bookingNotice: data.bookingNotice,
+          bookingHorizon: data.bookingHorizon,
           cancellationHours: data.cancellationHours,
         });
         break;
@@ -1421,11 +1615,20 @@ export default function OnboardingWizard({
       case 1:
         return !!data.displayName.trim();
       case 2:
-        return locations.some((l) => l.name.trim().length > 0);
-      case 3:
-        return data.lessonDurations.some(
-          (d) => (data.lessonPricing[String(d)] ?? 0) > 0,
+        // Need at least one named location AND at least one priced
+        // duration somewhere across the locations (task 130).
+        return (
+          locations.some((l) => l.name.trim().length > 0) &&
+          locations.some((l) =>
+            l.lessonDurations.some(
+              (d) => (l.lessonPricing[String(d)] ?? 0) > 0,
+            ),
+          )
         );
+      case 3:
+        // Reservation specs always have defaults — step is valid by
+        // default. The pro can still adjust if they want.
+        return data.bookingNotice >= 0 && data.bookingHorizon >= 1;
       case 4: {
         if (
           !data.invoiceAddressLine1.trim() ||
@@ -1523,9 +1726,15 @@ export default function OnboardingWizard({
 
         {/* Step content */}
         <div className="mt-8 rounded-xl border border-green-200 bg-white p-6 shadow-sm sm:p-8">
-          <h2 className="mb-6 text-lg font-semibold text-green-900">
+          <h2 className="text-lg font-semibold text-green-900">
             {currentStepName}
           </h2>
+          {step < STEP_SUBSCRIPTION && (
+            <p className="mb-6 mt-1 text-xs text-green-600">
+              {t("auth.requiredLegend", locale)}
+            </p>
+          )}
+          {step >= STEP_SUBSCRIPTION && <div className="mb-6" />}
 
           {error && (
             <div className="mb-4 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
@@ -1549,11 +1758,26 @@ export default function OnboardingWizard({
           {step === 2 && (
             <LocationsStep locations={locations} onChange={setLocations} locale={locale} />
           )}
-          {step === 3 && <LessonsStep data={data} onChange={updateData} locale={locale} />}
+          {step === 3 && (
+            <ReservationSpecsStep
+              data={data}
+              onChange={updateData}
+              locale={locale}
+            />
+          )}
           {step === 4 && <InvoicingStep data={data} onChange={updateData} locale={locale} />}
           {step === 5 && <BankStep data={data} onChange={updateData} locale={locale} />}
           {step === STEP_SUBSCRIPTION && (
-            <SubscriptionStep onSuccess={() => setStep(STEP_COUNT)} locale={locale} />
+            <SubscriptionStep
+              onSuccess={() => setStep(STEP_COUNT)}
+              locale={locale}
+              plan={subscriptionPlan}
+              setPlan={setSubscriptionPlan}
+              clientSecret={subscriptionClientSecret}
+              setClientSecret={setSubscriptionClientSecret}
+              billingPrefill={subscriptionBillingPrefill}
+              setBillingPrefill={setSubscriptionBillingPrefill}
+            />
           )}
 
           {/* Navigation. Continue is hidden on the subscription step

@@ -10,7 +10,9 @@ import {
   date,
   numeric,
   index,
+  uniqueIndex,
 } from "drizzle-orm/pg-core";
+import { sql } from "drizzle-orm";
 
 export const users = pgTable("users", {
   id: serial("id").primaryKey(),
@@ -28,6 +30,7 @@ export const users = pgTable("users", {
   stripeCustomerId: varchar("stripe_customer_id", { length: 255 }),
   // Golf profile (students)
   handicap: numeric("handicap"),
+  clubMemberNumber: varchar("club_member_number", { length: 64 }),
   golfGoals: jsonb("golf_goals").$type<string[]>(),
   golfGoalsOther: varchar("golf_goals_other", { length: 500 }),
   onboardingCompletedAt: timestamp("onboarding_completed_at"),
@@ -243,6 +246,39 @@ export const proLocations = pgTable("pro_locations", {
   notes: text("notes"),
   sortOrder: integer("sort_order").notNull().default(0),
   active: boolean("active").notNull().default(true),
+  /**
+   * Per-location lesson durations + pricing (task 109). Each location
+   * is its own offering — a pro at multiple clubs can charge different
+   * prices and offer different durations per club. Defaults match the
+   * pre-migration shape of `pro_profiles.lessonDurations`/`lessonPricing`/
+   * `extraStudentPricing` so existing rows behave the same after the
+   * backfill.
+   *
+   * `pro_profiles.lessonDurations`/`lessonPricing`/`extraStudentPricing`
+   * remain in place for one ship cycle as a safety net but are no
+   * longer the source of truth — booking flows read from these
+   * location-level columns.
+   */
+  lessonDurations: jsonb("lesson_durations")
+    .$type<number[]>()
+    .notNull()
+    .default([60]),
+  lessonPricing: jsonb("lesson_pricing")
+    .$type<Record<string, number>>()
+    .notNull()
+    .default({}),
+  extraStudentPricing: jsonb("extra_student_pricing")
+    .$type<Record<string, number>>()
+    .notNull()
+    .default({}),
+  /**
+   * Maximum number of participants in a single lesson at this location
+   * (task 130). Per-location because a driving range fits more students
+   * than a 1-on-1 studio. Default 4 matches the previous pro-level
+   * default. Replaces `pro_profiles.max_group_size` as the source of
+   * truth — booking flows read from here.
+   */
+  maxGroupSize: integer("max_group_size").notNull().default(4),
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
 
@@ -279,6 +315,18 @@ export const proSchedulePeriods = pgTable("pro_schedule_periods", {
     .notNull(),
   validFrom: date("valid_from"),
   validUntil: date("valid_until"),
+  // Per-period display window for the availability editor grid
+  // (task 119). Pure rendering — narrows the visible row range on
+  // /pro/availability so a pro who only teaches 09:00–18:00 doesn't
+  // see empty 07:00 and 19:00–22:00 rows. Doesn't affect actual
+  // availability calculations: rows outside the window stay
+  // editable in DB and saved verbatim.
+  displayStartTime: varchar("display_start_time", { length: 5 })
+    .notNull()
+    .default("09:00"),
+  displayEndTime: varchar("display_end_time", { length: 5 })
+    .notNull()
+    .default("22:00"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
 
@@ -423,6 +471,14 @@ export const proStudents = pgTable("pro_students", {
   source: varchar("source", { length: 20 }).notNull().default("self"),
   status: varchar("status", { length: 20 }).notNull().default("active"),
   lastMessageAt: timestamp("last_message_at"),
+  // Per-side read marker for the coaching chat (task 122). Updated
+  // when the relevant party opens /member/coaching/[id] or
+  // /pro/students/[id]'s chat tab. Used to compute unread badges on
+  // the lists + WhatsApp-style read-receipt ticks inside the
+  // conversation: a message is "read" iff
+  // otherSide.lastSeenAt > comment.createdAt.
+  studentLastSeenAt: timestamp("student_last_seen_at"),
+  proLastSeenAt: timestamp("pro_last_seen_at"),
   // Booking preferences (auto-populated from booking history)
   preferredLocationId: integer("preferred_location_id").references(
     () => proLocations.id
@@ -432,7 +488,14 @@ export const proStudents = pgTable("pro_students", {
   preferredTime: varchar("preferred_time", { length: 20 }), // HH:MM or morning/afternoon/evening
   preferredInterval: varchar("preferred_interval", { length: 20 }), // weekly, biweekly, monthly
   createdAt: timestamp("created_at").defaultNow().notNull(),
-});
+}, (t) => ({
+  // Partial unique index — at most one ACTIVE row per (pro, student)
+  // pair. Inactive rows are exempt so a student can deactivate then
+  // reactivate without DB friction. Backs the dedupe fixes in task 147.
+  proUserActiveIdx: uniqueIndex("pro_students_pro_user_active_idx")
+    .on(t.proProfileId, t.userId)
+    .where(sql`${t.status} = 'active'`),
+}));
 
 // ─── Pro Mailing ────────────────────────────────────────────
 

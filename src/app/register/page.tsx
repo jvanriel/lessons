@@ -97,6 +97,7 @@ export default async function RegisterPage({ searchParams }: Props) {
         phone: user.phone || "",
         preferredLocale: user.preferredLocale || DEFAULT_LOCALE,
         handicap: user.handicap || "",
+        clubMemberNumber: user.clubMemberNumber || "",
         golfGoals: (user.golfGoals as string[]) || [],
         golfGoalsOther: user.golfGoalsOther || "",
       };
@@ -167,6 +168,7 @@ export default async function RegisterPage({ searchParams }: Props) {
       phone: (qPhone ?? "").trim(),
       preferredLocale: locale,
       handicap: "",
+      clubMemberNumber: "",
       golfGoals: [],
       golfGoalsOther: "",
     };

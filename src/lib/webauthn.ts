@@ -20,8 +20,9 @@ const PREVIEW_HOST = "preview.golflessons.be";
 // whitespace (a stray space at the end of the value pasted into the
 // dashboard). WebAuthn verification fails strict-equality on the
 // origin, so a single space breaks Face ID / Touch ID registration
-// with a confusing "expected '...<space>'" error.
-function cleanEnv(v: string | undefined): string | undefined {
+// with a confusing "expected '...<space>'" error. Exported so the
+// unit tests can pin the trim behaviour directly.
+export function cleanEnv(v: string | undefined): string | undefined {
   return v?.trim() || undefined;
 }
 

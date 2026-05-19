@@ -1,6 +1,7 @@
 "use client";
 
 import dynamic from "next/dynamic";
+import { useEffect, useRef, useState } from "react";
 import { isValidPhoneNumber } from "libphonenumber-js/min";
 import "react-phone-number-input/style.css";
 import "./phone-field.css";
@@ -52,11 +53,29 @@ export default function PhoneField({
   const invalid =
     !!showError && value.length > 0 && !isValidPhoneNumber(value);
 
+  // task 148 — re-default the country to BE after the user clears the
+  // field. The library's `defaultCountry` only applies on initial
+  // render; once the user types e.g. `+31…` the country becomes NL,
+  // and clearing the field leaves the country at the library's
+  // "International" globe fallback instead of snapping back to BE.
+  // Bumping `reset` whenever the value transitions from non-empty to
+  // empty drops both the internal phoneDigits and country state, so
+  // BE re-applies cleanly.
+  const [resetSignal, setResetSignal] = useState(0);
+  const prevValueRef = useRef(value);
+  useEffect(() => {
+    if (prevValueRef.current && !value) {
+      setResetSignal((c) => c + 1);
+    }
+    prevValueRef.current = value;
+  }, [value]);
+
   return (
     <div>
       <PhoneInput
         international
         defaultCountry="BE"
+        reset={resetSignal}
         value={(value || undefined) as Value | undefined}
         onChange={(v) => onChange((v ?? "") as string)}
         placeholder={placeholder}

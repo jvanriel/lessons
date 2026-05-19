@@ -6,7 +6,7 @@ import CmsBlock from "@/components/cms/CmsBlock";
 import CmsPageInit from "@/components/cms/CmsPageInit";
 
 export const metadata = {
-  title: "For Students — Golf Lessons",
+  title: "For Golfers — Golf Lessons",
   description:
     "Sign up for free and book lessons with certified golf professionals. Get personalized coaching, tips, videos, and more.",
 };

@@ -1,6 +1,6 @@
 # Gap Analysis — Pre-Launch
 
-Last updated: 2026-05-02
+Last updated: 2026-05-09
 
 Living document tracking what's left before golflessons.be can go live.
 Cross-reference for sprint planning and Nadine's testing feedback.
@@ -79,6 +79,7 @@ Shipped 2026-04-15 → 04-17. (All known items closed as of 2026-05-02 — see R
 - **Promote `/dev/gdpr` to user-facing self-service** — add "Export my data" and "Delete my account" buttons to `/member/profile`. The dev-only tool at `/dev/gdpr` is enough for now (manual lookup + export/delete on request).
 - **Mobile day-picker view for `/pro/availability` and `/pro/bookings` calendar** — both grids currently use horizontal scroll on phones (with scroll hints). A dedicated one-day-at-a-time mobile view would be nicer but isn't strictly required.
 - **Web-push notification retries** — currently fire-and-forget via `.catch(() => {})`. Transient 503s from APNs/FCM silently drop. Lower priority than the blob/email retries that already shipped.
+- **Rate-limit pre-auth token routes** — `/api/auth/claim-booking`, `/api/auth/verify-email`, `/api/auth/qr-login`, password-reset, public booking. First Azure-IP probe with a garbage token landed 2026-05-07 (SENTRY-ORANGE-ZEBRA-1V, since resolved). Routes are safe by design (redirect-on-failure, no DB writes) and v1.1.59 already silences the Sentry noise, so this is purely defence-in-depth. We already have `@upstash/ratelimit` in the project — easy to add a per-IP limit (e.g. 20 GETs/min) per route if probe volume picks up.
 - **Drop dead schema columns** `proProfiles.stripeConnectAccountId`, `stripeConnectOnboarded` — Connect is rejected, these never get populated. Migration is risk-free but no visible benefit pre-launch.
 - **Pro discovery / filtering on `/pros`** (Nadine task #24) — currently a flat list of every published pro. Acceptable while we launch with 2-3 pros, but won't scale past ~10. A proper implementation needs:
   - Lat/lng on `pro_locations` (schema migration)
@@ -88,6 +89,14 @@ Shipped 2026-04-15 → 04-17. (All known items closed as of 2026-05-02 — see R
 - Nadine's deferred sub-issues from task #6:
   - Embedded `/pros` browser in onboarding instead of flat list.
   - Re-enabling email field after registration (requires verify-new-email flow). **Note**: shipped as a typo-fix-only path in commit 66125d2 (task #23). A full email-change-after-verification flow is still post-launch.
+
+### Cloudflare adjacencies
+
+Vercel doesn't cover these, and they're a better fit than rolling our own:
+
+- **Video hosting → Cloudflare Stream** before pros start uploading lesson recordings / technique videos. Stream gives adaptive-bitrate HLS, transcoding, signed URLs, and per-view analytics for ~$5 per 1000 min stored + $1 per 1000 min delivered. Vercel Blob is a flat file store — no transcoding, the full source file is re-delivered on every play, no analytics. Cheaper to plan for Stream now than to migrate after the lesson-video feature ships. Supersedes the "Vercel Blob for now, revisit later" line in `docs/design.md`.
+- **Pro `@golflessons.be` addresses → Cloudflare Email Routing** (free) — see task #118. MX-level alias forwarding (`firstname@golflessons.be → pro's-personal-inbox`) plus Workspace "send-as" so replies look correct. No mailboxes to host, no IMAP, no per-seat cost. Migadu (~€19/yr unlimited) is the fallback if a pro ever needs a real mailbox.
+- **Replace reCAPTCHA v3 with Cloudflare Turnstile** on the public booking flow. Free, drop-in, same invisible UX, no Google dependency, better EU privacy posture. Small migration, low priority.
 
 ## Recently shipped (sweep — 2026-05-02, v1.1.0 + v1.1.1 — timezone correctness + version surface)
 

@@ -40,9 +40,12 @@ export default async function EditProBookingPage({ params }: Props) {
       startTime: lessonBookings.startTime,
       endTime: lessonBookings.endTime,
       participantCount: lessonBookings.participantCount,
+      proProfileId: lessonBookings.proProfileId,
+      proLocationId: lessonBookings.proLocationId,
       proDisplayName: proProfiles.displayName,
-      lessonDurations: proProfiles.lessonDurations,
-      maxGroupSize: proProfiles.maxGroupSize,
+      // Per-location since task 130 — see member-side edit page note.
+      lessonDurations: proLocations.lessonDurations,
+      maxGroupSize: proLocations.maxGroupSize,
       locationName: locations.name,
       locationCity: locations.city,
     })
@@ -100,6 +103,8 @@ export default async function EditProBookingPage({ params }: Props) {
             endTime: row.endTime,
             duration,
             participantCount: row.participantCount,
+            proProfileId: row.proProfileId,
+            proLocationId: row.proLocationId,
             proName: row.proDisplayName,
             locationLabel,
             participants,

@@ -7,6 +7,7 @@ import {
   proProfiles,
   proLocations,
   locations,
+  proStudents,
 } from "@/lib/db/schema";
 import { and, eq, asc } from "drizzle-orm";
 import { getSession, hasRole } from "@/lib/auth";
@@ -40,9 +41,15 @@ export default async function EditMemberBookingPage({ params }: Props) {
       startTime: lessonBookings.startTime,
       endTime: lessonBookings.endTime,
       participantCount: lessonBookings.participantCount,
+      proProfileId: lessonBookings.proProfileId,
+      proLocationId: lessonBookings.proLocationId,
       proDisplayName: proProfiles.displayName,
-      lessonDurations: proProfiles.lessonDurations,
-      maxGroupSize: proProfiles.maxGroupSize,
+      // Lesson durations + maxGroupSize live per-location since task 130
+      // — pro_profiles.* are stale; reading them here meant the edit
+      // form's duration dropdown only ever showed 60 min, so Nadine
+      // couldn't extend a booking from 60 → 90. (task 114 retest)
+      lessonDurations: proLocations.lessonDurations,
+      maxGroupSize: proLocations.maxGroupSize,
       locationName: locations.name,
       locationCity: locations.city,
     })
@@ -69,6 +76,26 @@ export default async function EditMemberBookingPage({ params }: Props) {
     .from(lessonParticipants)
     .where(eq(lessonParticipants.bookingId, bookingId))
     .orderBy(asc(lessonParticipants.id));
+
+  // Pull the proStudent relationship so the edit form can render
+  // the same "In a week / 2 weeks / month" interval pills as
+  // QuickBook on the member dashboard. Each pill toggles the
+  // relationship's preferredInterval for future suggestions —
+  // doesn't change THIS booking's date, but matches the UX the
+  // user expects from the booking flow.
+  const [rel] = await db
+    .select({
+      id: proStudents.id,
+      preferredInterval: proStudents.preferredInterval,
+    })
+    .from(proStudents)
+    .where(
+      and(
+        eq(proStudents.proProfileId, row.proProfileId),
+        eq(proStudents.userId, session.userId),
+      ),
+    )
+    .limit(1);
 
   const duration =
     (row.endTime.split(":").reduce((h, m) => Number(h) * 60 + Number(m), 0) -
@@ -100,6 +127,8 @@ export default async function EditMemberBookingPage({ params }: Props) {
             endTime: row.endTime,
             duration,
             participantCount: row.participantCount,
+            proProfileId: row.proProfileId,
+            proLocationId: row.proLocationId,
             proName: row.proDisplayName,
             locationLabel,
             participants,
@@ -109,6 +138,8 @@ export default async function EditMemberBookingPage({ params }: Props) {
           cancelHref="/member/bookings"
           durations={(row.lessonDurations as number[] | null) ?? [60]}
           maxGroupSize={row.maxGroupSize ?? 1}
+          proStudentId={rel?.id ?? null}
+          currentInterval={rel?.preferredInterval ?? null}
           locale={locale}
         />
       </div>

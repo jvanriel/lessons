@@ -7,14 +7,14 @@
  */
 
 /**
- * Pro self-service signup is open on preview/dev while we test with
- * a hand-picked set of pros on production. When this returns false,
- * `/pro/register` and `/pro/onboarding` are blocked for unauthenticated
- * users and the `/for-pros` CTAs open a waitlist dialog instead of
- * linking to the onboarding wizard.
+ * Pro self-service signup. Open everywhere as of 2026-05-19 — the
+ * closed-beta gate was lifted once the onboarding flow had been
+ * exercised end-to-end by hand-picked pros. Kept as a function (not
+ * an inline `true`) so we can flip it back to env-gated without
+ * touching every call site if signup ever needs throttling again.
  */
 export function isProSignupOpen(): boolean {
-  return process.env.VERCEL_ENV !== "production";
+  return true;
 }
 
 /** Inbox that receives pro-waitlist signups. */

@@ -57,9 +57,6 @@ export default async function BookingPage({
       displayName: proProfiles.displayName,
       photoUrl: proProfiles.photoUrl,
       specialties: proProfiles.specialties,
-      lessonDurations: proProfiles.lessonDurations,
-      lessonPricing: proProfiles.lessonPricing,
-      extraStudentPricing: proProfiles.extraStudentPricing,
       bookingEnabled: proProfiles.bookingEnabled,
       published: proProfiles.published,
       maxGroupSize: proProfiles.maxGroupSize,
@@ -120,7 +117,7 @@ export default async function BookingPage({
     }
   }
 
-  // Load pro locations
+  // Load pro locations with their per-location pricing (task 109).
   const proLocs = await db
     .select({
       id: proLocations.id,
@@ -128,6 +125,10 @@ export default async function BookingPage({
       city: locations.city,
       address: locations.address,
       lessonDuration: proLocations.lessonDuration,
+      lessonDurations: proLocations.lessonDurations,
+      lessonPricing: proLocations.lessonPricing,
+      extraStudentPricing: proLocations.extraStudentPricing,
+      maxGroupSize: proLocations.maxGroupSize,
     })
     .from(proLocations)
     .innerJoin(locations, eq(proLocations.locationId, locations.id))
@@ -148,15 +149,17 @@ export default async function BookingPage({
           displayName: pro.displayName,
           photoUrl: pro.photoUrl,
           specialties: pro.specialties,
-          lessonDurations: pro.lessonDurations as number[],
-          lessonPricing:
-            (pro.lessonPricing as Record<string, number> | null) ?? {},
-          extraStudentPricing:
-            (pro.extraStudentPricing as Record<string, number> | null) ?? null,
           maxGroupSize: pro.maxGroupSize,
           bookingHorizon: pro.bookingHorizon,
         }}
-        locations={proLocs}
+        locations={proLocs.map((l) => ({
+          ...l,
+          lessonDurations: (l.lessonDurations as number[] | null) ?? [],
+          lessonPricing:
+            (l.lessonPricing as Record<string, number> | null) ?? {},
+          extraStudentPricing:
+            (l.extraStudentPricing as Record<string, number> | null) ?? null,
+        }))}
         userDetails={userDetails}
         showAllSteps={full === "1"}
         allowBookingWithoutPayment={pro.allowBookingWithoutPayment}

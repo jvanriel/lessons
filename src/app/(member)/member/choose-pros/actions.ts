@@ -11,6 +11,7 @@ import {
 import { eq, and, isNull, inArray, gte } from "drizzle-orm";
 import { getSession, hasRole } from "@/lib/auth";
 import { redirect } from "next/navigation";
+import { revalidatePath } from "next/cache";
 import { cancelBooking } from "../bookings/actions";
 import { excludeDummiesOnProduction } from "@/lib/pro-visibility";
 
@@ -41,7 +42,7 @@ export async function getPublishedPros() {
   const prosWithLocations = await Promise.all(
     pros.map(async (pro) => {
       const locs = await db
-        .select({ city: locations.city })
+        .select({ name: locations.name, city: locations.city })
         .from(proLocations)
         .innerJoin(locations, eq(proLocations.locationId, locations.id))
         .where(
@@ -51,7 +52,8 @@ export async function getPublishedPros() {
           )
         );
       const cities = [...new Set(locs.map((l) => l.city).filter(Boolean))];
-      return { ...pro, cities };
+      const courses = [...new Set(locs.map((l) => l.name).filter(Boolean))];
+      return { ...pro, cities, courses };
     })
   );
 
@@ -226,5 +228,10 @@ export async function selectPros(
     };
   }
 
-  redirect("/member/dashboard");
+  // Auto-save callsite stays on /member/choose-pros; refresh other
+  // surfaces that reflect the relationship list (dashboard cards,
+  // student-side coaching list).
+  revalidatePath("/member/choose-pros");
+  revalidatePath("/member/dashboard");
+  revalidatePath("/member/coaching");
 }

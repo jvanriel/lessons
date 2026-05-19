@@ -11,8 +11,14 @@ import {
   getTrialEndingSubject,
   buildPaymentFailedEmail,
   getPaymentFailedSubject,
+  buildSubscriptionEndedEmail,
+  getSubscriptionEndedSubject,
 } from "@/lib/email-templates";
 import { resolveLocale } from "@/lib/i18n";
+import {
+  parseNoShowSettlement,
+  computeSettlementPlatformFee,
+} from "@/lib/no-show-settlement";
 
 // Stripe v22's Subscription type moved `current_period_end` / `trial_end`
 // onto items in newer API versions. Our account is still on the pre-move
@@ -148,6 +154,21 @@ async function recordEvent(event: Stripe.Event, bookingId?: number) {
 // ─── Event Handlers ─────────────────────────────────────
 
 async function handleCheckoutCompleted(session: Stripe.Checkout.Session) {
+  // Task 155 phase 2 — no-show settlement Checkout sessions arrive
+  // with mode='payment' and metadata.kind='no-show-settlement'. They
+  // settle a lesson the student didn't show up for. We flip the
+  // booking row to paid + recompute platformFeeCents with online=true
+  // (the platform is collecting via Stripe now, so the Stripe
+  // surcharge applies regardless of the original cash-only setting).
+  //
+  // The follow-up payment_intent.succeeded event later no-ops via
+  // the existing idempotency guard in handlePaymentIntentSucceeded.
+  const settlement = parseNoShowSettlement(session);
+  if (settlement) {
+    await handleNoShowSettlement(settlement);
+    return;
+  }
+
   if (session.mode !== "subscription") return;
 
   const profile = await findProfileByMetadata(
@@ -186,6 +207,58 @@ async function handleCheckoutCompleted(session: Stripe.Checkout.Session) {
   );
 }
 
+/**
+ * Task 155 phase 2 — finalize a no-show settlement once the student
+ * pays the Checkout link from the no-show email. Recomputes
+ * `platformFeeCents` with `online: true` (Stripe is collecting, so
+ * the surcharge applies) and flips the row to paid.
+ *
+ * Idempotent: re-firing on an already-paid row is a no-op.
+ */
+async function handleNoShowSettlement(settlement: {
+  bookingId: number;
+  paymentIntentId: string | null;
+}) {
+  const { bookingId, paymentIntentId } = settlement;
+
+  const [booking] = await db
+    .select({
+      id: lessonBookings.id,
+      paymentStatus: lessonBookings.paymentStatus,
+      priceCents: lessonBookings.priceCents,
+    })
+    .from(lessonBookings)
+    .where(eq(lessonBookings.id, bookingId))
+    .limit(1);
+  if (!booking) {
+    console.warn(
+      `no-show settlement webhook for unknown booking ${bookingId}`,
+    );
+    return;
+  }
+  if (booking.paymentStatus === "paid") {
+    console.log(`no-show settlement already paid for booking ${bookingId}`);
+    return;
+  }
+
+  const platformFeeCents = computeSettlementPlatformFee(booking.priceCents);
+
+  await db
+    .update(lessonBookings)
+    .set({
+      paymentStatus: "paid",
+      paidAt: new Date(),
+      platformFeeCents,
+      ...(paymentIntentId ? { stripePaymentIntentId: paymentIntentId } : {}),
+      updatedAt: new Date(),
+    })
+    .where(eq(lessonBookings.id, bookingId));
+
+  console.log(
+    `Booking ${bookingId} no-show settlement paid (PI ${paymentIntentId ?? "?"}), fee=${platformFeeCents}`,
+  );
+}
+
 async function handleSubscriptionUpdated(subscription: SubscriptionWithPeriod) {
   const profile = await findProfileBySubscription(subscription.id);
   if (!profile) return;
@@ -196,22 +269,33 @@ async function handleSubscriptionUpdated(subscription: SubscriptionWithPeriod) {
     status = "none";
   }
 
+  // task 127 — when the pro asks to cancel (cancel_at_period_end=true),
+  // hide them from /pros and block new bookings immediately even
+  // though the trial/period keeps running. Already-confirmed bookings
+  // stay intact: existing students keep their lessons, but no new
+  // bookings come in. We don't auto-republish on un-cancel — pro can
+  // re-toggle visibility from /pro/profile if they want.
+  const updates: Partial<typeof proProfiles.$inferInsert> = {
+    subscriptionStatus: status,
+    subscriptionCurrentPeriodEnd: new Date(
+      subscription.current_period_end * 1000
+    ),
+    subscriptionTrialEnd: subscription.trial_end
+      ? new Date(subscription.trial_end * 1000)
+      : null,
+    updatedAt: new Date(),
+  };
+  if (subscription.cancel_at_period_end && profile.published) {
+    updates.published = false;
+  }
+
   await db
     .update(proProfiles)
-    .set({
-      subscriptionStatus: status,
-      subscriptionCurrentPeriodEnd: new Date(
-        subscription.current_period_end * 1000
-      ),
-      subscriptionTrialEnd: subscription.trial_end
-        ? new Date(subscription.trial_end * 1000)
-        : null,
-      updatedAt: new Date(),
-    })
+    .set(updates)
     .where(eq(proProfiles.id, profile.id));
 
   console.log(
-    `Subscription updated for pro ${profile.id}: status=${status}`
+    `Subscription updated for pro ${profile.id}: status=${status} cancel_at_period_end=${subscription.cancel_at_period_end}`
   );
 }
 
@@ -219,15 +303,60 @@ async function handleSubscriptionDeleted(subscription: Stripe.Subscription) {
   const profile = await findProfileBySubscription(subscription.id);
   if (!profile) return;
 
+  // task 127 — Jan's call: don't cancel existing bookings. The pro
+  // can still log in to honor confirmed lessons (goodwill towards
+  // students who already booked). Just defensively unpublish so no
+  // new bookings come in, and send a "we miss you, come back" mail
+  // with a /pro/subscribe link.
   await db
     .update(proProfiles)
     .set({
       subscriptionStatus: "cancelled",
+      published: false,
       updatedAt: new Date(),
     })
     .where(eq(proProfiles.id, profile.id));
 
+  await sendComeBackEmail(profile.id);
+
   console.log(`Subscription cancelled for pro ${profile.id}`);
+}
+
+/**
+ * Send the "your subscription has ended, come back when you're ready"
+ * mail to a pro after `customer.subscription.deleted` fires. Fire-
+ * and-forget — webhook handlers shouldn't block on mail.
+ */
+async function sendComeBackEmail(proProfileId: number) {
+  const [row] = await db
+    .select({
+      email: users.email,
+      firstName: users.firstName,
+      preferredLocale: users.preferredLocale,
+    })
+    .from(proProfiles)
+    .innerJoin(users, eq(proProfiles.userId, users.id))
+    .where(eq(proProfiles.id, proProfileId))
+    .limit(1);
+  if (!row?.email) return;
+
+  const locale = resolveLocale(row.preferredLocale);
+  const baseUrl =
+    process.env.NEXT_PUBLIC_APP_URL ||
+    (process.env.VERCEL_URL
+      ? `https://${process.env.VERCEL_URL}`
+      : "http://localhost:3000");
+  const subscribeUrl = `${baseUrl}/pro/subscribe`;
+
+  sendEmail({
+    to: row.email,
+    subject: getSubscriptionEndedSubject(locale),
+    html: buildSubscriptionEndedEmail({
+      firstName: row.firstName,
+      locale,
+      subscribeUrl,
+    }),
+  }).catch(() => {});
 }
 
 async function handleTrialWillEnd(subscription: SubscriptionWithPeriod) {

@@ -41,6 +41,9 @@ export default async function ProStudentChatPage({
       studentFirstName: users.firstName,
       studentLastName: users.lastName,
       studentEmail: users.email,
+      // Golfer's last_seen_at — viewer here is the pro, so this
+      // is the *other* side for read-receipt purposes.
+      studentLastSeenAt: proStudents.studentLastSeenAt,
     })
     .from(proStudents)
     .innerJoin(users, eq(proStudents.userId, users.id))
@@ -100,6 +103,11 @@ export default async function ProStudentChatPage({
           partnerName={studentName}
           partnerRole="student"
           emptyText={t("coaching.empty", await getLocale())}
+          otherSideLastSeenAt={
+            record.studentLastSeenAt
+              ? record.studentLastSeenAt.toISOString()
+              : null
+          }
         />
       </div>
     </div>

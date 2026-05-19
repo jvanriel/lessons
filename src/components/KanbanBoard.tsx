@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useTransition, useEffect } from "react";
+import { useState, useTransition, useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
 import {
   createTask,
@@ -86,8 +86,8 @@ const COLOR_MAP: Record<string, string> = {
 type DetailTab = "task" | "comments" | "share";
 
 const TABS: { id: DetailTab; label: string }[] = [
-  { id: "task", label: "Task" },
   { id: "comments", label: "Comments" },
+  { id: "task", label: "Task" },
   { id: "share", label: "Share" },
 ];
 
@@ -521,12 +521,12 @@ function TaskDetailPanel({
   onDelete: (id: number) => void;
   onUpdate: (task: SerializedTask) => void;
 }) {
-  const [activeTab, setActiveTab] = useState<DetailTab>("task");
+  const [activeTab, setActiveTab] = useState<DetailTab>("comments");
   const [prevTaskId, setPrevTaskId] = useState(task.id);
 
   if (prevTaskId !== task.id) {
     setPrevTaskId(task.id);
-    setActiveTab("task");
+    setActiveTab("comments");
   }
 
   return (
@@ -604,9 +604,59 @@ function TaskDetailPanel({
                   body: formData,
                 });
                 if (!res.ok) {
-                  const err = await res.json().catch(() => ({ error: "Upload failed" }));
-                  console.error("Task upload error:", err.error);
-                  return null;
+                  const body = (await res
+                    .json()
+                    .catch(() => ({}))) as { error?: string };
+                  // Throw so Comments.tsx can show the message
+                  // (task 16 — Nadine flagged that silent failures
+                  // gave no feedback for too-large / wrong-type
+                  // uploads).
+                  throw new Error(body.error ?? "Upload failed");
+                }
+                return res.json();
+              }}
+              onCreateGoogleDoc={async (type, title) => {
+                const res = await fetch(
+                  "/api/admin/tasks/google-create",
+                  {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({
+                      taskId: task.id,
+                      type,
+                      title,
+                    }),
+                  },
+                );
+                if (!res.ok) {
+                  const body = (await res
+                    .json()
+                    .catch(() => ({}))) as { error?: string };
+                  throw new Error(
+                    body.error ?? "Failed to create Google file",
+                  );
+                }
+                return res.json();
+              }}
+              onAttachGoogleLink={async (url: string) => {
+                const res = await fetch(
+                  "/api/admin/tasks/google-attach",
+                  {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({
+                      taskId: task.id,
+                      url,
+                    }),
+                  },
+                );
+                if (!res.ok) {
+                  const body = (await res
+                    .json()
+                    .catch(() => ({}))) as { error?: string };
+                  throw new Error(
+                    body.error ?? "Failed to attach Google file",
+                  );
                 }
                 return res.json();
               }}
@@ -1064,8 +1114,31 @@ function TaskCreateModal({
   >([]);
   const [newCheckItem, setNewCheckItem] = useState("");
   const [firstComment, setFirstComment] = useState("");
+  // task 16 retest — attach a file (image / PDF / Office doc) at
+  // task-creation time. Pre-fix the paperclip only existed inside
+  // an opened task's Comments tab, forcing the create-then-open
+  // workflow Nadine kept hitting. The file is uploaded AFTER
+  // createTask returns the new task id, and posted as the task's
+  // first comment with the attachment so it shows up in the
+  // timeline immediately.
+  const [pendingFile, setPendingFile] = useState<File | null>(null);
+  const [fileError, setFileError] = useState<string | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
   const [isPending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
+
+  function handleFilePicked(f: File | null) {
+    setFileError(null);
+    if (!f) {
+      setPendingFile(null);
+      return;
+    }
+    if (f.size > 10 * 1024 * 1024) {
+      setFileError("File size exceeds 10MB limit.");
+      return;
+    }
+    setPendingFile(f);
+  }
 
   function handleCreate() {
     if (!title.trim()) {
@@ -1073,6 +1146,7 @@ function TaskCreateModal({
       return;
     }
     setError(null);
+    setFileError(null);
     startTransition(async () => {
       const fd = new FormData();
       fd.set("title", title.trim());
@@ -1085,9 +1159,124 @@ function TaskCreateModal({
       const result = await createTask(null, fd);
       if (result.error) {
         setError(result.error);
-      } else if (result.task) {
-        onCreated(result.task);
+        return;
       }
+      if (!result.task) return;
+
+      // Optional attachment — upload then post a comment with the
+      // attachment. Failure here doesn't roll the task back; we
+      // surface the error and still hand the new task to the parent
+      // so the user can retry from inside the task.
+      if (pendingFile) {
+        try {
+          // Google Drive for Desktop represents native Google files
+          // (Docs/Sheets/Slides) as tiny JSON shortcuts. Picking one
+          // from the file picker yields the stub, not the real file
+          // — route it through the Drive attach API so the cloud
+          // file is what gets linked (task 16 retest).
+          const lowerName = pendingFile.name.toLowerCase();
+          const isShortcut =
+            lowerName.endsWith(".gdoc") ||
+            lowerName.endsWith(".gsheet") ||
+            lowerName.endsWith(".gslides") ||
+            lowerName.endsWith(".gdraw") ||
+            lowerName.endsWith(".gform");
+          if (isShortcut) {
+            let driveUrl: string | null = null;
+            try {
+              const text = await pendingFile.text();
+              const parsed = JSON.parse(text) as { url?: string };
+              if (typeof parsed.url === "string") driveUrl = parsed.url;
+            } catch {
+              // Fall through to regular upload — the user will see
+              // the upload-side error if any.
+            }
+            if (driveUrl) {
+              const attachRes = await fetch(
+                "/api/admin/tasks/google-attach",
+                {
+                  method: "POST",
+                  headers: { "Content-Type": "application/json" },
+                  body: JSON.stringify({
+                    taskId: result.task.id,
+                    url: driveUrl,
+                  }),
+                },
+              );
+              if (!attachRes.ok) {
+                const body = (await attachRes.json().catch(() => ({}))) as {
+                  error?: string;
+                };
+                setError(
+                  body.error ?? "Drive attach failed — task was created.",
+                );
+                onCreated(result.task);
+                return;
+              }
+              const attachment = (await attachRes.json()) as {
+                name: string;
+                url: string;
+                size: number;
+                contentType: string;
+              };
+              await fetch("/api/comments", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                  contextType: "task",
+                  contextId: result.task.id,
+                  content: "",
+                  attachments: [attachment],
+                }),
+              });
+              onCreated(result.task);
+              return;
+            }
+          }
+
+          const uploadFd = new FormData();
+          uploadFd.set("file", pendingFile);
+          uploadFd.set("taskId", String(result.task.id));
+          const uploadRes = await fetch("/api/admin/tasks/upload", {
+            method: "POST",
+            body: uploadFd,
+          });
+          if (!uploadRes.ok) {
+            const body = (await uploadRes.json().catch(() => ({}))) as {
+              error?: string;
+            };
+            setError(body.error ?? "File upload failed — task was created.");
+            onCreated(result.task);
+            return;
+          }
+          const attachment = (await uploadRes.json()) as {
+            name: string;
+            url: string;
+            size: number;
+            contentType: string;
+          };
+          const caption = attachment.contentType.startsWith("image/")
+            ? "📷 Photo"
+            : attachment.contentType.startsWith("video/")
+              ? "🎬 Video"
+              : `📎 ${attachment.name}`;
+          await fetch("/api/comments", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              contextType: "task",
+              contextId: result.task.id,
+              content: caption,
+              attachments: [attachment],
+            }),
+          });
+        } catch {
+          setError("File upload failed — task was created.");
+          onCreated(result.task);
+          return;
+        }
+      }
+      onCreated(result.task);
     });
   }
 
@@ -1140,6 +1329,51 @@ function TaskCreateModal({
                 placeholder="Optional — will become the first entry in the task's comment thread."
                 className="w-full resize-none rounded-lg border border-green-200 bg-white px-3 py-2 text-sm text-green-900 focus:border-green-500 focus:outline-none focus:ring-1 focus:ring-green-500"
               />
+            </div>
+
+            <div>
+              <label className="mb-1 block text-sm font-medium text-green-900">
+                Attachment
+              </label>
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept="image/*,video/*,.pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.csv,.txt,.md,.gdoc,.gsheet,.gslides,.gdraw,.gform"
+                className="hidden"
+                onChange={(e) => {
+                  handleFilePicked(e.target.files?.[0] ?? null);
+                  e.target.value = "";
+                }}
+              />
+              {pendingFile ? (
+                <div className="flex items-center justify-between rounded-lg border border-green-200 bg-green-50/40 px-3 py-2 text-sm text-green-900">
+                  <span className="truncate">📎 {pendingFile.name}</span>
+                  <button
+                    type="button"
+                    onClick={() => setPendingFile(null)}
+                    className="ml-3 text-xs text-red-500 hover:text-red-700"
+                  >
+                    Remove
+                  </button>
+                </div>
+              ) : (
+                <button
+                  type="button"
+                  onClick={() => fileInputRef.current?.click()}
+                  className="inline-flex items-center gap-2 rounded-lg border border-green-200 bg-white px-3 py-2 text-sm font-medium text-green-800 hover:border-green-400 hover:bg-green-50"
+                >
+                  <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+                    <path strokeLinecap="round" strokeLinejoin="round" d="m18.375 12.739-7.693 7.693a4.5 4.5 0 0 1-6.364-6.364l10.94-10.94A3 3 0 1 1 19.5 7.372L8.552 18.32m.009-.01-.01.01m5.699-9.941-7.81 7.81a1.5 1.5 0 0 0 2.112 2.13" />
+                  </svg>
+                  Attach image or file
+                </button>
+              )}
+              {fileError && (
+                <p className="mt-2 text-xs text-red-600">{fileError}</p>
+              )}
+              <p className="mt-1 text-xs text-green-700/60">
+                Optional. Images, videos, PDFs and Office docs up to 10 MB.
+              </p>
             </div>
 
             <div>
