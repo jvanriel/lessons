@@ -65,6 +65,15 @@ interface Props {
    * expanded detail panel).
    */
   onClose?: () => void;
+  /**
+   * Optional "mark as no-show" handler (task 155). When provided
+   * AND the booking is confirmed, render an amber action button
+   * next to Cancel. Callers only pass this for PAST confirmed
+   * bookings — the action makes no sense for future lessons.
+   */
+  onMarkNoShow?: () => void;
+  /** True while the no-show server action is in flight. */
+  noShowPending?: boolean;
 }
 
 export default function BookingCard({
@@ -74,6 +83,8 @@ export default function BookingCard({
   onCancel,
   showDate,
   onClose,
+  onMarkNoShow,
+  noShowPending,
 }: Props) {
   const paymentBadge = getPaymentBadge(b.paymentStatus);
   const paymentLabel = paymentBadge ? t(paymentBadge.labelKey, locale) : null;
@@ -240,6 +251,29 @@ export default function BookingCard({
                   </svg>
                   {t("proStudentBookings.cancel", locale)}
                 </button>
+                {onMarkNoShow && (
+                  <button
+                    type="button"
+                    onClick={onMarkNoShow}
+                    disabled={noShowPending}
+                    className="inline-flex items-center gap-1 rounded-md border border-amber-200 px-3 py-1.5 text-xs font-medium text-amber-700 transition-colors hover:bg-amber-50 disabled:opacity-50"
+                  >
+                    <svg
+                      className="h-3.5 w-3.5"
+                      fill="none"
+                      viewBox="0 0 24 24"
+                      stroke="currentColor"
+                      strokeWidth={2}
+                    >
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        d="M12 9v3.75m9-.75a9 9 0 11-18 0 9 9 0 0118 0zm-9 3.75h.008v.008H12v-.008z"
+                      />
+                    </svg>
+                    {t("proStudentBookings.markNoShow", locale)}
+                  </button>
+                )}
               </>
             )}
           </div>

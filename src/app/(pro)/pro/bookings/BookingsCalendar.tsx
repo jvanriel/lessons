@@ -14,8 +14,9 @@ import {
 import type { Locale } from "@/lib/i18n";
 import { t } from "@/lib/i18n/translations";
 import { getPaymentBadge } from "@/lib/payment-status";
-import { proCancelBooking } from "../students/actions";
+import { proCancelBooking, proMarkNoShow } from "../students/actions";
 import { CancelBookingDialog } from "../_components/CancelBookingDialog";
+import { MarkNoShowDialog } from "../_components/MarkNoShowDialog";
 import BookingCard from "./BookingCard";
 import { LOCATION_COLORS, buildLocationColorMap } from "@/lib/location-colors";
 
@@ -165,6 +166,8 @@ export function BookingsCalendar({
   const [expandedBookingId, setExpandedBookingId] = useState<number | null>(null);
   const [cancelTargetId, setCancelTargetId] = useState<number | null>(null);
   const [cancelPending, startCancelTransition] = useTransition();
+  const [noShowTargetId, setNoShowTargetId] = useState<number | null>(null);
+  const [noShowPending, startNoShowTransition] = useTransition();
 
   // Build location → colour-index map identical to AvailabilityEditor's
   // (same shared helper, same `sortOrder`-ordered list). The booking
@@ -485,6 +488,16 @@ export function BookingsCalendar({
                 locale={locale}
                 cancelPending={cancelPending}
                 onCancel={() => setCancelTargetId(booking.id)}
+                noShowPending={noShowPending}
+                onMarkNoShow={
+                  // Task 155: only past confirmed bookings can be
+                  // marked no-show. The dialog itself + the server
+                  // action both re-validate, but hiding the button
+                  // upfront avoids dead clicks.
+                  booking.date < today && booking.status === "confirmed"
+                    ? () => setNoShowTargetId(booking.id)
+                    : undefined
+                }
                 showDate
                 onClose={() => setExpandedBookingId(null)}
               />
@@ -517,6 +530,53 @@ export function BookingsCalendar({
             }}
             onClose={() => setCancelTargetId(null)}
             pending={cancelPending}
+            formatDate={(d) =>
+              formatDateLocale(d, locale, {
+                weekday: "short",
+                month: "short",
+                day: "numeric",
+              })
+            }
+            locale={locale}
+          />
+        );
+      })()}
+
+      {noShowTargetId !== null && (() => {
+        const target = bookings.find((b) => b.id === noShowTargetId);
+        if (!target) return null;
+        return (
+          <MarkNoShowDialog
+            date={target.date}
+            startTime={target.startTime}
+            endTime={target.endTime}
+            studentName={
+              `${target.studentFirstName ?? ""} ${target.studentLastName ?? ""}`.trim() ||
+              undefined
+            }
+            onConfirm={() => {
+              const id = target.id;
+              startNoShowTransition(async () => {
+                const result = await proMarkNoShow(id);
+                if ("error" in result) {
+                  alert(result.error);
+                } else {
+                  if (result.settlementUrl) {
+                    alert(
+                      t(
+                        "proStudentBookings.noShowDialog.linkSent",
+                        locale,
+                      ),
+                    );
+                  }
+                  router.refresh();
+                  if (expandedBookingId === id) setExpandedBookingId(null);
+                }
+                setNoShowTargetId(null);
+              });
+            }}
+            onClose={() => setNoShowTargetId(null)}
+            pending={noShowPending}
             formatDate={(d) =>
               formatDateLocale(d, locale, {
                 weekday: "short",
