@@ -11,6 +11,8 @@ import {
   getTrialEndingSubject,
   buildPaymentFailedEmail,
   getPaymentFailedSubject,
+  buildSubscriptionEndedEmail,
+  getSubscriptionEndedSubject,
 } from "@/lib/email-templates";
 import { resolveLocale } from "@/lib/i18n";
 
@@ -196,22 +198,33 @@ async function handleSubscriptionUpdated(subscription: SubscriptionWithPeriod) {
     status = "none";
   }
 
+  // task 127 — when the pro asks to cancel (cancel_at_period_end=true),
+  // hide them from /pros and block new bookings immediately even
+  // though the trial/period keeps running. Already-confirmed bookings
+  // stay intact: existing students keep their lessons, but no new
+  // bookings come in. We don't auto-republish on un-cancel — pro can
+  // re-toggle visibility from /pro/profile if they want.
+  const updates: Partial<typeof proProfiles.$inferInsert> = {
+    subscriptionStatus: status,
+    subscriptionCurrentPeriodEnd: new Date(
+      subscription.current_period_end * 1000
+    ),
+    subscriptionTrialEnd: subscription.trial_end
+      ? new Date(subscription.trial_end * 1000)
+      : null,
+    updatedAt: new Date(),
+  };
+  if (subscription.cancel_at_period_end && profile.published) {
+    updates.published = false;
+  }
+
   await db
     .update(proProfiles)
-    .set({
-      subscriptionStatus: status,
-      subscriptionCurrentPeriodEnd: new Date(
-        subscription.current_period_end * 1000
-      ),
-      subscriptionTrialEnd: subscription.trial_end
-        ? new Date(subscription.trial_end * 1000)
-        : null,
-      updatedAt: new Date(),
-    })
+    .set(updates)
     .where(eq(proProfiles.id, profile.id));
 
   console.log(
-    `Subscription updated for pro ${profile.id}: status=${status}`
+    `Subscription updated for pro ${profile.id}: status=${status} cancel_at_period_end=${subscription.cancel_at_period_end}`
   );
 }
 
@@ -219,15 +232,60 @@ async function handleSubscriptionDeleted(subscription: Stripe.Subscription) {
   const profile = await findProfileBySubscription(subscription.id);
   if (!profile) return;
 
+  // task 127 — Jan's call: don't cancel existing bookings. The pro
+  // can still log in to honor confirmed lessons (goodwill towards
+  // students who already booked). Just defensively unpublish so no
+  // new bookings come in, and send a "we miss you, come back" mail
+  // with a /pro/subscribe link.
   await db
     .update(proProfiles)
     .set({
       subscriptionStatus: "cancelled",
+      published: false,
       updatedAt: new Date(),
     })
     .where(eq(proProfiles.id, profile.id));
 
+  await sendComeBackEmail(profile.id);
+
   console.log(`Subscription cancelled for pro ${profile.id}`);
+}
+
+/**
+ * Send the "your subscription has ended, come back when you're ready"
+ * mail to a pro after `customer.subscription.deleted` fires. Fire-
+ * and-forget — webhook handlers shouldn't block on mail.
+ */
+async function sendComeBackEmail(proProfileId: number) {
+  const [row] = await db
+    .select({
+      email: users.email,
+      firstName: users.firstName,
+      preferredLocale: users.preferredLocale,
+    })
+    .from(proProfiles)
+    .innerJoin(users, eq(proProfiles.userId, users.id))
+    .where(eq(proProfiles.id, proProfileId))
+    .limit(1);
+  if (!row?.email) return;
+
+  const locale = resolveLocale(row.preferredLocale);
+  const baseUrl =
+    process.env.NEXT_PUBLIC_APP_URL ||
+    (process.env.VERCEL_URL
+      ? `https://${process.env.VERCEL_URL}`
+      : "http://localhost:3000");
+  const subscribeUrl = `${baseUrl}/pro/subscribe`;
+
+  sendEmail({
+    to: row.email,
+    subject: getSubscriptionEndedSubject(locale),
+    html: buildSubscriptionEndedEmail({
+      firstName: row.firstName,
+      locale,
+      subscribeUrl,
+    }),
+  }).catch(() => {});
 }
 
 async function handleTrialWillEnd(subscription: SubscriptionWithPeriod) {

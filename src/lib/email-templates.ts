@@ -732,6 +732,80 @@ export function getPaymentFailedSubject(locale: Locale): string {
   return (PAYMENT_FAILED_STRINGS[locale] ?? PAYMENT_FAILED_STRINGS.en).subject;
 }
 
+// ─── Subscription ended / "come back" email ────────────────────────
+//
+// Fired from the Stripe webhook on `customer.subscription.deleted`
+// (task 127). Warm, low-pressure tone — Jan's call was "just unpublish
+// and invite the pro to subscribe, creates some goodwill". Existing
+// confirmed bookings stay intact; we mention that explicitly so the
+// pro knows they can still log in to honor those lessons.
+
+const SUBSCRIPTION_ENDED_STRINGS: Record<
+  Locale,
+  {
+    subject: string;
+    greeting: string;
+    body: string;
+    bookings: string;
+    cta: string;
+    help: string;
+  }
+> = {
+  en: {
+    subject: "Your Golf Lessons subscription has ended",
+    greeting: "Hi",
+    body: "Your Golf Lessons subscription has ended and your pro profile is no longer visible to new students. We hope you'll come back when the time is right — your account stays as it is, no data is removed.",
+    bookings: "Any lessons your students have already booked are still confirmed. You can log in any time to message them or honor those sessions.",
+    cta: "Re-activate my subscription",
+    help: "Questions or thoughts? Just reply to this email — we'd love to hear from you.",
+  },
+  nl: {
+    subject: "Je Golf Lessons abonnement is gestopt",
+    greeting: "Hallo",
+    body: "Je Golf Lessons abonnement is gestopt en je pro-profiel is niet meer zichtbaar voor nieuwe golfers. We hopen dat je terugkomt wanneer het je past — je account blijft staan zoals het is, er wordt niks verwijderd.",
+    bookings: "Lessen die je golfers al geboekt hebben blijven bevestigd. Je kunt altijd inloggen om met hen te chatten of die lessen alsnog te geven.",
+    cta: "Mijn abonnement heractiveren",
+    help: "Vragen of opmerkingen? Antwoord gewoon op deze e-mail — we horen graag van je.",
+  },
+  fr: {
+    subject: "Votre abonnement Golf Lessons a pris fin",
+    greeting: "Bonjour",
+    body: "Votre abonnement Golf Lessons a pris fin et votre profil pro n'est plus visible pour les nouveaux golfeurs. Nous espérons que vous reviendrez quand le moment sera venu — votre compte reste tel quel, rien n'est supprimé.",
+    bookings: "Les cours que vos golfeurs ont déjà réservés restent confirmés. Vous pouvez vous connecter à tout moment pour échanger avec eux ou assurer ces séances.",
+    cta: "Réactiver mon abonnement",
+    help: "Questions ou remarques ? Répondez simplement à cet e-mail — nous serions ravis de vous lire.",
+  },
+};
+
+export function buildSubscriptionEndedEmail(opts: {
+  firstName: string;
+  locale: Locale;
+  subscribeUrl: string;
+}): string {
+  const s =
+    SUBSCRIPTION_ENDED_STRINGS[opts.locale] ?? SUBSCRIPTION_ENDED_STRINGS.en;
+  const body = `
+    <h2 style="font-family:Georgia,'Times New Roman',serif;font-size:22px;color:${COLORS.green950};margin:0 0 16px 0;font-weight:normal;">
+      ${formatGreeting(s.greeting, opts.firstName, opts.locale)}
+    </h2>
+    <p style="margin:0 0 16px 0;">${s.body}</p>
+    <p style="margin:0 0 24px 0;color:#555;font-size:14px;">${s.bookings}</p>
+    <p style="margin:0 0 24px 0;">
+      <a href="${opts.subscribeUrl}" style="display:inline-block;background:${COLORS.gold600};color:${COLORS.white};padding:12px 28px;border-radius:6px;text-decoration:none;font-weight:700;font-size:14px;">
+        ${s.cta}
+      </a>
+    </p>
+    <p style="color:#666;font-size:13px;margin:0;">${s.help}</p>
+  `;
+  return emailLayout(body, undefined, opts.locale);
+}
+
+export function getSubscriptionEndedSubject(locale: Locale): string {
+  return (
+    SUBSCRIPTION_ENDED_STRINGS[locale] ?? SUBSCRIPTION_ENDED_STRINGS.en
+  ).subject;
+}
+
 // ─── Booking confirmation emails ───────────────────────────────────
 
 const BOOKING_STUDENT_STRINGS: Record<Locale, {

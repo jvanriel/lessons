@@ -17,6 +17,19 @@ If any role inside the brackets is unknown (typo), the parser falls
 back to treating the brackets as literal text — better to over-show
 than silently hide.
 
+## 2026-05-19 — v1.1.97
+
+- **[pro] Cancelling your subscription now hides your profile right
+  away.** Previously, a pro who cancelled mid-trial stayed visible
+  on the public Pros list and could keep taking new bookings until
+  the trial actually expired. Now the moment the cancellation
+  reaches Stripe your profile flips to unpublished — no new bookings
+  come in, but every lesson your students already booked stays
+  confirmed so you can still teach them out. When the period
+  finishes you get a warm "your subscription has ended, come back
+  when you're ready" email with a link to re-subscribe. Your
+  account, students and chat history all stay intact.
+
 ## 2026-05-19 — v1.1.96
 
 - **[pro] Location addresses now get real coordinates again.** The
