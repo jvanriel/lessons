@@ -279,6 +279,11 @@ export async function saveWeekOverrides(data: {
     endTime?: string;
     reason?: string;
   }>;
+  // Optional reason the pro typed in the "Cancel these bookings?" dialog
+  // — applied to every booking the block sweep cancels in this save
+  // (task 154). Falls back to any per-block `reason` set via the
+  // double-click popover, then to a generic default.
+  cancellationReason?: string;
 }): Promise<{ error?: string; cancelledBookingIds?: number[] }> {
   const { profile } = await requireProWithProfile();
 
@@ -346,30 +351,49 @@ export async function saveWeekOverrides(data: {
         ),
       );
 
-    const partialByDate = new Map<string, Array<{ s: string; e: string }>>();
+    const partialByDate = new Map<
+      string,
+      Array<{ s: string; e: string; reason?: string }>
+    >();
     for (const o of partialBlocks) {
       const arr = partialByDate.get(o.date) ?? [];
-      arr.push({ s: o.startTime!, e: o.endTime! });
+      arr.push({ s: o.startTime!, e: o.endTime!, reason: o.reason });
       partialByDate.set(o.date, arr);
     }
+    const fullDayReasonByDate = new Map<string, string | undefined>();
+    for (const o of data.overrides) {
+      if (o.type === "blocked" && !o.startTime && !o.endTime) {
+        fullDayReasonByDate.set(o.date, o.reason);
+      }
+    }
+    const dialogReason = data.cancellationReason?.trim();
 
     for (const b of candidates) {
       const fullDay = blockedDates.has(b.date);
       let overlaps = fullDay;
+      let overlappingBlockReason: string | undefined =
+        fullDay ? fullDayReasonByDate.get(b.date) : undefined;
       if (!overlaps) {
         const ranges = partialByDate.get(b.date) ?? [];
         for (const r of ranges) {
           if (r.s < b.endTime && r.e > b.startTime) {
             overlaps = true;
+            overlappingBlockReason = r.reason;
             break;
           }
         }
       }
       if (!overlaps) continue;
+      // Reason priority: explicit dialog input > per-block reason set via
+      // the double-click popover > generic fallback (task 154).
+      const reason =
+        dialogReason ||
+        overlappingBlockReason?.trim() ||
+        "Cancelled — pro blocked this time slot";
       const result = await cancelBookingByPro({
         bookingId: b.id,
         proProfileId: profile.id,
-        reason: "Cancelled — pro blocked this time slot",
+        reason,
       });
       if ("success" in result) cancelledBookingIds.push(b.id);
     }

@@ -164,6 +164,15 @@ export async function cancelBookingByPro(opts: {
     method: "CANCEL" as const,
   };
 
+  // The pro-typed cancellation reason — when the caller passed something
+  // beyond the generic defaults, surface it as a "Reason: X" row on both
+  // emails so the student sees why the pro cancelled (task 154).
+  const trimmedReason = opts.reason?.trim();
+  const hasUserReason =
+    !!trimmedReason &&
+    trimmedReason !== "Cancelled by pro" &&
+    trimmedReason !== "Cancelled — pro blocked this time slot";
+
   if (student?.email) {
     const ss = CANCEL_STRINGS[studentLocale] ?? CANCEL_STRINGS.en;
     sendEmail({
@@ -177,6 +186,7 @@ export async function cancelBookingByPro(opts: {
           [ss.date, formatCancelLessonDate(booking.date, studentLocale)],
           [ss.time, `${booking.startTime} – ${booking.endTime}`],
           [ss.location, locationName],
+          ...(hasUserReason ? [[ss.reason, trimmedReason!] as [string, string]] : []),
         ],
         helper: ss.helper,
         locale: studentLocale,
@@ -198,6 +208,7 @@ export async function cancelBookingByPro(opts: {
           [ps.date, formatCancelLessonDate(booking.date, proLocale)],
           [ps.time, `${booking.startTime} – ${booking.endTime}`],
           [ps.location, locationName],
+          ...(hasUserReason ? [[ps.reason, trimmedReason!] as [string, string]] : []),
         ],
         helper: ps.helper,
         locale: proLocale,

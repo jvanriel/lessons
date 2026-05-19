@@ -17,6 +17,14 @@ If any role inside the brackets is unknown (typo), the parser falls
 back to treating the brackets as literal text — better to over-show
 than silently hide.
 
+## 2026-05-19 — v1.1.93
+
+- **[pro] Pros can give a reason when a block cancels existing
+  bookings.** The "Cancel these bookings?" dialog now has a Reason
+  field. Whatever the pro types lands in the cancellation email each
+  affected student receives, so they understand why the lesson was
+  cancelled (illness, terrain closed, ...).
+
 ## 2026-05-19 — v1.1.92
 
 - **Invited golfers flip to "Actief" the moment they claim their

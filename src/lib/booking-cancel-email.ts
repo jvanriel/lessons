@@ -19,6 +19,7 @@ export const CANCEL_STRINGS: Record<
     date: string;
     time: string;
     location: string;
+    reason: string;
     helper: string;
   }
 > = {
@@ -38,6 +39,7 @@ export const CANCEL_STRINGS: Record<
     date: "Date",
     time: "Time",
     location: "Location",
+    reason: "Reason",
     helper:
       "An updated calendar invite is attached so the event is removed from your calendar.",
   },
@@ -59,6 +61,7 @@ export const CANCEL_STRINGS: Record<
     date: "Datum",
     time: "Tijd",
     location: "Locatie",
+    reason: "Reden",
     helper:
       "Een bijgewerkte agenda-uitnodiging zit in bijlage zodat het evenement uit je agenda verdwijnt.",
   },
@@ -80,6 +83,7 @@ export const CANCEL_STRINGS: Record<
     date: "Date",
     time: "Heure",
     location: "Lieu",
+    reason: "Raison",
     helper:
       "Une invitation calendrier mise à jour est jointe pour retirer l'événement de votre agenda.",
   },

@@ -1800,6 +1800,9 @@ function PreviewBlockingGrid({
   const [pendingConflicts, setPendingConflicts] = useState<
     SerializedBooking[] | null
   >(null);
+  // Reason the pro types in the conflict dialog — flows to every
+  // cancellation email sent in this save (task 154).
+  const [cancellationReason, setCancellationReason] = useState("");
 
   // Booking dialog: tap any booking cell to open the shared
   // BookingCard (same surface as /pro/bookings). Cancel uses the same
@@ -2227,23 +2230,30 @@ function PreviewBlockingGrid({
     return [...seen.values()];
   }, [days, blockedCells, fullDayBlocked, bookingMap]);
 
-  const flushSave = useCallback(async () => {
-    setSaveStatus("saving");
-    setDirty(false);
-    const { datesToReplace, records } = buildOverrideRecords();
-    const result = await saveWeekOverrides({ datesToReplace, overrides: records });
-    if (!result.error) {
-      setSaveStatus("saved");
-      if (result.cancelledBookingIds && result.cancelledBookingIds.length > 0) {
-        // Cancelled bookings need to disappear from bookingMap — refresh
-        // the page so the server-rendered bookings prop is current.
-        router.refresh();
+  const flushSave = useCallback(
+    async (reason?: string) => {
+      setSaveStatus("saving");
+      setDirty(false);
+      const { datesToReplace, records } = buildOverrideRecords();
+      const result = await saveWeekOverrides({
+        datesToReplace,
+        overrides: records,
+        cancellationReason: reason,
+      });
+      if (!result.error) {
+        setSaveStatus("saved");
+        if (result.cancelledBookingIds && result.cancelledBookingIds.length > 0) {
+          // Cancelled bookings need to disappear from bookingMap — refresh
+          // the page so the server-rendered bookings prop is current.
+          router.refresh();
+        }
+        setTimeout(() => setSaveStatus((s) => (s === "saved" ? "idle" : s)), 2000);
+      } else {
+        setSaveStatus("idle");
       }
-      setTimeout(() => setSaveStatus((s) => (s === "saved" ? "idle" : s)), 2000);
-    } else {
-      setSaveStatus("idle");
-    }
-  }, [buildOverrideRecords, router]);
+    },
+    [buildOverrideRecords, router],
+  );
 
   // ─── Auto-save overrides after 2s of inactivity ──
   useEffect(() => {
@@ -2262,11 +2272,14 @@ function PreviewBlockingGrid({
   }, [dirty, pendingConflicts, findConflictingBookings, flushSave]);
 
   function confirmCancelOverlappingBookings() {
+    const reason = cancellationReason.trim();
     setPendingConflicts(null);
-    flushSave();
+    setCancellationReason("");
+    flushSave(reason || undefined);
   }
 
   function undoBlocksOverBookings() {
+    setCancellationReason("");
     // Drop just the blocks that overlap a booking, leaving any
     // non-conflicting block painting from the same edit intact.
     setBlockedCells((prev) => {
@@ -2857,6 +2870,16 @@ function PreviewBlockingGrid({
                 </li>
               ))}
             </ul>
+            <label className="mt-4 block text-xs font-medium text-green-700">
+              {t("proAvail.blockCancels.reasonLabel", locale)}
+              <textarea
+                value={cancellationReason}
+                onChange={(e) => setCancellationReason(e.target.value)}
+                placeholder={t("proAvail.blockCancels.reasonPlaceholder", locale)}
+                rows={2}
+                className="mt-1 block w-full rounded-md border border-green-200 bg-white px-3 py-2 text-sm text-green-900 focus:border-green-400 focus:outline-none focus:ring-1 focus:ring-green-400"
+              />
+            </label>
             <div className="mt-5 flex gap-3">
               <button
                 type="button"
