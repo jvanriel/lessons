@@ -17,6 +17,17 @@ If any role inside the brackets is unknown (typo), the parser falls
 back to treating the brackets as literal text — better to over-show
 than silently hide.
 
+## 2026-05-19 — v1.1.102
+
+- **You stay logged in for as long as you keep using the app.**
+  The login session was a fixed 7-day cookie — after that you got
+  bounced back to the login screen even if you'd been booking
+  lessons all week. The middleware now extends the session
+  whenever you visit any logged-in page and your token is more
+  than a day old: a fresh 7-day window starts. If you genuinely
+  stop using the app for 7 days the session still expires, like
+  before.
+
 ## 2026-05-19 — v1.1.101
 
 - **[admin,dev] Picking a Google Doc/Sheet/Slides from the file
