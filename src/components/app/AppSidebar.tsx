@@ -375,7 +375,7 @@ export default function AppSidebar({
   // role — there's nothing to badge for admin/dev-only users.
   const showCoachingBadge =
     roles.includes("member") || roles.includes("pro");
-  const coachingUnread = useCoachingUnread(showCoachingBadge);
+  const coachingUnread = useCoachingUnread(showCoachingBadge).total;
 
   const visibleSections = sections.filter((s) => {
     // `role` is optional: a section without one (e.g. utility entries

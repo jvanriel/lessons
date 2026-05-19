@@ -144,7 +144,7 @@ export default function BottomNav({ roles, locale }: BottomNavProps) {
   // Coaching-chat unread badge (task 122, refresh tightened in task 144).
   const showCoachingBadge =
     roles.includes("member") || roles.includes("pro");
-  const coachingUnread = useCoachingUnread(showCoachingBadge);
+  const coachingUnread = useCoachingUnread(showCoachingBadge).total;
 
   const isPro = roles.includes("pro");
   const isAdmin = roles.includes("admin");

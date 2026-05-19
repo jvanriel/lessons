@@ -22,24 +22,44 @@ import { usePathname } from "next/navigation";
 
 export const COACHING_UNREAD_EVENT = "coaching:unread-changed";
 
+export interface CoachingUnreadState {
+  total: number;
+  /** keyed by stringified pro_students.id — the shape the API returns */
+  byProStudentId: Record<string, number>;
+}
+
+const EMPTY_STATE: CoachingUnreadState = { total: 0, byProStudentId: {} };
+
 /**
- * Returns the total unread coaching-chat count for the current
- * session. Returns 0 (without polling) when `enabled` is false —
+ * Returns the unread coaching-chat counts for the current session —
+ * both the total (used by the bottom-nav badge) and a per-conversation
+ * map (used by /member/coaching list cards + dashboard chat buttons).
+ *
+ * Returns the empty state (without polling) when `enabled` is false —
  * use that to skip the network for admin/dev-only users.
+ *
+ * Task 144 follow-up: Nadine reported missing badges on the golfer
+ * side. Conversations are now polled client-side so the per-card
+ * badges stay fresh without a full navigation.
  */
-export function useCoachingUnread(enabled: boolean): number {
+export function useCoachingUnread(enabled: boolean): CoachingUnreadState {
   const pathname = usePathname();
-  const [unread, setUnread] = useState(0);
+  const [state, setState] = useState<CoachingUnreadState>(EMPTY_STATE);
 
   useEffect(() => {
     if (!enabled) return;
     let cancelled = false;
     async function fetchCount() {
       try {
-        const res = await fetch("/api/coaching/unread");
+        const res = await fetch("/api/coaching/unread", { cache: "no-store" });
         if (!res.ok) return;
-        const data = (await res.json()) as { total?: number };
-        if (!cancelled) setUnread(data.total ?? 0);
+        const data = (await res.json()) as Partial<CoachingUnreadState>;
+        if (!cancelled) {
+          setState({
+            total: data.total ?? 0,
+            byProStudentId: data.byProStudentId ?? {},
+          });
+        }
       } catch {
         // Keep last value on transient failure.
       }
@@ -72,10 +92,15 @@ export function useCoachingUnread(enabled: boolean): number {
     let cancelled = false;
     (async () => {
       try {
-        const res = await fetch("/api/coaching/unread");
+        const res = await fetch("/api/coaching/unread", { cache: "no-store" });
         if (!res.ok) return;
-        const data = (await res.json()) as { total?: number };
-        if (!cancelled) setUnread(data.total ?? 0);
+        const data = (await res.json()) as Partial<CoachingUnreadState>;
+        if (!cancelled) {
+          setState({
+            total: data.total ?? 0,
+            byProStudentId: data.byProStudentId ?? {},
+          });
+        }
       } catch {
         // ignore
       }
@@ -85,7 +110,21 @@ export function useCoachingUnread(enabled: boolean): number {
     };
   }, [pathname, enabled]);
 
-  return unread;
+  return state;
+}
+
+/**
+ * Convenience accessor for callers that only care about a single
+ * conversation's badge (per-card on /member/coaching, dashboard's
+ * chat button). Returns 0 when disabled or when the row isn't in
+ * the map.
+ */
+export function useCoachingUnreadForProStudent(
+  enabled: boolean,
+  proStudentId: number,
+): number {
+  const state = useCoachingUnread(enabled);
+  return state.byProStudentId[String(proStudentId)] ?? 0;
 }
 
 /**

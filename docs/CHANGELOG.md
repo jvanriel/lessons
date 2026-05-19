@@ -17,6 +17,18 @@ If any role inside the brackets is unknown (typo), the parser falls
 back to treating the brackets as literal text — better to over-show
 than silently hide.
 
+## 2026-05-19 — v1.1.95
+
+- **Chat unread badges work again.** A subtle SQL bug in the
+  per-conversation unread query was making the red dot next to
+  "Chat", "Golfspelers" and the individual pro/golfer cards
+  silently return 0 — every coaching conversation looked read
+  even when the other side had just typed a fresh message. The
+  query now uses an explicit table alias so Postgres correlates
+  the subquery to the right row. Per-card badges on the golfer's
+  dashboard and on /coaching also refresh live (10s + on focus +
+  on send/receive) instead of only at page load (task 144 round 2).
+
 ## 2026-05-19 — v1.1.94
 
 - **Marketing copy now uses "golfers" everywhere.** The home hero

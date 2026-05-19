@@ -7,8 +7,13 @@ import { getSession, hasRole } from "@/lib/auth";
 import { getLocale } from "@/lib/locale";
 import { t } from "@/lib/i18n/translations";
 import { getCoachingUnreadCountsForStudent } from "@/lib/coaching-unread";
+import CoachingProList from "./CoachingProList";
 
 export const metadata = { title: "Coaching — Golf Lessons" };
+
+// Page reads session cookies, so it's dynamic — but be explicit so a
+// future build-time prerender attempt doesn't ship a stale shell.
+export const dynamic = "force-dynamic";
 
 export default async function MemberCoachingListPage() {
   const session = await getSession();
@@ -37,6 +42,11 @@ export default async function MemberCoachingListPage() {
     getCoachingUnreadCountsForStudent(session.userId),
   ]);
 
+  const initialUnread: Record<string, number> = {};
+  for (const [k, v] of unread.byProStudentId.entries()) {
+    initialUnread[String(k)] = v;
+  }
+
   return (
     <div className="mx-auto max-w-2xl px-4 py-6">
       <h1 className="font-display text-2xl font-bold text-green-900">
@@ -59,60 +69,7 @@ export default async function MemberCoachingListPage() {
           </Link>
         </div>
       ) : (
-        <ul className="mt-6 space-y-3">
-          {myPros.map((pro) => {
-            const unreadCount = unread.byProStudentId.get(pro.proStudentId) ?? 0;
-            return (
-            <li key={pro.proStudentId}>
-              <Link
-                href={`/member/coaching/${pro.proStudentId}`}
-                className="flex items-center gap-3 rounded-xl border border-green-200 bg-white p-4 transition-colors hover:border-green-300"
-              >
-                {pro.proPhotoUrl ? (
-                  // eslint-disable-next-line @next/next/no-img-element
-                  <img
-                    src={pro.proPhotoUrl}
-                    alt={pro.proDisplayName}
-                    className="h-12 w-12 rounded-full object-cover"
-                  />
-                ) : (
-                  <div className="flex h-12 w-12 items-center justify-center rounded-full bg-green-100 text-base font-medium text-green-600">
-                    {pro.proDisplayName.charAt(0)}
-                  </div>
-                )}
-                <div className="flex-1">
-                  <p className={`text-sm ${unreadCount > 0 ? "font-bold" : "font-medium"} text-green-900`}>
-                    {pro.proDisplayName}
-                  </p>
-                  {pro.proSpecialties && (
-                    <p className="text-xs text-green-500">
-                      {pro.proSpecialties}
-                    </p>
-                  )}
-                </div>
-                {unreadCount > 0 && (
-                  <span className="inline-flex min-w-[24px] items-center justify-center rounded-full bg-red-500 px-2 py-0.5 text-xs font-semibold text-white">
-                    {unreadCount > 99 ? "99+" : unreadCount}
-                  </span>
-                )}
-                <svg
-                  className="h-5 w-5 text-green-400"
-                  fill="none"
-                  viewBox="0 0 24 24"
-                  stroke="currentColor"
-                  strokeWidth={2}
-                >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    d="m8.25 4.5 7.5 7.5-7.5 7.5"
-                  />
-                </svg>
-              </Link>
-            </li>
-            );
-          })}
-        </ul>
+        <CoachingProList myPros={myPros} initialUnread={initialUnread} />
       )}
     </div>
   );

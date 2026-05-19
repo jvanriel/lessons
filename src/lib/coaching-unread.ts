@@ -66,6 +66,19 @@ export interface UnreadCounts {
   total: number;
 }
 
+// Drizzle's `sql` template renders `${table.column}` as a bare
+// `"column"` without a table qualifier. That's fine in the outer
+// FROM, but inside a correlated subquery any column name that also
+// exists on the inner table gets resolved to the *inner* table —
+// silently. For our query that meant `${proStudents.id}` rendered as
+// `"id"` resolved to `comments.id`, so the join condition
+// `comments.context_id = pro_students.id` became
+// `comments.context_id = comments.id` — never true. The unread count
+// was always 0, and Nadine never saw a badge (task 144 follow-up).
+//
+// Fix: write the subquery with hand-written table aliases so the
+// correlation is explicit and Postgres can't misresolve.
+
 export async function getCoachingUnreadCountsForStudent(
   userId: number,
 ): Promise<UnreadCounts> {
@@ -75,14 +88,14 @@ export async function getCoachingUnreadCountsForStudent(
     .select({
       proStudentId: proStudents.id,
       unread: sql<number>`(
-        SELECT COUNT(*)::int FROM ${comments}
-        WHERE ${comments.contextType} = 'coaching'
-          AND ${comments.contextId} = ${proStudents.id}
-          AND ${comments.authorId} <> ${userId}
-          AND ${comments.deletedAt} IS NULL
+        SELECT COUNT(*)::int FROM comments c
+        WHERE c.context_type = 'coaching'
+          AND c.context_id = pro_students.id
+          AND c.author_id <> ${userId}
+          AND c.deleted_at IS NULL
           AND (
-            ${proStudents.studentLastSeenAt} IS NULL
-            OR ${comments.createdAt} > ${proStudents.studentLastSeenAt}
+            pro_students.student_last_seen_at IS NULL
+            OR c.created_at > pro_students.student_last_seen_at
           )
       )`,
     })
@@ -105,14 +118,14 @@ export async function getCoachingUnreadCountsForPro(
     .select({
       proStudentId: proStudents.id,
       unread: sql<number>`(
-        SELECT COUNT(*)::int FROM ${comments}
-        WHERE ${comments.contextType} = 'coaching'
-          AND ${comments.contextId} = ${proStudents.id}
-          AND ${comments.authorId} <> ${userId}
-          AND ${comments.deletedAt} IS NULL
+        SELECT COUNT(*)::int FROM comments c
+        WHERE c.context_type = 'coaching'
+          AND c.context_id = pro_students.id
+          AND c.author_id <> ${userId}
+          AND c.deleted_at IS NULL
           AND (
-            ${proStudents.proLastSeenAt} IS NULL
-            OR ${comments.createdAt} > ${proStudents.proLastSeenAt}
+            pro_students.pro_last_seen_at IS NULL
+            OR c.created_at > pro_students.pro_last_seen_at
           )
       )`,
     })
