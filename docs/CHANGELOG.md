@@ -17,6 +17,20 @@ If any role inside the brackets is unknown (typo), the parser falls
 back to treating the brackets as literal text — better to over-show
 than silently hide.
 
+## 2026-05-19 — v1.1.96
+
+- **[pro] Location addresses now get real coordinates again.** The
+  post-save verification card was relying on Nominatim, which
+  silently rate-limited Vercel's shared egress IPs — every newly
+  saved location ended up with NULL coords, so Waze and Google
+  Maps fell back to fuzzy text matching and could send students to
+  the wrong street. Switched the geocoder to Google's Geocoding
+  API (with Nominatim kept as a fallback so the system still works
+  before the key is provisioned). Once GOOGLE_MAPS_API_KEY is set
+  in Vercel, the verification card embeds a Google Map preview
+  too, and the address field becomes a Google Places autocomplete
+  — pros pick a real Belgian address instead of typing freeform.
+
 ## 2026-05-19 — v1.1.95
 
 - **Chat unread badges work again.** A subtle SQL bug in the

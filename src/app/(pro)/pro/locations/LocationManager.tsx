@@ -11,6 +11,7 @@ import { t } from "@/lib/i18n/translations";
 import type { Locale } from "@/lib/i18n";
 import { TimezonePicker } from "@/components/TimezonePicker";
 import { defaultTimezoneForCountry } from "@/lib/timezones";
+import AddressAutocomplete from "@/components/AddressAutocomplete";
 
 interface ProLocation {
   proLocationId: number;
@@ -201,11 +202,11 @@ function AddLocationForm({
   createPending: boolean;
   onCancel: () => void;
 }) {
-  // Track country in React state so the TZ picker can re-infer when the
-  // pro types a country (Belgium → Europe/Brussels, France →
-  // Europe/Paris, etc.). The picker still gives the pro full override
-  // power; this is just a smarter starting value.
+  // Track country + city in React state so we can auto-fill them
+  // from Google Places when the pro picks an autocomplete suggestion.
+  // Country also drives the TZ picker (Belgium → Europe/Brussels, etc.).
   const [country, setCountry] = useState("Belgium");
+  const [city, setCity] = useState("");
   const inferredTz = defaultTimezoneForCountry(country);
 
   return (
@@ -232,6 +233,8 @@ function AddLocationForm({
             </label>
             <input
               name="city"
+              value={city}
+              onChange={(e) => setCity(e.target.value)}
               placeholder={t("proLocations.cityPlaceholder", locale)}
               className={inputClass}
             />
@@ -240,10 +243,14 @@ function AddLocationForm({
             <label className="block text-xs font-medium text-green-700">
               {t("proLocations.address", locale)}
             </label>
-            <input
+            <AddressAutocomplete
               name="address"
               placeholder={t("proLocations.addressPlaceholder", locale)}
               className={inputClass}
+              onPlaceSelected={(p) => {
+                if (p.city) setCity(p.city);
+                if (p.country) setCountry(p.country);
+              }}
             />
           </div>
           <div>
@@ -327,6 +334,7 @@ function EditLocationForm({
   );
   const [active, setActive] = useState(location.active);
   const [country, setCountry] = useState(location.country ?? "");
+  const [city, setCity] = useState(location.city ?? "");
   // Edit form: prefer the row's stored timezone as the explicit
   // value (so the picker shows what's persisted, not the country
   // inference). The inferred fallback only matters when `value` is
@@ -429,7 +437,8 @@ function EditLocationForm({
           </label>
           <input
             name="city"
-            defaultValue={location.city ?? ""}
+            value={city}
+            onChange={(e) => setCity(e.target.value)}
             placeholder={t("proLocations.cityPlaceholder", locale)}
             className={inputClass}
           />
@@ -438,11 +447,15 @@ function EditLocationForm({
           <label className="block text-xs font-medium text-green-700">
             {t("proLocations.address", locale)}
           </label>
-          <input
+          <AddressAutocomplete
             name="address"
             defaultValue={location.address ?? ""}
             placeholder={t("proLocations.addressPlaceholder", locale)}
             className={inputClass}
+            onPlaceSelected={(p) => {
+              if (p.city) setCity(p.city);
+              if (p.country) setCountry(p.country);
+            }}
           />
         </div>
         <div>
@@ -628,11 +641,25 @@ function GeocodeFeedbackCard({
   if (feedback.matched) {
     const lat = parseFloat(feedback.lat);
     const lng = parseFloat(feedback.lng);
-    // ±0.005° on each side ≈ 1km box at Belgian latitudes — close
-    // enough that the pin is visible without losing context.
-    const bbox = `${lng - 0.005},${lat - 0.003},${lng + 0.005},${lat + 0.003}`;
-    const embedUrl = `https://www.openstreetmap.org/export/embed.html?bbox=${encodeURIComponent(bbox)}&layer=mapnik&marker=${lat},${lng}`;
-    const fullUrl = `https://www.openstreetmap.org/?mlat=${lat}&mlon=${lng}#map=17/${lat}/${lng}`;
+    // Prefer Google Maps Embed (matches the in-app Waze/Google Maps
+    // navigation buttons the student gets in their booking
+    // confirmation, so what the pro sees here = what the student
+    // sees). Embed API doesn't bill against the Maps Platform free
+    // tier. Falls back to the OSM iframe when the public key isn't
+    // set — keeps the verification card useful in environments
+    // without Google credentials.
+    const googleKey = process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY;
+    const embedUrl = googleKey
+      ? `https://www.google.com/maps/embed/v1/place?key=${googleKey}&q=${lat},${lng}&zoom=17`
+      : (() => {
+          // ±0.005° on each side ≈ 1km box at Belgian latitudes — close
+          // enough that the pin is visible without losing context.
+          const bbox = `${lng - 0.005},${lat - 0.003},${lng + 0.005},${lat + 0.003}`;
+          return `https://www.openstreetmap.org/export/embed.html?bbox=${encodeURIComponent(bbox)}&layer=mapnik&marker=${lat},${lng}`;
+        })();
+    const fullUrl = googleKey
+      ? `https://www.google.com/maps/search/?api=1&query=${lat},${lng}`
+      : `https://www.openstreetmap.org/?mlat=${lat}&mlon=${lng}#map=17/${lat}/${lng}`;
     return (
       <div className="rounded-xl border border-green-300 bg-green-50/60 p-4">
         <div className="flex items-start justify-between gap-3">
