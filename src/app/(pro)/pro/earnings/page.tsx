@@ -2,7 +2,7 @@ import { requireProProfile } from "@/lib/pro";
 import { redirect } from "next/navigation";
 import { db } from "@/lib/db";
 import { lessonBookings, users } from "@/lib/db/schema";
-import { eq, and, desc, sql, gte } from "drizzle-orm";
+import { eq, and, desc, sql, gte, isNotNull, ne } from "drizzle-orm";
 import { BookingRefreshListener } from "@/components/BookingRefreshListener";
 import { getLocale } from "@/lib/locale";
 import { formatDate as formatDateHelper } from "@/lib/format-date";
@@ -32,6 +32,7 @@ function PaymentStatusBadge({ status, locale }: { status: string; locale: Locale
     pending: "bg-amber-100 text-amber-700",
     refunded: "bg-gray-100 text-gray-600",
     failed: "bg-red-100 text-red-700",
+    credit: "bg-rose-100 text-rose-700",
   };
 
   const key = `proEarnings.status.${status}`;
@@ -89,8 +90,16 @@ export default async function EarningsPage() {
       )
     );
 
-  // Recent payments (last 20)
-  const recentPayments = await db
+  // Recent payment events: original payments + credit notes for
+  // cancellations. Pre-task-151 only the original payment row was
+  // emitted, so a cancelled booking lingered in the table without any
+  // indication that it had been reversed — Nadine flagged. (Jan:
+  // "we'd better add a credit note and respect the order of events".)
+  //
+  // Two passes — payments + cancellations — merged client-side and
+  // ordered by event time. The merged list is capped at 20 events
+  // total (so e.g. 12 payments + 8 credits would render fully).
+  const paymentRows = await db
     .select({
       id: lessonBookings.id,
       date: lessonBookings.date,
@@ -98,6 +107,7 @@ export default async function EarningsPage() {
       platformFeeCents: lessonBookings.platformFeeCents,
       paymentStatus: lessonBookings.paymentStatus,
       paidAt: lessonBookings.paidAt,
+      createdAt: lessonBookings.createdAt,
       studentFirstName: users.firstName,
       studentLastName: users.lastName,
     })
@@ -106,11 +116,76 @@ export default async function EarningsPage() {
     .where(
       and(
         eq(lessonBookings.proProfileId, profile.id),
-        sql`${lessonBookings.paymentStatus} != 'pending'`
-      )
+        ne(lessonBookings.paymentStatus, "pending"),
+      ),
     )
     .orderBy(desc(lessonBookings.paidAt), desc(lessonBookings.createdAt))
     .limit(20);
+
+  const cancellationRows = await db
+    .select({
+      id: lessonBookings.id,
+      date: lessonBookings.date,
+      priceCents: lessonBookings.priceCents,
+      platformFeeCents: lessonBookings.platformFeeCents,
+      cancelledAt: lessonBookings.cancelledAt,
+      studentFirstName: users.firstName,
+      studentLastName: users.lastName,
+    })
+    .from(lessonBookings)
+    .innerJoin(users, eq(lessonBookings.bookedById, users.id))
+    .where(
+      and(
+        eq(lessonBookings.proProfileId, profile.id),
+        eq(lessonBookings.status, "cancelled"),
+        isNotNull(lessonBookings.cancelledAt),
+      ),
+    )
+    .orderBy(desc(lessonBookings.cancelledAt))
+    .limit(20);
+
+  type RecentEvent = {
+    /** React key — booking id + kind. */
+    rowKey: string;
+    kind: "payment" | "credit";
+    eventAt: Date;
+    date: string;
+    priceCents: number | null;
+    platformFeeCents: number | null;
+    /** "paid" / "manual" / etc. for payments; "credit" for credit notes. */
+    paymentStatus: string;
+    studentFirstName: string;
+    studentLastName: string;
+  };
+
+  const recentEvents: RecentEvent[] = [
+    ...paymentRows.map((p): RecentEvent => ({
+      rowKey: `${p.id}-payment`,
+      kind: "payment",
+      eventAt: p.paidAt ?? p.createdAt,
+      date: p.date,
+      priceCents: p.priceCents,
+      platformFeeCents: p.platformFeeCents,
+      paymentStatus: p.paymentStatus,
+      studentFirstName: p.studentFirstName,
+      studentLastName: p.studentLastName,
+    })),
+    ...cancellationRows.map((c): RecentEvent => ({
+      rowKey: `${c.id}-credit`,
+      kind: "credit",
+      // cancelledAt is non-null by query filter.
+      eventAt: c.cancelledAt!,
+      date: c.date,
+      priceCents: c.priceCents != null ? -c.priceCents : null,
+      platformFeeCents:
+        c.platformFeeCents != null ? -c.platformFeeCents : null,
+      paymentStatus: "credit",
+      studentFirstName: c.studentFirstName,
+      studentLastName: c.studentLastName,
+    })),
+  ]
+    .sort((a, b) => b.eventAt.getTime() - a.eventAt.getTime())
+    .slice(0, 20);
 
   const monthlyNet =
     (monthlySummary?.totalRevenue ?? 0) - (monthlySummary?.totalFees ?? 0);
@@ -183,7 +258,7 @@ export default async function EarningsPage() {
           </h2>
         </div>
 
-        {recentPayments.length === 0 ? (
+        {recentEvents.length === 0 ? (
           <div className="px-6 py-12 text-center text-sm text-green-500">
             {t("proEarnings.empty", locale)}
           </div>
@@ -201,29 +276,37 @@ export default async function EarningsPage() {
                 </tr>
               </thead>
               <tbody className="divide-y divide-green-50">
-                {recentPayments.map((payment) => {
+                {recentEvents.map((ev) => {
                   const net =
-                    (payment.priceCents ?? 0) -
-                    (payment.platformFeeCents ?? 0);
+                    (ev.priceCents ?? 0) - (ev.platformFeeCents ?? 0);
+                  const isCredit = ev.kind === "credit";
                   return (
-                    <tr key={payment.id} className="hover:bg-green-50/50">
+                    <tr
+                      key={ev.rowKey}
+                      className={`hover:bg-green-50/50 ${isCredit ? "bg-rose-50/30" : ""}`}
+                    >
                       <td className="px-6 py-3 text-green-900">
-                        {payment.studentFirstName} {payment.studentLastName}
+                        {ev.studentFirstName} {ev.studentLastName}
                       </td>
                       <td className="px-6 py-3 text-green-600">
-                        {formatDate(payment.date, locale)}
+                        {formatDate(ev.date, locale)}
                       </td>
-                      <td className="px-6 py-3 text-right text-green-900">
-                        {formatCents(payment.priceCents)}
+                      <td className={`px-6 py-3 text-right ${isCredit ? "text-rose-700" : "text-green-900"}`}>
+                        {formatCents(ev.priceCents)}
                       </td>
-                      <td className="px-6 py-3 text-right text-green-500">
-                        {formatCents(payment.platformFeeCents)}
+                      <td className={`px-6 py-3 text-right ${isCredit ? "text-rose-700" : "text-green-500"}`}>
+                        {formatCents(ev.platformFeeCents)}
                       </td>
-                      <td className="px-6 py-3 text-right font-medium text-green-900">
+                      <td
+                        className={`px-6 py-3 text-right font-medium ${isCredit ? "text-rose-700" : "text-green-900"}`}
+                      >
                         {formatCents(net)}
                       </td>
                       <td className="px-6 py-3">
-                        <PaymentStatusBadge status={payment.paymentStatus} locale={locale} />
+                        <PaymentStatusBadge
+                          status={ev.paymentStatus}
+                          locale={locale}
+                        />
                       </td>
                     </tr>
                   );

@@ -17,6 +17,16 @@ If any role inside the brackets is unknown (typo), the parser falls
 back to treating the brackets as literal text — better to over-show
 than silently hide.
 
+## 2026-05-19 — v1.1.91
+
+- **[pro] Cancellations show as a credit-note line in earnings.**
+  The "Recente betalingen" table on /pro/earnings used to render a
+  cancelled lesson as a regular payment row, so it looked like the
+  pro had collected money for a lesson that was actually cancelled.
+  Cancellations now appear as a second row — same student, signed-
+  negative amount, "Kredietnota" status — sorted chronologically
+  with the original payment so the audit trail is preserved.
+
 ## 2026-05-19 — v1.1.90
 
 - **No more 404 when an invited golfer tries to book with a half-
