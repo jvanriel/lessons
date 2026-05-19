@@ -24,24 +24,10 @@ import { drive, auth as driveAuth } from "@googleapis/drive";
 
 // ─── Service account (shared with Gmail in mail.ts) ────────
 
-/**
- * Strip surrounding double/single quotes and trim whitespace.
- * Vercel pastes can leave the env var wrapped in quotes; without
- * this, the PEM parser blows up with
- * "error:1E08010C:DECODER routines::unsupported". Mirrors
- * `stripQuotesAndTrim` in mail.ts.
- */
-function stripQuotesAndTrim(raw: string | undefined): string {
-  if (!raw) return "";
-  let v = raw.trim();
-  if (
-    (v.startsWith('"') && v.endsWith('"')) ||
-    (v.startsWith("'") && v.endsWith("'"))
-  ) {
-    v = v.slice(1, -1).trim();
-  }
-  return v;
-}
+// stripQuotesAndTrim + buildTaskFolderName moved to
+// @/lib/google-drive-helpers so they can be unit-tested without the
+// server-only module's side-effecty import graph.
+import { stripQuotesAndTrim, buildTaskFolderName } from "./google-drive-helpers";
 
 function getCredentials() {
   const email = stripQuotesAndTrim(process.env.GOOGLE_SERVICE_ACCOUNT_EMAIL);
@@ -135,10 +121,7 @@ export async function getTaskFolderId(
 ): Promise<string> {
   const drive = getDriveClient();
   const rootId = await getTasksRootFolderId();
-  const folderName = `Task #${taskId} — ${taskTitle.slice(0, 80)}`.replace(
-    /'/g,
-    "\\'",
-  );
+  const folderName = buildTaskFolderName(taskId, taskTitle);
   const res = await drive.files.list({
     q: `name = '${folderName}' and mimeType = '${FOLDER_MIME}' and '${rootId}' in parents and trashed = false`,
     fields: "files(id)",
