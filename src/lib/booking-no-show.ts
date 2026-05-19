@@ -44,6 +44,13 @@ import {
 import { eq, and } from "drizzle-orm";
 import { fromZonedTime } from "date-fns-tz";
 import { getStripe } from "@/lib/stripe";
+import { sendEmail } from "@/lib/mail";
+import { resolveLocale } from "@/lib/i18n";
+import { formatLocationFull } from "@/lib/location-display";
+import {
+  buildNoShowEmail,
+  getNoShowSubject,
+} from "@/lib/booking-no-show-email";
 
 const SETTLEMENT_EXPIRY_DAYS = 30;
 
@@ -113,7 +120,12 @@ export async function markBookingAsNoShow(
   if (!booking) return { error: "Booking not found." };
 
   const [loc] = await db
-    .select({ timezone: locations.timezone })
+    .select({
+      name: locations.name,
+      address: locations.address,
+      city: locations.city,
+      timezone: locations.timezone,
+    })
     .from(proLocations)
     .innerJoin(locations, eq(proLocations.locationId, locations.id))
     .where(eq(proLocations.id, booking.proLocationId))
@@ -121,6 +133,7 @@ export async function markBookingAsNoShow(
   if (!loc) {
     return { error: "Lesson location not found." };
   }
+  const locationName = formatLocationFull(loc);
 
   const lessonStart = fromZonedTime(
     `${booking.date}T${booking.startTime}:00`,
@@ -138,6 +151,7 @@ export async function markBookingAsNoShow(
       firstName: users.firstName,
       lastName: users.lastName,
       email: users.email,
+      preferredLocale: users.preferredLocale,
     })
     .from(users)
     .where(eq(users.id, booking.bookedById))
@@ -145,6 +159,16 @@ export async function markBookingAsNoShow(
   if (!student?.email) {
     return { error: "Student email not found." };
   }
+  const studentLocale = resolveLocale(student.preferredLocale);
+
+  // Pro display name — used by both the Stripe Checkout product
+  // name and the no-show email, so resolve it once upfront.
+  const [proRow] = await db
+    .select({ displayName: proProfiles.displayName })
+    .from(proProfiles)
+    .where(eq(proProfiles.id, proProfileId))
+    .limit(1);
+  const proDisplayName = proRow?.displayName ?? "your pro";
 
   const branch = needsSettlementCheckout(booking.paymentStatus);
 
@@ -156,13 +180,6 @@ export async function markBookingAsNoShow(
       // No price means no fee to collect (free lesson, comp pro,
       // etc.). Treat as 'skip' — still mark no-show but no link.
     } else {
-      const [proRow] = await db
-        .select({ displayName: proProfiles.displayName })
-        .from(proProfiles)
-        .where(eq(proProfiles.id, proProfileId))
-        .limit(1);
-      const proDisplayName = proRow?.displayName ?? "your pro";
-
       try {
         const stripe = getStripe();
         const expiresAt =
@@ -231,11 +248,31 @@ export async function markBookingAsNoShow(
     })
     .where(eq(lessonBookings.id, bookingId));
 
-  // Email content lives in Phase 3 — for now the action returns the
-  // settlement URL (when applicable) so the pro UI can render it
-  // inline. The Phase-3 commit will wire in sendNoShowPaidEmail /
-  // sendNoShowSettlementEmail using the same patterns as
-  // sendComeBackEmail / cancellation mailers.
+  // Notify the student. PAID variant is a plain FYI; UNPAID variant
+  // carries the Checkout CTA. Fire-and-forget — the pro's action
+  // already succeeded by this point, and a transient mail failure
+  // shouldn't bubble back to them as an error.
+  const paid = booking.paymentStatus === "paid";
+  sendEmail({
+    to: student.email,
+    subject: getNoShowSubject({
+      paid,
+      proName: proDisplayName,
+      locale: studentLocale,
+    }),
+    html: buildNoShowEmail({
+      paid,
+      recipientFirstName: student.firstName,
+      proDisplayName,
+      date: booking.date,
+      startTime: booking.startTime,
+      endTime: booking.endTime,
+      locationName,
+      priceCents: booking.priceCents,
+      settlementUrl,
+      locale: studentLocale,
+    }),
+  }).catch(() => {});
 
   return { success: true, settlementUrl };
 }
