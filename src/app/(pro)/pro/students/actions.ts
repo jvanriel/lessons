@@ -70,6 +70,7 @@ import {
   type ExistingBooking,
 } from "@/lib/lesson-slots";
 import { cancelBookingByPro } from "@/lib/booking-cancel";
+import { markBookingAsNoShow } from "@/lib/booking-no-show";
 import { findStudentOverlap } from "@/lib/booking-overlap";
 import { after } from "next/server";
 import crypto from "node:crypto";
@@ -1445,6 +1446,33 @@ export async function proCancelBooking(bookingId: number) {
 
   revalidatePath("/pro/students");
   revalidatePath("/pro/bookings");
+
+  return result;
+}
+
+/**
+ * Pro-side "mark as no-show" wrapper (task 155). Auth gate + cache
+ * revalidate around `markBookingAsNoShow` so the pro doesn't have to
+ * thread proProfileId through every UI call site.
+ *
+ * Returns `{ success: true, settlementUrl? }` on success or
+ * `{ error }` on user-actionable failure. The optional
+ * `settlementUrl` is present when the booking was unpaid and a
+ * Stripe Checkout session was created — the UI can surface it as
+ * "we sent a payment link" inline confirmation.
+ */
+export async function proMarkNoShow(bookingId: number) {
+  const { profile } = await requireProProfile();
+  if (!profile) return { error: "No pro profile." };
+
+  const result = await markBookingAsNoShow({
+    bookingId,
+    proProfileId: profile.id,
+  });
+
+  revalidatePath("/pro/students");
+  revalidatePath("/pro/bookings");
+  revalidatePath("/pro/earnings");
 
   return result;
 }
