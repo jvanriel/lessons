@@ -15,6 +15,7 @@ import type { Locale } from "@/lib/i18n";
 import { formatDate as formatDateLocale } from "@/lib/format-date";
 import { addDaysToDateString } from "@/lib/local-date";
 import { LOCATION_COLORS, buildLocationColorMap } from "@/lib/location-colors";
+import { beginCellPointer } from "@/lib/availability-grid-pointer";
 import BookingCard from "../bookings/BookingCard";
 import { CancelBookingDialog } from "../_components/CancelBookingDialog";
 import { proCancelBooking } from "../students/actions";
@@ -352,75 +353,9 @@ function LandscapeRotatePrompt({ locale }: { locale: Locale }) {
 
 // ─── Touch paint helpers ─────────────────────────────
 
-const LONG_PRESS_MS = 350;
-const LONG_PRESS_MOVE_TOLERANCE = 10;
-
-/**
- * Gates a cell paint operation by pointer type:
- *
- *   - Mouse / pen → `fire` runs immediately AND `startDrag` is invoked,
- *     so a desktop click toggles the cell and a held-down drag paints
- *     the cells the cursor crosses.
- *   - Touch → `fire` only runs after the finger stays put for ~350ms
- *     (long-press, with a haptic buzz on supported devices). A short
- *     tap does nothing — leaves the page free to scroll. `startDrag`
- *     is NOT called on touch: drag-paint is desktop-only by design
- *     (task 75). Mobile users toggle one cell per long-press.
- */
-function beginCellPointer(
-  e: React.PointerEvent,
-  fire: () => void,
-  startDrag: () => void,
-) {
-  if (e.pointerType !== "touch") {
-    e.preventDefault();
-    fire();
-    startDrag();
-    return;
-  }
-  // Touch: wait for a long-press before doing anything. Meanwhile the
-  // browser is free to scroll if the user slides their finger.
-  const startX = e.clientX;
-  const startY = e.clientY;
-  let done = false;
-  const cleanup = () => {
-    done = true;
-    window.removeEventListener("pointermove", onMove, true);
-    window.removeEventListener("pointerup", onEnd, true);
-    window.removeEventListener("pointercancel", onEnd, true);
-  };
-  const onMove = (ev: PointerEvent) => {
-    if (done) return;
-    if (
-      Math.abs(ev.clientX - startX) > LONG_PRESS_MOVE_TOLERANCE ||
-      Math.abs(ev.clientY - startY) > LONG_PRESS_MOVE_TOLERANCE
-    ) {
-      clearTimeout(timer);
-      cleanup();
-    }
-  };
-  const onEnd = () => {
-    clearTimeout(timer);
-    cleanup();
-  };
-  const timer = window.setTimeout(() => {
-    if (done) return;
-    fire();
-    // Intentionally NOT calling startDrag on touch — drag-paint is
-    // desktop-only. Long-press toggles a single cell and stops.
-    if ("vibrate" in navigator) {
-      try {
-        navigator.vibrate(15);
-      } catch {
-        /* user-agent gesture rules — ignore */
-      }
-    }
-    cleanup();
-  }, LONG_PRESS_MS);
-  window.addEventListener("pointermove", onMove, true);
-  window.addEventListener("pointerup", onEnd, true);
-  window.addEventListener("pointercancel", onEnd, true);
-}
+// beginCellPointer + LONG_PRESS_MS moved to
+// @/lib/availability-grid-pointer so the touch / mouse branch can be
+// unit-tested without spinning up this 2700-line editor.
 
 /**
  * Given a clientX/Y, find the [data-cell] element under the cursor and
