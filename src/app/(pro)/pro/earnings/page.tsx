@@ -10,6 +10,10 @@ import type { Locale } from "@/lib/i18n";
 import { t } from "@/lib/i18n/translations";
 import { PLATFORM_FEE_PERCENT, STRIPE_SURCHARGE_PERCENT } from "@/lib/stripe";
 import PageHeading from "@/components/app/PageHeading";
+import {
+  buildRecentEvents,
+  type RecentEvent,
+} from "@/lib/recent-earnings-events";
 
 export const metadata = { title: "Earnings — Golf Lessons" };
 
@@ -144,48 +148,10 @@ export default async function EarningsPage() {
     .orderBy(desc(lessonBookings.cancelledAt))
     .limit(20);
 
-  type RecentEvent = {
-    /** React key — booking id + kind. */
-    rowKey: string;
-    kind: "payment" | "credit";
-    eventAt: Date;
-    date: string;
-    priceCents: number | null;
-    platformFeeCents: number | null;
-    /** "paid" / "manual" / etc. for payments; "credit" for credit notes. */
-    paymentStatus: string;
-    studentFirstName: string;
-    studentLastName: string;
-  };
-
-  const recentEvents: RecentEvent[] = [
-    ...paymentRows.map((p): RecentEvent => ({
-      rowKey: `${p.id}-payment`,
-      kind: "payment",
-      eventAt: p.paidAt ?? p.createdAt,
-      date: p.date,
-      priceCents: p.priceCents,
-      platformFeeCents: p.platformFeeCents,
-      paymentStatus: p.paymentStatus,
-      studentFirstName: p.studentFirstName,
-      studentLastName: p.studentLastName,
-    })),
-    ...cancellationRows.map((c): RecentEvent => ({
-      rowKey: `${c.id}-credit`,
-      kind: "credit",
-      // cancelledAt is non-null by query filter.
-      eventAt: c.cancelledAt!,
-      date: c.date,
-      priceCents: c.priceCents != null ? -c.priceCents : null,
-      platformFeeCents:
-        c.platformFeeCents != null ? -c.platformFeeCents : null,
-      paymentStatus: "credit",
-      studentFirstName: c.studentFirstName,
-      studentLastName: c.studentLastName,
-    })),
-  ]
-    .sort((a, b) => b.eventAt.getTime() - a.eventAt.getTime())
-    .slice(0, 20);
+  const recentEvents: RecentEvent[] = buildRecentEvents(
+    paymentRows,
+    cancellationRows.map((c) => ({ ...c, cancelledAt: c.cancelledAt! })),
+  );
 
   const monthlyNet =
     (monthlySummary?.totalRevenue ?? 0) - (monthlySummary?.totalFees ?? 0);
