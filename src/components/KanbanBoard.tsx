@@ -1169,6 +1169,71 @@ function TaskCreateModal({
       // so the user can retry from inside the task.
       if (pendingFile) {
         try {
+          // Google Drive for Desktop represents native Google files
+          // (Docs/Sheets/Slides) as tiny JSON shortcuts. Picking one
+          // from the file picker yields the stub, not the real file
+          // — route it through the Drive attach API so the cloud
+          // file is what gets linked (task 16 retest).
+          const lowerName = pendingFile.name.toLowerCase();
+          const isShortcut =
+            lowerName.endsWith(".gdoc") ||
+            lowerName.endsWith(".gsheet") ||
+            lowerName.endsWith(".gslides") ||
+            lowerName.endsWith(".gdraw") ||
+            lowerName.endsWith(".gform");
+          if (isShortcut) {
+            let driveUrl: string | null = null;
+            try {
+              const text = await pendingFile.text();
+              const parsed = JSON.parse(text) as { url?: string };
+              if (typeof parsed.url === "string") driveUrl = parsed.url;
+            } catch {
+              // Fall through to regular upload — the user will see
+              // the upload-side error if any.
+            }
+            if (driveUrl) {
+              const attachRes = await fetch(
+                "/api/admin/tasks/google-attach",
+                {
+                  method: "POST",
+                  headers: { "Content-Type": "application/json" },
+                  body: JSON.stringify({
+                    taskId: result.task.id,
+                    url: driveUrl,
+                  }),
+                },
+              );
+              if (!attachRes.ok) {
+                const body = (await attachRes.json().catch(() => ({}))) as {
+                  error?: string;
+                };
+                setError(
+                  body.error ?? "Drive attach failed — task was created.",
+                );
+                onCreated(result.task);
+                return;
+              }
+              const attachment = (await attachRes.json()) as {
+                name: string;
+                url: string;
+                size: number;
+                contentType: string;
+              };
+              await fetch("/api/comments", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                  contextType: "task",
+                  contextId: result.task.id,
+                  content: "",
+                  attachments: [attachment],
+                }),
+              });
+              onCreated(result.task);
+              return;
+            }
+          }
+
           const uploadFd = new FormData();
           uploadFd.set("file", pendingFile);
           uploadFd.set("taskId", String(result.task.id));
@@ -1273,7 +1338,7 @@ function TaskCreateModal({
               <input
                 ref={fileInputRef}
                 type="file"
-                accept="image/*,video/*,.pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.csv,.txt,.md"
+                accept="image/*,video/*,.pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.csv,.txt,.md,.gdoc,.gsheet,.gslides,.gdraw,.gform"
                 className="hidden"
                 onChange={(e) => {
                   handleFilePicked(e.target.files?.[0] ?? null);

@@ -17,6 +17,20 @@ If any role inside the brackets is unknown (typo), the parser falls
 back to treating the brackets as literal text — better to over-show
 than silently hide.
 
+## 2026-05-19 — v1.1.101
+
+- **[admin,dev] Picking a Google Doc/Sheet/Slides from the file
+  picker now actually attaches it.** Google Drive for Desktop
+  represents native Google files as 1-KB JSON shortcuts on the
+  local disk, and the file picker was hiding them by default
+  (their extensions weren't in the allow-list). The task attachment
+  flow now (1) shows `.gdoc/.gsheet/.gslides/.gdraw/.gform` files
+  in the picker and (2) when one is chosen, reads the embedded
+  Drive URL out of the shortcut and routes it through the Drive
+  attach API instead of uploading the 1-KB stub to Blob. Works
+  from both the New Task dialog and from the Comments tab of an
+  already-open task.
+
 ## 2026-05-19 — v1.1.100
 
 - **"Find another pro" button in account-deletion emails works

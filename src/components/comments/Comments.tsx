@@ -278,6 +278,28 @@ export default function Comments({
 
   // ─── File Upload ────────────────────────────────────
 
+  /**
+   * Detect a Google Drive for Desktop shortcut file. These are tiny
+   * JSON stubs (≤1 KB) Drive places on the local filesystem to
+   * represent native Google Docs/Sheets/Slides — uploading the stub
+   * to Blob would store the JSON, not the actual document. We
+   * intercept and route through the Drive attach API instead, which
+   * resolves the cloud file via the service account. (task 16
+   * retest — Nadine's Drive folder shows .gdoc/.gsheet shortcuts as
+   * "no extension" in Explorer; the file picker hides them by
+   * mime-type unless we accept their extensions explicitly.)
+   */
+  function isGoogleShortcut(file: File): boolean {
+    const name = file.name.toLowerCase();
+    return (
+      name.endsWith(".gdoc") ||
+      name.endsWith(".gsheet") ||
+      name.endsWith(".gslides") ||
+      name.endsWith(".gdraw") ||
+      name.endsWith(".gform")
+    );
+  }
+
   async function handleFileUpload(file: File) {
     if (!onUpload || uploading) return;
     setUploading(true);
@@ -285,6 +307,46 @@ export default function Comments({
     shouldAutoScroll.current = true;
 
     try {
+      // Google native files (Docs/Sheets/Slides) selected from a
+      // Drive-synced folder come through as small JSON shortcuts.
+      // Parse the embedded URL and reroute through the Drive attach
+      // flow so the cloud file is what gets linked. Falls through to
+      // a normal upload if parsing fails for any reason.
+      if (onAttachGoogleLink && isGoogleShortcut(file)) {
+        try {
+          const text = await file.text();
+          const parsed = JSON.parse(text) as { url?: string };
+          const driveUrl = typeof parsed.url === "string" ? parsed.url : null;
+          if (driveUrl) {
+            const attachment = await onAttachGoogleLink(driveUrl);
+            const res = await fetch("/api/comments", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({
+                contextType,
+                contextId,
+                content: "",
+                attachments: [attachment],
+              }),
+            });
+            if (res.ok) {
+              const newComment: Comment = await res.json();
+              setComments((prev) => [...prev, newComment]);
+            } else {
+              const body = (await res.json().catch(() => ({}))) as {
+                error?: string;
+              };
+              setUploadError(body.error ?? "Failed to attach Google file.");
+            }
+            return;
+          }
+        } catch {
+          // Shortcut didn't parse — fall through to normal upload so
+          // the user sees the upload-side error (likely "type not
+          // allowed") rather than a silent skip.
+        }
+      }
+
       const attachment = await onUpload(file);
       if (!attachment) {
         // The caller signalled "nothing to attach" without throwing —
@@ -1267,7 +1329,7 @@ export default function Comments({
           ref={fileInputRef}
           type="file"
           className="hidden"
-          accept="image/jpeg,image/png,image/gif,image/webp,image/heic,image/heif,video/mp4,video/quicktime,video/webm,application/pdf,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document,application/vnd.ms-excel,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/vnd.ms-powerpoint,application/vnd.openxmlformats-officedocument.presentationml.presentation,text/csv,text/plain,text/markdown"
+          accept="image/jpeg,image/png,image/gif,image/webp,image/heic,image/heif,video/mp4,video/quicktime,video/webm,application/pdf,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document,application/vnd.ms-excel,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/vnd.ms-powerpoint,application/vnd.openxmlformats-officedocument.presentationml.presentation,text/csv,text/plain,text/markdown,.gdoc,.gsheet,.gslides,.gdraw,.gform"
           onChange={(e) => {
             const file = e.target.files?.[0];
             if (file) handleFileUpload(file);
