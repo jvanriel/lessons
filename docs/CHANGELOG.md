@@ -17,6 +17,18 @@ If any role inside the brackets is unknown (typo), the parser falls
 back to treating the brackets as literal text — better to over-show
 than silently hide.
 
+## 2026-05-19 — v1.1.94
+
+- **Marketing copy now uses "golfers" everywhere.** The home hero
+  no longer leans on "Belgische thuisbasis" / "Made in Belgium" —
+  it just says the platform is built for golfers and the pros who
+  teach them. The for-pros feature cards, terms of use and privacy
+  policy were also rephrased so "leerlingen / élèves / students"
+  becomes "golfers / golfeurs / golfers", matching the rest of the
+  product. The Dutch privacy text now spells out "AVG" as
+  "Algemene Verordening Gegevensbescherming (AVG)" so first-time
+  readers know what it refers to.
+
 ## 2026-05-19 — v1.1.93
 
 - **[pro] Pros can give a reason when a block cancels existing

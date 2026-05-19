@@ -10,15 +10,15 @@ const content: Record<Locale, { title: string; lastUpdated: string; sections: Ar
     sections: [
       {
         heading: "1. Who we are",
-        body: "Golf Lessons (golflessons.be) is a platform that connects golf students with golf professionals for lesson bookings, coaching, and communication. The platform is operated from Belgium.",
+        body: "Golf Lessons (golflessons.be) is a platform that connects golfers with golf professionals for lesson bookings, coaching, and communication. The platform is operated from Belgium.",
       },
       {
         heading: "2. What data we collect",
-        body: "We collect the following personal data:\n\n- **Account information**: name, email address, phone number, preferred language.\n- **Golf profile**: handicap, improvement goals.\n- **Booking data**: lesson dates, times, locations, scheduling preferences.\n- **Payment data**: payment method details are processed and stored by Stripe. We do not store card numbers on our servers.\n- **Communication data**: messages exchanged between students and pros via the coaching chat.\n- **Technical data**: IP address, browser type, and device information for security and analytics purposes.",
+        body: "We collect the following personal data:\n\n- **Account information**: name, email address, phone number, preferred language.\n- **Golf profile**: handicap, improvement goals.\n- **Booking data**: lesson dates, times, locations, scheduling preferences.\n- **Payment data**: payment method details are processed and stored by Stripe. We do not store card numbers on our servers.\n- **Communication data**: messages exchanged between golfers and pros via the coaching chat.\n- **Technical data**: IP address, browser type, and device information for security and analytics purposes.",
       },
       {
         heading: "3. Why we collect your data",
-        body: "We process your personal data for the following purposes:\n\n- To create and manage your account.\n- To enable lesson bookings between students and pros.\n- To process payments via Stripe.\n- To facilitate coaching communication.\n- To send transactional emails (booking confirmations, reminders, verification).\n- To improve our platform and services.",
+        body: "We process your personal data for the following purposes:\n\n- To create and manage your account.\n- To enable lesson bookings between golfers and pros.\n- To process payments via Stripe.\n- To facilitate coaching communication.\n- To send transactional emails (booking confirmations, reminders, verification).\n- To improve our platform and services.",
       },
       {
         heading: "4. Legal basis",
@@ -56,15 +56,15 @@ const content: Record<Locale, { title: string; lastUpdated: string; sections: Ar
     sections: [
       {
         heading: "1. Wie zijn wij",
-        body: "Golf Lessons (golflessons.be) is een platform dat golfstudenten verbindt met golfprofessionals voor het boeken van lessen, coaching en communicatie. Het platform wordt beheerd vanuit Belgi\u00eb.",
+        body: "Golf Lessons (golflessons.be) is een platform dat golfers verbindt met golfprofessionals voor het boeken van lessen, coaching en communicatie. Het platform wordt beheerd vanuit Belgi\u00eb.",
       },
       {
         heading: "2. Welke gegevens verzamelen wij",
-        body: "Wij verzamelen de volgende persoonsgegevens:\n\n- **Accountgegevens**: naam, e-mailadres, telefoonnummer, voorkeurstaal.\n- **Golfprofiel**: handicap, verbeterdoelen.\n- **Boekingsgegevens**: lesdatums, tijden, locaties, planningsvoorkeuren.\n- **Betalingsgegevens**: betaalmethode-informatie wordt verwerkt en opgeslagen door Stripe. Wij slaan geen kaartnummers op onze servers op.\n- **Communicatiegegevens**: berichten uitgewisseld tussen studenten en pro's via de coaching-chat.\n- **Technische gegevens**: IP-adres, browsertype en apparaatinformatie voor beveiligings- en analysedoeleinden.",
+        body: "Wij verzamelen de volgende persoonsgegevens:\n\n- **Accountgegevens**: naam, e-mailadres, telefoonnummer, voorkeurstaal.\n- **Golfprofiel**: handicap, verbeterdoelen.\n- **Boekingsgegevens**: lesdatums, tijden, locaties, planningsvoorkeuren.\n- **Betalingsgegevens**: betaalmethode-informatie wordt verwerkt en opgeslagen door Stripe. Wij slaan geen kaartnummers op onze servers op.\n- **Communicatiegegevens**: berichten uitgewisseld tussen golfers en pro's via de coaching-chat.\n- **Technische gegevens**: IP-adres, browsertype en apparaatinformatie voor beveiligings- en analysedoeleinden.",
       },
       {
         heading: "3. Waarom verzamelen wij uw gegevens",
-        body: "Wij verwerken uw persoonsgegevens voor de volgende doeleinden:\n\n- Om uw account aan te maken en te beheren.\n- Om het boeken van lessen tussen studenten en pro's mogelijk te maken.\n- Om betalingen via Stripe te verwerken.\n- Om coaching-communicatie te faciliteren.\n- Om transactionele e-mails te versturen (boekingsbevestigingen, herinneringen, verificatie).\n- Om ons platform en onze diensten te verbeteren.",
+        body: "Wij verwerken uw persoonsgegevens voor de volgende doeleinden:\n\n- Om uw account aan te maken en te beheren.\n- Om het boeken van lessen tussen golfers en pro's mogelijk te maken.\n- Om betalingen via Stripe te verwerken.\n- Om coaching-communicatie te faciliteren.\n- Om transactionele e-mails te versturen (boekingsbevestigingen, herinneringen, verificatie).\n- Om ons platform en onze diensten te verbeteren.",
       },
       {
         heading: "4. Rechtsgrond",
@@ -80,7 +80,7 @@ const content: Record<Locale, { title: string; lastUpdated: string; sections: Ar
       },
       {
         heading: "7. Uw rechten",
-        body: "Op grond van de AVG heeft u het recht om:\n\n- Toegang te krijgen tot uw persoonsgegevens.\n- Onjuiste gegevens te corrigeren.\n- Verwijdering van uw gegevens te verzoeken.\n- Verwerking te beperken of er bezwaar tegen te maken.\n- Gegevensoverdraagbaarheid.\n- Toestemming op elk moment in te trekken.\n\nOm deze rechten uit te oefenen, neem contact met ons op via privacy@golflessons.be.",
+        body: "Op grond van de Algemene Verordening Gegevensbescherming (AVG) heeft u het recht om:\n\n- Toegang te krijgen tot uw persoonsgegevens.\n- Onjuiste gegevens te corrigeren.\n- Verwijdering van uw gegevens te verzoeken.\n- Verwerking te beperken of er bezwaar tegen te maken.\n- Gegevensoverdraagbaarheid.\n- Toestemming op elk moment in te trekken.\n\nOm deze rechten uit te oefenen, neem contact met ons op via privacy@golflessons.be.",
       },
       {
         heading: "8. Cookies",
@@ -102,15 +102,15 @@ const content: Record<Locale, { title: string; lastUpdated: string; sections: Ar
     sections: [
       {
         heading: "1. Qui sommes-nous",
-        body: "Golf Lessons (golflessons.be) est une plateforme qui met en relation des \u00e9l\u00e8ves de golf avec des professionnels de golf pour la r\u00e9servation de cours, le coaching et la communication. La plateforme est exploit\u00e9e depuis la Belgique.",
+        body: "Golf Lessons (golflessons.be) est une plateforme qui met en relation des golfeurs avec des professionnels de golf pour la r\u00e9servation de cours, le coaching et la communication. La plateforme est exploit\u00e9e depuis la Belgique.",
       },
       {
         heading: "2. Quelles donn\u00e9es nous collectons",
-        body: "Nous collectons les donn\u00e9es personnelles suivantes :\n\n- **Informations de compte** : nom, adresse e-mail, num\u00e9ro de t\u00e9l\u00e9phone, langue pr\u00e9f\u00e9r\u00e9e.\n- **Profil golf** : handicap, objectifs d'am\u00e9lioration.\n- **Donn\u00e9es de r\u00e9servation** : dates, heures, lieux des cours, pr\u00e9f\u00e9rences de planification.\n- **Donn\u00e9es de paiement** : les informations de moyen de paiement sont trait\u00e9es et stock\u00e9es par Stripe. Nous ne stockons pas les num\u00e9ros de carte sur nos serveurs.\n- **Donn\u00e9es de communication** : messages \u00e9chang\u00e9s entre \u00e9l\u00e8ves et pros via le chat de coaching.\n- **Donn\u00e9es techniques** : adresse IP, type de navigateur et informations sur l'appareil \u00e0 des fins de s\u00e9curit\u00e9 et d'analyse.",
+        body: "Nous collectons les donn\u00e9es personnelles suivantes :\n\n- **Informations de compte** : nom, adresse e-mail, num\u00e9ro de t\u00e9l\u00e9phone, langue pr\u00e9f\u00e9r\u00e9e.\n- **Profil golf** : handicap, objectifs d'am\u00e9lioration.\n- **Donn\u00e9es de r\u00e9servation** : dates, heures, lieux des cours, pr\u00e9f\u00e9rences de planification.\n- **Donn\u00e9es de paiement** : les informations de moyen de paiement sont trait\u00e9es et stock\u00e9es par Stripe. Nous ne stockons pas les num\u00e9ros de carte sur nos serveurs.\n- **Donn\u00e9es de communication** : messages \u00e9chang\u00e9s entre golfeurs et pros via le chat de coaching.\n- **Donn\u00e9es techniques** : adresse IP, type de navigateur et informations sur l'appareil \u00e0 des fins de s\u00e9curit\u00e9 et d'analyse.",
       },
       {
         heading: "3. Pourquoi nous collectons vos donn\u00e9es",
-        body: "Nous traitons vos donn\u00e9es personnelles aux fins suivantes :\n\n- Pour cr\u00e9er et g\u00e9rer votre compte.\n- Pour permettre les r\u00e9servations de cours entre \u00e9l\u00e8ves et pros.\n- Pour traiter les paiements via Stripe.\n- Pour faciliter la communication de coaching.\n- Pour envoyer des e-mails transactionnels (confirmations de r\u00e9servation, rappels, v\u00e9rification).\n- Pour am\u00e9liorer notre plateforme et nos services.",
+        body: "Nous traitons vos donn\u00e9es personnelles aux fins suivantes :\n\n- Pour cr\u00e9er et g\u00e9rer votre compte.\n- Pour permettre les r\u00e9servations de cours entre golfeurs et pros.\n- Pour traiter les paiements via Stripe.\n- Pour faciliter la communication de coaching.\n- Pour envoyer des e-mails transactionnels (confirmations de r\u00e9servation, rappels, v\u00e9rification).\n- Pour am\u00e9liorer notre plateforme et nos services.",
       },
       {
         heading: "4. Base l\u00e9gale",
