@@ -97,7 +97,11 @@ export default async function MemberDashboard() {
     }
   }
 
-  // Get my pros (via proStudents relationships) with booking preferences
+  // Get my pros (via proStudents relationships) with booking preferences.
+  // `published` is queried so the dashboard can hide booking entry
+  // points for pros who haven't finished their profile yet — clicking
+  // /member/book/[proId] 404s on those (task 150). Chat stays available
+  // either way.
   const myPros = await db
     .select({
       proStudentId: proStudents.id,
@@ -106,6 +110,7 @@ export default async function MemberDashboard() {
       photoUrl: proProfiles.photoUrl,
       specialties: proProfiles.specialties,
       bookingEnabled: proProfiles.bookingEnabled,
+      published: proProfiles.published,
       allowBookingWithoutPayment: proProfiles.allowBookingWithoutPayment,
       hasPreferences: proStudents.preferredLocationId,
     })
@@ -120,11 +125,13 @@ export default async function MemberDashboard() {
       )
     );
 
-  // Fetch quick book data for pros with saved preferences
+  // Fetch quick book data for pros with saved preferences. Require
+  // `published` too — an unpublished pro with preferences shouldn't
+  // surface a QuickBook strip that 404s when clicked.
   const quickBookMap: Record<number, QuickBookData> = {};
   await Promise.all(
     myPros
-      .filter((p) => p.hasPreferences !== null && p.bookingEnabled)
+      .filter((p) => p.hasPreferences !== null && p.bookingEnabled && p.published)
       .map(async (p) => {
         const data = await getQuickBookData(p.proProfileId, p.proStudentId);
         if (data.hasPreferences) {
@@ -219,7 +226,11 @@ export default async function MemberDashboard() {
                     </svg>
                     {t("memberDash.chat", locale)}
                   </Link>
-                  {pro.bookingEnabled && !quickBookMap[pro.proStudentId] && (
+                  {/* Booking entry is gated on the pro being fully
+                      published — pre-task-150 an invited student saw a
+                      "Boek les" CTA that 404'd because /member/book/[proId]
+                      filters on proProfiles.published=true. */}
+                  {pro.bookingEnabled && pro.published && !quickBookMap[pro.proStudentId] && (
                     <Link
                       href={`/member/book/${pro.proProfileId}`}
                       className="flex flex-1 items-center justify-center rounded-md bg-gold-600 px-3 py-1.5 text-xs font-medium text-white transition-colors hover:bg-gold-500"
@@ -228,7 +239,11 @@ export default async function MemberDashboard() {
                     </Link>
                   )}
                 </div>
-                {quickBookMap[pro.proStudentId] ? (
+                {!pro.published ? (
+                  <p className="mt-3 text-[11px] leading-snug text-green-500/80">
+                    {t("memberDash.proNotReady", locale)}
+                  </p>
+                ) : quickBookMap[pro.proStudentId] ? (
                   <QuickBook
                     data={quickBookMap[pro.proStudentId]}
                     proId={pro.proProfileId}

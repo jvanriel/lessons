@@ -17,6 +17,17 @@ If any role inside the brackets is unknown (typo), the parser falls
 back to treating the brackets as literal text — better to over-show
 than silently hide.
 
+## 2026-05-19 — v1.1.90
+
+- **No more 404 when an invited golfer tries to book with a half-
+  set-up pro.** A pro can invite golfers before their profile is
+  published. The golfer would see the pro card on their dashboard
+  with a "Book a lesson" button — clicking it 404'd because the
+  booking page filters on published pros. The dashboard now hides
+  the booking buttons when the pro isn't published and shows a
+  friendly "this pro is still setting up — chat already works"
+  message. Chat link stays active either way.
+
 ## 2026-05-19 — v1.1.89
 
 - **Phone-field country resets to Belgium after you clear it.**

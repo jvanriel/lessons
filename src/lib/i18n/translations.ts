@@ -511,6 +511,8 @@ const translations: Record<Locale, Record<string, string>> = {
     "memberDash.chat": "Chat",
     "memberDash.bookLesson": "Book a lesson",
     "memberDash.quickBookHint": "Quick Book shows up here once you've booked your first lesson with this pro.",
+    "memberDash.proNotReady":
+      "This pro is still setting up their profile. Booking opens once they go live — you can already chat in the meantime.",
     "memberDash.with": "with",
     "memberDash.at": "at",
     "memberDash.viewAll": "View all",
@@ -2084,6 +2086,8 @@ const translations: Record<Locale, Record<string, string>> = {
     "memberDash.chat": "Chat",
     "memberDash.bookLesson": "Boek les",
     "memberDash.quickBookHint": "Boek direct verschijnt hier zodra je een eerste les bij deze pro hebt geboekt.",
+    "memberDash.proNotReady":
+      "Deze pro is zijn profiel nog aan het opzetten. Boeken kan zodra hij online staat — chatten kan ondertussen al.",
     "memberDash.with": "met",
     "memberDash.at": "bij",
     "memberDash.viewAll": "Alles bekijken",
@@ -3637,6 +3641,8 @@ const translations: Record<Locale, Record<string, string>> = {
     "memberDash.chat": "Chat",
     "memberDash.bookLesson": "Réserver un cours",
     "memberDash.quickBookHint": "Quick Book apparaîtra ici dès que vous aurez réservé votre premier cours avec ce pro.",
+    "memberDash.proNotReady":
+      "Ce pro met encore son profil en place. Vous pourrez réserver dès qu'il sera en ligne — en attendant, le chat est déjà ouvert.",
     "memberDash.with": "avec",
     "memberDash.at": "à",
     "memberDash.viewAll": "Voir tout",
