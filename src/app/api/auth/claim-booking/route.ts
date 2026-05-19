@@ -1,9 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
-import { jwtVerify, errors as joseErrors } from "jose";
+import { jwtVerify } from "jose";
 import * as Sentry from "@sentry/nextjs";
 import { db } from "@/lib/db";
 import { users, lessonBookings } from "@/lib/db/schema";
 import { eq } from "drizzle-orm";
+import { isClaimBookingUserError } from "@/lib/claim-booking-errors";
 
 function getSecret() {
   return new TextEncoder().encode(
@@ -80,17 +81,10 @@ export async function GET(request: NextRequest) {
     // Fallback: no booking found — send to home page
     return NextResponse.redirect(new URL("/?verified=1", request.url));
   } catch (err) {
-    // Don't alert on user-input failures: a stale, expired, or
-    // mangled magic link is a 4xx-class problem, not a server bug.
-    // jose throws subclasses of JOSEError for malformed/expired/
-    // wrong-signature tokens; our own guards throw plain Errors with
-    // known messages. Both should redirect quietly. Anything else
-    // (DB failure, unexpected state) still escalates to Sentry.
-    const isUserError =
-      err instanceof joseErrors.JOSEError ||
-      (err instanceof Error &&
-        (err.message === "Invalid token" || err.message === "User not found"));
-    if (!isUserError) {
+    // Don't alert on user-input failures. The predicate covers
+    // jose's JOSEError subclasses + our two well-known guard
+    // messages; everything else still escalates to Sentry.
+    if (!isClaimBookingUserError(err)) {
       Sentry.captureException(err, { tags: { area: "claim-booking" } });
     }
     return NextResponse.redirect(new URL("/login?claim=error", request.url));
