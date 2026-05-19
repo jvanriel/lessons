@@ -6,6 +6,7 @@ import { users } from "@/lib/db/schema";
 import { eq } from "drizzle-orm";
 import { jwtVerify } from "jose";
 import { hashPassword, setSessionCookie, parseRoles } from "@/lib/auth";
+import { activatePendingProStudentRelationships } from "@/lib/pro-students";
 import { limitByIp, resetPasswordLimiter } from "@/lib/rate-limit";
 import { getLocale } from "@/lib/locale";
 import { t } from "@/lib/i18n/translations";
@@ -75,6 +76,14 @@ export async function resetPasswordWithToken(
       ...(!user.emailVerifiedAt ? { emailVerifiedAt: new Date() } : {}),
     })
     .where(eq(users.id, user.id));
+
+  // task 152 — this action is the landing for pro-invite emails (the
+  // pro's invite URL points at /reset-password?token=…). Flip every
+  // pending pro_students row for this user to active before the
+  // session is sealed so the inviting pro shows up on the student's
+  // dashboard / list immediately, instead of staying as a "Uitgenodigd"
+  // row that never auto-resolves.
+  await activatePendingProStudentRelationships(user.id);
 
   // Log them in
   await setSessionCookie({

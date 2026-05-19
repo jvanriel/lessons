@@ -2,10 +2,10 @@
 
 import { redirect } from "next/navigation";
 import { db } from "@/lib/db";
-import { users, userEmails, proStudents } from "@/lib/db/schema";
-import { and } from "drizzle-orm";
+import { users, userEmails } from "@/lib/db/schema";
 import { eq, or } from "drizzle-orm";
 import { verifyPassword, setSessionCookie, parseRoles } from "@/lib/auth";
+import { activatePendingProStudentRelationships } from "@/lib/pro-students";
 import { logEvent } from "@/lib/events";
 import { limitByIp, loginLimiter } from "@/lib/rate-limit";
 import { getLocale } from "@/lib/locale";
@@ -74,16 +74,10 @@ export async function userLogin(
     .set({ lastLoginAt: new Date() })
     .where(eq(users.id, user.id));
 
-  // Activate any pending pro-student relationships (e.g. from pro invites)
-  await db
-    .update(proStudents)
-    .set({ status: "active" })
-    .where(
-      and(
-        eq(proStudents.userId, user.id),
-        eq(proStudents.status, "pending")
-      )
-    );
+  // Activate any pending pro-student relationships (e.g. from pro
+  // invites). Uses the dedup-aware helper so legacy duplicate rows
+  // (pre-task-147) don't trip the partial unique index. (task 152)
+  await activatePendingProStudentRelationships(user.id);
 
   await setSessionCookie({
     userId: user.id,

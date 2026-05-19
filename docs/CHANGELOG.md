@@ -17,6 +17,17 @@ If any role inside the brackets is unknown (typo), the parser falls
 back to treating the brackets as literal text — better to over-show
 than silently hide.
 
+## 2026-05-19 — v1.1.92
+
+- **Invited golfers flip to "Actief" the moment they claim their
+  account.** When a pro invited a golfer, the pending pro_students
+  row stayed at "Uitgenodigd" forever even after the golfer set
+  their password — and the choose-pros step could create a second
+  active row, so the pro saw the same person twice in their list.
+  Both the invite-email reset-password flow and the new-account
+  register/login paths now flip pending → active on first login,
+  with a safety dedup against any legacy duplicate active sibling.
+
 ## 2026-05-19 — v1.1.91
 
 - **[pro] Cancellations show as a credit-note line in earnings.**
