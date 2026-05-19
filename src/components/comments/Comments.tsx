@@ -1,6 +1,10 @@
 "use client";
 
 import { useState, useEffect, useRef, useCallback } from "react";
+import {
+  isGoogleShortcutName,
+  parseGoogleShortcutUrl,
+} from "@/lib/google-shortcut";
 
 // ─── Types ─────────────────────────────────────────────
 
@@ -278,28 +282,6 @@ export default function Comments({
 
   // ─── File Upload ────────────────────────────────────
 
-  /**
-   * Detect a Google Drive for Desktop shortcut file. These are tiny
-   * JSON stubs (≤1 KB) Drive places on the local filesystem to
-   * represent native Google Docs/Sheets/Slides — uploading the stub
-   * to Blob would store the JSON, not the actual document. We
-   * intercept and route through the Drive attach API instead, which
-   * resolves the cloud file via the service account. (task 16
-   * retest — Nadine's Drive folder shows .gdoc/.gsheet shortcuts as
-   * "no extension" in Explorer; the file picker hides them by
-   * mime-type unless we accept their extensions explicitly.)
-   */
-  function isGoogleShortcut(file: File): boolean {
-    const name = file.name.toLowerCase();
-    return (
-      name.endsWith(".gdoc") ||
-      name.endsWith(".gsheet") ||
-      name.endsWith(".gslides") ||
-      name.endsWith(".gdraw") ||
-      name.endsWith(".gform")
-    );
-  }
-
   async function handleFileUpload(file: File) {
     if (!onUpload || uploading) return;
     setUploading(true);
@@ -312,11 +294,10 @@ export default function Comments({
       // Parse the embedded URL and reroute through the Drive attach
       // flow so the cloud file is what gets linked. Falls through to
       // a normal upload if parsing fails for any reason.
-      if (onAttachGoogleLink && isGoogleShortcut(file)) {
+      if (onAttachGoogleLink && isGoogleShortcutName(file.name)) {
         try {
           const text = await file.text();
-          const parsed = JSON.parse(text) as { url?: string };
-          const driveUrl = typeof parsed.url === "string" ? parsed.url : null;
+          const driveUrl = parseGoogleShortcutUrl(text);
           if (driveUrl) {
             const attachment = await onAttachGoogleLink(driveUrl);
             const res = await fetch("/api/comments", {
