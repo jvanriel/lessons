@@ -17,6 +17,16 @@ If any role inside the brackets is unknown (typo), the parser falls
 back to treating the brackets as literal text — better to over-show
 than silently hide.
 
+## 2026-05-19 — v1.1.100
+
+- **"Find another pro" button in account-deletion emails works
+  again.** When a pro account was removed, the cancellation email
+  to the affected students contained a button whose href was just
+  `/pros` — a relative URL with no scheme/host. Email clients
+  render that as `http:///pros` and browsers refuse to open it.
+  The link is now built with the absolute app URL, so it routes
+  cleanly to the live `/pros` listing.
+
 ## 2026-05-19 — v1.1.99
 
 - **[pro] Removing a period inside another schedule no longer
