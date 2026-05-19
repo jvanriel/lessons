@@ -15,6 +15,10 @@ import {
   getSubscriptionEndedSubject,
 } from "@/lib/email-templates";
 import { resolveLocale } from "@/lib/i18n";
+import {
+  parseNoShowSettlement,
+  computeSettlementPlatformFee,
+} from "@/lib/no-show-settlement";
 
 // Stripe v22's Subscription type moved `current_period_end` / `trial_end`
 // onto items in newer API versions. Our account is still on the pre-move
@@ -150,6 +154,21 @@ async function recordEvent(event: Stripe.Event, bookingId?: number) {
 // ─── Event Handlers ─────────────────────────────────────
 
 async function handleCheckoutCompleted(session: Stripe.Checkout.Session) {
+  // Task 155 phase 2 — no-show settlement Checkout sessions arrive
+  // with mode='payment' and metadata.kind='no-show-settlement'. They
+  // settle a lesson the student didn't show up for. We flip the
+  // booking row to paid + recompute platformFeeCents with online=true
+  // (the platform is collecting via Stripe now, so the Stripe
+  // surcharge applies regardless of the original cash-only setting).
+  //
+  // The follow-up payment_intent.succeeded event later no-ops via
+  // the existing idempotency guard in handlePaymentIntentSucceeded.
+  const settlement = parseNoShowSettlement(session);
+  if (settlement) {
+    await handleNoShowSettlement(settlement);
+    return;
+  }
+
   if (session.mode !== "subscription") return;
 
   const profile = await findProfileByMetadata(
@@ -185,6 +204,58 @@ async function handleCheckoutCompleted(session: Stripe.Checkout.Session) {
 
   console.log(
     `Subscription activated for pro ${profile.id}: ${sub.id} (${plan}, ${sub.status})`
+  );
+}
+
+/**
+ * Task 155 phase 2 — finalize a no-show settlement once the student
+ * pays the Checkout link from the no-show email. Recomputes
+ * `platformFeeCents` with `online: true` (Stripe is collecting, so
+ * the surcharge applies) and flips the row to paid.
+ *
+ * Idempotent: re-firing on an already-paid row is a no-op.
+ */
+async function handleNoShowSettlement(settlement: {
+  bookingId: number;
+  paymentIntentId: string | null;
+}) {
+  const { bookingId, paymentIntentId } = settlement;
+
+  const [booking] = await db
+    .select({
+      id: lessonBookings.id,
+      paymentStatus: lessonBookings.paymentStatus,
+      priceCents: lessonBookings.priceCents,
+    })
+    .from(lessonBookings)
+    .where(eq(lessonBookings.id, bookingId))
+    .limit(1);
+  if (!booking) {
+    console.warn(
+      `no-show settlement webhook for unknown booking ${bookingId}`,
+    );
+    return;
+  }
+  if (booking.paymentStatus === "paid") {
+    console.log(`no-show settlement already paid for booking ${bookingId}`);
+    return;
+  }
+
+  const platformFeeCents = computeSettlementPlatformFee(booking.priceCents);
+
+  await db
+    .update(lessonBookings)
+    .set({
+      paymentStatus: "paid",
+      paidAt: new Date(),
+      platformFeeCents,
+      ...(paymentIntentId ? { stripePaymentIntentId: paymentIntentId } : {}),
+      updatedAt: new Date(),
+    })
+    .where(eq(lessonBookings.id, bookingId));
+
+  console.log(
+    `Booking ${bookingId} no-show settlement paid (PI ${paymentIntentId ?? "?"}), fee=${platformFeeCents}`,
   );
 }
 
