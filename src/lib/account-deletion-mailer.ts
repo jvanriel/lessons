@@ -114,7 +114,15 @@ function formatLessonDate(date: string, locale: Locale): string {
   }).format(new Date(date + "T00:00:00"));
 }
 
-function buildEmailBody(opts: {
+/**
+ * Render the HTML body for an account-deletion notification email.
+ * Exported for unit tests — the `notifyCounterpartOfAccountDeletion`
+ * helper composes its callers' arguments and passes them straight
+ * through, so testing this gives us coverage of the CTA-URL
+ * rendering (regression for task 62 round 2: a relative `/pros` href
+ * rendered as `http:///pros` in mail clients).
+ */
+export function buildEmailBody(opts: {
   greeting: string;
   recipientFirstName: string;
   bodyLine: string;
