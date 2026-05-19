@@ -17,6 +17,19 @@ If any role inside the brackets is unknown (typo), the parser falls
 back to treating the brackets as literal text — better to over-show
 than silently hide.
 
+## 2026-05-19 — v1.1.99
+
+- **[pro] Removing a period inside another schedule no longer
+  leaves an invisible gap.** When you removed a bounded period
+  whose neighbouring periods have different schedules, the date
+  range went silently uncovered — students saw "no slots" but the
+  pro had no signal. Now the editor keeps a visible empty
+  placeholder tab for that range, marked in amber with a "leeg"
+  badge, and the editor itself shows an amber hint above the grid
+  ("Deze periode heeft nog geen beschikbaarheid — kleur cellen in
+  het rooster hieronder in"). The auto-merge behaviour (when both
+  neighbours match) is unchanged.
+
 ## 2026-05-19 — v1.1.98
 
 - **Edit-booking dialog explains why the participant picker is

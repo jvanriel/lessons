@@ -115,6 +115,21 @@ function cloneGrid(g: LocationGrid): LocationGrid {
  * apart since) collapse back into one when the user removes the
  * bounded period that originally split them. (task 77 item D)
  */
+/**
+ * True when every cell of the grid is empty — used to flag a period
+ * that's been left without availability (typically the gap-placeholder
+ * inserted after removing a bounded period whose flanks couldn't be
+ * merged). (task 77 retest)
+ */
+function isGridEmpty(g: LocationGrid): boolean {
+  for (let day = 0; day < 7; day++) {
+    for (let row = 0; row < ROWS; row++) {
+      if (g[day][row].size > 0) return false;
+    }
+  }
+  return true;
+}
+
 function gridsEqual(a: LocationGrid, b: LocationGrid): boolean {
   for (let day = 0; day < 7; day++) {
     for (let row = 0; row < ROWS; row++) {
@@ -754,8 +769,9 @@ function SchedulePeriodsSection({
     const idx = periods.findIndex((p) => p.id === id);
     if (idx < 0) return;
     const wasLast = idx === periods.length - 1 && periods.length > 1;
-    // Snapshot the flanking periods BEFORE the filter — used by the
-    // auto-merge step below. (task 77 item D)
+    // Snapshot the flanking periods + the removed period BEFORE the
+    // filter — used by the auto-merge step + gap-placeholder below.
+    const removed = periods[idx];
     const prev = idx > 0 ? periods[idx - 1] : null;
     const after = idx < periods.length - 1 ? periods[idx + 1] : null;
 
@@ -767,16 +783,46 @@ function SchedulePeriodsSection({
     // identical pieces sandwiching a now-empty range. Without this,
     // the editor would leave (null, X-1) + (Y+1, null) as two stuck
     // tabs even though the user just wants their Altijd back.
+    let merged = false;
     if (prev && after && periodsCanMerge(prev, after)) {
-      const merged: Period = {
+      const mergedPeriod: Period = {
         ...prev,
         validUntil: after.validUntil,
         grid: cloneGrid(prev.grid),
       };
       next = next
         .filter((p) => p.id !== prev.id && p.id !== after.id)
-        .concat(merged)
+        .concat(mergedPeriod)
         .sort(sortPeriods);
+      merged = true;
+    }
+
+    // Gap placeholder: when neighbors couldn't be merged AND the
+    // removed period was bounded (had both a start and end date),
+    // re-insert an EMPTY period at the same date range so the pro
+    // visibly sees the now-uncovered window and knows to fill in
+    // availability for it. Without this, the date range becomes
+    // silent dead space — students see "no slots" but the pro
+    // doesn't notice (task 77 retest, Nadine 2026-05-18).
+    if (
+      !merged &&
+      removed &&
+      removed.validFrom &&
+      removed.validUntil &&
+      prev &&
+      after
+    ) {
+      next = [
+        ...next,
+        {
+          id: `p${Date.now()}`,
+          validFrom: removed.validFrom,
+          validUntil: removed.validUntil,
+          displayStartTime: removed.displayStartTime,
+          displayEndTime: removed.displayEndTime,
+          grid: emptyGrid(),
+        },
+      ].sort(sortPeriods);
     }
     // If the user removed the chronologically last period and ticked
     // the "extend previous" toggle, clear the new-last's validUntil
@@ -837,21 +883,41 @@ function SchedulePeriodsSection({
         <span className="text-sm font-medium text-green-800">
           {t("proAvail.schedulePeriods", locale)}:
         </span>
-        {periods.map((p) => (
-          <button
-            key={p.id}
-            type="button"
-            onClick={() => onActivePeriodChange(p.id)}
-            className={`rounded-full px-3 py-1 text-xs font-medium transition-colors ${
-              p.id === activePeriodId
-                ? "bg-green-700 text-white"
-                : "border border-green-200 bg-white text-green-700 hover:border-green-400"
-            }`}
-            title={periodLabel(p, locale)}
-          >
-            {periodLabel(p, locale)}
-          </button>
-        ))}
+        {periods.map((p) => {
+          // Bounded periods with no slots get an amber border + ring so
+          // the pro spots them at a glance — typically gap placeholders
+          // left after removing a non-mergeable middle period. The
+          // unbounded Altijd-tab is always considered "fine" even when
+          // empty (it's the default starting state).
+          const isEmpty =
+            (p.validFrom !== null || p.validUntil !== null) &&
+            isGridEmpty(p.grid);
+          const isActive = p.id === activePeriodId;
+          return (
+            <button
+              key={p.id}
+              type="button"
+              onClick={() => onActivePeriodChange(p.id)}
+              className={`rounded-full px-3 py-1 text-xs font-medium transition-colors ${
+                isActive
+                  ? isEmpty
+                    ? "bg-amber-600 text-white"
+                    : "bg-green-700 text-white"
+                  : isEmpty
+                    ? "border border-amber-300 bg-amber-50 text-amber-700 hover:border-amber-500"
+                    : "border border-green-200 bg-white text-green-700 hover:border-green-400"
+              }`}
+              title={periodLabel(p, locale)}
+            >
+              {periodLabel(p, locale)}
+              {isEmpty && (
+                <span className="ml-1 opacity-80">
+                  · {t("proAvail.emptyBadge", locale)}
+                </span>
+              )}
+            </button>
+          );
+        })}
         <button
           type="button"
           onClick={() => setShowAdd(true)}
@@ -889,6 +955,18 @@ function SchedulePeriodsSection({
                 ) && (
                   <p className="mt-1 text-[11px] italic text-green-500">
                     {t("proAvail.alwaysResetHint", locale)}
+                  </p>
+                )}
+              {/* Empty-period banner: bounded period with no slots —
+                  typically a gap placeholder left by removing a
+                  middle period whose flanks didn't match (task 77
+                  retest). Surfaces the unfilled range so the pro
+                  knows to paint availability in. */}
+              {(activePeriod.validFrom !== null ||
+                activePeriod.validUntil !== null) &&
+                isGridEmpty(activePeriod.grid) && (
+                  <p className="mt-1 rounded-md bg-amber-50 px-2 py-1 text-[11px] text-amber-800">
+                    {t("proAvail.emptyPeriodHint", locale)}
                   </p>
                 )}
             </div>
