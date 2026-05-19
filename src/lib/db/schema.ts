@@ -10,7 +10,9 @@ import {
   date,
   numeric,
   index,
+  uniqueIndex,
 } from "drizzle-orm/pg-core";
+import { sql } from "drizzle-orm";
 
 export const users = pgTable("users", {
   id: serial("id").primaryKey(),
@@ -486,7 +488,14 @@ export const proStudents = pgTable("pro_students", {
   preferredTime: varchar("preferred_time", { length: 20 }), // HH:MM or morning/afternoon/evening
   preferredInterval: varchar("preferred_interval", { length: 20 }), // weekly, biweekly, monthly
   createdAt: timestamp("created_at").defaultNow().notNull(),
-});
+}, (t) => ({
+  // Partial unique index — at most one ACTIVE row per (pro, student)
+  // pair. Inactive rows are exempt so a student can deactivate then
+  // reactivate without DB friction. Backs the dedupe fixes in task 147.
+  proUserActiveIdx: uniqueIndex("pro_students_pro_user_active_idx")
+    .on(t.proProfileId, t.userId)
+    .where(sql`${t.status} = 'active'`),
+}));
 
 // ─── Pro Mailing ────────────────────────────────────────────
 

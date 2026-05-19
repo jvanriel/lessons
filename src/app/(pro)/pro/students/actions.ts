@@ -331,14 +331,20 @@ export async function inviteStudent(
       .onConflictDoNothing();
   }
 
-  // Create pro-student relationship
-  // "pro_added" is always active immediately; "invited" is pending until first login
-  await db.insert(proStudents).values({
-    proProfileId: profile.id,
-    userId,
-    source,
-    status: source === "pro_added" ? "active" : (tempPassword ? "pending" : "active"),
-  });
+  // Create pro-student relationship.
+  // "pro_added" is always active immediately; "invited" is pending until first login.
+  // onConflictDoNothing guards the (pro_profile_id, user_id) WHERE status='active'
+  // partial unique index added in task 147 — a concurrent invite race won't
+  // produce a duplicate active row.
+  await db
+    .insert(proStudents)
+    .values({
+      proProfileId: profile.id,
+      userId,
+      source,
+      status: source === "pro_added" ? "active" : (tempPassword ? "pending" : "active"),
+    })
+    .onConflictDoNothing();
 
   // Send invite email if a new user was created. The pro's locale
   // (from their session cookie) is used since the new student

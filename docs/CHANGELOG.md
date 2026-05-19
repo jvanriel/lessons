@@ -17,6 +17,17 @@ If any role inside the brackets is unknown (typo), the parser falls
 back to treating the brackets as literal text — better to over-show
 than silently hide.
 
+## 2026-05-19 — v1.1.88
+
+- **Pros no longer appear twice on the member dashboard.** A
+  duplicate `pro_students` row was created when the onboarding
+  flow only deduped against active rows (so a "pending" or
+  "inactive" row got duplicated) or when two inserts raced past
+  the check-then-insert. The table now has a partial unique index
+  that makes duplicates impossible at the DB level, and the
+  onboarding flow reactivates inactive/pending rows instead of
+  inserting a new one.
+
 ## 2026-05-17 — v1.1.87
 
 - **[pro] Cancelled bookings no longer block new ones on the
