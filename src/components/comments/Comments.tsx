@@ -5,6 +5,11 @@ import {
   isGoogleShortcutName,
   parseGoogleShortcutUrl,
 } from "@/lib/google-shortcut";
+import {
+  computeReadReceipt,
+  readReceiptColorClass,
+  readReceiptGlyph,
+} from "@/lib/read-receipt";
 
 // ─── Types ─────────────────────────────────────────────
 
@@ -124,9 +129,6 @@ export default function Comments({
   emptyText = "No comments yet. Start the conversation.",
   readReceiptOtherSeenAt,
 }: CommentsProps) {
-  const otherSeenAtMs = readReceiptOtherSeenAt
-    ? new Date(readReceiptOtherSeenAt).getTime()
-    : null;
   const [comments, setComments] = useState<Comment[]>([]);
   const [loading, setLoading] = useState(true);
   const [input, setInput] = useState("");
@@ -1161,16 +1163,18 @@ export default function Comments({
                       !isDeleted &&
                       readReceiptOtherSeenAt !== undefined &&
                       (() => {
-                        const sentAt = new Date(comment.createdAt).getTime();
-                        const isRead =
-                          otherSeenAtMs !== null && otherSeenAtMs >= sentAt;
+                        const state = computeReadReceipt(
+                          readReceiptOtherSeenAt,
+                          comment.createdAt,
+                        );
+                        const label = state === "read" ? "Read" : "Sent";
                         return (
                           <span
-                            className={`text-[11px] ${isRead ? "text-blue-500" : "text-green-400"}`}
-                            aria-label={isRead ? "Read" : "Sent"}
-                            title={isRead ? "Read" : "Sent"}
+                            className={`text-[11px] ${readReceiptColorClass(state)}`}
+                            aria-label={label}
+                            title={label}
                           >
-                            {isRead ? "✓✓" : "✓"}
+                            {readReceiptGlyph(state)}
                           </span>
                         );
                       })()}
