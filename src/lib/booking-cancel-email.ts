@@ -89,6 +89,21 @@ export const CANCEL_STRINGS: Record<
   },
 };
 
+/**
+ * True when the caller-supplied cancellation reason is something
+ * the pro actually typed (so the student should see it on the
+ * cancellation email), as opposed to one of the legacy hard-coded
+ * defaults from before task 154. Surfacing "Reason: Cancelled by
+ * pro" would be both redundant and confusing.
+ */
+export function isUserCancellationReason(reason: string | undefined): boolean {
+  const trimmed = reason?.trim();
+  if (!trimmed) return false;
+  if (trimmed === "Cancelled by pro") return false;
+  if (trimmed === "Cancelled — pro blocked this time slot") return false;
+  return true;
+}
+
 export function formatCancelLessonDate(date: string, locale: Locale): string {
   const dateLocale =
     locale === "nl" ? "nl-BE" : locale === "fr" ? "fr-BE" : "en-GB";

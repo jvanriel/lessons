@@ -18,6 +18,7 @@ import {
   CANCEL_STRINGS,
   formatCancelLessonDate,
   buildCancelEmailBody,
+  isUserCancellationReason,
 } from "@/lib/booking-cancel-email";
 
 export type CancelByProResult =
@@ -167,11 +168,8 @@ export async function cancelBookingByPro(opts: {
   // The pro-typed cancellation reason — when the caller passed something
   // beyond the generic defaults, surface it as a "Reason: X" row on both
   // emails so the student sees why the pro cancelled (task 154).
+  const hasUserReason = isUserCancellationReason(opts.reason);
   const trimmedReason = opts.reason?.trim();
-  const hasUserReason =
-    !!trimmedReason &&
-    trimmedReason !== "Cancelled by pro" &&
-    trimmedReason !== "Cancelled — pro blocked this time slot";
 
   if (student?.email) {
     const ss = CANCEL_STRINGS[studentLocale] ?? CANCEL_STRINGS.en;
