@@ -17,6 +17,17 @@ If any role inside the brackets is unknown (typo), the parser falls
 back to treating the brackets as literal text — better to over-show
 than silently hide.
 
+## 2026-05-19 — v1.1.98
+
+- **Edit-booking dialog explains why the participant picker is
+  missing.** When a pro has configured a location for solo lessons
+  only (max participants = 1), the "Aantal deelnemers" dropdown
+  used to silently disappear on the edit form, making it look like
+  a missing feature. Now you see a short hint there: "Deze pro
+  biedt op deze locatie enkel privélessen aan." (EN/NL/FR). The
+  underlying behaviour (no extra-participant slot for max=1
+  locations) is unchanged — this just makes the limitation visible.
+
 ## 2026-05-19 — v1.1.97
 
 - **[pro] Cancelling your subscription now hides your profile right
