@@ -405,7 +405,11 @@ export async function updateBooking(formData: FormData) {
     .limit(1);
   const cancellationHours = proRow?.cancellationHours ?? 24;
   const editError = validateEditAllowed(booking, cancellationHours, tz, {
-    proposed: { date: changes.date, startTime: changes.startTime },
+    proposed: {
+      date: changes.date,
+      startTime: changes.startTime,
+      endTime: changes.endTime,
+    },
   });
   if (editError) {
     const localeForError = await getLocale();
