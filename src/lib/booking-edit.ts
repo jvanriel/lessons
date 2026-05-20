@@ -114,29 +114,43 @@ export type EditNotAllowedReason = "only-confirmed" | "too-late";
  * Server-side validation for an edit. Returns null on success or a
  * typed error code the action layer translates.
  *
- * The cancellation-window gate ONLY applies when the edit moves the
- * lesson to a different start (date or startTime). The rationale: a
- * student who could "edit" their way to an earlier date past the
- * cancellation deadline would be circumventing the policy. But pure
- * non-reschedule edits — adding a participant, shortening / extending
- * the duration at the same startTime — don't change the pro's
- * exposure and were getting blocked unnecessarily. (post-task-114
- * follow-up; v1.1.103+.)
+ * The cancellation-window gate applies to any edit that REDUCES the
+ * pro's commitment — a true reschedule (date or startTime change)
+ * AND a shrink (same start, earlier end). Both let the student
+ * release time the pro can no longer fill on short notice; the
+ * policy rationale (no last-minute partial-cancellations) is
+ * identical to the full-cancel case.
+ *
+ * Edits that DON'T reduce the pro's commitment — adding a
+ * participant, extending the duration at the same start, keeping
+ * everything as-is and just renaming participants — bypass the gate.
+ * (v1.1.104 first opened this up; v1.1.105 tightened it after
+ * spotting the shrink loophole.)
  *
  * `proCancelOverride` lets the pro side bypass the gate entirely
  * for their own bookings, mirroring the cancel flow's
  * `proCancelBooking` semantics.
  */
 export function validateEditAllowed(
-  booking: { date: string; startTime: string; status: string; cancelledAt: Date | null },
+  booking: {
+    date: string;
+    startTime: string;
+    endTime: string;
+    status: string;
+    cancelledAt: Date | null;
+  },
   cancellationHours: number,
   locationTimezone: string,
   opts: {
     proCancelOverride?: boolean;
-    /** The edit being applied. When the proposed date+startTime
-     *  match the booking's existing slot, the cancellation-window
-     *  gate is skipped — only true reschedules are policy-gated. */
-    proposed?: { date: string; startTime: string };
+    /** The edit being applied. The gate fires when this would
+     *  reduce the pro's commitment: a date or startTime change
+     *  (reschedule), or an endTime that lands earlier than the
+     *  existing one (shrink). When `proposed.endTime` is omitted
+     *  the shrink check is skipped — the caller hasn't said either
+     *  way, so we default to the pre-v1.1.105 lenient behaviour.
+     *  Both v1.1.105 call sites do pass the full triple. */
+    proposed?: { date: string; startTime: string; endTime?: string };
   } = {},
 ): EditNotAllowedReason | null {
   if (booking.status !== "confirmed" || booking.cancelledAt) {
@@ -144,16 +158,19 @@ export function validateEditAllowed(
   }
   if (opts.proCancelOverride) return null;
 
-  // Non-reschedule edits (participant change, duration tweak at the
-  // same startTime) skip the cancellation-window gate. The lesson's
-  // wall-clock start hasn't moved, so the policy rationale doesn't
-  // apply.
-  if (
-    opts.proposed &&
-    opts.proposed.date === booking.date &&
-    opts.proposed.startTime === booking.startTime
-  ) {
-    return null;
+  // Skip the cancellation-window gate only when the edit doesn't
+  // shrink the pro's commitment:
+  //   • date + startTime unchanged, AND
+  //   • endTime is the same or later than the original (extend or
+  //     equal — never shorter).
+  if (opts.proposed) {
+    const sameStart =
+      opts.proposed.date === booking.date &&
+      opts.proposed.startTime === booking.startTime;
+    const notShrunk =
+      opts.proposed.endTime === undefined ||
+      opts.proposed.endTime >= booking.endTime;
+    if (sameStart && notShrunk) return null;
   }
 
   const check = checkCancellationAllowed(

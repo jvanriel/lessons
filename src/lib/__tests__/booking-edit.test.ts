@@ -204,6 +204,7 @@ describe("validateEditAllowed", () => {
       {
         date: "2026-06-20", // 6 days away
         startTime: "10:00",
+        endTime: "11:00",
         status: "confirmed",
         cancelledAt: null,
       },
@@ -218,6 +219,7 @@ describe("validateEditAllowed", () => {
       {
         date: "2026-06-20",
         startTime: "10:00",
+        endTime: "11:00",
         status: "cancelled",
         cancelledAt: new Date("2026-06-13T10:00:00Z"),
       },
@@ -233,6 +235,7 @@ describe("validateEditAllowed", () => {
       {
         date: "2026-06-14",
         startTime: "20:00",
+        endTime: "21:00",
         status: "confirmed",
         cancelledAt: null,
       },
@@ -249,6 +252,7 @@ describe("validateEditAllowed", () => {
       {
         date: "2026-06-14",
         startTime: "20:00",
+        endTime: "21:00",
         status: "confirmed",
         cancelledAt: null,
       },
@@ -266,6 +270,7 @@ describe("validateEditAllowed", () => {
       {
         date: "2026-06-20",
         startTime: "10:00",
+        endTime: "11:00",
         status: "cancelled",
         cancelledAt: new Date(),
       },
@@ -276,73 +281,124 @@ describe("validateEditAllowed", () => {
     expect(result).toBe("only-confirmed");
   });
 
-  describe("non-reschedule edits bypass the cancellation window", () => {
+  describe("non-reduction edits bypass the cancellation window", () => {
     // A user reported on 2026-05-20 that extending a same-day booking
     // (to add a participant) got "too-late" — even though they
     // weren't moving the lesson. The cancellation policy's rationale
-    // (prevent gaming the rules by re-scheduling) doesn't apply when
-    // the wall-clock start is unchanged, so the gate now skips for
-    // those edits.
+    // (prevent gaming the rules by partial-cancelling on short
+    // notice) doesn't apply when the pro's commitment isn't reduced,
+    // so the gate now skips for participant-only edits and
+    // extend-duration edits at the same startTime. SHRINKS still
+    // count as partial cancellations and get gated. (v1.1.105.)
 
     const inWindowBooking = {
       date: "2026-06-14", // same day as "now"
       startTime: "20:00", // 12h away — well inside the 24h window
+      endTime: "21:00", // existing 60-min lesson
       status: "confirmed",
       cancelledAt: null,
     };
 
-    it("allows participant-only edit (proposed slot matches existing)", () => {
+    it("allows participant-only edit (same start, same end)", () => {
       const result = validateEditAllowed(inWindowBooking, 24, TZ, {
-        proposed: { date: "2026-06-14", startTime: "20:00" },
+        proposed: {
+          date: "2026-06-14",
+          startTime: "20:00",
+          endTime: "21:00",
+        },
       });
       expect(result).toBeNull();
     });
 
-    it("allows duration-change edit at the same startTime", () => {
-      // The endTime / duration aren't part of the gate input — what
-      // matters is that date + startTime didn't move. The action
-      // layer handles slot-conflict / availability checks separately.
+    it("allows EXTENDING the duration at the same startTime", () => {
+      // 60 → 90 min: pro's commitment grows, not shrinks. Should
+      // pass — the pro earns more, not less.
       const result = validateEditAllowed(inWindowBooking, 24, TZ, {
-        proposed: { date: "2026-06-14", startTime: "20:00" },
+        proposed: {
+          date: "2026-06-14",
+          startTime: "20:00",
+          endTime: "21:30",
+        },
       });
       expect(result).toBeNull();
+    });
+
+    it("REJECTS shrinking the duration inside the window", () => {
+      // 60 → 30 min: same start, earlier end. The freed tail is
+      // effectively a partial cancellation the pro can't re-sell
+      // on short notice. The cancellation policy applies. (The
+      // loophole v1.1.105 closed.)
+      const result = validateEditAllowed(inWindowBooking, 24, TZ, {
+        proposed: {
+          date: "2026-06-14",
+          startTime: "20:00",
+          endTime: "20:30",
+        },
+      });
+      expect(result).toBe("too-late");
     });
 
     it("STILL rejects a true reschedule inside the window (date changes)", () => {
       const result = validateEditAllowed(inWindowBooking, 24, TZ, {
-        proposed: { date: "2026-06-15", startTime: "20:00" },
+        proposed: {
+          date: "2026-06-15",
+          startTime: "20:00",
+          endTime: "21:00",
+        },
       });
       expect(result).toBe("too-late");
     });
 
     it("STILL rejects a true reschedule inside the window (startTime changes)", () => {
       const result = validateEditAllowed(inWindowBooking, 24, TZ, {
-        proposed: { date: "2026-06-14", startTime: "21:00" },
+        proposed: {
+          date: "2026-06-14",
+          startTime: "21:00",
+          endTime: "22:00",
+        },
       });
       expect(result).toBe("too-late");
     });
 
-    it("falls back to the existing gate when no proposed slot is passed", () => {
-      // Older call sites might not pass `proposed` yet — the
-      // pre-change behaviour stays in place for them: every in-
-      // window edit is rejected. Pin the backwards compatibility.
+    it("falls back to the lenient gate when proposed.endTime is omitted", () => {
+      // Older call sites or partial proposals (no endTime supplied)
+      // get the pre-v1.1.105 behaviour: skip the gate when date +
+      // startTime match. Both v1.1.105 production call sites now
+      // pass endTime, but the defensive default stays lenient so
+      // a future caller can't accidentally tighten the gate by
+      // forgetting the field.
+      const result = validateEditAllowed(inWindowBooking, 24, TZ, {
+        proposed: { date: "2026-06-14", startTime: "20:00" },
+      });
+      expect(result).toBeNull();
+    });
+
+    it("falls back to the existing gate when no proposed slot is passed at all", () => {
+      // Backwards-compat: every in-window edit rejected. Pinned so
+      // an older caller using the bare 3-arg form doesn't silently
+      // start allowing things.
       const result = validateEditAllowed(inWindowBooking, 24, TZ);
       expect(result).toBe("too-late");
     });
 
-    it("non-reschedule edit is still rejected on a cancelled booking", () => {
-      // The bypass only short-circuits the time-window gate; the
-      // status check still runs first.
+    it("status gate still fires first even when proposed signals a non-shrink edit", () => {
       const result = validateEditAllowed(
         {
           date: "2026-06-14",
           startTime: "20:00",
+          endTime: "21:00",
           status: "cancelled",
           cancelledAt: new Date(),
         },
         24,
         TZ,
-        { proposed: { date: "2026-06-14", startTime: "20:00" } },
+        {
+          proposed: {
+            date: "2026-06-14",
+            startTime: "20:00",
+            endTime: "21:00",
+          },
+        },
       );
       expect(result).toBe("only-confirmed");
     });
