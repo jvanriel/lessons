@@ -404,7 +404,9 @@ export async function updateBooking(formData: FormData) {
     .where(eq(proProfiles.id, booking.proProfileId))
     .limit(1);
   const cancellationHours = proRow?.cancellationHours ?? 24;
-  const editError = validateEditAllowed(booking, cancellationHours, tz);
+  const editError = validateEditAllowed(booking, cancellationHours, tz, {
+    proposed: { date: changes.date, startTime: changes.startTime },
+  });
   if (editError) {
     const localeForError = await getLocale();
     return {

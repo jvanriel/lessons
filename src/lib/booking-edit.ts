@@ -114,24 +114,48 @@ export type EditNotAllowedReason = "only-confirmed" | "too-late";
  * Server-side validation for an edit. Returns null on success or a
  * typed error code the action layer translates.
  *
- * The cancellation-window gate is the same one that protects the
- * cancel flow — the rationale being that if the lesson is too late to
- * cancel, it's also too late to reschedule (otherwise users could
- * "edit" their way around the cancellation policy by bumping the date
- * back and re-submitting). `proCancelOverride` lets the pro side
- * bypass the gate for their own bookings, mirroring the cancel
- * flow's `proCancelBooking` semantics.
+ * The cancellation-window gate ONLY applies when the edit moves the
+ * lesson to a different start (date or startTime). The rationale: a
+ * student who could "edit" their way to an earlier date past the
+ * cancellation deadline would be circumventing the policy. But pure
+ * non-reschedule edits — adding a participant, shortening / extending
+ * the duration at the same startTime — don't change the pro's
+ * exposure and were getting blocked unnecessarily. (post-task-114
+ * follow-up; v1.1.103+.)
+ *
+ * `proCancelOverride` lets the pro side bypass the gate entirely
+ * for their own bookings, mirroring the cancel flow's
+ * `proCancelBooking` semantics.
  */
 export function validateEditAllowed(
   booking: { date: string; startTime: string; status: string; cancelledAt: Date | null },
   cancellationHours: number,
   locationTimezone: string,
-  opts: { proCancelOverride?: boolean } = {},
+  opts: {
+    proCancelOverride?: boolean;
+    /** The edit being applied. When the proposed date+startTime
+     *  match the booking's existing slot, the cancellation-window
+     *  gate is skipped — only true reschedules are policy-gated. */
+    proposed?: { date: string; startTime: string };
+  } = {},
 ): EditNotAllowedReason | null {
   if (booking.status !== "confirmed" || booking.cancelledAt) {
     return "only-confirmed";
   }
   if (opts.proCancelOverride) return null;
+
+  // Non-reschedule edits (participant change, duration tweak at the
+  // same startTime) skip the cancellation-window gate. The lesson's
+  // wall-clock start hasn't moved, so the policy rationale doesn't
+  // apply.
+  if (
+    opts.proposed &&
+    opts.proposed.date === booking.date &&
+    opts.proposed.startTime === booking.startTime
+  ) {
+    return null;
+  }
+
   const check = checkCancellationAllowed(
     booking.date,
     booking.startTime,
