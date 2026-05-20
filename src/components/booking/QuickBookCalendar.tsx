@@ -30,6 +30,7 @@
 import {
   useState,
   useEffect,
+  useMemo,
   useRef,
   useTransition,
 } from "react";
@@ -201,19 +202,43 @@ export default function QuickBookCalendar({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedDate, duration, excludeBookingId]);
 
+  // When editing an existing booking, the booking's own slot stays
+  // selectable even when it's now inside the pro's bookingNotice
+  // window (which strips it from the server `slots`). The notice is
+  // a guard against NEW bookings — a last-minute edit (e.g. adding a
+  // participant the day before the lesson) shouldn't get nulled out
+  // and disable the Save button. Splice the current slot in if it's
+  // for the visible date and the server response didn't already
+  // include it.
+  const visibleSlots = useMemo<QuickBookSlot[]>(() => {
+    if (
+      !currentSlot ||
+      currentSlot.date !== selectedDate ||
+      slots.some((s) => s.startTime === currentSlot.startTime)
+    ) {
+      return slots;
+    }
+    return [
+      ...slots,
+      { startTime: currentSlot.startTime, endTime: currentSlot.endTime },
+    ].sort((a, b) => a.startTime.localeCompare(b.startTime));
+  }, [slots, currentSlot, selectedDate]);
+
   // If duration changed and the previously-selected slot's
   // startTime is no longer available, drop the selection so the
-  // parent doesn't submit a stale slot.
+  // parent doesn't submit a stale slot. `visibleSlots` (not the raw
+  // `slots`) is the source of truth here so a grandfathered edit
+  // slot doesn't trip the null-out.
   useEffect(() => {
     if (!selectedSlot) return;
-    if (slots.length === 0) return;
+    if (visibleSlots.length === 0) return;
     if (selectedDate !== selectedSlot.date) return;
-    const stillThere = slots.some(
+    const stillThere = visibleSlots.some(
       (s) => s.startTime === selectedSlot.startTime,
     );
     if (!stillThere) onSlotChange(null);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [slots, selectedDate]);
+  }, [visibleSlots, selectedDate]);
 
   // Date pill window: 5 pills centred on the selection, clamped to
   // the available range. Same logic as QuickRebook for visual parity.
@@ -336,7 +361,7 @@ export default function QuickBookCalendar({
       )}
 
       {/* Slot list */}
-      {isPending && slots.length === 0 ? (
+      {isPending && visibleSlots.length === 0 ? (
         <div className="flex items-center gap-2 py-4 text-sm text-green-500">
           <svg className="h-4 w-4 animate-spin" viewBox="0 0 24 24" fill="none">
             <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
@@ -344,7 +369,7 @@ export default function QuickBookCalendar({
           </svg>
           {t("memberQB.loadingTimes", locale)}
         </div>
-      ) : slots.length === 0 ? (
+      ) : visibleSlots.length === 0 ? (
         <div className="py-2 text-xs text-green-500">
           <p>{t("memberQB.noSlots", locale)}</p>
           {blockReason && (
@@ -356,7 +381,7 @@ export default function QuickBookCalendar({
         </div>
       ) : (
         <div className="mb-3 flex flex-wrap gap-1.5">
-          {slots.map((slot) => {
+          {visibleSlots.map((slot) => {
             const isCurrent = isCurrentSlot(slot);
             const isSelected = isSelectedSlot(slot);
             return (
