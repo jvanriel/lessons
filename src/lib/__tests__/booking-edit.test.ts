@@ -275,6 +275,78 @@ describe("validateEditAllowed", () => {
     );
     expect(result).toBe("only-confirmed");
   });
+
+  describe("non-reschedule edits bypass the cancellation window", () => {
+    // A user reported on 2026-05-20 that extending a same-day booking
+    // (to add a participant) got "too-late" — even though they
+    // weren't moving the lesson. The cancellation policy's rationale
+    // (prevent gaming the rules by re-scheduling) doesn't apply when
+    // the wall-clock start is unchanged, so the gate now skips for
+    // those edits.
+
+    const inWindowBooking = {
+      date: "2026-06-14", // same day as "now"
+      startTime: "20:00", // 12h away — well inside the 24h window
+      status: "confirmed",
+      cancelledAt: null,
+    };
+
+    it("allows participant-only edit (proposed slot matches existing)", () => {
+      const result = validateEditAllowed(inWindowBooking, 24, TZ, {
+        proposed: { date: "2026-06-14", startTime: "20:00" },
+      });
+      expect(result).toBeNull();
+    });
+
+    it("allows duration-change edit at the same startTime", () => {
+      // The endTime / duration aren't part of the gate input — what
+      // matters is that date + startTime didn't move. The action
+      // layer handles slot-conflict / availability checks separately.
+      const result = validateEditAllowed(inWindowBooking, 24, TZ, {
+        proposed: { date: "2026-06-14", startTime: "20:00" },
+      });
+      expect(result).toBeNull();
+    });
+
+    it("STILL rejects a true reschedule inside the window (date changes)", () => {
+      const result = validateEditAllowed(inWindowBooking, 24, TZ, {
+        proposed: { date: "2026-06-15", startTime: "20:00" },
+      });
+      expect(result).toBe("too-late");
+    });
+
+    it("STILL rejects a true reschedule inside the window (startTime changes)", () => {
+      const result = validateEditAllowed(inWindowBooking, 24, TZ, {
+        proposed: { date: "2026-06-14", startTime: "21:00" },
+      });
+      expect(result).toBe("too-late");
+    });
+
+    it("falls back to the existing gate when no proposed slot is passed", () => {
+      // Older call sites might not pass `proposed` yet — the
+      // pre-change behaviour stays in place for them: every in-
+      // window edit is rejected. Pin the backwards compatibility.
+      const result = validateEditAllowed(inWindowBooking, 24, TZ);
+      expect(result).toBe("too-late");
+    });
+
+    it("non-reschedule edit is still rejected on a cancelled booking", () => {
+      // The bypass only short-circuits the time-window gate; the
+      // status check still runs first.
+      const result = validateEditAllowed(
+        {
+          date: "2026-06-14",
+          startTime: "20:00",
+          status: "cancelled",
+          cancelledAt: new Date(),
+        },
+        24,
+        TZ,
+        { proposed: { date: "2026-06-14", startTime: "20:00" } },
+      );
+      expect(result).toBe("only-confirmed");
+    });
+  });
 });
 
 describe("validateEditParticipants (re-export)", () => {

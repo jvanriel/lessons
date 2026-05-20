@@ -1535,7 +1535,9 @@ export async function proUpdateBooking(formData: FormData) {
 
   const tz = await getProLocationTimezone(booking.proLocationId);
   const cancellationHours = profile.cancellationHours ?? 24;
-  const editError = validateEditAllowed(booking, cancellationHours, tz);
+  const editError = validateEditAllowed(booking, cancellationHours, tz, {
+    proposed: { date: changes.date, startTime: changes.startTime },
+  });
   if (editError) {
     const localeForError = await getLocale();
     return {
