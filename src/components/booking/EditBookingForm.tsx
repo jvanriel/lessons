@@ -9,6 +9,8 @@ import QuickBookCalendar, {
   type QuickBookSelection,
 } from "@/components/booking/QuickBookCalendar";
 import type { IntervalValue } from "@/components/booking/IntervalPills";
+import { ParticipantHistoryChips } from "@/components/booking/ParticipantHistoryChips";
+import { saveParticipants } from "@/lib/participant-history";
 import { formatDate } from "@/lib/format-date";
 
 interface BookingDetails {
@@ -151,6 +153,10 @@ export default function EditBookingForm({
         setError(result.error);
         return;
       }
+      // Persist the confirmed extra participants to localStorage so
+      // they reappear as chips on the next booking the user opens.
+      // Privacy-by-design: this stays on the booker's device only.
+      saveParticipants(extraParticipants);
       router.push(successHref);
       router.refresh();
     });
@@ -256,6 +262,19 @@ export default function EditBookingForm({
           </p>
           {extraParticipants.map((p, i) => (
             <div key={i} className="space-y-2">
+              {/* Recently-added chips — render above each row so the
+                  booker can quick-fill from history without retyping.
+                  Hides per-chip when the person is already in this
+                  form's participant list (excluded by email or name). */}
+              <ParticipantHistoryChips
+                excluded={extraParticipants.filter((_, j) => j !== i)}
+                onPick={(picked) => {
+                  setExtraParticipants((prev) =>
+                    prev.map((x, j) => (j === i ? { ...picked } : x)),
+                  );
+                }}
+                locale={locale}
+              />
               <div className="flex items-center justify-between">
                 <p className="text-xs font-medium text-green-700">
                   {t("book.extraParticipantHeading", locale).replace(

@@ -18,6 +18,8 @@ import {
   computeBookingPriceBreakdown,
 } from "@/lib/pricing";
 import { PriceBreakdown } from "@/components/booking/PriceBreakdown";
+import { ParticipantHistoryChips } from "@/components/booking/ParticipantHistoryChips";
+import { saveParticipants } from "@/lib/participant-history";
 
 // ─── Types ──────────────────────────────────────────
 
@@ -356,6 +358,18 @@ export function BookingWizard({
       if (result.error) {
         setError(result.error);
       } else {
+        // Persist the confirmed extra participants to localStorage so
+        // they reappear as chips on the next booking the user opens.
+        // Privacy-by-design: stays on the booker's device only. The
+        // `phone` field on each participant is intentionally NOT
+        // stored — only firstName/lastName/email travel into history.
+        saveParticipants(
+          extraParticipants.map((p) => ({
+            firstName: p.firstName,
+            lastName: p.lastName,
+            email: p.email,
+          })),
+        );
         try {
           sessionStorage.removeItem(draftKey);
         } catch {
@@ -615,6 +629,23 @@ export function BookingWizard({
               </p>
               {extraParticipants.map((p, i) => (
                 <div key={i} className="space-y-2">
+                  {/* Recently-added chips — quick-fill from history.
+                      Phone isn't part of history (privacy scope) so
+                      picking a chip preserves the row's existing
+                      phone value. */}
+                  <ParticipantHistoryChips
+                    excluded={extraParticipants.filter((_, j) => j !== i)}
+                    onPick={(picked) => {
+                      setExtraParticipants((prev) =>
+                        prev.map((x, j) =>
+                          j === i
+                            ? { ...picked, phone: x.phone }
+                            : x,
+                        ),
+                      );
+                    }}
+                    locale={locale}
+                  />
                   <p className="text-xs font-medium text-green-700">
                     {t("book.extraParticipantHeading", locale).replace(
                       "{n}",
